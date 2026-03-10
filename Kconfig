@@ -1,0 +1,31 @@
+menu "Ameba River"
+
+config AMEBA_RIVER_EN
+    bool "Enable ameba-river application"
+    default y
+
+config RIVER_ONLINE_CONTROL_EN
+    bool "Enable online home control path"
+    default y
+
+config RIVER_DIAG_CMD_EN
+    bool "Enable river monitor command"
+    default y
+
+choice RIVER_LOCAL_FRONTEND_MODE
+    prompt "Local voice front-end mode"
+    default RIVER_LOCAL_VAD_ONLY
+
+config RIVER_LOCAL_VAD_ONLY
+    bool "Local VAD only"
+
+config RIVER_LOCAL_VAD_WAKEWORD
+    bool "Local VAD + wake word"
+
+endchoice
+
+config RIVER_OFFLINE_ASR_RESERVED
+    bool "Reserve offline ASR integration points"
+    default y
+
+endmenu

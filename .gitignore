@@ -1,0 +1,12 @@
+build_*/
+menuconfig/
+*.bin
+*.axf
+*.map
+*.asm
+*.log
+*.o
+*.a
+*.swp
+*.swo
+*.tmp
