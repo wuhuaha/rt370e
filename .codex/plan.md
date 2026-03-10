@@ -28,4 +28,5 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 6. Build online/offline fusion coordinator with clear fallback rules.
 
 ## Current Step
-- Step 1 in progress: skeleton, echo command, simulated device control, reserved speech interfaces.
+- Step 1 completed: skeleton, echo command, simulated device control, reserved speech interfaces, and basic board bring-up are in place.
+- Next recommended step: Step 2, replace the echo-only cloud stub with a real online control client abstraction and request flow.

@@ -15,3 +15,13 @@
 ## Step 1.1
 - Added a project-side CMake bootstrap to pre-generate `build_info.h` placeholders in `menuconfig/project_{ap,hp,lp}`.
 - This works around an SDK parallel-build race seen on `RTL8730E`, where `wifi_tunnel_app` may compile before the SDK-generated `build_info.h` exists.
+
+## Step 1.2
+- Captured `RTL8730E` EVB board knowledge from the user-provided hardware guide into `.codex/knowledge.md`.
+- Recorded bring-up-critical hardware facts for future implementation:
+  - LOGUART and reset baseline
+  - NOR/NAND and download implications
+  - audio input and amplifier constraints
+  - restricted GPIOs on `RTL8730EAM`
+  - SWD and antenna rework notes
+- Kept the original EVB PDF in `.codex` so project decisions can be traced back to the source document.
