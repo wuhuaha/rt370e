@@ -33,7 +33,8 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 - Step 2.1 completed: serial diagnostics are available to separate capture-side failure from playback-side failure during board bring-up.
 - Step 2.2 completed: boot-time echo autostart is enabled so board audio can be validated even when monitor command registration is not usable on the target.
 - Step 2.3 completed: `river` project Kconfig symbols now propagate into the compiled sources through `platform_autoconf.h`.
-- Next recommended step depends on board results:
-  - if audio loopback works, continue with Step 3 online control abstraction
-  - if `cap_peak` stays near zero, first refine EVB microphone routing
-  - if `cap_peak/play_peak` are healthy but still silent, first refine EVB output route and amplifier state
+- Step 2.4 completed: mono `AMIC3` echo narrowed the mic side, but runtime results still did not produce clean speech.
+- Step 2.5 in progress: isolate the speaker path with a direct `AudioTrack` playback self-test based on the SDK `aplay` flow.
+- Next recommended step depends on the speaker self-test result:
+  - if direct playback is clean, continue by refining capture routing and reintroducing echo on top of the proven speaker path
+  - if direct playback is silent or still noisy, stop changing software architecture and focus on board output routing, amplifier path, and speaker wiring

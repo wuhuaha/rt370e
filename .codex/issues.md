@@ -25,6 +25,10 @@
   - `read_ok` and `write_ok` are stable
   - `read_fail` and `write_fail` stay `0`
 - The remaining issue is audio quality, not basic data flow. The initial raw dual-mic replay profile produced dominant noise on the speaker.
+- The current blocker is now narrowed to the analog output side:
+  - either the speaker path itself is fine and only mic-loop data is noisy
+  - or the board output route / amplifier / speaker wiring is still wrong
+- The latest validation step therefore must remove microphone capture from the equation and prove `AudioTrack -> speaker` alone.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -55,3 +59,7 @@
   - validate one microphone first
   - keep playback volume conservative
   - gate low-level noise so idle raw ADC noise is not continuously replayed
+- For the current output-isolation round:
+  - use a direct speaker playback self-test based on the SDK `aplay` path
+  - autostart the speaker test at boot
+  - keep echo autostart disabled until clean playback is proven

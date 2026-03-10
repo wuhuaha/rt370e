@@ -20,6 +20,14 @@ config RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     bool "Enable audio echo diagnostics by default"
     default n
 
+config RIVER_SPEAKER_TEST_AUTOSTART
+    bool "Autostart direct speaker playback test at boot"
+    default n
+
+config RIVER_SPEAKER_TEST_DIAG_DEFAULT_ON
+    bool "Enable speaker playback diagnostics by default"
+    default n
+
 choice RIVER_LOCAL_FRONTEND_MODE
     prompt "Local voice front-end mode"
     default RIVER_LOCAL_VAD_ONLY

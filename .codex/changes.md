@@ -88,3 +88,17 @@
   - capture high-pass filter enabled
   - simple noise gate before the delayed replay buffer
 - The goal of this step is to determine whether the EVB can produce an intelligible delayed voice replay before revisiting multi-mic raw playback.
+
+## Step 2.5
+- Added a direct speaker playback self-test based on the SDK `aplay` / `AudioTrack` path, so speaker output can be validated without involving microphone capture.
+- Added `river_voice_speaker_test_*` in `components/river_voice`:
+  - fixed dual-mono PCM playback to `DEVICE_OUT_SPEAKER`
+  - repeating board-audible test pattern:
+    - `1000 Hz` for `400 ms`
+    - `200 ms` silence
+    - `1500 Hz` for `400 ms`
+    - `1000 ms` silence
+  - lightweight serial diagnostics for playback progress
+- Updated boot flow so this playback self-test can autostart independently of the echo path.
+- Switched current `prj.conf` bring-up defaults from echo autostart to speaker-test autostart to isolate the analog output chain first.
+- Recorded the board flash type as runtime-confirmed `NOR` from the boot log.

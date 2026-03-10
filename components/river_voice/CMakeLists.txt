@@ -18,6 +18,7 @@ set(private_compile_options)
 ameba_list_append(private_sources
     river_voice_frontend.c
     river_voice_echo.c
+    river_voice_speaker_test.c
 )
 
 ameba_list_append(private_includes

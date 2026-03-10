@@ -36,6 +36,18 @@ river_status_t river_app_boot(void)
         return RIVER_ERR_UNSUPPORTED;
     }
 
+#ifdef CONFIG_RIVER_SPEAKER_TEST_DIAG_DEFAULT_ON
+    river_voice_speaker_test_set_diag_enabled(true);
+    printf("[river][voice] boot speaker playback diagnostics enabled\n");
+#endif
+
+#ifdef CONFIG_RIVER_SPEAKER_TEST_AUTOSTART
+    printf("[river][voice] boot speaker playback autostart enabled\n");
+    if (river_voice_speaker_test_start() != RIVER_OK) {
+        printf("[river][voice] boot speaker playback autostart failed\n");
+    }
+#endif
+
 #ifdef CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     river_voice_echo_set_diag_enabled(true);
     printf("[river][voice] boot audio echo diagnostics enabled\n");
@@ -65,6 +77,7 @@ void river_app_print_status(void)
 #else
     printf("[river] online_control=disabled\n");
 #endif
+    river_voice_speaker_test_dump_status();
     river_voice_echo_dump_status();
     river_online_control_dump_status();
 }

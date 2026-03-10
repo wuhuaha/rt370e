@@ -35,5 +35,12 @@ const char *river_voice_echo_status_name(void);
 void river_voice_echo_set_diag_enabled(bool enabled);
 bool river_voice_echo_diag_enabled(void);
 void river_voice_echo_dump_status(void);
+river_status_t river_voice_speaker_test_start(void);
+river_status_t river_voice_speaker_test_stop(void);
+bool river_voice_speaker_test_is_running(void);
+const char *river_voice_speaker_test_status_name(void);
+void river_voice_speaker_test_set_diag_enabled(bool enabled);
+bool river_voice_speaker_test_diag_enabled(void);
+void river_voice_speaker_test_dump_status(void);
 
 #endif

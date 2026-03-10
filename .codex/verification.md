@@ -180,3 +180,48 @@ Manual check:
 Expected diagnostics:
 - low-level background peaks may still exist, but the replayed idle noise should be reduced by the software gate
 - speech should drive `cap_peak` above the gate threshold and appear on `play_peak` about `1 second` later
+
+## Step 2.5
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] boot speaker playback diagnostics enabled
+[river][voice] boot speaker playback autostart enabled
+[river][voice] speaker test config: 16000 Hz, 2 ch, 16-bit, dual-mono tone -> speaker
+[river][voice] speaker test pattern: 1000Hz 400ms, gap 200ms, 1500Hz 400ms, gap 1000ms
+[river][voice] speaker test started
+```
+
+Expected repeating serial diagnostics:
+```text
+[river][voice][spk] segment=tone_a freq=1000Hz peak=6000 write_ok=...
+[river][voice][spk] segment=gap_b freq=0Hz peak=0 write_ok=...
+```
+
+Manual check:
+- No `river` shell command is required in this step.
+- After boot completes, listen for a repeating pattern:
+  - a medium-pitch beep
+  - short silence
+  - a higher-pitch beep
+  - longer silence
+- This pattern should repeat continuously until reset or power-off.
+
+Interpretation:
+- The repeating beep is clean and recognizable:
+  - the basic speaker playback path is healthy
+  - the earlier noise problem is upstream of direct playback, most likely in capture routing or raw mic replay quality
+- Serial diagnostics advance but no sound is heard:
+  - the digital playback path is active
+  - remaining suspicion shifts to speaker wiring, output route, mute, or amplifier path
+- The sound is still only noise during this test:
+  - the problem is no longer tied to microphone capture
+  - next focus should be board output route, amplifier state, or hardware wiring

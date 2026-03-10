@@ -26,6 +26,7 @@
 - If the main chip is `RTL8730EAM`, the default external flash in the guide is `GD25Q256EWIG` NOR flash.
 - Current project bring-up should keep memory type explicit during flashing because `NOR` and `NAND` profiles are not interchangeable.
 - The board supports USB download and LOGUART download.
+- Current board runtime boot logs now confirm: `BOOT FROM NOR`.
 
 ## Serial And Bring-Up
 - Default LOGUART format:
@@ -97,7 +98,6 @@
 - The exact board population in use:
   - board silk-screen is now known as `EV730EA2 RO1`
   - main chip still needs confirmation as `RTL8730EAM` or `RTL8730EAH`
-  - `NOR` or `NAND`
 - Which audio input path will be used first:
   - AMIC
   - DMIC
