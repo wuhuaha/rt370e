@@ -32,6 +32,8 @@ river_status_t river_voice_echo_start(void);
 river_status_t river_voice_echo_stop(void);
 bool river_voice_echo_is_running(void);
 const char *river_voice_echo_status_name(void);
+void river_voice_echo_set_diag_enabled(bool enabled);
+bool river_voice_echo_diag_enabled(void);
 void river_voice_echo_dump_status(void);
 
 #endif

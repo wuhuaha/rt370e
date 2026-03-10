@@ -41,3 +41,17 @@
 - Kept the feature command-driven instead of auto-starting at boot so board validation can stay isolated and reversible.
 - Verified the code path with a full local `RTL8730E` build after enabling audio framework support.
 - Recorded the in-use board silk-screen as `EV730EA2 RO1` and kept the chip package / flash type as still-to-confirm hardware facts.
+
+## Step 2.1
+- Added serial-side audio echo diagnostics so capture and playback can be distinguished without changing the board wiring.
+- Extended the monitor command with:
+  - `river audio diag on`
+  - `river audio diag off`
+  - `river audio diag status`
+- Added rolling `1 second` diagnostic logs from the echo task:
+  - `cap_peak=[ch0,ch1]` for capture-side PCM peak
+  - `play_peak=[ch0,ch1]` for delayed playback-side PCM peak
+  - read/write success and failure counters
+  - partial-read counter
+- Exposed diagnostic state through `river audio status` so runtime state can be checked before and after starting the loop.
+- Verified the diagnostic-enhanced build locally for `RTL8730E`.

@@ -23,12 +23,14 @@
 #define RIVER_VOICE_ECHO_TASK_STACK        (1024U * 12U)
 #define RIVER_VOICE_ECHO_TASK_PRIORITY     4U
 #define RIVER_VOICE_ECHO_CAPTURE_VOLUME    0x30U
+#define RIVER_VOICE_ECHO_DIAG_WINDOW_MS    1000U
 
 typedef struct {
     bool running;
     bool stop_requested;
     bool record_started;
     bool track_started;
+    bool diag_enabled;
     rtos_task_t task;
     struct AudioRecord *record;
     struct AudioTrack *track;
@@ -40,13 +42,106 @@ typedef struct {
     size_t read_offset;
     size_t write_offset;
     uint32_t warmup_bytes_remaining;
+    uint32_t diag_read_ok;
+    uint32_t diag_write_ok;
+    uint32_t diag_read_fail;
+    uint32_t diag_write_fail;
+    uint32_t diag_partial_read;
+    uint32_t diag_chunks_until_log;
+    uint16_t diag_capture_peak_ch0;
+    uint16_t diag_capture_peak_ch1;
+    uint16_t diag_playback_peak_ch0;
+    uint16_t diag_playback_peak_ch1;
 } river_voice_echo_context_t;
 
 static river_voice_echo_context_t g_river_voice_echo;
+static bool g_river_voice_echo_diag_enabled;
 
 static size_t river_voice_min_size(size_t left, size_t right)
 {
     return left < right ? left : right;
+}
+
+static uint16_t river_voice_echo_abs16(int32_t value)
+{
+    if (value < 0) {
+        value = -value;
+    }
+    if (value > 32767) {
+        value = 32767;
+    }
+    return (uint16_t)value;
+}
+
+static void river_voice_echo_update_stereo_peak(const uint8_t *buffer,
+                                                size_t bytes,
+                                                uint16_t *peak_ch0,
+                                                uint16_t *peak_ch1)
+{
+    const int16_t *samples;
+    size_t sample_count;
+    size_t index;
+
+    if (buffer == 0 || bytes < 4U || peak_ch0 == 0 || peak_ch1 == 0) {
+        return;
+    }
+
+    samples = (const int16_t *)buffer;
+    sample_count = bytes / sizeof(int16_t);
+    for (index = 0; (index + 1U) < sample_count; index += 2U) {
+        uint16_t peak0;
+        uint16_t peak1;
+
+        peak0 = river_voice_echo_abs16(samples[index]);
+        peak1 = river_voice_echo_abs16(samples[index + 1U]);
+        if (peak0 > *peak_ch0) {
+            *peak_ch0 = peak0;
+        }
+        if (peak1 > *peak_ch1) {
+            *peak_ch1 = peak1;
+        }
+    }
+}
+
+static void river_voice_echo_reset_diag_counters(void)
+{
+    g_river_voice_echo.diag_read_ok = 0U;
+    g_river_voice_echo.diag_write_ok = 0U;
+    g_river_voice_echo.diag_read_fail = 0U;
+    g_river_voice_echo.diag_write_fail = 0U;
+    g_river_voice_echo.diag_partial_read = 0U;
+    g_river_voice_echo.diag_capture_peak_ch0 = 0U;
+    g_river_voice_echo.diag_capture_peak_ch1 = 0U;
+    g_river_voice_echo.diag_playback_peak_ch0 = 0U;
+    g_river_voice_echo.diag_playback_peak_ch1 = 0U;
+    g_river_voice_echo.diag_chunks_until_log = RIVER_VOICE_ECHO_DIAG_WINDOW_MS / RIVER_VOICE_ECHO_FRAME_MS;
+}
+
+static void river_voice_echo_log_diagnostics_if_needed(void)
+{
+    if (!g_river_voice_echo.diag_enabled) {
+        return;
+    }
+
+    if (g_river_voice_echo.diag_chunks_until_log > 0U) {
+        g_river_voice_echo.diag_chunks_until_log--;
+    }
+    if (g_river_voice_echo.diag_chunks_until_log > 0U) {
+        return;
+    }
+
+    printf("[river][voice][diag] cap_peak=[%u,%u] play_peak=[%u,%u] read_ok=%lu write_ok=%lu read_fail=%lu write_fail=%lu partial=%lu\n",
+           (unsigned int)g_river_voice_echo.diag_capture_peak_ch0,
+           (unsigned int)g_river_voice_echo.diag_capture_peak_ch1,
+           (unsigned int)g_river_voice_echo.diag_playback_peak_ch0,
+           (unsigned int)g_river_voice_echo.diag_playback_peak_ch1,
+           (unsigned long)g_river_voice_echo.diag_read_ok,
+           (unsigned long)g_river_voice_echo.diag_write_ok,
+           (unsigned long)g_river_voice_echo.diag_read_fail,
+           (unsigned long)g_river_voice_echo.diag_write_fail,
+           (unsigned long)g_river_voice_echo.diag_partial_read);
+
+    river_voice_echo_reset_diag_counters();
 }
 
 static void river_voice_echo_ring_read(void *dst, size_t bytes)
@@ -133,6 +228,7 @@ static void river_voice_echo_release_buffers(void)
     g_river_voice_echo.read_offset = 0U;
     g_river_voice_echo.write_offset = 0U;
     g_river_voice_echo.warmup_bytes_remaining = 0U;
+    river_voice_echo_reset_diag_counters();
 }
 
 static river_status_t river_voice_echo_prepare_buffers(void)
@@ -143,6 +239,7 @@ static river_status_t river_voice_echo_prepare_buffers(void)
     g_river_voice_echo.chunk_bytes = (bytes_per_second * RIVER_VOICE_ECHO_FRAME_MS) / 1000U;
     g_river_voice_echo.delay_buffer_bytes = (bytes_per_second * RIVER_VOICE_ECHO_DELAY_MS) / 1000U;
     g_river_voice_echo.warmup_bytes_remaining = (uint32_t)((bytes_per_second * RIVER_VOICE_ECHO_WARMUP_MS) / 1000U);
+    g_river_voice_echo.diag_enabled = g_river_voice_echo_diag_enabled;
 
     g_river_voice_echo.delay_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.delay_buffer_bytes);
     g_river_voice_echo.capture_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.chunk_bytes);
@@ -255,22 +352,41 @@ static void river_voice_echo_task(void *param)
                                       g_river_voice_echo.chunk_bytes,
                                       true);
         if (bytes_read < 0) {
+            g_river_voice_echo.diag_read_fail++;
+            river_voice_echo_log_diagnostics_if_needed();
             printf("[river][voice] AudioRecord_Read failed: %ld\n", (long)bytes_read);
             rtos_time_delay_ms(RIVER_VOICE_ECHO_FRAME_MS);
             continue;
         }
+        g_river_voice_echo.diag_read_ok++;
+        if ((size_t)bytes_read < g_river_voice_echo.chunk_bytes) {
+            memset(g_river_voice_echo.capture_buffer + bytes_read, 0, g_river_voice_echo.chunk_bytes - (size_t)bytes_read);
+            g_river_voice_echo.diag_partial_read++;
+        }
 
         river_voice_echo_apply_warmup(g_river_voice_echo.capture_buffer, g_river_voice_echo.chunk_bytes);
+        river_voice_echo_update_stereo_peak(g_river_voice_echo.capture_buffer,
+                                            g_river_voice_echo.chunk_bytes,
+                                            &g_river_voice_echo.diag_capture_peak_ch0,
+                                            &g_river_voice_echo.diag_capture_peak_ch1);
         river_voice_echo_ring_read(g_river_voice_echo.playback_buffer, g_river_voice_echo.chunk_bytes);
+        river_voice_echo_update_stereo_peak(g_river_voice_echo.playback_buffer,
+                                            g_river_voice_echo.chunk_bytes,
+                                            &g_river_voice_echo.diag_playback_peak_ch0,
+                                            &g_river_voice_echo.diag_playback_peak_ch1);
         river_voice_echo_ring_write(g_river_voice_echo.capture_buffer, g_river_voice_echo.chunk_bytes);
 
         if (AudioTrack_Write(g_river_voice_echo.track,
                              g_river_voice_echo.playback_buffer,
                              g_river_voice_echo.chunk_bytes,
                              true) < 0) {
+            g_river_voice_echo.diag_write_fail++;
+            river_voice_echo_log_diagnostics_if_needed();
             printf("[river][voice] AudioTrack_Write failed\n");
             break;
         }
+        g_river_voice_echo.diag_write_ok++;
+        river_voice_echo_log_diagnostics_if_needed();
     }
 
     river_voice_echo_close_audio();
@@ -350,6 +466,18 @@ bool river_voice_echo_is_running(void)
     return g_river_voice_echo.running;
 }
 
+void river_voice_echo_set_diag_enabled(bool enabled)
+{
+    g_river_voice_echo_diag_enabled = enabled;
+    g_river_voice_echo.diag_enabled = enabled;
+    river_voice_echo_reset_diag_counters();
+}
+
+bool river_voice_echo_diag_enabled(void)
+{
+    return g_river_voice_echo_diag_enabled;
+}
+
 const char *river_voice_echo_status_name(void)
 {
     return river_voice_echo_is_running() ? "running" : "stopped";
@@ -358,6 +486,7 @@ const char *river_voice_echo_status_name(void)
 void river_voice_echo_dump_status(void)
 {
     printf("[river] audio_echo=%s\n", river_voice_echo_status_name());
+    printf("[river] audio_echo_diag=%s\n", river_voice_echo_diag_enabled() ? "on" : "off");
     if (river_voice_echo_is_running()) {
         printf("[river] audio_echo_profile=%luHz/%luch/%lums\n",
                (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,

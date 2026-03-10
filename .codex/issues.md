@@ -17,6 +17,7 @@
   - channel 1 -> `AMIC3`
 - The current echo path has no AEC, AGC, or VAD in the loop. If speaker volume is high or the speaker is too close to the microphones, audible feedback is expected.
 - Playback is currently pinned to `DEVICE_OUT_SPEAKER`. If the actual board route is earphone-only or uses a different amplifier path, the device selection may need adjustment.
+- The new serial diagnostics show PCM activity and read/write health, but they do not prove the analog speaker path is electrically correct.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -32,3 +33,9 @@
   - speaker vs earphone output
   - `AMIC1/AMIC3` vs another mic pair
   - board amplifier mute or power state
+- Use `river audio diag on` before changing routes:
+  - `cap_peak` near zero while speaking usually means the selected microphone path is wrong or inactive
+  - nonzero `cap_peak` plus nonzero `play_peak` usually means digital capture and delayed transfer are working, so remaining suspicion shifts to output routing, mute, amplifier, or board wiring
+- Use SDK audio tools for single-side isolation when needed:
+  - `aplay` to validate speaker playback without microphone capture
+  - `arecord` to validate microphone routing or SDK-native record-then-play flow

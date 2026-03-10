@@ -16,6 +16,7 @@ static void river_diag_help(void)
     printf("\triver echo <text>\n");
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
+    printf("\triver audio diag <on|off|status>\n");
     printf("\triver device <light|fan|curtain|socket> <on|off|toggle>\n");
 }
 
@@ -95,6 +96,34 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
     if (strcmp((const char *)argv[0], "audio") == 0) {
         if (argc < 2) {
             printf("[river][diag] usage: river audio <start|stop|status>\n");
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "diag") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river audio diag <on|off|status>\n");
+                return 0;
+            }
+
+            audio_action = (const char *)argv[2];
+            if (strcmp(audio_action, "on") == 0) {
+                river_voice_echo_set_diag_enabled(true);
+                river_voice_echo_dump_status();
+                return 0;
+            }
+
+            if (strcmp(audio_action, "off") == 0) {
+                river_voice_echo_set_diag_enabled(false);
+                river_voice_echo_dump_status();
+                return 0;
+            }
+
+            if (strcmp(audio_action, "status") == 0) {
+                river_voice_echo_dump_status();
+                return 0;
+            }
+
+            printf("[river][diag] usage: river audio diag <on|off|status>\n");
             return 0;
         }
 
