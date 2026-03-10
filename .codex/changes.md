@@ -40,3 +40,4 @@
   - `river audio echo <start|stop|status>`
 - Kept the feature command-driven instead of auto-starting at boot so board validation can stay isolated and reversible.
 - Verified the code path with a full local `RTL8730E` build after enabling audio framework support.
+- Recorded the in-use board silk-screen as `EV730EA2 RO1` and kept the chip package / flash type as still-to-confirm hardware facts.

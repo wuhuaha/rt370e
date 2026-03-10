@@ -4,6 +4,11 @@
 - Document: `UG0702 EV8730EA2 User Guide`
 - File: `.codex/UG0702_EV8730EA2_User_Guide_EVB_v1.0(221906).pdf`
 - Scope: evaluation board guidance for `RTL8730EAM` and `RTL8730EAH`
+- Current board silk-screen reported by user: `EV730EA2 RO1`
+- Working interpretation:
+  - this is very likely the same `EV8730EA2` board family documented in the guide
+  - `RO1` is treated as board revision `R01`
+  - the silk-screen alone still does not prove whether the mounted main chip is `RTL8730EAM` or `RTL8730EAH`
 
 ## Board Baseline
 - The EVB targets `RTL8730EAM` and `RTL8730EAH`.
@@ -90,7 +95,8 @@
 
 ## Open Questions To Confirm
 - The exact board population in use:
-  - `RTL8730EAM` or `RTL8730EAH`
+  - board silk-screen is now known as `EV730EA2 RO1`
+  - main chip still needs confirmation as `RTL8730EAM` or `RTL8730EAH`
   - `NOR` or `NAND`
 - Which audio input path will be used first:
   - AMIC

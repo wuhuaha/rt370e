@@ -5,7 +5,8 @@
 - `speechmind` has not been integrated yet. This step only prepares the architecture needed to absorb it safely.
 - The SDK project generator cannot directly scaffold `component/application/speechmind` as an external example template, so reuse will need selective code import instead of one-shot cloning.
 - The exact board population is still not recorded in-project:
-  - `RTL8730EAM` vs `RTL8730EAH`
+  - board silk-screen is known: `EV730EA2 RO1`
+  - main chip still unknown: `RTL8730EAM` vs `RTL8730EAH`
   - `NOR` vs `NAND`
 - Audio hardware choices are not fixed yet:
   - AMIC vs DMIC as the first local front-end path
