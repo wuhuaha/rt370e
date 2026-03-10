@@ -1,5 +1,6 @@
 build_*/
 menuconfig/
+soc_info.json
 *.bin
 *.axf
 *.map

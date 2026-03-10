@@ -11,3 +11,4 @@
 - Keep all local speech entry points behind `river_voice_frontend_*`.
 - Use monitor commands first so board bring-up is independent from microphone pipeline risk.
 - Reuse `speechmind` incrementally once Step 1 board validation is stable.
+- Use project-side `build_info.h` bootstrap headers so `RTL8730E` parallel builds do not depend on SDK generation order.

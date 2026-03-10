@@ -6,7 +6,7 @@ Build:
 cd /root/ameba-river
 source env.sh
 ameba.py soc RTL8730E
-ameba.py build
+ameba.py build -p
 ```
 
 Runtime checks from monitor:

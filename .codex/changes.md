@@ -11,3 +11,7 @@
   - text echo path
   - simulated device control for `light`, `fan`, `curtain`, and `socket`
 - Reserved stable interfaces for future local VAD, wake word, offline ASR, and real online control transport.
+
+## Step 1.1
+- Added a project-side CMake bootstrap to pre-generate `build_info.h` placeholders in `menuconfig/project_{ap,hp,lp}`.
+- This works around an SDK parallel-build race seen on `RTL8730E`, where `wifi_tunnel_app` may compile before the SDK-generated `build_info.h` exists.

@@ -1,3 +1,7 @@
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/river_build_info_bootstrap.cmake)
+
+river_prepare_build_info_placeholders()
+
 set(RIVER_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ameba_add_subdirectory(components/river_core)
