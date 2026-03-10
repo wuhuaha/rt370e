@@ -77,3 +77,14 @@
   - other `CONFIG_RIVER_*` switches
   now affect the compiled `river` code as intended.
 - Fixed `river_diag_cmd.c` includes so the command module also builds when `CONFIG_RIVER_DIAG_CMD_EN` is truly enabled.
+
+## Step 2.4
+- Narrowed the board echo path to a lower-risk validation profile after runtime logs showed the digital chain was healthy but the replayed content was dominated by noise.
+- Changed the echo profile to:
+  - mono capture/playback
+  - `AMIC3` only
+  - lower speaker volume
+  - lower mic boost
+  - capture high-pass filter enabled
+  - simple noise gate before the delayed replay buffer
+- The goal of this step is to determine whether the EVB can produce an intelligible delayed voice replay before revisiting multi-mic raw playback.

@@ -20,6 +20,11 @@
 - The new serial diagnostics show PCM activity and read/write health, but they do not prove the analog speaker path is electrically correct.
 - On the user's current board setup, the boot log is visible but the custom `river` monitor command is reported as unknown at runtime.
 - The `river` code initially did not see project Kconfig macros because the external-project build exposes them through `platform_autoconf.h`, not through global compile definitions.
+- Runtime diagnostics confirmed that the digital echo path is healthy on the board:
+  - `cap_peak` and `play_peak` both move
+  - `read_ok` and `write_ok` are stable
+  - `read_fail` and `write_fail` stay `0`
+- The remaining issue is audio quality, not basic data flow. The initial raw dual-mic replay profile produced dominant noise on the speaker.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -46,3 +51,7 @@
   - keep diagnostics enabled by default
   - revisit monitor command registration after the audio route is proven
 - Include `platform_autoconf.h` from the shared `river` type header so all `river` components see the same generated config state.
+- Reduce board-validation complexity before changing architecture:
+  - validate one microphone first
+  - keep playback volume conservative
+  - gate low-level noise so idle raw ADC noise is not continuously replayed

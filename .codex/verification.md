@@ -154,3 +154,29 @@ ameba.py build -p
 Expected build result:
 - the build succeeds with `CONFIG_RIVER_*` options taking effect in `river_app.c`, `river_voice_frontend.c`, and `river_diag_cmd.c`
 - the boot-time echo autostart path is no longer compiled out accidentally
+
+## Step 2.4
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] audio echo config: 16000 Hz, 1 ch, 1000 ms delay, AMIC3 mono -> speaker
+```
+
+Manual check:
+- After boot, speak close to the board microphone path used by `AMIC3`.
+- Wait about `1 second`.
+- Compare the result with the previous build:
+  - whether idle speaker hiss/noise is reduced
+  - whether delayed speech becomes distinguishable
+
+Expected diagnostics:
+- low-level background peaks may still exist, but the replayed idle noise should be reduced by the software gate
+- speech should drive `cap_peak` above the gate threshold and appear on `play_peak` about `1 second` later
