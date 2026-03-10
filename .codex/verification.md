@@ -280,3 +280,24 @@ Expected diagnostics:
 - `cap_peak` remains meaningful while speaking
 - `play_peak` remains meaningful about `1 second` later
 - If this step works, the user should finally hear delayed replay because the playback format now matches the previously validated direct speaker test shape
+
+## Step 2.6.2
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] audio echo gain: hw=0.60 sw=1.00 pcm=x4 cap=0x20 gate=1024 mic=AMIC3 micbst=5dB
+```
+
+Manual check:
+- Speak close to the microphone for `2-3 seconds`.
+- Wait about `1 second`.
+- Confirm whether the delayed replay is now comfortably audible.
+- Also watch for clipping or harsh distortion because this step intentionally raises gain aggressively.

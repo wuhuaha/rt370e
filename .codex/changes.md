@@ -124,3 +124,10 @@
   - dual-mono stereo speaker playback
   - explicit `AudioTrack_SetVolume(1.0, 1.0)`
 - This step isolates whether the previous silence came from mono-track playback format mismatch rather than from capture failure.
+
+## Step 2.6.2
+- The dual-mono echo path became audible on the board, but replay loudness was still too low for practical evaluation.
+- Raised echo playback output again:
+  - hardware playback volume from `0.45` to `0.60`
+  - added saturating PCM replay gain of `x4` before stereo duplication
+- This keeps the microphone route unchanged and only increases delayed replay loudness.

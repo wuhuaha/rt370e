@@ -29,8 +29,9 @@
 #define RIVER_VOICE_ECHO_NOISE_GATE_PEAK       1024U
 #define RIVER_VOICE_ECHO_CAPTURE_MIC           AUDIO_AMIC3
 #define RIVER_VOICE_ECHO_CAPTURE_MIC_GAIN      AUDIO_MICBST_GAIN_5DB
-#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.45f
+#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.60f
 #define RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME    1.00f
+#define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     4U
 
 typedef struct {
     bool running;
@@ -80,6 +81,17 @@ static uint16_t river_voice_echo_abs16(int32_t value)
         value = 32767;
     }
     return (uint16_t)value;
+}
+
+static int16_t river_voice_echo_sat16(int32_t value)
+{
+    if (value > 32767) {
+        return 32767;
+    }
+    if (value < -32768) {
+        return -32768;
+    }
+    return (int16_t)value;
 }
 
 static uint16_t river_voice_echo_update_peak(const uint8_t *buffer,
@@ -335,7 +347,8 @@ static void river_voice_echo_expand_mono_to_stereo(uint8_t *dst, const uint8_t *
     for (index = 0; index < frame_count; ++index) {
         int16_t sample;
 
-        sample = src_samples[index];
+        sample = river_voice_echo_sat16((int32_t)src_samples[index] *
+                                        (int32_t)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN);
         *dst_samples++ = sample;
         *dst_samples++ = sample;
     }
@@ -424,9 +437,10 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
            (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
            (unsigned long)RIVER_VOICE_ECHO_DELAY_MS);
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f cap=0x%02lx gate=%lu mic=AMIC3 micbst=5dB\n",
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu cap=0x%02lx gate=%lu mic=AMIC3 micbst=5dB\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
+           (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,
            (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_NOISE_GATE_PEAK);
     return RIVER_OK;
