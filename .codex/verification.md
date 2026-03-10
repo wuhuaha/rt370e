@@ -259,3 +259,24 @@ Manual check:
   - whether delayed speech is now audible
   - whether idle noise is acceptable
   - whether speech is still buried in noise
+
+## Step 2.6.1
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] audio echo config: 16000 Hz capture mono -> 16000 Hz playback dual-mono, 1000 ms delay, AMIC3 -> speaker
+[river][voice] audio echo gain: hw=0.45 sw=1.00 cap=0x20 gate=1024 mic=AMIC3 micbst=5dB
+```
+
+Expected diagnostics:
+- `cap_peak` remains meaningful while speaking
+- `play_peak` remains meaningful about `1 second` later
+- If this step works, the user should finally hear delayed replay because the playback format now matches the previously validated direct speaker test shape

@@ -32,6 +32,10 @@
 - That playback isolation step is now complete:
   - direct speaker playback is audible and normal on the user's board
   - remaining audio risk is now concentrated on microphone routing / raw capture quality / echo gain balance
+- A more specific playback-format risk is now identified:
+  - the board proved `2 ch` direct playback
+  - the earlier echo path used `1 ch` playback
+  - silent echo with nonzero `play_peak` strongly suggests that mono playback may not map cleanly to the current speaker route
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -70,3 +74,7 @@
   - switch boot-time validation back to echo
   - keep serial diagnostics enabled
   - treat speaker output as known-good and interpret failures primarily through the capture side
+- For the current round:
+  - keep capture mono
+  - mirror delayed mono PCM into dual-mono stereo for playback
+  - only change microphone routing again if this playback-format fix still fails

@@ -115,3 +115,12 @@
   - disable speaker self-test autostart
 - Raised echo playback hardware volume so delayed replay is easier to evaluate on the already-proven speaker path.
 - Added an explicit echo gain log line at boot to keep runtime settings visible in serial output.
+
+## Step 2.6.1
+- Runtime diagnostics showed a healthy capture path and nonzero delayed playback PCM, but the board still produced no audible echo.
+- To align echo with the already-proven direct playback route, the echo output path now uses:
+  - `AMIC3` mono capture
+  - mono delay buffer
+  - dual-mono stereo speaker playback
+  - explicit `AudioTrack_SetVolume(1.0, 1.0)`
+- This step isolates whether the previous silence came from mono-track playback format mismatch rather than from capture failure.
