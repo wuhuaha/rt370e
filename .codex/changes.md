@@ -131,3 +131,22 @@
   - hardware playback volume from `0.45` to `0.60`
   - added saturating PCM replay gain of `x4` before stereo duplication
 - This keeps the microphone route unchanged and only increases delayed replay loudness.
+
+## Step 2.7
+- Reviewed SDK `aivoice` and `speechmind` before changing the board path:
+  - `aivoice` explicitly supports `AFE_LINEAR_2MIC_30MM`, `50MM`, and `70MM`
+  - `speechmind` on `AmebaSmart` uses `AFE_CONFIG_ASR_DEFAULT_2MIC50MM()`
+  - the `EA` board routing in `speechmind` maps the first dual-mic pair to `AMIC1 + AMIC3`
+  - `AMIC5` is also configured there as an extra raw channel
+- Added an explicit board-array abstraction in `river_voice_board.*` so microphone routing and future AFE geometry stay out of the echo task itself.
+- Current board baseline recorded in code:
+  - board family: `EV8730EA2/EV730EA2`
+  - active array: `linear-2mic-50mm`
+  - active capture pair: `AMIC1 + AMIC3`
+  - reserved auxiliary raw mic: `AMIC5`
+- Refactored the echo path to validate dual-mic capture without forcing an early beamforming implementation:
+  - capture is now `2 ch`
+  - raw dual-mic PCM is downmixed to mono for the delay ring
+  - delayed mono PCM is expanded back to dual-mono speaker playback
+  - diagnostics keep reporting both capture channels independently
+- Verified the new dual-mic-array build locally for `RTL8730E`.

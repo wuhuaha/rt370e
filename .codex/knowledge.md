@@ -55,6 +55,28 @@
   - then use `J3.1` and `J4.1`
 - Wrong `12V` audio power wiring can damage the PC or USB adapter.
 
+## SDK Voice Baseline
+- SDK `aivoice` AFE explicitly supports these microphone geometries:
+  - `AFE_1MIC`
+  - `AFE_LINEAR_2MIC_30MM`
+  - `AFE_LINEAR_2MIC_50MM`
+  - `AFE_LINEAR_2MIC_70MM`
+  - `AFE_CIRCLE_3MIC_50MM`
+- SDK `speechmind` on `AmebaSmart` uses:
+  - `AFE_CONFIG_ASR_DEFAULT_2MIC50MM()`
+  - optional `SSL` on top of that geometry
+- `speechmind` capture routing for the `EA` board is:
+  - channel 0 -> `AMIC1`
+  - channel 1 -> `AMIC3`
+  - channel 2 -> `AMIC5`
+- Working project interpretation for `ameba-river`:
+  - the safest dual-mic starting point is `AMIC1 + AMIC3`
+  - software geometry should start at `linear-2mic-50mm` to stay aligned with future `aivoice` AFE resources
+  - `AMIC5` should stay reserved as an auxiliary raw tap until there is a concrete need for 3-channel dump, calibration, or debugging
+- Important limitation:
+  - `50mm` is currently a software compatibility baseline, not a physically measured spacing from the user's exact board revision
+  - if later SSL / beamforming accuracy matters, the actual microphone spacing and orientation should be measured and revalidated
+
 ## RF And Antenna
 - The EVB defaults to external IPEX antennas.
 - `IPEX1` is Bluetooth.

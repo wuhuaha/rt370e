@@ -218,14 +218,8 @@ Manual check:
 
 Interpretation:
 - The repeating beep is clean and recognizable:
-  - the basic speaker playback path is healthy
-  - the earlier noise problem is upstream of direct playback, most likely in capture routing or raw mic replay quality
-- Serial diagnostics advance but no sound is heard:
-  - the digital playback path is active
-  - remaining suspicion shifts to speaker wiring, output route, mute, or amplifier path
-- The sound is still only noise during this test:
-  - the problem is no longer tied to microphone capture
-  - next focus should be board output route, amplifier state, or hardware wiring
+  - the direct speaker playback path is proven
+  - remaining echo issues should be traced to capture routing or echo processing, not basic playback hardware
 
 ## Step 2.6
 Build and flash:
@@ -301,3 +295,44 @@ Manual check:
 - Wait about `1 second`.
 - Confirm whether the delayed replay is now comfortably audible.
 - Also watch for clipping or harsh distortion because this step intentionally raises gain aggressively.
+
+## Step 2.7
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] board array: EV8730EA2/EV730EA2 linear-2mic-50mm primary=AMIC1 secondary=AMIC3 spacing=50mm
+[river][voice] board array aux: AMIC5 reserved for future AFE/beamforming raw tap
+[river][voice] aivoice-ready geometry: AFE_LINEAR_2MIC_50MM
+[river][voice] audio echo config: 16000 Hz capture dual-mic -> 16000 Hz playback dual-mono, 1000 ms delay, AMIC1+AMIC3 mix -> speaker
+[river][voice] audio echo array: linear-2mic-50mm spacing=50mm aivoice=AFE_LINEAR_2MIC_50MM aux=AMIC5(reserved)
+```
+
+Manual check:
+- No `river` shell command is required in this step.
+- Speak at the board from the normal frontal direction for `2-3` seconds.
+- Wait about `1 second` and listen for delayed replay.
+- Compare the result with the previous single-mic echo build:
+  - whether voice loudness improves
+  - whether front-facing speech is cleaner
+  - whether both capture channels show activity in diagnostics
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] play_peak=[..., ...] read_ok=50 write_ok=50 read_fail=0 write_fail=0 partial=0
+```
+
+Quick interpretation:
+- `cap_peak` channel 0 and channel 1 both move while speaking:
+  - the `AMIC1 + AMIC3` pair is alive
+- only one capture channel moves consistently:
+  - one array leg or its gain/routing still needs adjustment
+- delayed playback is present but noisy:
+  - the dual-mic digital path works, but this raw average still needs AFE / beamforming / gain tuning

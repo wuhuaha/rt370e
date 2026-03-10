@@ -36,6 +36,12 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 - Step 2.4 completed: mono `AMIC3` echo narrowed the mic side, but runtime results still did not produce clean speech.
 - Step 2.5 completed: direct `AudioTrack` speaker playback is proven on the user's board.
 - Step 2.6 in progress: reintroduce echo on top of the proven speaker path and continue narrowing microphone routing / raw capture quality.
-- Next recommended step depends on the renewed echo result:
-  - if delayed speech is now intelligible, continue toward reusable local front-end abstractions
-  - if `cap_peak` is healthy but audio is still dominated by noise, compare `AMIC3` against another candidate mic route such as `AMIC5`
+- Step 2.6 completed: mono `AMIC3` echo became audible after aligning playback format and gain with the proven speaker path.
+- Step 2.7 completed: the board voice path is now aligned with SDK `speechmind` / `aivoice` dual-mic baseline:
+  - board array metadata is modeled explicitly
+  - current array geometry is `linear-2mic-50mm`
+  - echo capture now uses `AMIC1 + AMIC3`
+  - delayed replay uses a downmixed mono debug path so future beamforming / AFE integration can replace the mix stage cleanly
+- Next recommended step depends on the dual-mic echo result:
+  - if delayed speech is intelligible, keep this as the permanent raw-array bring-up mode and start adding AFE adapter hooks
+  - if audio is still noisy or weak, keep the dual-mic route but compare mix policy, gain balance, and the reserved `AMIC5` raw tap

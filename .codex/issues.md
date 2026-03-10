@@ -36,6 +36,13 @@
   - the board proved `2 ch` direct playback
   - the earlier echo path used `1 ch` playback
   - silent echo with nonzero `play_peak` strongly suggests that mono playback may not map cleanly to the current speaker route
+- The current dual-mic array geometry is chosen to match SDK `speechmind` / `aivoice` defaults, not a measured mechanical drawing from the user's exact board revision.
+- The new dual-mic echo path is intentionally only a raw-array debug mode:
+  - no beamforming
+  - no AEC
+  - no AGC
+  - no channel calibration
+  - no per-mic delay compensation
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -78,3 +85,8 @@
   - keep capture mono
   - mirror delayed mono PCM into dual-mono stereo for playback
   - only change microphone routing again if this playback-format fix still fails
+- For the dual-mic-array round:
+  - keep `AMIC1 + AMIC3` as the main pair because this matches SDK `speechmind` on `EA`
+  - keep `AMIC5` reserved as a future raw tap rather than pulling it into the debug mix immediately
+  - treat `linear-2mic-50mm` as the software baseline required for future `aivoice` AFE integration
+  - do not treat the current averaged replay as representative beamforming quality; it is only a board-validation path
