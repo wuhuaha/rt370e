@@ -106,3 +106,12 @@
 ## Step 2.5.1
 - Raised the direct speaker self-test output gain after the first board run proved playback existed but was too quiet for reliable evaluation.
 - Aligned hardware volume with the SDK `aplay` default level range and increased PCM tone amplitude while keeping the same playback pattern.
+
+## Step 2.6
+- The direct speaker playback self-test is now board-proven, so the default bring-up path is switched back to mic-to-speaker echo.
+- Current `prj.conf` defaults now:
+  - enable echo autostart
+  - enable echo diagnostics by default
+  - disable speaker self-test autostart
+- Raised echo playback hardware volume so delayed replay is easier to evaluate on the already-proven speaker path.
+- Added an explicit echo gain log line at boot to keep runtime settings visible in serial output.

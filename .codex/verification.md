@@ -226,3 +226,36 @@ Interpretation:
 - The sound is still only noise during this test:
   - the problem is no longer tied to microphone capture
   - next focus should be board output route, amplifier state, or hardware wiring
+
+## Step 2.6
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] boot audio echo diagnostics enabled
+[river][voice] boot audio echo autostart enabled
+[river][voice] audio echo config: 16000 Hz, 1 ch, 1000 ms delay, AMIC3 mono -> speaker
+[river][voice] audio echo gain: hw=0.45 cap=0x20 gate=1024 mic=AMIC3 micbst=5dB
+[river][voice] audio echo started
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[...,0] play_peak=[...,0] read_ok=50 write_ok=50 read_fail=0 write_fail=0 partial=0
+```
+
+Manual check:
+- No shell command is required.
+- After boot completes, speak close to the microphone path for `2-3 seconds`.
+- Wait about `1 second` for the delayed replay.
+- Compare with previous results:
+  - whether delayed speech is now audible
+  - whether idle noise is acceptable
+  - whether speech is still buried in noise

@@ -34,7 +34,8 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 - Step 2.2 completed: boot-time echo autostart is enabled so board audio can be validated even when monitor command registration is not usable on the target.
 - Step 2.3 completed: `river` project Kconfig symbols now propagate into the compiled sources through `platform_autoconf.h`.
 - Step 2.4 completed: mono `AMIC3` echo narrowed the mic side, but runtime results still did not produce clean speech.
-- Step 2.5 in progress: isolate the speaker path with a direct `AudioTrack` playback self-test based on the SDK `aplay` flow.
-- Next recommended step depends on the speaker self-test result:
-  - if direct playback is clean, continue by refining capture routing and reintroducing echo on top of the proven speaker path
-  - if direct playback is silent or still noisy, stop changing software architecture and focus on board output routing, amplifier path, and speaker wiring
+- Step 2.5 completed: direct `AudioTrack` speaker playback is proven on the user's board.
+- Step 2.6 in progress: reintroduce echo on top of the proven speaker path and continue narrowing microphone routing / raw capture quality.
+- Next recommended step depends on the renewed echo result:
+  - if delayed speech is now intelligible, continue toward reusable local front-end abstractions
+  - if `cap_peak` is healthy but audio is still dominated by noise, compare `AMIC3` against another candidate mic route such as `AMIC5`

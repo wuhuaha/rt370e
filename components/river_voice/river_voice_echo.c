@@ -28,7 +28,7 @@
 #define RIVER_VOICE_ECHO_NOISE_GATE_PEAK   1024U
 #define RIVER_VOICE_ECHO_CAPTURE_MIC       AUDIO_AMIC3
 #define RIVER_VOICE_ECHO_CAPTURE_MIC_GAIN  AUDIO_MICBST_GAIN_5DB
-#define RIVER_VOICE_ECHO_PLAYBACK_VOL      0.18f
+#define RIVER_VOICE_ECHO_PLAYBACK_VOL      0.45f
 
 typedef struct {
     bool running;
@@ -377,6 +377,10 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
            (unsigned long)RIVER_VOICE_ECHO_CHANNELS,
            (unsigned long)RIVER_VOICE_ECHO_DELAY_MS);
+    printf("[river][voice] audio echo gain: hw=%.2f cap=0x%02lx gate=%lu mic=AMIC3 micbst=5dB\n",
+           (double)RIVER_VOICE_ECHO_PLAYBACK_VOL,
+           (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
+           (unsigned long)RIVER_VOICE_ECHO_NOISE_GATE_PEAK);
     return RIVER_OK;
 }
 

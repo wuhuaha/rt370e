@@ -29,6 +29,9 @@
   - either the speaker path itself is fine and only mic-loop data is noisy
   - or the board output route / amplifier / speaker wiring is still wrong
 - The latest validation step therefore must remove microphone capture from the equation and prove `AudioTrack -> speaker` alone.
+- That playback isolation step is now complete:
+  - direct speaker playback is audible and normal on the user's board
+  - remaining audio risk is now concentrated on microphone routing / raw capture quality / echo gain balance
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -63,3 +66,7 @@
   - use a direct speaker playback self-test based on the SDK `aplay` path
   - autostart the speaker test at boot
   - keep echo autostart disabled until clean playback is proven
+- For the next round:
+  - switch boot-time validation back to echo
+  - keep serial diagnostics enabled
+  - treat speaker output as known-good and interpret failures primarily through the capture side
