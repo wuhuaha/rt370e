@@ -32,6 +32,7 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 - Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
 - Step 2.1 completed: serial diagnostics are available to separate capture-side failure from playback-side failure during board bring-up.
 - Step 2.2 completed: boot-time echo autostart is enabled so board audio can be validated even when monitor command registration is not usable on the target.
+- Step 2.3 completed: `river` project Kconfig symbols now propagate into the compiled sources through `platform_autoconf.h`.
 - Next recommended step depends on board results:
   - if audio loopback works, continue with Step 3 online control abstraction
   - if `cap_peak` stays near zero, first refine EVB microphone routing

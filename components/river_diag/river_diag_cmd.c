@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ameba_soc.h"
 #include "platform_stdlib.h"
 #include "basic_types.h"
 
 #include "river/river_app.h"
 #include "river/river_online_control.h"
+#include "river/river_voice.h"
 
 #ifdef CONFIG_RIVER_DIAG_CMD_EN
 #define RIVER_ECHO_TEXT_MAX 128

@@ -141,3 +141,16 @@ Expected behavior:
 - `audio_echo=running` appears in the boot-time status dump
 - diagnostics print automatically about every `1 second`
 - no shell interaction is required to trigger the loop
+
+## Step 2.3
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Expected build result:
+- the build succeeds with `CONFIG_RIVER_*` options taking effect in `river_app.c`, `river_voice_frontend.c`, and `river_diag_cmd.c`
+- the boot-time echo autostart path is no longer compiled out accidentally

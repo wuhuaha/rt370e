@@ -1,6 +1,8 @@
 #ifndef AMEBA_RIVER_TYPES_H
 #define AMEBA_RIVER_TYPES_H
 
+#include "platform_autoconf.h"
+
 typedef enum {
     RIVER_OK = 0,
     RIVER_ERR_ARG = -1,

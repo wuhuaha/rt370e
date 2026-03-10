@@ -19,6 +19,7 @@
 - Playback is currently pinned to `DEVICE_OUT_SPEAKER`. If the actual board route is earphone-only or uses a different amplifier path, the device selection may need adjustment.
 - The new serial diagnostics show PCM activity and read/write health, but they do not prove the analog speaker path is electrically correct.
 - On the user's current board setup, the boot log is visible but the custom `river` monitor command is reported as unknown at runtime.
+- The `river` code initially did not see project Kconfig macros because the external-project build exposes them through `platform_autoconf.h`, not through global compile definitions.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -44,3 +45,4 @@
   - autostart echo at boot
   - keep diagnostics enabled by default
   - revisit monitor command registration after the audio route is proven
+- Include `platform_autoconf.h` from the shared `river` type header so all `river` components see the same generated config state.

@@ -66,3 +66,14 @@
   - enables echo diagnostics at startup
   - starts the `1000 ms` delayed mic-to-speaker echo automatically
   - keeps printing `river` status after autostart so runtime state is visible from the boot log alone
+
+## Step 2.3
+- Fixed project Kconfig visibility for the `river` sources by including the generated `platform_autoconf.h` through `river_types.h`.
+- This was required because the external-project compile flow passes the generated config header through include paths, not through per-file `-D CONFIG_*` flags.
+- With this fix in place:
+  - `CONFIG_RIVER_AUDIO_ECHO_AUTOSTART`
+  - `CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON`
+  - `CONFIG_RIVER_DIAG_CMD_EN`
+  - other `CONFIG_RIVER_*` switches
+  now affect the compiled `river` code as intended.
+- Fixed `river_diag_cmd.c` includes so the command module also builds when `CONFIG_RIVER_DIAG_CMD_EN` is truly enabled.
