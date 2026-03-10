@@ -21,12 +21,15 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 
 ## Step Plan
 1. Bootstrap project, add `.codex` workflow, and create monitor echo + device-control skeleton.
-2. Replace echo-only cloud stub with a real online control client abstraction and request flow.
-3. Introduce audio front-end abstraction and connect local VAD callbacks.
-4. Add wake word adapter and event bridge.
-5. Add offline ASR adapter interface and routing model.
-6. Build online/offline fusion coordinator with clear fallback rules.
+2. Add a board-level mic-to-speaker audio echo path with fixed delay so the audio hardware chain can be validated independently.
+3. Replace echo-only cloud stub with a real online control client abstraction and request flow.
+4. Promote the local audio path into a reusable front-end abstraction and connect VAD callbacks.
+5. Add wake word adapter and event bridge.
+6. Add offline ASR adapter interface and routing model.
+7. Build online/offline fusion coordinator with clear fallback rules.
 
 ## Current Step
-- Step 1 completed: skeleton, echo command, simulated device control, reserved speech interfaces, and basic board bring-up are in place.
-- Next recommended step: Step 2, replace the echo-only cloud stub with a real online control client abstraction and request flow.
+- Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
+- Next recommended step depends on board results:
+  - if audio loopback works, continue with Step 3 online control abstraction
+  - if audio routing is wrong, first refine mic/output mapping on the EVB

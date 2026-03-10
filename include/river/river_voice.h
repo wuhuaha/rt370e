@@ -1,6 +1,8 @@
 #ifndef AMEBA_RIVER_VOICE_H
 #define AMEBA_RIVER_VOICE_H
 
+#include <stdbool.h>
+
 #include "river/river_types.h"
 
 typedef enum {
@@ -26,5 +28,10 @@ typedef void (*river_voice_event_handler_t)(const river_voice_event_t *event);
 river_status_t river_voice_frontend_init(void);
 void river_voice_frontend_set_handler(river_voice_event_handler_t handler);
 const char *river_voice_frontend_mode_name(void);
+river_status_t river_voice_echo_start(void);
+river_status_t river_voice_echo_stop(void);
+bool river_voice_echo_is_running(void);
+const char *river_voice_echo_status_name(void);
+void river_voice_echo_dump_status(void);
 
 #endif

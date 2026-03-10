@@ -53,5 +53,6 @@ void river_app_print_status(void)
 #else
     printf("[river] online_control=disabled\n");
 #endif
+    river_voice_echo_dump_status();
     river_online_control_dump_status();
 }

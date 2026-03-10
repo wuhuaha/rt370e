@@ -25,3 +25,18 @@
   - restricted GPIOs on `RTL8730EAM`
   - SWD and antenna rework notes
 - Kept the original EVB PDF in `.codex` so project decisions can be traced back to the source document.
+
+## Step 2
+- Enabled the project-side audio framework and passthrough build options needed for board audio bring-up.
+- Added `river_voice_echo_*` in `components/river_voice`:
+  - `AudioRecord` capture from `AMIC1 + AMIC3`
+  - `AudioTrack` playback to speaker
+  - fixed `1000 ms` ring-buffer delay
+  - short capture warm-up mute to reduce startup pop/noise
+- Extended the `river` monitor command with:
+  - `river audio start`
+  - `river audio stop`
+  - `river audio status`
+  - `river audio echo <start|stop|status>`
+- Kept the feature command-driven instead of auto-starting at boot so board validation can stay isolated and reversible.
+- Verified the code path with a full local `RTL8730E` build after enabling audio framework support.

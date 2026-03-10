@@ -8,6 +8,7 @@ river_status_t river_voice_frontend_init(void)
 {
     printf("[river][voice] frontend init: %s\n", river_voice_frontend_mode_name());
     printf("[river][voice] local capture pipeline is reserved for VAD/wake word/offline ASR growth\n");
+    printf("[river][voice] board audio echo test: river audio start | river audio stop | river audio status\n");
     return RIVER_OK;
 }
 

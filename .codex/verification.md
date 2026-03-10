@@ -33,3 +33,38 @@ Reference baseline captured:
   - audio path, amplifier, and `12V` safety note
   - `RTL8730EAM` GPIO restrictions
 - Source document retained in `.codex` for traceability.
+
+## Step 2
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Runtime checks from monitor:
+```text
+river status
+river audio status
+river audio start
+```
+
+Manual check:
+- Speak into the microphone array after `river audio start`.
+- Wait about `1 second`.
+- Confirm the captured voice is replayed from the speaker with an obvious fixed delay.
+- Keep the speaker away from the microphones during this test to avoid strong acoustic feedback.
+
+Stop and inspect:
+```text
+river audio stop
+river audio status
+river status
+```
+
+Expected behavior:
+- `river audio start` prints the selected audio profile and reports `audio echo started`
+- `river audio status` reports `audio_echo=running` while active
+- Voice is replayed with approximately `1000 ms` delay
+- `river audio stop` stops the loop and `river audio status` returns `audio_echo=stopped`

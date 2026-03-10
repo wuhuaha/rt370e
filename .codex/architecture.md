@@ -17,7 +17,7 @@ Only owns the Ameba entrypoint and boot sequence handoff.
 Owns runtime boot, shared status, and business-level routing.
 
 ### `components/river_voice`
-Owns local front-end interfaces. Today it only reports configured mode. Later it will host VAD, wake word, and offline ASR adapters.
+Owns local front-end interfaces. Today it reports configured mode and hosts a board-level audio echo path for mic/speaker bring-up. Later it will host VAD, wake word, and offline ASR adapters.
 
 ### `components/river_cloud`
 Owns online control transport. Today it is a stub that echoes text and exposes a simulated device-control path. Later it will contain the real HTTP/WebSocket or vendor SDK integration.
@@ -27,6 +27,7 @@ Owns monitor commands so every phase can be tested without full voice input.
 
 ## Reserved interfaces
 - `river_voice_frontend_*`: local voice event boundary
+- `river_voice_echo_*`: board audio bring-up and future pre-roll buffer boundary
 - `river_cloud_adapter_*`: online provider boundary
 - `river_online_control_*`: home-control service boundary
 

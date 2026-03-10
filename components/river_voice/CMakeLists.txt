@@ -17,10 +17,12 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_voice_frontend.c
+    river_voice_echo.c
 )
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
+    ${c_CMPT_AUDIO_DIR}/interfaces
 )
 
 ameba_add_internal_library(river_voice

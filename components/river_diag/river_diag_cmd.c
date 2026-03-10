@@ -14,6 +14,8 @@ static void river_diag_help(void)
 {
     printf("\triver status\n");
     printf("\triver echo <text>\n");
+    printf("\triver audio <start|stop|status>\n");
+    printf("\triver audio echo <start|stop|status>\n");
     printf("\triver device <light|fan|curtain|socket> <on|off|toggle>\n");
 }
 
@@ -53,6 +55,7 @@ static void river_diag_join_args(u16 argc, u8 *argv[], u16 start, char *out_text
 static u32 river_diag_cmd(u16 argc, u8 *argv[])
 {
     char echo_text[RIVER_ECHO_TEXT_MAX];
+    const char *audio_action;
 
     if (argc == 0) {
         river_diag_help();
@@ -86,6 +89,45 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
         if (river_online_control_set_device((const char *)argv[1], (const char *)argv[2]) != RIVER_OK) {
             printf("[river][diag] invalid device command\n");
         }
+        return 0;
+    }
+
+    if (strcmp((const char *)argv[0], "audio") == 0) {
+        if (argc < 2) {
+            printf("[river][diag] usage: river audio <start|stop|status>\n");
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "echo") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river audio echo <start|stop|status>\n");
+                return 0;
+            }
+            audio_action = (const char *)argv[2];
+        } else {
+            audio_action = (const char *)argv[1];
+        }
+
+        if (strcmp(audio_action, "status") == 0) {
+            river_voice_echo_dump_status();
+            return 0;
+        }
+
+        if (strcmp(audio_action, "start") == 0) {
+            if (river_voice_echo_start() != RIVER_OK) {
+                printf("[river][diag] audio echo start failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp(audio_action, "stop") == 0) {
+            if (river_voice_echo_stop() != RIVER_OK) {
+                printf("[river][diag] audio echo stop failed\n");
+            }
+            return 0;
+        }
+
+        printf("[river][diag] usage: river audio <start|stop|status>\n");
         return 0;
     }
 
