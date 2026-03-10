@@ -196,6 +196,7 @@ Boot-time expectation:
 [river][voice] boot speaker playback diagnostics enabled
 [river][voice] boot speaker playback autostart enabled
 [river][voice] speaker test config: 16000 Hz, 2 ch, 16-bit, dual-mono tone -> speaker
+[river][voice] speaker test gain: hw=0.60 sw=1.00 amplitude=16000
 [river][voice] speaker test pattern: 1000Hz 400ms, gap 200ms, 1500Hz 400ms, gap 1000ms
 [river][voice] speaker test started
 ```

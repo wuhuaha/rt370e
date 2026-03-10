@@ -102,3 +102,7 @@
 - Updated boot flow so this playback self-test can autostart independently of the echo path.
 - Switched current `prj.conf` bring-up defaults from echo autostart to speaker-test autostart to isolate the analog output chain first.
 - Recorded the board flash type as runtime-confirmed `NOR` from the boot log.
+
+## Step 2.5.1
+- Raised the direct speaker self-test output gain after the first board run proved playback existed but was too quiet for reliable evaluation.
+- Aligned hardware volume with the SDK `aplay` default level range and increased PCM tone amplitude while keeping the same playback pattern.

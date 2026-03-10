@@ -19,9 +19,9 @@
 #define RIVER_VOICE_SPK_TEST_FRAME_MS          20U
 #define RIVER_VOICE_SPK_TEST_TASK_STACK        (1024U * 8U)
 #define RIVER_VOICE_SPK_TEST_TASK_PRIORITY     4U
-#define RIVER_VOICE_SPK_TEST_HW_VOLUME         0.20f
+#define RIVER_VOICE_SPK_TEST_HW_VOLUME         0.60f
 #define RIVER_VOICE_SPK_TEST_SW_VOLUME         1.00f
-#define RIVER_VOICE_SPK_TEST_AMPLITUDE         6000
+#define RIVER_VOICE_SPK_TEST_AMPLITUDE         16000
 #define RIVER_VOICE_SPK_TEST_DIAG_WINDOW_MS    1000U
 
 typedef struct {
@@ -195,6 +195,10 @@ static river_status_t river_voice_speaker_test_open_audio(void)
     printf("[river][voice] speaker test config: %lu Hz, %lu ch, 16-bit, dual-mono tone -> speaker\n",
            (unsigned long)RIVER_VOICE_SPK_TEST_SAMPLE_RATE,
            (unsigned long)RIVER_VOICE_SPK_TEST_CHANNELS);
+    printf("[river][voice] speaker test gain: hw=%.2f sw=%.2f amplitude=%d\n",
+           (double)RIVER_VOICE_SPK_TEST_HW_VOLUME,
+           (double)RIVER_VOICE_SPK_TEST_SW_VOLUME,
+           (int)RIVER_VOICE_SPK_TEST_AMPLITUDE);
     printf("[river][voice] speaker test pattern: 1000Hz 400ms, gap 200ms, 1500Hz 400ms, gap 1000ms\n");
     return RIVER_OK;
 }
