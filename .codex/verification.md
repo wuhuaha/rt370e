@@ -110,3 +110,34 @@ Quick interpretation:
   - likely analog output route, mute, amplifier, or board-level speaker path problem
 - `read_fail` or `write_fail` increases:
   - treat this as an SDK/audio-driver issue before changing mic or speaker routing
+
+## Step 2.2
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time check from monitor:
+- No manual `river` command is required in this step.
+- Wait for boot to finish and look for these lines:
+
+```text
+[river][voice] boot audio echo diagnostics enabled
+[river][voice] boot audio echo autostart enabled
+[river][voice] audio echo config: 16000 Hz, 2 ch, 1000 ms delay, AMIC1+AMIC3 -> speaker
+[river][voice] audio echo started
+```
+
+Manual check:
+- Speak into the microphone array after boot completes.
+- Wait about `1 second`.
+- Watch the repeating `[river][voice][diag] ...` line and listen for delayed replay.
+
+Expected behavior:
+- `audio_echo=running` appears in the boot-time status dump
+- diagnostics print automatically about every `1 second`
+- no shell interaction is required to trigger the loop

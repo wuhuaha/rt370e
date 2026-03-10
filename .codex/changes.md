@@ -55,3 +55,14 @@
   - partial-read counter
 - Exposed diagnostic state through `river audio status` so runtime state can be checked before and after starting the loop.
 - Verified the diagnostic-enhanced build locally for `RTL8730E`.
+
+## Step 2.2
+- Added configurable boot-time audio echo autostart for board bring-up when monitor command injection is unavailable or unreliable.
+- Added two project configs:
+  - `CONFIG_RIVER_AUDIO_ECHO_AUTOSTART`
+  - `CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON`
+- Enabled both in `prj.conf` for the current board-validation phase.
+- Updated boot flow so `river_app_boot()`:
+  - enables echo diagnostics at startup
+  - starts the `1000 ms` delayed mic-to-speaker echo automatically
+  - keeps printing `river` status after autostart so runtime state is visible from the boot log alone

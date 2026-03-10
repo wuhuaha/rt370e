@@ -36,6 +36,18 @@ river_status_t river_app_boot(void)
         return RIVER_ERR_UNSUPPORTED;
     }
 
+#ifdef CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
+    river_voice_echo_set_diag_enabled(true);
+    printf("[river][voice] boot audio echo diagnostics enabled\n");
+#endif
+
+#ifdef CONFIG_RIVER_AUDIO_ECHO_AUTOSTART
+    printf("[river][voice] boot audio echo autostart enabled\n");
+    if (river_voice_echo_start() != RIVER_OK) {
+        printf("[river][voice] boot audio echo autostart failed\n");
+    }
+#endif
+
     river_app_print_status();
     return RIVER_OK;
 }

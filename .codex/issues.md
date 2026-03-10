@@ -18,6 +18,7 @@
 - The current echo path has no AEC, AGC, or VAD in the loop. If speaker volume is high or the speaker is too close to the microphones, audible feedback is expected.
 - Playback is currently pinned to `DEVICE_OUT_SPEAKER`. If the actual board route is earphone-only or uses a different amplifier path, the device selection may need adjustment.
 - The new serial diagnostics show PCM activity and read/write health, but they do not prove the analog speaker path is electrically correct.
+- On the user's current board setup, the boot log is visible but the custom `river` monitor command is reported as unknown at runtime.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -39,3 +40,7 @@
 - Use SDK audio tools for single-side isolation when needed:
   - `aplay` to validate speaker playback without microphone capture
   - `arecord` to validate microphone routing or SDK-native record-then-play flow
+- During the current bring-up phase, avoid depending on monitor commands for echo control:
+  - autostart echo at boot
+  - keep diagnostics enabled by default
+  - revisit monitor command registration after the audio route is proven
