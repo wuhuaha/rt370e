@@ -687,3 +687,16 @@
 - Updated board RGB handling:
   - runtime no longer assumes `PA_9 + WS2812`
   - current board RGB path remains intentionally deferred until `LEDR/LEDG/LEDB` mapping is confirmed
+
+## Step 4.19
+- Triaged an external `TFLite Micro` initialization reference into project knowledge instead of applying it blindly.
+- Recorded the parts that are directly useful for current `Silero VAD` bring-up:
+  - schema-version guard
+  - defensive `AllocateTensors()` failure handling
+  - explicit `TensorArena` usage reporting
+  - `float32 first, optimize later`
+- Recorded the parts that need project-specific correction:
+  - current project uses `MicroMutableOpResolver`, not `AllOpsResolver`
+  - current runtime runs on `RTL8730E` `CA32`, so generic Cortex-M FPU flags are not directly applicable
+  - generic `SCB_InvalidateDCache_by_Addr()` examples are not the current CA32 cache API
+  - dynamic tensor-arena allocation needs allocator-level alignment scrutiny rather than static-array assumptions

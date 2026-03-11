@@ -218,6 +218,42 @@
   - for `RTL8730E`, first priority remains:
     - getting the real board runtime stable
     - then measuring latency / memory / arena usage
+
+## TFLite Micro Initialization Notes
+- A useful standing principle for this project:
+  - `make it work first, then make it fast`
+  - for `Silero VAD`, this means:
+    - first migrate and validate the original `float32` model
+    - then measure `arena / heap / flash / latency`
+    - only after real pressure appears, evaluate quantization or pruning
+- Good ideas worth keeping from generic TFLM initialization templates:
+  - explicit schema-version checking before runtime
+  - explicit reporting of actual `TensorArena` usage
+  - defensive logging around interpreter creation and `AllocateTensors()`
+  - treating model runtime bring-up as a resource-measurement step, not only a functional step
+- Important adaptations for current `ameba-river`:
+  - the project already uses `MicroMutableOpResolver`, not `AllOpsResolver`
+  - this is the correct direction for the current image budget and should be preserved
+  - current runtime already prints actual arena usage from `interpreter->arena_used_bytes()`
+  - current `Silero` runtime also checks model schema compatibility before opening
+- Important caution for memory alignment:
+  - many generic examples use:
+    - `alignas(16) static uint8_t tensor_arena[...]`
+  - in this project, the tensor arena is allocated dynamically from Realtek RTOS heaps
+  - that means alignment should be validated against the allocator behavior, not assumed just because a static example used `alignas`
+  - if future instability suggests alignment risk, add an explicit runtime alignment check for the allocated arena pointer
+- Important caution for CPU/FPU guidance:
+  - generic Cortex-M advice like `-mfpu=fpv5-sp-d16` does not apply directly to the current `RTL8730E` CA32 application core
+  - current project build uses the CA32 toolchain path and hard-float configuration already provided by the SDK
+- Important caution for cache examples:
+  - generic `SCB_InvalidateDCache_by_Addr()` examples are conceptually relevant
+  - but they are not drop-in APIs for the current `CA32` runtime
+  - for this board, cache/DMA consistency must follow the Ameba CA32 path and SDK guidance
+- Current project position:
+  - no immediate change is required from this reference
+  - it is best used as:
+    - a checklist for defensive runtime validation
+    - a reminder to keep resource reporting and alignment scrutiny in the bring-up path
     - only then deciding whether deeper ARM-specific optimization is needed
 
 ## External Reference Priority
