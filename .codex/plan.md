@@ -89,9 +89,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - stop using SDK `VAD` and migrate directly to `Silero VAD`
   - record the full `Silero VAD` migration process in a dedicated reproducibility document:
     - `/.codex/silero_vad_porting.md`
+- Step 4.1 completed: voice-side cleanup and `ASR + AEC` minimal skeleton are now landed:
+  - removed the old `speaker_test` code path from the build and boot flow
+  - removed SDK `VAD/KWS/ASR` menu resources from the current project config because they are not the target direction
+  - replaced the old ambiguous preproc state with explicit profiles:
+    - `asr_mainline`
+    - `asr_barge_in_aec`
+  - current default profile is now `asr_barge_in_aec`, still based on `AFE_FOR_ASR`
+  - the runtime logs now describe the real product direction instead of reporting `vad` before any detector exists
 - Next recommended step:
-  - prune obsolete voice-side test / strategy branches so the codebase truly reflects `ASR-first`
-  - formalize two stable interfaces only:
-    - `preproc` for `AFE/AEC/beamforming`
-    - `detector` for `VAD/KWS`
-  - start `Silero VAD` migration with reproducibility logging from the first commit
+  - start the actual `Silero VAD` migration on top of the new detector boundary
+  - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile for now
+  - add a first reproducible import / conversion / integration record into `/.codex/silero_vad_porting.md`

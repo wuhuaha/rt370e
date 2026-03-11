@@ -59,12 +59,12 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 ## Current RTL8730E Policy
 - Frame cadence is fixed to `16 ms` because SDK AIVoice AFE requires `256 samples @ 16 kHz`.
 - Board geometry is fixed to `AMIC1 + AMIC3`, `2mic50mm`, matching the SDK `speechmind` / `aivoice` baseline for `AmebaSmart`.
-- The active default preproc policy is now `ASR-first`, not communication-first:
-  - `AFE_FOR_ASR`
-  - `SSL on`
-  - `NS off`
-  - fixed AGC
+- The voice preproc layer now exposes two explicit product-facing profiles:
+  - `asr_mainline`
+  - `asr_barge_in_aec`
+- The active default profile is currently `asr_barge_in_aec`, but it still stays on the `AFE_FOR_ASR` side rather than switching the whole product to a communication profile.
 - `AEC` is now a priority feature, but it must remain an adapter behind `river_voice_preproc_*` so the SDK backend can be replaced later.
 - The playback reference remains a project-owned component because future self-developed `AEC` also needs the same `mic + ref` boundary.
 - `VAD` must not be tied to SDK `aivoice`; the target direction is `Silero VAD` first, then future self-developed VAD on the same detector interface.
+- The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

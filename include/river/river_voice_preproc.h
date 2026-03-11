@@ -9,6 +9,11 @@
 
 typedef struct river_voice_preproc_ops river_voice_preproc_ops_t;
 
+typedef enum {
+    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0,
+    RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC = 1
+} river_voice_preproc_profile_t;
+
 typedef struct river_voice_preproc {
     const river_voice_preproc_ops_t *ops;
     void *backend_ctx;
@@ -21,6 +26,7 @@ typedef struct river_voice_preproc {
     uint32_t reference_channels;
     uint32_t sample_rate;
     uint32_t frame_ms;
+    river_voice_preproc_profile_t profile;
     bool reference_enabled;
 } river_voice_preproc_t;
 
@@ -42,6 +48,7 @@ uint32_t river_voice_preproc_output_channels(const river_voice_preproc_t *prepro
 uint32_t river_voice_preproc_reference_channels(const river_voice_preproc_t *preproc);
 bool river_voice_preproc_reference_enabled(const river_voice_preproc_t *preproc);
 const char *river_voice_preproc_backend_name(void);
+const char *river_voice_preproc_profile_name(void);
 void river_voice_preproc_dump_profile(void);
 
 #endif

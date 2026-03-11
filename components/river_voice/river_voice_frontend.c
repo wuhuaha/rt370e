@@ -15,7 +15,7 @@ river_status_t river_voice_frontend_init(void)
     river_voice_capture_dump_profile();
     river_voice_preproc_dump_profile();
     river_voice_ref_dump_profile();
-    printf("[river][voice] local capture pipeline is reserved for VAD/wake word/offline ASR growth\n");
+    printf("[river][voice] detector backend: pending (silero_vad planned)\n");
     printf("[river][voice] current board path follows SDK speechmind/aivoice baseline: AMIC1 + AMIC3 dual mic\n");
     printf("[river][voice] board audio echo test: river audio start | river audio stop | river audio status\n");
     return RIVER_OK;
@@ -29,9 +29,5 @@ void river_voice_frontend_set_handler(river_voice_event_handler_t handler)
 
 const char *river_voice_frontend_mode_name(void)
 {
-#ifdef CONFIG_RIVER_LOCAL_VAD_WAKEWORD
-    return "vad+wakeup";
-#else
-    return "vad";
-#endif
+    return "asr-first";
 }

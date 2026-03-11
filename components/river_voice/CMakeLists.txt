@@ -23,7 +23,6 @@ ameba_list_append(private_sources
     river_voice_preproc.c
     river_voice_preproc_aivoice.c
     river_voice_ref.c
-    river_voice_speaker_test.c
 )
 
 ameba_list_append(private_includes

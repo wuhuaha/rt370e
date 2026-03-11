@@ -497,6 +497,38 @@ Interpretation:
 - speech becomes obviously worse at both near and far distance:
   - revisit the active ASR tuning before adding `VAD/KWS`
 
+## Step 4.1
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] frontend init: asr-first
+[river][voice] preproc backend: aivoice_afe ... profile=asr_barge_in_aec
+[river][voice] preproc afe: mode=asr aec=on ns=off agc=on(fixed=10dB) ssl=on ref=playback_ring(1ch)
+[river][voice] detector backend: pending (silero_vad planned)
+[river] local_preproc_profile=asr_barge_in_aec
+```
+
+Manual check:
+- Confirm that no `speaker_test` logs appear anymore.
+- Confirm that the board still boots and starts the echo debug path normally.
+- Compare the current runtime identity with earlier builds:
+  - product logs should now describe `ASR-first`
+  - no log should claim that SDK `VAD` is already active
+
+Interpretation:
+- Boot succeeds and the new profile/log lines appear:
+  - the codebase is successfully cleaned down to the new `ASR + AEC` skeleton
+- Build succeeds but old `speaker_test` logs still appear:
+  - stale image or stale flashing path should be suspected first
+
 ## Step 2.6.1
 Build and flash:
 ```bash

@@ -61,30 +61,35 @@ static int river_voice_preproc_aivoice_callback(void *user_data,
     return 0;
 }
 
-static bool river_voice_preproc_aivoice_policy_uses_reference(void)
+static bool river_voice_preproc_aivoice_policy_uses_reference(river_voice_preproc_profile_t profile)
 {
-    return false;
+    return profile == RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC;
 }
 
-static void river_voice_preproc_aivoice_apply_active_policy(struct afe_config *afe_param,
-                                                            const river_voice_board_array_profile_t *profile)
+static void river_voice_preproc_aivoice_apply_active_policy(river_voice_preproc_profile_t active_profile,
+                                                            struct afe_config *afe_param,
+                                                            const river_voice_board_array_profile_t *board_profile)
 {
     *afe_param = (struct afe_config)AFE_CONFIG_ASR_DEFAULT_2MIC50MM();
     afe_param->mic_array = AFE_LINEAR_2MIC_50MM;
-    afe_param->sample_rate = (int)profile->sample_rate;
-    afe_param->frame_size = (int)((profile->sample_rate * profile->frame_ms) / 1000U);
+    afe_param->sample_rate = (int)board_profile->sample_rate;
+    afe_param->frame_size = (int)((board_profile->sample_rate * board_profile->frame_ms) / 1000U);
 
-    /* Keep the active path aligned to wake-word / ASR tuning.
-     * Barge-in AEC remains a later optional profile instead of the default. */
     afe_param->afe_mode = AFE_FOR_ASR;
-    afe_param->ref_num = 0;
-    afe_param->enable_aec = false;
     afe_param->enable_ns = false;
     afe_param->enable_agc = true;
     afe_param->enable_ssl = true;
     afe_param->enable_res = false;
     afe_param->agc_fixed_gain = 10;
     afe_param->enable_adaptive_agc = false;
+
+    if (active_profile == RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC) {
+        afe_param->ref_num = 1;
+        afe_param->enable_aec = true;
+    } else {
+        afe_param->ref_num = 0;
+        afe_param->enable_aec = false;
+    }
 }
 
 static void river_voice_preproc_aivoice_pack_frame(river_voice_preproc_aivoice_context_t *context,
@@ -130,7 +135,7 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
     }
 
     memset(&config, 0, sizeof(config));
-    river_voice_preproc_aivoice_apply_active_policy(&afe_param, profile);
+    river_voice_preproc_aivoice_apply_active_policy(preproc->profile, &afe_param, profile);
     common_param = (struct aivoice_sdk_config)AIVOICE_SDK_CONFIG_DEFAULT();
     common_param.timeout = 5;
 
@@ -145,7 +150,7 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    preproc->reference_enabled = river_voice_preproc_aivoice_policy_uses_reference();
+    preproc->reference_enabled = river_voice_preproc_aivoice_policy_uses_reference(preproc->profile);
     preproc->reference_channels = preproc->reference_enabled ? 1U : 0U;
     preproc->reference_frame_bytes = preproc->reference_enabled ? preproc->output_frame_bytes : 0U;
     preproc->feed_frame_bytes = preproc->input_frame_bytes + preproc->reference_frame_bytes;
@@ -258,10 +263,15 @@ void river_voice_preproc_aivoice_dump_profile(void)
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    printf("[river][voice] preproc backend: aivoice_afe %s %lu Hz %lums in=%luch out=1ch\n",
+    printf("[river][voice] preproc backend: aivoice_afe %s %lu Hz %lums in=%luch out=1ch profile=%s\n",
            profile->aivoice_geometry_name,
            (unsigned long)profile->sample_rate,
            (unsigned long)profile->frame_ms,
-           (unsigned long)profile->capture_channels);
+           (unsigned long)profile->capture_channels,
+           river_voice_preproc_profile_name());
+#ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
+    printf("[river][voice] preproc afe: mode=asr aec=on ns=off agc=on(fixed=10dB) ssl=on ref=playback_ring(1ch)\n");
+#else
     printf("[river][voice] preproc afe: mode=asr aec=off ns=off agc=on(fixed=10dB) ssl=on ref=staged-off\n");
+#endif
 }

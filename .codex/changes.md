@@ -297,3 +297,22 @@
 - Added a dedicated reproducibility document target for `Silero VAD` migration:
   - `/.codex/silero_vad_porting.md`
 - Declared that future self-developed `AEC/VAD` must plug into existing stable interfaces instead of leaking SDK-specific assumptions upward.
+
+## Step 4.1
+- Removed the old direct speaker self-test implementation from the active codebase:
+  - deleted `components/river_voice/river_voice_speaker_test.c`
+  - removed related declarations, build entries, boot hooks, and Kconfig items
+- Simplified the project config so current voice resources reflect the actual roadmap:
+  - kept `AIVOICE + AFE 2MIC50MM`
+  - removed SDK `VAD`
+  - removed SDK `KWS`
+  - removed SDK `ASR` resource selection
+- Added explicit preproc profiles on the stable `river_voice_preproc` boundary:
+  - `asr_mainline`
+  - `asr_barge_in_aec`
+- Set the current default profile to `asr_barge_in_aec`, but kept the backend policy on the `AFE_FOR_ASR` side so the product remains `ASR-first`.
+- Cleaned up runtime logs and status output so they now describe:
+  - `asr-first` frontend intent
+  - current preproc backend
+  - current preproc profile
+  - `Silero VAD` still pending

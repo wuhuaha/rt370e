@@ -53,6 +53,7 @@
   - multiple temporary echo tuning rounds
   - earlier `COM/AEC` trial direction
   These should be pruned so the codebase reflects the final `ASR-first` product direction.
+- The direct speaker self-test code has now been removed, but old documentation references still exist in earlier historical records.
 - `AEC` is intentionally disabled in the new AFE step:
   - the current project does not yet provide a dedicated speaker-reference PCM path
   - enabling SDK AEC without a clean reference would make quality worse and reduce debuggability
@@ -63,6 +64,9 @@
   - frame-size / hop-size adaptation
   - latency and threshold tuning
   - deterministic reproducibility of model conversion and integration
+- The current default profile is `asr_barge_in_aec` on top of SDK `aivoice`:
+  - this keeps `AEC` priority high
+  - but still inherits the SDK AFE/AEC acoustic behavior until a custom backend is introduced
 - The new AFE path has only been verified by local cross-build so far; it still needs board-side acoustic validation.
 - Enabling `AIVOICE` also pulls more SDK components into the build, so later runtime memory headroom must be checked after board validation.
 - The new post-AFE adaptive gain is intentionally only a debug replay aid:
@@ -175,3 +179,7 @@
   - delete voice-side code that no longer serves the final product direction
   - keep only stable boundaries for `preproc`, `detector`, and `router`
   - record every `Silero VAD` migration choice in a reproducible document from day one
+- For the next implementation step:
+  - do not reintroduce SDK `VAD`
+  - build the detector layer directly for `Silero VAD`
+  - keep the new `preproc` profile abstraction stable so custom `AEC` can later replace SDK `aivoice`
