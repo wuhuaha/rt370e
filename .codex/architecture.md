@@ -1,11 +1,11 @@
 # Architecture Notes
 
 ## Why this structure
-The first release only needs online home control, but the product target is a voice appliance with:
-- online dialogue
-- local VAD or VAD + wake word
-- future offline recognition
-- future online/offline fusion
+The current product direction is narrower and stricter than the initial exploration:
+- `ASR-first`
+- wake word and ASR quality first
+- online home control still remains the business target
+- `AEC` and `VAD` must remain replaceable by self-developed models later
 
 If online control logic is written directly inside `app_example()`, later integration will become tangled around audio callbacks, cloud transport, and device state. This repository starts with explicit boundaries so the first iteration stays small without blocking later growth.
 
@@ -21,7 +21,7 @@ Owns local front-end interfaces. It now contains:
 - `river_voice_capture`: raw microphone-array acquisition
 - `river_voice_preproc`: enhancement boundary
 - `river_voice_echo`: board-level debug sink on top of the front-end
-- future `VAD`, wake word, and offline ASR adapters
+- future `Silero VAD`, wake word, and self-developed model adapters
 
 ### `components/river_cloud`
 Owns online control transport. Today it is a stub that echoes text and exposes a simulated device-control path. Later it will contain the real HTTP/WebSocket or vendor SDK integration.
@@ -53,6 +53,8 @@ Where:
 This keeps the current SDK-backed step and the future self-developed step aligned:
 - today: `preproc = aivoice_afe`
 - later: `preproc = self_dsp` or `self_tflite`
+- today: `detector = silero_vad`
+- later: `detector = self_vad` or `self_kws`
 
 ## Current RTL8730E Policy
 - Frame cadence is fixed to `16 ms` because SDK AIVoice AFE requires `256 samples @ 16 kHz`.
@@ -62,6 +64,7 @@ This keeps the current SDK-backed step and the future self-developed step aligne
   - `SSL on`
   - `NS off`
   - fixed AGC
-- The playback reference remains a project-owned component, but it is now staged infrastructure rather than part of the default runtime path.
-- Future `AEC/barge-in` should be implemented as an optional profile on the same `mic + ref` boundary, not as the only front-end strategy.
+- `AEC` is now a priority feature, but it must remain an adapter behind `river_voice_preproc_*` so the SDK backend can be replaced later.
+- The playback reference remains a project-owned component because future self-developed `AEC` also needs the same `mic + ref` boundary.
+- `VAD` must not be tied to SDK `aivoice`; the target direction is `Silero VAD` first, then future self-developed VAD on the same detector interface.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

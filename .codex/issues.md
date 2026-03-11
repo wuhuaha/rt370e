@@ -48,10 +48,21 @@
   - it is not a substitute for production AFE, AGC, or beamforming
   - very loud near-field speech can still clip or sound uneven
 - The current pre-processing backend is still single-choice and fixed to `aivoice_afe`.
+- The repository still contains exploratory voice-side code and records from earlier bring-up phases:
+  - direct speaker self-test
+  - multiple temporary echo tuning rounds
+  - earlier `COM/AEC` trial direction
+  These should be pruned so the codebase reflects the final `ASR-first` product direction.
 - `AEC` is intentionally disabled in the new AFE step:
   - the current project does not yet provide a dedicated speaker-reference PCM path
   - enabling SDK AEC without a clean reference would make quality worse and reduce debuggability
 - `VAD` is not yet connected even though the SDK resources are now enabled in the build.
+- The user has already rejected SDK `aivoice` `VAD` quality for this product.
+- `Silero VAD` migration will introduce its own risks:
+  - model format and runtime footprint on `RTL8730E`
+  - frame-size / hop-size adaptation
+  - latency and threshold tuning
+  - deterministic reproducibility of model conversion and integration
 - The new AFE path has only been verified by local cross-build so far; it still needs board-side acoustic validation.
 - Enabling `AIVOICE` also pulls more SDK components into the build, so later runtime memory headroom must be checked after board validation.
 - The new post-AFE adaptive gain is intentionally only a debug replay aid:
@@ -77,6 +88,10 @@
 - The active strategy is now intentionally biased toward wake-word / ASR quality, not toward duplex communication:
   - `AEC` is no longer active in the default path
   - if future barge-in during playback becomes mandatory, a dedicated communication profile will need to be reintroduced
+- The product direction has changed again:
+  - `ASR-first` remains the only mainline direction
+  - but `AEC` priority is now raised and should return earlier in the roadmap
+  - this must be done without coupling the project to SDK-only semantics
 - The current `ASR-first` profile follows the SDK baseline and therefore keeps `NS` off:
   - this may preserve more speech detail for KWS/ASR
   - but it can also make idle noise more audible during the current speaker replay debug phase
@@ -156,3 +171,7 @@
   - judge the active profile by far-field clarity and robustness, not by the lowest possible replay hiss
   - keep `AEC/ref` as optional staged infrastructure, not as the default path
   - add `VAD/KWS` only on top of the enhanced mono output, never on raw dual-mic PCM
+- For the next roadmap reset:
+  - delete voice-side code that no longer serves the final product direction
+  - keep only stable boundaries for `preproc`, `detector`, and `router`
+  - record every `Silero VAD` migration choice in a reproducible document from day one

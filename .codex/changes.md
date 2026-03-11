@@ -287,3 +287,13 @@
   - `capture dual-mic -> ASR-AFE 1ch -> delayed dual-mono replay`
   - `audio echo ref ... aec=staged-off`
 - Verified the `ASR-first` build locally for `RTL8730E`.
+
+## Step 4.0
+- Reset the implementation roadmap around the user's final product priorities:
+  - only `ASR-first`
+  - raise `AEC` priority
+  - stop planning around SDK `VAD`
+  - migrate directly to `Silero VAD`
+- Added a dedicated reproducibility document target for `Silero VAD` migration:
+  - `/.codex/silero_vad_porting.md`
+- Declared that future self-developed `AEC/VAD` must plug into existing stable interfaces instead of leaking SDK-specific assumptions upward.

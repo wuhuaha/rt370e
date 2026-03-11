@@ -1,7 +1,7 @@
 # Ameba River Plan
 
 ## Goal
-Build a maintainable `RTL8730E` voice home-control application that starts with online control and cleanly evolves into online/offline hybrid speech interaction.
+Build a maintainable `RTL8730E` `ASR-first` voice home-control application that prioritizes wake-word and ASR quality, while keeping `AEC` and `VAD` replaceable by self-developed models later.
 
 ## Architecture Direction
 1. `river_core`
@@ -9,12 +9,12 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
    - state and intent routing
    - future dialogue/session coordinator
 2. `river_voice`
-   - local VAD
-   - local wake word
-   - future offline ASR adapter
+   - `ASR-first` acoustic front-end
+   - `AEC` as a pluggable barge-in capability
+   - `VAD/KWS` as replaceable model adapters
 3. `river_cloud`
    - online speech / NLU / home-control transport
-   - future backend provider switch point
+   - backend provider switch point
 4. `river_diag`
    - monitor commands
    - test injection and observability
@@ -23,13 +23,13 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 1. Bootstrap project, add `.codex` workflow, and create monitor echo + device-control skeleton.
 2. Add a board-level mic-to-speaker audio echo path with fixed delay so the audio hardware chain can be validated independently.
 3. Split the local voice path into `capture -> preproc -> detector -> router`, and land an `AFE-only` backend that is suitable for `RTL8730E`.
-4. Make the default local front-end an `ASR-first` dual-mic AFE profile suitable for wake word and ASR.
-5. Add VAD and wake-word detection on top of the enhanced single-channel output instead of on raw array PCM.
-6. Add beamforming / spatial metadata abstraction without coupling app logic to a specific SDK.
-7. Keep playback reference / `AEC` as an optional barge-in profile, not the mainline default.
-8. Replace the cloud stub with a real online control client abstraction and request flow.
-9. Add offline ASR adapters behind stable local interfaces.
-10. Build online/offline fusion and preserve a clean path to self-developed `DSP/TFLite Micro` replacement.
+4. Refocus the product to `ASR-first` only and delete voice-side code paths that do not serve wake-word, ASR, or home-control.
+5. Raise `AEC` priority and land it behind a stable `preproc` adapter so SDK `aivoice` can be replaced by a self-developed backend later.
+6. Replace SDK `VAD` with `Silero VAD`, and keep a strict migration / reproduction record under `.codex`.
+7. Add wake-word detection on top of the enhanced mono output instead of on raw array PCM.
+8. Add beamforming / spatial metadata abstraction without coupling app logic to a specific SDK or model vendor.
+9. Replace the cloud stub with a real online control client abstraction and request flow.
+10. Keep `VAD/AEC/KWS` interfaces stable so future self-developed `DSP/TFLite Micro` models can be swapped in without touching app logic.
 
 ## Current Step
 - Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
@@ -83,7 +83,15 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - the default profile again centers on wake-word / ASR quality instead of communication echo control
   - runtime `AEC/ref` is no longer part of the main path; playback reference is kept only as staged infrastructure for a later optional barge-in profile
   - current tuning follows the SDK `ASR 2mic50mm` baseline: `SSL on`, `NS off`, `fixed AGC 10 dB`
+- Step 4.0 planned: reset the roadmap around the user's final product priorities:
+  - `ASR-first` only; remove voice-side code that does not contribute to wake-word / ASR / home-control
+  - move `AEC` ahead of `VAD/KWS` in implementation priority, but keep it behind a replaceable backend boundary
+  - stop using SDK `VAD` and migrate directly to `Silero VAD`
+  - record the full `Silero VAD` migration process in a dedicated reproducibility document:
+    - `/.codex/silero_vad_porting.md`
 - Next recommended step:
-  - validate that the `ASR-first` profile improves far-field clarity and keeps near-field speech stable enough for KWS/ASR
-  - add a detector boundary dedicated to `VAD/KWS`, fed only by the enhanced mono output
-  - keep `AEC` as a later optional barge-in profile rather than the default mainline path
+  - prune obsolete voice-side test / strategy branches so the codebase truly reflects `ASR-first`
+  - formalize two stable interfaces only:
+    - `preproc` for `AFE/AEC/beamforming`
+    - `detector` for `VAD/KWS`
+  - start `Silero VAD` migration with reproducibility logging from the first commit
