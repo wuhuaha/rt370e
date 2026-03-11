@@ -458,6 +458,45 @@ Interpretation:
 - `ref_read_miss` keeps growing after startup:
   - the reference ring is not keeping pace; do not start beamforming work yet
 
+## Step 3.4
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] preproc afe: mode=asr aec=off ns=off agc=on(fixed=10dB) ssl=on ref=staged-off
+[river][voice] audio echo config: 16000 Hz capture dual-mic -> ASR-AFE 1ch -> 16000 Hz playback dual-mono, 1000 ms delay, AMIC1+AMIC3 -> speaker
+[river][voice] audio echo ref: backend=playback_ring source=post-delay mono history=1536ms aec=staged-off
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] afe_peak=... play_peak=[..., ...] read_ok=... proc_ok=... write_ok=... ref_read_ok=0 ref_read_miss=0 ref_write_ok=0 ref_write_fail=0 read_fail=... proc_fail=... write_fail=...
+```
+
+Manual check:
+- First speak at `20-30 cm`
+- Then speak again at `0.5-1.0 m`
+- Compare with the previous `COM/AEC` round:
+  - whether far-field speech stays fuller and less over-suppressed
+  - whether near-field speech remains stable enough for future KWS
+  - whether replay hiss increases, which is acceptable within reason for this ASR-oriented phase
+
+Interpretation:
+- far-field speech becomes fuller or more natural:
+  - the `ASR-first` pivot is moving in the right direction
+- near-field is stable but replay hiss rises:
+  - acceptable for this phase; do not rush back to `COM/AEC`
+- speech becomes obviously worse at both near and far distance:
+  - revisit the active ASR tuning before adding `VAD/KWS`
+
 ## Step 2.6.1
 Build and flash:
 ```bash

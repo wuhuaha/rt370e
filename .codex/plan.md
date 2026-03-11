@@ -23,12 +23,13 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 1. Bootstrap project, add `.codex` workflow, and create monitor echo + device-control skeleton.
 2. Add a board-level mic-to-speaker audio echo path with fixed delay so the audio hardware chain can be validated independently.
 3. Split the local voice path into `capture -> preproc -> detector -> router`, and land an `AFE-only` backend that is suitable for `RTL8730E`.
-4. Add VAD on top of the enhanced single-channel output instead of on raw array PCM.
-5. Add playback reference routing and then enable AEC on the same front-end interface.
+4. Make the default local front-end an `ASR-first` dual-mic AFE profile suitable for wake word and ASR.
+5. Add VAD and wake-word detection on top of the enhanced single-channel output instead of on raw array PCM.
 6. Add beamforming / spatial metadata abstraction without coupling app logic to a specific SDK.
-7. Replace the cloud stub with a real online control client abstraction and request flow.
-8. Add wake word and offline ASR adapters behind stable local interfaces.
-9. Build online/offline fusion and preserve a clean path to self-developed `DSP/TFLite Micro` replacement.
+7. Keep playback reference / `AEC` as an optional barge-in profile, not the mainline default.
+8. Replace the cloud stub with a real online control client abstraction and request flow.
+9. Add offline ASR adapters behind stable local interfaces.
+10. Build online/offline fusion and preserve a clean path to self-developed `DSP/TFLite Micro` replacement.
 
 ## Current Step
 - Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
@@ -77,7 +78,12 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - the active AFE policy is switched from `ASR`-style enhancement to `COM`-style enhancement with `AEC + NS + adaptive AGC`
   - the application still only knows `capture -> preproc -> replay`; SDK `AEC` details remain local to the preproc backend
   - diagnostics from Step `3.2` are kept so the new reference-driven path can be validated before any beamforming or VAD work
+- Step 3.4 completed: the active local front-end strategy is pivoted back to `ASR-first`:
+  - the running AIVoice policy now uses `AFE_FOR_ASR`
+  - the default profile again centers on wake-word / ASR quality instead of communication echo control
+  - runtime `AEC/ref` is no longer part of the main path; playback reference is kept only as staged infrastructure for a later optional barge-in profile
+  - current tuning follows the SDK `ASR 2mic50mm` baseline: `SSL on`, `NS off`, `fixed AGC 10 dB`
 - Next recommended step:
-  - validate that the `AEC` path reduces near-end replay noise and speaker leakage without killing far-field speech
-  - if reference timing is stable, add an explicit `beamforming-ready` mode boundary inside `preproc`
-  - keep `VAD` as a separate later step; do not couple it back into the current `AEC` debug loop
+  - validate that the `ASR-first` profile improves far-field clarity and keeps near-field speech stable enough for KWS/ASR
+  - add a detector boundary dedicated to `VAD/KWS`, fed only by the enhanced mono output
+  - keep `AEC` as a later optional barge-in profile rather than the default mainline path

@@ -74,6 +74,12 @@
   - `AMIC3`
   - `playback_ref`
   if this assumption is wrong for a specific SDK release, the build will still pass but runtime quality will degrade sharply
+- The active strategy is now intentionally biased toward wake-word / ASR quality, not toward duplex communication:
+  - `AEC` is no longer active in the default path
+  - if future barge-in during playback becomes mandatory, a dedicated communication profile will need to be reintroduced
+- The current `ASR-first` profile follows the SDK baseline and therefore keeps `NS` off:
+  - this may preserve more speech detail for KWS/ASR
+  - but it can also make idle noise more audible during the current speaker replay debug phase
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -146,3 +152,7 @@
   - validate `ref_read_ok/ref_write_ok` first before judging acoustic quality
   - treat `AEC` as a quality-improvement layer on top of a known-good `AFE` path, not as a replacement for future beamforming
   - if far-field speech drops too much, tune reference timing and COM-profile gains before reintroducing any detector or VAD logic
+- For the current `ASR-first` round:
+  - judge the active profile by far-field clarity and robustness, not by the lowest possible replay hiss
+  - keep `AEC/ref` as optional staged infrastructure, not as the default path
+  - add `VAD/KWS` only on top of the enhanced mono output, never on raw dual-mic PCM

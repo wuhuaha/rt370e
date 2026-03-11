@@ -270,3 +270,20 @@
   - `capture dual-mic + 1ch ref -> AEC/AFE 1ch`
   - `audio echo ref ... aec=on`
 - Verified the `AEC`-enabled build locally for `RTL8730E`.
+
+## Step 3.4
+- Pivoted the active front-end strategy from `COM/AEC` back to `ASR-first`, because the project goal is now explicitly to maximize wake-word and ASR quality.
+- Updated `river_voice_preproc_aivoice.c` so the running AIVoice policy is now:
+  - `AFE_FOR_ASR`
+  - `ref_num = 0`
+  - `enable_aec = false`
+  - `enable_ns = false`
+  - `enable_agc = true`
+  - `enable_ssl = true`
+  - `agc_fixed_gain = 10 dB`
+  - `enable_adaptive_agc = false`
+- Kept the playback-reference packing code in place as optional infrastructure, but removed it from the active default runtime path.
+- Updated `river_voice_echo.c` so the debug replay path now reflects the real running profile:
+  - `capture dual-mic -> ASR-AFE 1ch -> delayed dual-mono replay`
+  - `audio echo ref ... aec=staged-off`
+- Verified the `ASR-first` build locally for `RTL8730E`.
