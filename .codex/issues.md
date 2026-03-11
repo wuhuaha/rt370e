@@ -58,6 +58,9 @@
   - it helps the board speaker test path
   - it should not be treated as the final production gain-control strategy
   - once VAD/AEC/local ASR are in place, gain staging should move back toward the front-end policy instead of the replay sink
+- User feedback for the current phase is clear:
+  - detector-style gating is not wanted right now
+  - next noise reduction steps should prioritize AFE/AEC policy over reintroducing early VAD gating
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -117,3 +120,8 @@
 - For the current far-field tuning round on top of AFE:
   - prefer modest `NS + AGC + post-AFE replay gain` over reverting to raw dual-mic mixing
   - use `afe_peak` to decide whether the next issue is in enhancement output or only in replay loudness
+- For the current lower-noise round:
+  - do not add a new detector stage
+  - reduce AFE fixed AGC first
+  - let replay-side post-AGC mute only very low-level frames
+  - move to playback-reference-based `AEC` before revisiting SDK `VAD`

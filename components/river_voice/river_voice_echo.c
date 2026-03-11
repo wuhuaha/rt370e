@@ -28,9 +28,9 @@
 #define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.80f
 #define RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME    1.00f
 #define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     2U
-#define RIVER_VOICE_ECHO_POST_AGC_GATE         96U
-#define RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK  12000U
-#define RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN     4U
+#define RIVER_VOICE_ECHO_POST_AGC_GATE         192U
+#define RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK  9000U
+#define RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN     2U
 
 typedef struct {
     bool running;
@@ -261,7 +261,8 @@ static uint16_t river_voice_echo_apply_post_agc(uint8_t *buffer, size_t bytes)
     peak = 0U;
     river_voice_echo_update_peak(buffer, bytes, 1U, &peak, &peak);
     if (peak < RIVER_VOICE_ECHO_POST_AGC_GATE) {
-        return peak;
+        memset(buffer, 0, bytes);
+        return 0U;
     }
 
     gain = 1U;
@@ -481,7 +482,7 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned long)g_river_voice_echo.actual_delay_ms,
            river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
            river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic));
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu post_agc=target%u/maxx%lu gate=%u cap=0x%02lx preproc=%s\n",
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu post_agc=target%u/maxx%lu floor=%u cap=0x%02lx preproc=%s\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,

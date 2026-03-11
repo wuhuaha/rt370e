@@ -218,3 +218,15 @@
   - enhanced AFE output energy
   - final playback energy
 - Verified the tuned build locally for `RTL8730E`.
+
+## Step 3.1.1
+- Reverted the experimental detector-gated replay step after user feedback showed this direction was not wanted for the current phase.
+- Kept the architecture prepared for future `VAD`, but restored the active runtime path to:
+  - `capture -> preproc -> replay`
+- Retuned the AFE/replay gain policy to reduce idle noise without introducing a new detector stage:
+  - AFE fixed AGC gain reduced from `15 dB` to `9 dB`
+  - AFE `NS` aggressiveness raised from `low` to `mid`
+  - replay-side post-AGC reduced from `target12000/maxx4` to `target9000/maxx2`
+  - replay-side post-AGC floor raised from `96` to `192`
+  - frames below the post-AGC floor are now muted instead of being replayed as background hiss
+- Verified the retuned build locally for `RTL8730E`.

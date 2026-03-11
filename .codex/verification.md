@@ -337,6 +337,44 @@ Interpretation:
 - `afe_peak` and `play_peak` are both healthy but far-field speech is still poor:
   - stop tuning replay gain and move next to `VAD + reference-path + AEC`
 
+## Step 3.1.1
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] preproc afe: aec=off ns=on(mid) agc=on(fixed=9dB) ssl=off ref=0
+[river][voice] audio echo gain: hw=0.80 sw=1.00 pcm=x2 post_agc=target9000/maxx2 floor=192 cap=0x30 preproc=aivoice_afe
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] afe_peak=... play_peak=[..., ...] read_ok=... proc_ok=... write_ok=... read_fail=... proc_fail=... write_fail=... partial_read=... partial_proc=...
+```
+
+Manual check:
+- Keep the room quiet for `3-5` seconds first and listen for idle hiss.
+- Then speak at `20-30 cm`, and again at `0.5-1.0 m`.
+- Compare with Step `3.1`:
+  - whether idle noise is clearly lower
+  - whether near-field speech remains large enough
+  - whether far-field speech is still understandable enough for the next AEC step
+
+Interpretation:
+- idle hiss drops clearly and near speech remains usable:
+  - this round is successful; move next to playback-reference plumbing and `AEC`
+- idle hiss drops but far speech becomes too weak:
+  - the next adjustment should be limited gain rebalance, not reintroducing `VAD`
+- idle hiss is still large even after this step:
+  - stop tuning replay gain and move next to `AEC/reference-path`
+
 ## Step 2.6.1
 Build and flash:
 ```bash
