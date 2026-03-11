@@ -223,3 +223,8 @@
 - The restored official ONNX layout is also a reminder not to rely on mutated local graphs:
   - canonical upstream keeps `model.decoder.rnn.*` at the top level
   - any graph that moves those tensors into subgraphs should be treated as an experimental derivative, not the pinned baseline
+- The first verified `TFLite` artifact is batch-fixed:
+  - audio input `[1, 576]`
+  - state input `[2, 1, 128]`
+  - this is acceptable for the first embedded detector integration because the device runtime is also batch `1`
+  - if multi-batch host evaluation is needed later, it should be treated as a separate export target instead of changing the embedded baseline

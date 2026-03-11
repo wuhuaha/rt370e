@@ -193,3 +193,16 @@ It must be updated during every migration step so the port can be rebuilt later 
       --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
       --output third_party/silero_vad/upstream/silero_vad_16k_op15_reconstruction_manifest.json
     ```
+- Direct rebuild result on `2026-03-11`:
+  - added `tools/silero_vad/rebuild_tf_silero_vad.py`
+  - reconstruction strategy:
+    - `STFT` and encoder convs rebuilt in `TensorFlow`
+    - decoder `LSTM` rebuilt with an explicit ONNX-style gate implementation instead of assuming framework gate order
+    - batch fixed to `1` for the first embedded artifact
+  - verification against official ONNX:
+    - output max abs diff `1.5599653124809265e-08`
+    - state max abs diff `1.6689300537109375e-06`
+  - generated artifact:
+    - `/root/ameba-river/third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
+    - sha256 `5a532943646b1dd71930fb02e26e0600ba97ee80990302726294aef8a3142a05`
+    - size `1248388` bytes

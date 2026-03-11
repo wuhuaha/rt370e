@@ -132,8 +132,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - added a reconstruction-oriented tensor extractor that emits:
     - source tensor metadata
     - decoder `LSTM` tensors after the ONNX slice/concat layout
+- Step 4.6 completed: the first direct embedded detector artifact now exists and is numerically verified:
+  - rebuilt the pinned official ONNX in `TensorFlow` from extracted weights instead of forcing the old graph through `onnx2tf`
+  - matched ONNX numerically at batch `1`:
+    - output max abs diff `1.56e-08`
+    - state max abs diff `1.67e-06`
+  - exported a batch=`1` `TFLite` artifact:
+    - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
 - Next recommended step:
-  - stop forcing the old ONNX graph through `onnx2tf`
-  - use the new tensor extractor output to reconstruct the official `Silero VAD` network in host-side `Keras` from the published `tinygrad` skeleton
-  - export that reconstructed model to `.tflite`
+  - integrate the verified `TFLite` artifact into `river_voice_detector_silero`
+  - measure tensor arena, heap delta, flash delta, and per-window latency on `RTL8730E`
+  - only then decide whether compression is necessary
   - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile while detector migration continues

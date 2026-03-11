@@ -771,3 +771,24 @@ Expected current result:
   - `decoder.lstm.W`
   - `decoder.lstm.R`
   - `decoder.lstm.B`
+
+Rebuild and verify the batch=`1` TensorFlow/TFLite artifact:
+```bash
+cd /root/ameba-river
+source /root/ameba-river/.venv-silero-convert/bin/activate
+python tools/silero_vad/rebuild_tf_silero_vad.py \
+  --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+  --verification-output third_party/silero_vad/upstream/silero_vad_16k_tf_rebuild_verification.json \
+  --verify-cases 4 \
+  --seed 8730 \
+  --tflite-output third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite
+```
+
+Expected current result:
+- verification report should show:
+  - output max abs diff around `1e-08`
+  - state max abs diff around `1e-06`
+- generated artifact should exist:
+  - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
+- generated artifact checksum should be:
+  - `5a532943646b1dd71930fb02e26e0600ba97ee80990302726294aef8a3142a05`

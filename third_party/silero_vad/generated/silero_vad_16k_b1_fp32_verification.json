@@ -1,0 +1,45 @@
+{
+  "source_onnx_sha256": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+  "tflite_sha256": "5a532943646b1dd71930fb02e26e0600ba97ee80990302726294aef8a3142a05",
+  "tflite_size": 1248388,
+  "max_abs_diff_output_vs_onnx": 1.5599653124809265e-08,
+  "max_abs_diff_state_vs_onnx": 1.6689300537109375e-06,
+  "inputs": [
+    {
+      "name": "serving_default_state:0",
+      "shape": [
+        2,
+        1,
+        128
+      ],
+      "dtype": "<class 'numpy.float32'>"
+    },
+    {
+      "name": "serving_default_input:0",
+      "shape": [
+        1,
+        576
+      ],
+      "dtype": "<class 'numpy.float32'>"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "PartitionedCall:0",
+      "shape": [
+        1,
+        1
+      ],
+      "dtype": "<class 'numpy.float32'>"
+    },
+    {
+      "name": "PartitionedCall:1",
+      "shape": [
+        2,
+        1,
+        128
+      ],
+      "dtype": "<class 'numpy.float32'>"
+    }
+  ]
+}

@@ -84,5 +84,9 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 - Reconstruction will no longer start from opaque ONNX conversion guesses alone.
   - The project now has a dedicated extractor that derives the decoder `LSTM` tensors exactly as the ONNX graph feeds them.
   - The next `Keras` step should use that derived tensor map instead of re-slicing weights ad hoc.
+- That reconstruction step is now proven for the first embedded target:
+  - a batch=`1` `TFLite` artifact exists
+  - it stays numerically aligned with the pinned ONNX baseline
+  - the next architecture step is runtime integration, not another export experiment
 - The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

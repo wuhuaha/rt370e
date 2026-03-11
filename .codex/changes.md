@@ -391,3 +391,19 @@
 - This step intentionally does not add a `.tflite` model yet.
   - it narrows the migration by proving that the pinned official source can now be treated as immutable
   - and that the next `Keras` reconstruction step has a reproducible tensor map to start from
+
+## Step 4.6
+- Added `tools/silero_vad/rebuild_tf_silero_vad.py`:
+  - rebuilds the pinned official `Silero VAD` graph in `TensorFlow`
+  - uses an explicit ONNX-style decoder `LSTM` implementation to avoid gate-order ambiguity
+  - exports a batch=`1` `TFLite` artifact
+- Verified the reconstructed TensorFlow model against official ONNX:
+  - output max abs diff `1.5599653124809265e-08`
+  - state max abs diff `1.6689300537109375e-06`
+- Added generated artifacts:
+  - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
+  - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32_verification.json`
+  - `third_party/silero_vad/generated/METADATA.md`
+- This is the first project-side `Silero VAD` detector artifact that is both:
+  - directly derived from the pinned official upstream model
+  - numerically checked against the original ONNX
