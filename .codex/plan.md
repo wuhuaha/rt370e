@@ -22,11 +22,13 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
 ## Step Plan
 1. Bootstrap project, add `.codex` workflow, and create monitor echo + device-control skeleton.
 2. Add a board-level mic-to-speaker audio echo path with fixed delay so the audio hardware chain can be validated independently.
-3. Replace echo-only cloud stub with a real online control client abstraction and request flow.
-4. Promote the local audio path into a reusable front-end abstraction and connect VAD callbacks.
-5. Add wake word adapter and event bridge.
-6. Add offline ASR adapter interface and routing model.
-7. Build online/offline fusion coordinator with clear fallback rules.
+3. Split the local voice path into `capture -> preproc -> detector -> router`, and land an `AFE-only` backend that is suitable for `RTL8730E`.
+4. Add VAD on top of the enhanced single-channel output instead of on raw array PCM.
+5. Add playback reference routing and then enable AEC on the same front-end interface.
+6. Add beamforming / spatial metadata abstraction without coupling app logic to a specific SDK.
+7. Replace the cloud stub with a real online control client abstraction and request flow.
+8. Add wake word and offline ASR adapters behind stable local interfaces.
+9. Build online/offline fusion and preserve a clean path to self-developed `DSP/TFLite Micro` replacement.
 
 ## Current Step
 - Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
@@ -47,6 +49,14 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - dual-mic mix is no longer plain averaging; it now biases toward the stronger mic each frame
   - a lightweight per-frame AGC lifts low-level speech before replay
   - noise gate is lowered so farther speech is less likely to be muted
-- Next recommended step depends on the dual-mic echo result:
-  - if delayed speech is now usable at moderate distance, keep this as the raw-array debug mode and start adding AFE adapter hooks
-  - if audio is still weak or noisy, keep the dual-mic route and move next to either `AMIC5` comparative capture or real AFE preprocessing
+- Step 3.0 completed: the local voice path is now refactored for `RTL8730E` AIVoice AFE integration:
+  - added `river_voice_capture` as a reusable raw-array capture layer
+  - added `river_voice_preproc` as a backend-neutral enhancement boundary
+  - added `river_voice_preproc_aivoice` using SDK `aivoice_iface_afe_v1`
+  - aligned the board frame size to `256 samples / 16 ms`, which is the AIVoice-required input cadence
+  - switched the debug echo path from raw dual-mic mix replay to `dual-mic capture -> AFE enhanced mono -> delayed dual-mono replay`
+  - kept `AEC` disabled for now because there is still no dedicated playback reference path
+- Next recommended step:
+  - run board validation on the new `AFE-only` replay path first
+  - if enhanced replay is stable, add a VAD adapter on the AFE output
+  - after that, add playback-reference capture and enable AEC through the same preproc boundary

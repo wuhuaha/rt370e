@@ -67,6 +67,7 @@ river_status_t river_app_boot(void)
 void river_app_print_status(void)
 {
     printf("[river] local_frontend=%s\n", river_voice_frontend_mode_name());
+    printf("[river] local_preproc=%s\n", river_voice_preproc_backend_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED
     printf("[river] offline_asr=reserved\n");
 #else

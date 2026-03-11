@@ -8,60 +8,57 @@
 #include "os_wrapper.h"
 
 #include "audio/audio_control.h"
-#include "audio/audio_record.h"
 #include "audio/audio_service.h"
 #include "audio/audio_track.h"
 
 #include "river/river_voice.h"
 #include "river/river_voice_board.h"
+#include "river/river_voice_capture.h"
+#include "river/river_voice_preproc.h"
 
-#define RIVER_VOICE_ECHO_SAMPLE_RATE           16000U
 #define RIVER_VOICE_ECHO_PLAYBACK_CHANNELS     2U
 #define RIVER_VOICE_ECHO_BYTES_PER_SAMPLE      2U
-#define RIVER_VOICE_ECHO_FRAME_MS              20U
-#define RIVER_VOICE_ECHO_DELAY_MS              1000U
-#define RIVER_VOICE_ECHO_WARMUP_MS             100U
+#define RIVER_VOICE_ECHO_TARGET_DELAY_MS       1000U
+#define RIVER_VOICE_ECHO_WARMUP_MS             96U
 #define RIVER_VOICE_ECHO_TASK_STACK            (1024U * 12U)
 #define RIVER_VOICE_ECHO_TASK_PRIORITY         4U
-#define RIVER_VOICE_ECHO_CAPTURE_VOLUME        0x20U
-#define RIVER_VOICE_ECHO_DIAG_WINDOW_MS        1000U
+#define RIVER_VOICE_ECHO_CAPTURE_VOLUME        0x28U
 #define RIVER_VOICE_ECHO_CAPTURE_HPF_FC        0U
-#define RIVER_VOICE_ECHO_NOISE_GATE_PEAK       256U
-#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.60f
+#define RIVER_VOICE_ECHO_DIAG_WINDOW_MS        1000U
+#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.65f
 #define RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME    1.00f
 #define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     2U
-#define RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT   3U
-#define RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT       1U
-#define RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT   140U
-#define RIVER_VOICE_ECHO_AGC_TARGET_PEAK       6000U
-#define RIVER_VOICE_ECHO_AGC_MAX_GAIN          8U
 
 typedef struct {
     bool running;
     bool stop_requested;
-    bool record_started;
     bool track_started;
     bool diag_enabled;
     rtos_task_t task;
-    struct AudioRecord *record;
+    river_voice_capture_t capture;
+    river_voice_preproc_t preproc;
     struct AudioTrack *track;
     uint8_t *delay_buffer;
     uint8_t *capture_buffer;
-    uint8_t *mix_buffer;
+    uint8_t *enhanced_buffer;
     uint8_t *playback_buffer;
     uint8_t *track_buffer;
     size_t capture_chunk_bytes;
-    size_t mix_chunk_bytes;
+    size_t enhanced_chunk_bytes;
     size_t playback_chunk_bytes;
     size_t delay_buffer_bytes;
     size_t read_offset;
     size_t write_offset;
+    uint32_t actual_delay_ms;
     uint32_t warmup_bytes_remaining;
     uint32_t diag_read_ok;
+    uint32_t diag_proc_ok;
     uint32_t diag_write_ok;
     uint32_t diag_read_fail;
+    uint32_t diag_proc_fail;
     uint32_t diag_write_fail;
     uint32_t diag_partial_read;
+    uint32_t diag_partial_proc;
     uint32_t diag_chunks_until_log;
     uint16_t diag_capture_peak_ch0;
     uint16_t diag_capture_peak_ch1;
@@ -71,11 +68,6 @@ typedef struct {
 
 static river_voice_echo_context_t g_river_voice_echo;
 static bool g_river_voice_echo_diag_enabled;
-
-static const river_voice_board_array_profile_t *river_voice_echo_board_profile(void)
-{
-    return river_voice_board_array_profile();
-}
 
 static size_t river_voice_min_size(size_t left, size_t right)
 {
@@ -161,39 +153,22 @@ static uint16_t river_voice_echo_update_peak(const uint8_t *buffer,
     return max_peak;
 }
 
-static uint16_t river_voice_echo_measure_peak(const uint8_t *buffer, size_t bytes, uint32_t channels)
-{
-    uint16_t peak_ch0;
-    uint16_t peak_ch1;
-
-    peak_ch0 = 0U;
-    peak_ch1 = 0U;
-    return river_voice_echo_update_peak(buffer, bytes, channels, &peak_ch0, &peak_ch1);
-}
-
-static void river_voice_echo_apply_noise_gate(uint8_t *buffer, size_t bytes, uint16_t peak)
-{
-    if (buffer == 0) {
-        return;
-    }
-
-    if (peak < RIVER_VOICE_ECHO_NOISE_GATE_PEAK) {
-        memset(buffer, 0, bytes);
-    }
-}
-
 static void river_voice_echo_reset_diag_counters(void)
 {
     g_river_voice_echo.diag_read_ok = 0U;
+    g_river_voice_echo.diag_proc_ok = 0U;
     g_river_voice_echo.diag_write_ok = 0U;
     g_river_voice_echo.diag_read_fail = 0U;
+    g_river_voice_echo.diag_proc_fail = 0U;
     g_river_voice_echo.diag_write_fail = 0U;
     g_river_voice_echo.diag_partial_read = 0U;
+    g_river_voice_echo.diag_partial_proc = 0U;
     g_river_voice_echo.diag_capture_peak_ch0 = 0U;
     g_river_voice_echo.diag_capture_peak_ch1 = 0U;
     g_river_voice_echo.diag_playback_peak_ch0 = 0U;
     g_river_voice_echo.diag_playback_peak_ch1 = 0U;
-    g_river_voice_echo.diag_chunks_until_log = RIVER_VOICE_ECHO_DIAG_WINDOW_MS / RIVER_VOICE_ECHO_FRAME_MS;
+    g_river_voice_echo.diag_chunks_until_log = RIVER_VOICE_ECHO_DIAG_WINDOW_MS /
+                                               river_voice_board_array_profile()->frame_ms;
 }
 
 static void river_voice_echo_log_diagnostics_if_needed(void)
@@ -209,16 +184,19 @@ static void river_voice_echo_log_diagnostics_if_needed(void)
         return;
     }
 
-    printf("[river][voice][diag] cap_peak=[%u,%u] play_peak=[%u,%u] read_ok=%lu write_ok=%lu read_fail=%lu write_fail=%lu partial=%lu\n",
+    printf("[river][voice][diag] cap_peak=[%u,%u] play_peak=[%u,%u] read_ok=%lu proc_ok=%lu write_ok=%lu read_fail=%lu proc_fail=%lu write_fail=%lu partial_read=%lu partial_proc=%lu\n",
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch1,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch1,
            (unsigned long)g_river_voice_echo.diag_read_ok,
+           (unsigned long)g_river_voice_echo.diag_proc_ok,
            (unsigned long)g_river_voice_echo.diag_write_ok,
            (unsigned long)g_river_voice_echo.diag_read_fail,
+           (unsigned long)g_river_voice_echo.diag_proc_fail,
            (unsigned long)g_river_voice_echo.diag_write_fail,
-           (unsigned long)g_river_voice_echo.diag_partial_read);
+           (unsigned long)g_river_voice_echo.diag_partial_read,
+           (unsigned long)g_river_voice_echo.diag_partial_proc);
 
     river_voice_echo_reset_diag_counters();
 }
@@ -262,107 +240,6 @@ static void river_voice_echo_apply_warmup(uint8_t *buffer, size_t bytes)
     g_river_voice_echo.warmup_bytes_remaining -= (uint32_t)mute_bytes;
 }
 
-static void river_voice_echo_close_audio(void)
-{
-    if (g_river_voice_echo.track != 0) {
-        if (g_river_voice_echo.track_started) {
-            AudioTrack_Pause(g_river_voice_echo.track);
-            AudioTrack_Flush(g_river_voice_echo.track);
-            AudioTrack_Stop(g_river_voice_echo.track);
-            g_river_voice_echo.track_started = false;
-        }
-        AudioTrack_Destroy(g_river_voice_echo.track);
-        g_river_voice_echo.track = 0;
-    }
-
-    if (g_river_voice_echo.record != 0) {
-        if (g_river_voice_echo.record_started) {
-            AudioRecord_Stop(g_river_voice_echo.record);
-            g_river_voice_echo.record_started = false;
-        }
-        AudioRecord_Destroy(g_river_voice_echo.record);
-        g_river_voice_echo.record = 0;
-    }
-}
-
-static void river_voice_echo_release_buffers(void)
-{
-    if (g_river_voice_echo.track_buffer != 0) {
-        rtos_mem_free(g_river_voice_echo.track_buffer);
-        g_river_voice_echo.track_buffer = 0;
-    }
-
-    if (g_river_voice_echo.playback_buffer != 0) {
-        rtos_mem_free(g_river_voice_echo.playback_buffer);
-        g_river_voice_echo.playback_buffer = 0;
-    }
-
-    if (g_river_voice_echo.mix_buffer != 0) {
-        rtos_mem_free(g_river_voice_echo.mix_buffer);
-        g_river_voice_echo.mix_buffer = 0;
-    }
-
-    if (g_river_voice_echo.capture_buffer != 0) {
-        rtos_mem_free(g_river_voice_echo.capture_buffer);
-        g_river_voice_echo.capture_buffer = 0;
-    }
-
-    if (g_river_voice_echo.delay_buffer != 0) {
-        rtos_mem_free(g_river_voice_echo.delay_buffer);
-        g_river_voice_echo.delay_buffer = 0;
-    }
-
-    g_river_voice_echo.capture_chunk_bytes = 0U;
-    g_river_voice_echo.mix_chunk_bytes = 0U;
-    g_river_voice_echo.playback_chunk_bytes = 0U;
-    g_river_voice_echo.delay_buffer_bytes = 0U;
-    g_river_voice_echo.read_offset = 0U;
-    g_river_voice_echo.write_offset = 0U;
-    g_river_voice_echo.warmup_bytes_remaining = 0U;
-    river_voice_echo_reset_diag_counters();
-}
-
-static river_status_t river_voice_echo_prepare_buffers(void)
-{
-    const river_voice_board_array_profile_t *profile;
-    size_t capture_bytes_per_second;
-    size_t mix_bytes_per_second;
-    size_t playback_bytes_per_second;
-
-    profile = river_voice_echo_board_profile();
-    capture_bytes_per_second = RIVER_VOICE_ECHO_SAMPLE_RATE *
-                               profile->capture_channels *
-                               RIVER_VOICE_ECHO_BYTES_PER_SAMPLE;
-    mix_bytes_per_second = RIVER_VOICE_ECHO_SAMPLE_RATE *
-                           RIVER_VOICE_ECHO_BYTES_PER_SAMPLE;
-    playback_bytes_per_second = RIVER_VOICE_ECHO_SAMPLE_RATE *
-                                RIVER_VOICE_ECHO_PLAYBACK_CHANNELS *
-                                RIVER_VOICE_ECHO_BYTES_PER_SAMPLE;
-    g_river_voice_echo.capture_chunk_bytes = (capture_bytes_per_second * RIVER_VOICE_ECHO_FRAME_MS) / 1000U;
-    g_river_voice_echo.mix_chunk_bytes = (mix_bytes_per_second * RIVER_VOICE_ECHO_FRAME_MS) / 1000U;
-    g_river_voice_echo.playback_chunk_bytes = (playback_bytes_per_second * RIVER_VOICE_ECHO_FRAME_MS) / 1000U;
-    g_river_voice_echo.delay_buffer_bytes = (mix_bytes_per_second * RIVER_VOICE_ECHO_DELAY_MS) / 1000U;
-    g_river_voice_echo.warmup_bytes_remaining = (uint32_t)((mix_bytes_per_second * RIVER_VOICE_ECHO_WARMUP_MS) / 1000U);
-    g_river_voice_echo.diag_enabled = g_river_voice_echo_diag_enabled;
-
-    g_river_voice_echo.delay_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.delay_buffer_bytes);
-    g_river_voice_echo.capture_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.capture_chunk_bytes);
-    g_river_voice_echo.mix_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.mix_chunk_bytes);
-    g_river_voice_echo.playback_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.mix_chunk_bytes);
-    g_river_voice_echo.track_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.playback_chunk_bytes);
-
-    if (g_river_voice_echo.delay_buffer == 0 ||
-        g_river_voice_echo.capture_buffer == 0 ||
-        g_river_voice_echo.mix_buffer == 0 ||
-        g_river_voice_echo.playback_buffer == 0 ||
-        g_river_voice_echo.track_buffer == 0) {
-        river_voice_echo_release_buffers();
-        return RIVER_ERR_NO_MEMORY;
-    }
-
-    return RIVER_OK;
-}
-
 static void river_voice_echo_expand_mono_to_stereo(uint8_t *dst, const uint8_t *src, size_t mono_bytes)
 {
     const int16_t *src_samples;
@@ -388,156 +265,125 @@ static void river_voice_echo_expand_mono_to_stereo(uint8_t *dst, const uint8_t *
     }
 }
 
-static uint16_t river_voice_echo_mix_dual_mic_focus_to_mono(uint8_t *dst,
-                                                            const uint8_t *src,
-                                                            size_t capture_bytes,
-                                                            uint32_t capture_channels)
+static void river_voice_echo_close_audio(void)
 {
-    const int16_t *src_samples;
-    int16_t *dst_samples;
-    size_t frame_count;
-    size_t index;
-    uint16_t max_peak;
-    uint32_t sum_abs0;
-    uint32_t sum_abs1;
-    uint32_t weight0;
-    uint32_t weight1;
-    uint32_t weight_sum;
-
-    if (dst == 0 || src == 0) {
-        return 0U;
-    }
-
-    if (capture_channels == 1U) {
-        memcpy(dst, src, capture_bytes);
-        return river_voice_echo_measure_peak(dst, capture_bytes, 1U);
-    }
-
-    src_samples = (const int16_t *)src;
-    dst_samples = (int16_t *)dst;
-    frame_count = capture_bytes / (sizeof(int16_t) * capture_channels);
-    max_peak = 0U;
-    sum_abs0 = 0U;
-    sum_abs1 = 0U;
-
-    for (index = 0; index < frame_count; ++index) {
-        sum_abs0 += river_voice_echo_abs16(src_samples[index * capture_channels]);
-        sum_abs1 += river_voice_echo_abs16(src_samples[(index * capture_channels) + 1U]);
-    }
-
-    weight0 = 1U;
-    weight1 = 1U;
-    if ((sum_abs0 * 100U) >= (sum_abs1 * RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT)) {
-        weight0 = RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT;
-        weight1 = RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT;
-    } else if ((sum_abs1 * 100U) >= (sum_abs0 * RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT)) {
-        weight0 = RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT;
-        weight1 = RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT;
-    }
-    weight_sum = weight0 + weight1;
-
-    for (index = 0; index < frame_count; ++index) {
-        int32_t sample0;
-        int32_t sample1;
-        int32_t mixed;
-        uint16_t peak;
-
-        sample0 = src_samples[index * capture_channels];
-        sample1 = src_samples[(index * capture_channels) + 1U];
-        mixed = ((sample0 * (int32_t)weight0) + (sample1 * (int32_t)weight1)) / (int32_t)weight_sum;
-        dst_samples[index] = (int16_t)mixed;
-        peak = river_voice_echo_abs16(mixed);
-        if (peak > max_peak) {
-            max_peak = peak;
+    if (g_river_voice_echo.track != 0) {
+        if (g_river_voice_echo.track_started) {
+            AudioTrack_Pause(g_river_voice_echo.track);
+            AudioTrack_Flush(g_river_voice_echo.track);
+            AudioTrack_Stop(g_river_voice_echo.track);
+            g_river_voice_echo.track_started = false;
         }
+        AudioTrack_Destroy(g_river_voice_echo.track);
+        g_river_voice_echo.track = 0;
     }
 
-    return max_peak;
+    river_voice_preproc_close(&g_river_voice_echo.preproc);
+    river_voice_capture_close(&g_river_voice_echo.capture);
 }
 
-static uint16_t river_voice_echo_apply_agc(uint8_t *buffer, size_t bytes)
+static void river_voice_echo_release_buffers(void)
 {
-    int16_t *samples;
-    size_t sample_count;
-    size_t index;
-    uint16_t peak;
-    uint32_t gain;
-
-    if (buffer == 0 || bytes < sizeof(int16_t)) {
-        return 0U;
+    if (g_river_voice_echo.track_buffer != 0) {
+        rtos_mem_free(g_river_voice_echo.track_buffer);
+        g_river_voice_echo.track_buffer = 0;
     }
 
-    peak = river_voice_echo_measure_peak(buffer, bytes, 1U);
-    if (peak == 0U) {
-        return 0U;
+    if (g_river_voice_echo.playback_buffer != 0) {
+        rtos_mem_free(g_river_voice_echo.playback_buffer);
+        g_river_voice_echo.playback_buffer = 0;
     }
 
-    gain = (uint32_t)(RIVER_VOICE_ECHO_AGC_TARGET_PEAK / peak);
-    if (gain == 0U) {
-        gain = 1U;
-    }
-    if (gain > RIVER_VOICE_ECHO_AGC_MAX_GAIN) {
-        gain = RIVER_VOICE_ECHO_AGC_MAX_GAIN;
+    if (g_river_voice_echo.enhanced_buffer != 0) {
+        rtos_mem_free(g_river_voice_echo.enhanced_buffer);
+        g_river_voice_echo.enhanced_buffer = 0;
     }
 
-    if (gain == 1U) {
-        return peak;
+    if (g_river_voice_echo.capture_buffer != 0) {
+        rtos_mem_free(g_river_voice_echo.capture_buffer);
+        g_river_voice_echo.capture_buffer = 0;
     }
 
-    samples = (int16_t *)buffer;
-    sample_count = bytes / sizeof(int16_t);
-    for (index = 0; index < sample_count; ++index) {
-        samples[index] = river_voice_echo_sat16((int32_t)samples[index] * (int32_t)gain);
+    if (g_river_voice_echo.delay_buffer != 0) {
+        rtos_mem_free(g_river_voice_echo.delay_buffer);
+        g_river_voice_echo.delay_buffer = 0;
     }
 
-    return river_voice_echo_measure_peak(buffer, bytes, 1U);
+    g_river_voice_echo.capture_chunk_bytes = 0U;
+    g_river_voice_echo.enhanced_chunk_bytes = 0U;
+    g_river_voice_echo.playback_chunk_bytes = 0U;
+    g_river_voice_echo.delay_buffer_bytes = 0U;
+    g_river_voice_echo.read_offset = 0U;
+    g_river_voice_echo.write_offset = 0U;
+    g_river_voice_echo.actual_delay_ms = 0U;
+    g_river_voice_echo.warmup_bytes_remaining = 0U;
+    river_voice_echo_reset_diag_counters();
+}
+
+static river_status_t river_voice_echo_prepare_buffers(void)
+{
+    uint32_t delay_frames;
+    const river_voice_board_array_profile_t *profile;
+
+    profile = river_voice_board_array_profile();
+    g_river_voice_echo.capture_chunk_bytes = g_river_voice_echo.capture.frame_bytes;
+    g_river_voice_echo.enhanced_chunk_bytes = river_voice_preproc_output_frame_bytes(&g_river_voice_echo.preproc);
+    g_river_voice_echo.playback_chunk_bytes = g_river_voice_echo.enhanced_chunk_bytes *
+                                              RIVER_VOICE_ECHO_PLAYBACK_CHANNELS;
+    delay_frames = (RIVER_VOICE_ECHO_TARGET_DELAY_MS + (profile->frame_ms / 2U)) / profile->frame_ms;
+    if (delay_frames == 0U) {
+        delay_frames = 1U;
+    }
+    g_river_voice_echo.delay_buffer_bytes = g_river_voice_echo.enhanced_chunk_bytes * delay_frames;
+    g_river_voice_echo.actual_delay_ms = delay_frames * profile->frame_ms;
+    g_river_voice_echo.warmup_bytes_remaining =
+        (uint32_t)(((uint64_t)g_river_voice_echo.enhanced_chunk_bytes * RIVER_VOICE_ECHO_WARMUP_MS) /
+                   g_river_voice_echo.preproc.frame_ms);
+    g_river_voice_echo.diag_enabled = g_river_voice_echo_diag_enabled;
+
+    g_river_voice_echo.delay_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.delay_buffer_bytes);
+    g_river_voice_echo.capture_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.capture_chunk_bytes);
+    g_river_voice_echo.enhanced_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.enhanced_chunk_bytes);
+    g_river_voice_echo.playback_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.enhanced_chunk_bytes);
+    g_river_voice_echo.track_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_echo.playback_chunk_bytes);
+
+    if (g_river_voice_echo.delay_buffer == 0 ||
+        g_river_voice_echo.capture_buffer == 0 ||
+        g_river_voice_echo.enhanced_buffer == 0 ||
+        g_river_voice_echo.playback_buffer == 0 ||
+        g_river_voice_echo.track_buffer == 0) {
+        river_voice_echo_release_buffers();
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    return RIVER_OK;
 }
 
 static river_status_t river_voice_echo_open_audio(void)
 {
-    const river_voice_board_array_profile_t *profile;
-    AudioRecordConfig record_config;
     AudioTrackConfig track_config;
     size_t track_buffer_bytes;
 
-    profile = river_voice_echo_board_profile();
     AudioService_Init();
     AudioControl_SetPlaybackDevice(DEVICE_OUT_SPEAKER);
     AudioControl_SetPlaybackMute(false);
     AudioControl_SetAmplifierMute(false);
     AudioControl_SetHardwareVolume(RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME, RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME);
-
-    AudioControl_SetMicUsage(AUDIO_CAPTURE_USAGE_AMIC);
-    AudioControl_SetChannelMicCategory(0, profile->primary_mic);
-    AudioControl_SetMicBstGain(profile->primary_mic, profile->primary_mic_gain);
-    if (profile->capture_channels > 1U) {
-        AudioControl_SetChannelMicCategory(1, profile->secondary_mic);
-        AudioControl_SetMicBstGain(profile->secondary_mic, profile->secondary_mic_gain);
-    }
-    if (profile->aux_mic_reserved) {
-        AudioControl_SetChannelMicCategory(2, profile->aux_mic);
-        AudioControl_SetMicBstGain(profile->aux_mic, profile->aux_mic_gain);
-    }
-    AudioControl_SetCaptureVolume(profile->capture_channels, RIVER_VOICE_ECHO_CAPTURE_VOLUME);
+    AudioControl_SetCaptureVolume(river_voice_board_array_profile()->capture_channels, RIVER_VOICE_ECHO_CAPTURE_VOLUME);
     AudioControl_SetCaptureHpfFc(0, RIVER_VOICE_ECHO_CAPTURE_HPF_FC);
 
-    g_river_voice_echo.record = AudioRecord_Create();
-    if (g_river_voice_echo.record == 0) {
-        printf("[river][voice] create AudioRecord failed\n");
+    if (river_voice_capture_open(&g_river_voice_echo.capture) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    record_config.sample_rate = RIVER_VOICE_ECHO_SAMPLE_RATE;
-    record_config.channel_count = profile->capture_channels;
-    record_config.format = AUDIO_FORMAT_PCM_16_BIT;
-    record_config.device = DEVICE_IN_MIC;
-    record_config.buffer_bytes = (uint32_t)g_river_voice_echo.capture_chunk_bytes;
-    if (AudioRecord_Init(g_river_voice_echo.record, &record_config, AUDIO_INPUT_FLAG_NONE) != 0) {
-        printf("[river][voice] AudioRecord_Init failed\n");
+    if (river_voice_preproc_open(&g_river_voice_echo.preproc) != RIVER_OK) {
+        printf("[river][voice] preproc open failed\n");
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    AudioRecord_SetParameters(g_river_voice_echo.record, "cap_mode=no_afe_pure_data");
+    if (river_voice_echo_prepare_buffers() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
 
     g_river_voice_echo.track = AudioTrack_Create();
     if (g_river_voice_echo.track == 0) {
@@ -547,7 +393,7 @@ static river_status_t river_voice_echo_open_audio(void)
 
     track_buffer_bytes = AudioTrack_GetMinBufferBytes(g_river_voice_echo.track,
                                                       AUDIO_CATEGORY_MEDIA,
-                                                      RIVER_VOICE_ECHO_SAMPLE_RATE,
+                                                      g_river_voice_echo.capture.sample_rate,
                                                       AUDIO_FORMAT_PCM_16_BIT,
                                                       RIVER_VOICE_ECHO_PLAYBACK_CHANNELS);
     if (track_buffer_bytes < g_river_voice_echo.playback_chunk_bytes) {
@@ -556,7 +402,7 @@ static river_status_t river_voice_echo_open_audio(void)
     track_buffer_bytes *= 4U;
 
     track_config.category_type = AUDIO_CATEGORY_MEDIA;
-    track_config.sample_rate = RIVER_VOICE_ECHO_SAMPLE_RATE;
+    track_config.sample_rate = g_river_voice_echo.capture.sample_rate;
     track_config.format = AUDIO_FORMAT_PCM_16_BIT;
     track_config.channel_count = RIVER_VOICE_ECHO_PLAYBACK_CHANNELS;
     track_config.buffer_bytes = (uint32_t)track_buffer_bytes;
@@ -570,94 +416,86 @@ static river_status_t river_voice_echo_open_audio(void)
                          RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME);
     AudioTrack_SetStartThresholdBytes(g_river_voice_echo.track, (int32_t)track_buffer_bytes);
 
-    if (AudioRecord_Start(g_river_voice_echo.record) != 0) {
-        printf("[river][voice] AudioRecord_Start failed\n");
-        return RIVER_ERR_UNSUPPORTED;
-    }
-    g_river_voice_echo.record_started = true;
-
     if (AudioTrack_Start(g_river_voice_echo.track) != 0) {
         printf("[river][voice] AudioTrack_Start failed\n");
         return RIVER_ERR_UNSUPPORTED;
     }
     g_river_voice_echo.track_started = true;
 
-    printf("[river][voice] audio echo config: %lu Hz capture dual-mic -> %lu Hz playback dual-mono, %lu ms delay, %s+%s mix -> speaker\n",
-           (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
-           (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
-           (unsigned long)RIVER_VOICE_ECHO_DELAY_MS,
-           river_voice_board_mic_name(profile->primary_mic),
-           river_voice_board_mic_name(profile->secondary_mic));
-    printf("[river][voice] audio echo array: %s spacing=%lumm aivoice=%s aux=%s%s\n",
-           profile->geometry_name,
-           (unsigned long)profile->mic_spacing_mm,
-           profile->aivoice_geometry_name,
-           river_voice_board_mic_name(profile->aux_mic),
-           profile->aux_mic_reserved ? "(reserved)" : "");
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu agc_target=%lu agc_max=x%lu gate=%lu micbst=[%s,%s]\n",
+    printf("[river][voice] audio echo config: %lu Hz capture dual-mic -> AFE 1ch -> %lu Hz playback dual-mono, %lu ms delay, %s+%s -> speaker\n",
+           (unsigned long)g_river_voice_echo.capture.sample_rate,
+           (unsigned long)g_river_voice_echo.capture.sample_rate,
+           (unsigned long)g_river_voice_echo.actual_delay_ms,
+           river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
+           river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic));
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu cap=0x%02lx preproc=%s\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,
-           (unsigned long)RIVER_VOICE_ECHO_AGC_TARGET_PEAK,
-           (unsigned long)RIVER_VOICE_ECHO_AGC_MAX_GAIN,
-           (unsigned long)RIVER_VOICE_ECHO_NOISE_GATE_PEAK,
-           river_voice_board_mic_gain_name(profile->primary_mic_gain),
-           river_voice_board_mic_gain_name(profile->secondary_mic_gain));
-    printf("[river][voice] audio echo mix: dominant=%lu weak=%lu focus_ratio=%lu%%\n",
-           (unsigned long)RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT,
-           (unsigned long)RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT,
-           (unsigned long)RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT);
+           (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
+           river_voice_preproc_backend_name());
     return RIVER_OK;
 }
 
 static void river_voice_echo_task(void *param)
 {
-    const river_voice_board_array_profile_t *profile;
-
     (void)param;
-    profile = river_voice_echo_board_profile();
 
     while (!g_river_voice_echo.stop_requested) {
         int32_t bytes_read;
-        uint16_t capture_peak;
+        size_t enhanced_bytes;
 
         memset(g_river_voice_echo.capture_buffer, 0, g_river_voice_echo.capture_chunk_bytes);
-        bytes_read = AudioRecord_Read(g_river_voice_echo.record,
-                                      g_river_voice_echo.capture_buffer,
-                                      g_river_voice_echo.capture_chunk_bytes,
-                                      true);
+        bytes_read = river_voice_capture_read(&g_river_voice_echo.capture,
+                                             g_river_voice_echo.capture_buffer,
+                                             g_river_voice_echo.capture_chunk_bytes);
         if (bytes_read < 0) {
             g_river_voice_echo.diag_read_fail++;
             river_voice_echo_log_diagnostics_if_needed();
             printf("[river][voice] AudioRecord_Read failed: %ld\n", (long)bytes_read);
-            rtos_time_delay_ms(RIVER_VOICE_ECHO_FRAME_MS);
+            rtos_time_delay_ms(g_river_voice_echo.capture.frame_ms);
             continue;
         }
         g_river_voice_echo.diag_read_ok++;
         if ((size_t)bytes_read < g_river_voice_echo.capture_chunk_bytes) {
-            memset(g_river_voice_echo.capture_buffer + bytes_read, 0, g_river_voice_echo.capture_chunk_bytes - (size_t)bytes_read);
+            memset(g_river_voice_echo.capture_buffer + bytes_read,
+                   0,
+                   g_river_voice_echo.capture_chunk_bytes - (size_t)bytes_read);
             g_river_voice_echo.diag_partial_read++;
         }
 
-        capture_peak = river_voice_echo_update_peak(g_river_voice_echo.capture_buffer,
-                                                    g_river_voice_echo.capture_chunk_bytes,
-                                                    profile->capture_channels,
-                                                    &g_river_voice_echo.diag_capture_peak_ch0,
-                                                    &g_river_voice_echo.diag_capture_peak_ch1);
-        capture_peak = river_voice_echo_mix_dual_mic_focus_to_mono(g_river_voice_echo.mix_buffer,
-                                                                   g_river_voice_echo.capture_buffer,
-                                                                   g_river_voice_echo.capture_chunk_bytes,
-                                                                   profile->capture_channels);
-        river_voice_echo_apply_warmup(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
-        river_voice_echo_apply_noise_gate(g_river_voice_echo.mix_buffer,
-                                          g_river_voice_echo.mix_chunk_bytes,
-                                          capture_peak);
-        river_voice_echo_apply_agc(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
-        river_voice_echo_ring_read(g_river_voice_echo.playback_buffer, g_river_voice_echo.mix_chunk_bytes);
-        river_voice_echo_ring_write(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
+        river_voice_echo_update_peak(g_river_voice_echo.capture_buffer,
+                                     g_river_voice_echo.capture_chunk_bytes,
+                                     g_river_voice_echo.capture.channels,
+                                     &g_river_voice_echo.diag_capture_peak_ch0,
+                                     &g_river_voice_echo.diag_capture_peak_ch1);
+
+        enhanced_bytes = 0U;
+        if (river_voice_preproc_process(&g_river_voice_echo.preproc,
+                                        g_river_voice_echo.capture_buffer,
+                                        g_river_voice_echo.capture_chunk_bytes,
+                                        g_river_voice_echo.enhanced_buffer,
+                                        g_river_voice_echo.enhanced_chunk_bytes,
+                                        &enhanced_bytes) != RIVER_OK) {
+            g_river_voice_echo.diag_proc_fail++;
+            river_voice_echo_log_diagnostics_if_needed();
+            printf("[river][voice] preproc process failed\n");
+            continue;
+        }
+        g_river_voice_echo.diag_proc_ok++;
+        if (enhanced_bytes < g_river_voice_echo.enhanced_chunk_bytes) {
+            memset(g_river_voice_echo.enhanced_buffer + enhanced_bytes,
+                   0,
+                   g_river_voice_echo.enhanced_chunk_bytes - enhanced_bytes);
+            g_river_voice_echo.diag_partial_proc++;
+        }
+
+        river_voice_echo_apply_warmup(g_river_voice_echo.enhanced_buffer, g_river_voice_echo.enhanced_chunk_bytes);
+        river_voice_echo_ring_read(g_river_voice_echo.playback_buffer, g_river_voice_echo.enhanced_chunk_bytes);
+        river_voice_echo_ring_write(g_river_voice_echo.enhanced_buffer, g_river_voice_echo.enhanced_chunk_bytes);
         river_voice_echo_expand_mono_to_stereo(g_river_voice_echo.track_buffer,
                                                g_river_voice_echo.playback_buffer,
-                                               g_river_voice_echo.mix_chunk_bytes);
+                                               g_river_voice_echo.enhanced_chunk_bytes);
         river_voice_echo_update_peak(g_river_voice_echo.track_buffer,
                                      g_river_voice_echo.playback_chunk_bytes,
                                      RIVER_VOICE_ECHO_PLAYBACK_CHANNELS,
@@ -673,6 +511,7 @@ static void river_voice_echo_task(void *param)
             printf("[river][voice] AudioTrack_Write failed\n");
             break;
         }
+
         g_river_voice_echo.diag_write_ok++;
         river_voice_echo_log_diagnostics_if_needed();
     }
@@ -696,12 +535,7 @@ river_status_t river_voice_echo_start(void)
     }
 
     memset(&g_river_voice_echo, 0, sizeof(g_river_voice_echo));
-
-    status = river_voice_echo_prepare_buffers();
-    if (status != RIVER_OK) {
-        printf("[river][voice] allocate echo buffers failed\n");
-        return status;
-    }
+    river_voice_echo_reset_diag_counters();
 
     status = river_voice_echo_open_audio();
     if (status != RIVER_OK) {
@@ -773,19 +607,17 @@ const char *river_voice_echo_status_name(void)
 
 void river_voice_echo_dump_status(void)
 {
-    const river_voice_board_array_profile_t *profile;
-
-    profile = river_voice_echo_board_profile();
     printf("[river] audio_echo=%s\n", river_voice_echo_status_name());
     printf("[river] audio_echo_diag=%s\n", river_voice_echo_diag_enabled() ? "on" : "off");
     if (river_voice_echo_is_running()) {
-        printf("[river] audio_echo_profile=cap:%luHz/%luch(%s+%s) play:%luHz/%luch delay:%lums\n",
-               (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
-               (unsigned long)profile->capture_channels,
-               river_voice_board_mic_name(profile->primary_mic),
-               river_voice_board_mic_name(profile->secondary_mic),
-               (unsigned long)RIVER_VOICE_ECHO_SAMPLE_RATE,
+        printf("[river] audio_echo_profile=cap:%luHz/%luch(%s+%s) preproc:%s play:%luHz/%luch delay:%lums\n",
+               (unsigned long)g_river_voice_echo.capture.sample_rate,
+               (unsigned long)g_river_voice_echo.capture.channels,
+               river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
+               river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic),
+               river_voice_preproc_backend_name(),
+               (unsigned long)g_river_voice_echo.capture.sample_rate,
                (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_CHANNELS,
-               (unsigned long)RIVER_VOICE_ECHO_DELAY_MS);
+               (unsigned long)g_river_voice_echo.actual_delay_ms);
     }
 }

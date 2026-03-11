@@ -28,6 +28,7 @@ typedef void (*river_voice_event_handler_t)(const river_voice_event_t *event);
 river_status_t river_voice_frontend_init(void);
 void river_voice_frontend_set_handler(river_voice_event_handler_t handler);
 const char *river_voice_frontend_mode_name(void);
+const char *river_voice_preproc_backend_name(void);
 river_status_t river_voice_echo_start(void);
 river_status_t river_voice_echo_stop(void);
 bool river_voice_echo_is_running(void);

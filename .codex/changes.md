@@ -165,3 +165,37 @@
 - Reduced the pre-AGC noise gate threshold from `1024` to `256` so moderate-distance speech is less likely to be dropped entirely.
 - Reduced fixed playback PCM gain from `x4` to `x2` because gain is now moved earlier into the adaptive mix stage.
 - Verified the tuned build locally for `RTL8730E`.
+
+## Step 3.0
+- Started the first `RTL8730E`-appropriate AFE integration step without coupling the application to `speechmind`.
+- Added `river_voice_capture.*`:
+  - owns raw microphone-array capture only
+  - uses board metadata from `river_voice_board.*`
+  - currently outputs `16 kHz`, `16 ms`, `2 ch`, `PCM16`, matching AIVoice AFE input requirements
+- Added `river_voice_preproc.*`:
+  - defines a backend-neutral enhancement boundary
+  - owns preproc frame metadata and backend context
+  - is designed to keep future `self_dsp` or `TFLite Micro` replacement local to this layer
+- Added `river_voice_preproc_aivoice.c`:
+  - directly integrates SDK `aivoice_iface_afe_v1`
+  - uses `AFE_CONFIG_ASR_DEFAULT_2MIC50MM()` as the starting point because this matches SDK `speechmind` on `AmebaSmart`
+  - overrides the runtime policy for the current stage:
+    - `ref_num = 0`
+    - `enable_aec = false`
+    - `enable_ns = false`
+    - `enable_agc = true`
+    - `enable_ssl = false`
+- Updated board metadata so the voice frame cadence is `16 ms` instead of `20 ms`, matching `256 samples @ 16 kHz`.
+- Refactored `river_voice_echo.c` into a debug sink on top of the new front-end:
+  - input is now raw dual-mic capture
+  - enhancement is now done by the AFE backend
+  - delayed replay uses enhanced mono PCM expanded to dual-mono speaker output
+  - diagnostics now separate:
+    - raw capture health
+    - preproc success/failure
+    - playback write health
+- Enabled the SDK-side voice resources needed by the current and next stages in `prj.conf`:
+  - `AIVOICE`
+  - `AFE 2MIC50MM`
+  - baseline `VAD/KWS/ASR` resources for later steps
+- Verified the refactored AFE-only build locally for `RTL8730E`.

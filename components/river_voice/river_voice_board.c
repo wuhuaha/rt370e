@@ -11,7 +11,7 @@ static const river_voice_board_array_profile_t g_river_voice_board_array_profile
     .aivoice_geometry_name = "AFE_LINEAR_2MIC_50MM",
     .mic_spacing_mm = 50U,
     .sample_rate = 16000U,
-    .frame_ms = 20U,
+    .frame_ms = 16U,
     .capture_channels = 2U,
     .primary_mic = AUDIO_AMIC1,
     .secondary_mic = AUDIO_AMIC3,

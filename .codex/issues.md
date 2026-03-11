@@ -47,6 +47,13 @@
   - it is suitable for board listening tests
   - it is not a substitute for production AFE, AGC, or beamforming
   - very loud near-field speech can still clip or sound uneven
+- The current pre-processing backend is still single-choice and fixed to `aivoice_afe`.
+- `AEC` is intentionally disabled in the new AFE step:
+  - the current project does not yet provide a dedicated speaker-reference PCM path
+  - enabling SDK AEC without a clean reference would make quality worse and reduce debuggability
+- `VAD` is not yet connected even though the SDK resources are now enabled in the build.
+- The new AFE path has only been verified by local cross-build so far; it still needs board-side acoustic validation.
+- Enabling `AIVOICE` also pulls more SDK components into the build, so later runtime memory headroom must be checked after board validation.
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -98,3 +105,8 @@
   - use higher analog mic boost before adding more playback gain
   - bias the mix toward the stronger microphone instead of always averaging
   - keep AGC simple and reversible so it can be removed cleanly once real AFE is inserted
+- For the new AFE round:
+  - keep `AEC` off until a separate playback-reference path exists
+  - treat `river_voice_preproc` as the only allowed place to bind SDK AIVoice details
+  - keep `river_voice_capture` free of algorithm assumptions so it can feed future self-developed DSP or `TFLite Micro`
+  - validate `AFE-only` replay first, then add `VAD`, then add playback-reference-based `AEC`

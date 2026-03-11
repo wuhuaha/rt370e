@@ -28,6 +28,15 @@ config RIVER_SPEAKER_TEST_DIAG_DEFAULT_ON
     bool "Enable speaker playback diagnostics by default"
     default n
 
+choice RIVER_VOICE_PREPROC_BACKEND
+    prompt "Local voice pre-processing backend"
+    default RIVER_VOICE_PREPROC_AIVOICE_AFE
+
+config RIVER_VOICE_PREPROC_AIVOICE_AFE
+    bool "AIVoice AFE"
+
+endchoice
+
 choice RIVER_LOCAL_FRONTEND_MODE
     prompt "Local voice front-end mode"
     default RIVER_LOCAL_VAD_ONLY

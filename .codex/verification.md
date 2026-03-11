@@ -254,6 +254,52 @@ Manual check:
   - whether idle noise is acceptable
   - whether speech is still buried in noise
 
+## Step 3.0
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] board array: EV8730EA2/EV730EA2 linear-2mic-50mm primary=AMIC1 secondary=AMIC3 spacing=50mm
+[river][voice] capture profile: 16000 Hz, 16ms, 2ch, AMIC1+AMIC3
+[river][voice] preproc backend: aivoice_afe AFE_LINEAR_2MIC_50MM 16000 Hz 16ms in=2ch out=1ch
+[river] local_preproc=aivoice_afe
+[river][voice] boot audio echo diagnostics enabled
+[river][voice] boot audio echo autostart enabled
+[river][voice] audio echo config: 16000 Hz capture dual-mic -> AFE 1ch -> 16000 Hz playback dual-mono, 1000 ms delay, AMIC1+AMIC3 -> speaker
+[river][voice] audio echo gain: hw=0.65 sw=1.00 pcm=x2 cap=0x28 preproc=aivoice_afe
+[river][voice] audio echo started
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] play_peak=[..., ...] read_ok=... proc_ok=... write_ok=... read_fail=... proc_fail=... write_fail=... partial_read=... partial_proc=...
+```
+
+Manual check:
+- No shell command is required.
+- Speak at about `20-30 cm` first, then test again at about `0.5-1.0 m`.
+- Wait about `1 second` for delayed replay.
+- Compare with the previous raw-array echo:
+  - whether speech is more intelligible
+  - whether background hiss/noise is lower
+  - whether `proc_ok` remains stable and `proc_fail` stays `0`
+
+Interpretation:
+- `cap_peak` is active but `proc_fail` grows:
+  - treat this as an AFE integration issue before changing board routing
+- `cap_peak` is active, `proc_ok` is stable, and `play_peak` is active:
+  - the full `capture -> AFE -> delayed replay` chain is healthy
+- replay is still poor even when the diagnostics look healthy:
+  - next step should be VAD plus playback-reference plumbing, not more raw-mix tuning
+
 ## Step 2.6.1
 Build and flash:
 ```bash
