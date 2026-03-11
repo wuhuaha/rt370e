@@ -185,6 +185,9 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - board logs showed the persistent `Silero` tensors already had valid `dims/data/bytes`
   - remaining failure was therefore in the extra eval-tensor guard, not in model binding itself
   - detector now keeps strong size checks on persistent I/O tensors and only basic presence/type/data checks on eval tensors
+- Step 4.14 completed: eval tensors are no longer allowed to block detector open on this SDK snapshot:
+  - board logs proved the persistent tensors are now good enough to attempt real runtime bring-up
+  - eval tensors are still collected and patched when available, but only produce a diagnostic warning if degraded
 - Next recommended step:
   - flash the newly rebuilt image and confirm the detector now reaches `silero_vad runtime ready`
   - if it does, collect silence / near-field / far-field `vad_prob_q15` diagnostics

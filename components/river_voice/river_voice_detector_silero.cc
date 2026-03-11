@@ -422,26 +422,10 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
                                          context->state_output_eval_tensor,
                                          context->next_state);
 
-    if (context->audio_input_tensor == NULL ||
-        context->state_input_tensor == NULL ||
-        context->prob_output_tensor == NULL ||
-        context->state_output_tensor == NULL ||
-        context->audio_input_eval_tensor == NULL ||
+    if (context->audio_input_eval_tensor == NULL ||
         context->state_input_eval_tensor == NULL ||
         context->prob_output_eval_tensor == NULL ||
         context->state_output_eval_tensor == NULL ||
-        !river_silero_vad_tensor_buffer_ready(
-            context->audio_input_tensor,
-            RIVER_SILERO_VAD_MODEL_INPUT_SAMPLES * sizeof(float)) ||
-        !river_silero_vad_tensor_buffer_ready(
-            context->state_input_tensor,
-            RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float)) ||
-        !river_silero_vad_tensor_buffer_ready(
-            context->prob_output_tensor,
-            sizeof(float)) ||
-        !river_silero_vad_tensor_buffer_ready(
-            context->state_output_tensor,
-            RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float)) ||
         !river_silero_vad_eval_tensor_buffer_ready(
             context->audio_input_eval_tensor,
             RIVER_SILERO_VAD_MODEL_INPUT_SAMPLES * sizeof(float)) ||
@@ -453,6 +437,30 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
             sizeof(float)) ||
         !river_silero_vad_eval_tensor_buffer_ready(
             context->state_output_eval_tensor,
+            RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float))) {
+        printf("[river][voice] silero_vad eval tensor state degraded:"
+               " audio_in=%p state_in=%p prob_out=%p state_out=%p\n",
+               (void *)context->audio_input_eval_tensor,
+               (void *)context->state_input_eval_tensor,
+               (void *)context->prob_output_eval_tensor,
+               (void *)context->state_output_eval_tensor);
+    }
+
+    if (context->audio_input_tensor == NULL ||
+        context->state_input_tensor == NULL ||
+        context->prob_output_tensor == NULL ||
+        context->state_output_tensor == NULL ||
+        !river_silero_vad_tensor_buffer_ready(
+            context->audio_input_tensor,
+            RIVER_SILERO_VAD_MODEL_INPUT_SAMPLES * sizeof(float)) ||
+        !river_silero_vad_tensor_buffer_ready(
+            context->state_input_tensor,
+            RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float)) ||
+        !river_silero_vad_tensor_buffer_ready(
+            context->prob_output_tensor,
+            sizeof(float)) ||
+        !river_silero_vad_tensor_buffer_ready(
+            context->state_output_tensor,
             RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float))) {
         river_silero_vad_dump_interpreter_io(context->interpreter);
         context->interpreter->~MicroInterpreter();

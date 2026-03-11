@@ -275,3 +275,6 @@
 - The eval-tensor views on this SDK snapshot are still not trustworthy enough for strict byte-length gating during open:
   - current detector keeps strong size checks on the persistent tensors it uses directly
   - eval tensors are only required to exist, be `float32`, and expose non-null `data`
+- Even that relaxed eval requirement may still be too strict for this SDK snapshot:
+  - current detector now treats eval tensors as best-effort diagnostics, not as an open-time blocker
+  - if future SDK updates make eval tensors reliable again, this policy can be tightened deliberately

@@ -1012,3 +1012,26 @@ Interpretation:
 - if open still fails:
   - collect the next `silero_vad` block
   - the next suspect becomes invoke-time behavior or arena pressure, not tensor metadata or top-level buffers
+
+## Step 4.14
+Rebuild the eval-optional image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected current result:
+- boot may optionally print:
+  - `silero_vad eval tensor state degraded: ...`
+- detector open should no longer fail solely because eval tensors are incomplete
+- next expected milestone remains:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`

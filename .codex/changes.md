@@ -559,3 +559,22 @@
 - Revalidated after the guard relaxation:
   - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap` passed
   - full image rebuild was started immediately after the targeted rebuild
+
+## Step 4.14
+- Collected the next board-side `Silero` log from commit `8a7036f`:
+  - persistent I/O tensors now report valid:
+    - `dims`
+    - `data`
+    - `bytes`
+  - detector still fails in open before `runtime ready`
+- Root cause refinement:
+  - the remaining blocker is no longer persistent-tensor binding
+  - `eval tensor` availability is still SDK-specific and should not be treated as a hard prerequisite for detector open
+  - the detector runtime path itself reads and writes through the persistent tensors
+- Updated `river_voice_detector_silero.cc`:
+  - keep best-effort eval-tensor acquisition and patching
+  - downgrade eval-tensor validation from hard failure to diagnostic warning:
+    - log `silero_vad eval tensor state degraded: ...` when eval views are missing or incomplete
+  - keep hard open-time rejection only for persistent tensors that the detector actually uses directly
+- Revalidated after the change:
+  - targeted `river_voice_target_img2_ap` rebuild passed locally

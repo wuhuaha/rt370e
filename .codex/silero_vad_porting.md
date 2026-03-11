@@ -443,3 +443,19 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Next board-side validation target:
   - confirm boot reaches `silero_vad runtime ready`
   - if not, move the investigation to `Invoke()` behavior or arena headroom
+
+## Eval-Tensor Optional Policy
+- Next board-side log still failed after the relaxed eval-tensor byte-length guard:
+  - persistent tensors were already good:
+    - valid `dims`
+    - valid `data`
+    - expected `bytes`
+  - therefore the remaining blocker was not persistent binding anymore
+- Device-side action on `2026-03-11`:
+  - keep eval-tensor lookup and fallback-buffer patching as a best-effort compatibility step
+  - stop letting degraded eval tensors block detector open
+  - add a warning log instead:
+    - `silero_vad eval tensor state degraded: ...`
+- Rationale:
+  - the detector runtime itself currently reads and writes through the persistent I/O tensors
+  - the next meaningful validation target is now whether real runtime reaches `Invoke()` and emits `runtime ready`
