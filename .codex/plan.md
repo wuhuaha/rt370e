@@ -60,3 +60,8 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - run board validation on the new `AFE-only` replay path first
   - if enhanced replay is stable, add a VAD adapter on the AFE output
   - after that, add playback-reference capture and enable AEC through the same preproc boundary
+- Step 3.1 completed: the AFE-only replay path is tuned for clearer debug listening before VAD/AEC integration:
+  - AFE `NS` is enabled in low-aggressive mode
+  - AFE fixed AGC gain is raised to `15 dB`
+  - echo replay now applies a light post-AFE adaptive gain stage
+  - diagnostics now expose `afe_peak` to separate AFE output strength from raw capture and playback gain

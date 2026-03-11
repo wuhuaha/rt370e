@@ -54,6 +54,10 @@
 - `VAD` is not yet connected even though the SDK resources are now enabled in the build.
 - The new AFE path has only been verified by local cross-build so far; it still needs board-side acoustic validation.
 - Enabling `AIVOICE` also pulls more SDK components into the build, so later runtime memory headroom must be checked after board validation.
+- The new post-AFE adaptive gain is intentionally only a debug replay aid:
+  - it helps the board speaker test path
+  - it should not be treated as the final production gain-control strategy
+  - once VAD/AEC/local ASR are in place, gain staging should move back toward the front-end policy instead of the replay sink
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -110,3 +114,6 @@
   - treat `river_voice_preproc` as the only allowed place to bind SDK AIVoice details
   - keep `river_voice_capture` free of algorithm assumptions so it can feed future self-developed DSP or `TFLite Micro`
   - validate `AFE-only` replay first, then add `VAD`, then add playback-reference-based `AEC`
+- For the current far-field tuning round on top of AFE:
+  - prefer modest `NS + AGC + post-AFE replay gain` over reverting to raw dual-mic mixing
+  - use `afe_peak` to decide whether the next issue is in enhancement output or only in replay loudness

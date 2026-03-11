@@ -80,9 +80,13 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
     afe_param.sample_rate = (int)profile->sample_rate;
     afe_param.frame_size = (int)((profile->sample_rate * profile->frame_ms) / 1000U);
     afe_param.enable_aec = false;
-    afe_param.enable_ns = false;
+    afe_param.enable_ns = true;
     afe_param.enable_agc = true;
     afe_param.enable_ssl = false;
+    afe_param.ns_mode = AFE_NS_SIGNAL_SET();
+    afe_param.ns_aggressive_mode = AFE_NS_AGGR_LOW;
+    afe_param.ns_cost_mode = AFE_NS_COST_HIGH;
+    afe_param.agc_fixed_gain = 15;
     common_param = (struct aivoice_sdk_config)AIVOICE_SDK_CONFIG_DEFAULT();
     common_param.timeout = 5;
 
@@ -173,5 +177,5 @@ void river_voice_preproc_aivoice_dump_profile(void)
            (unsigned long)profile->sample_rate,
            (unsigned long)profile->frame_ms,
            (unsigned long)profile->capture_channels);
-    printf("[river][voice] preproc afe: aec=off ns=off agc=on ssl=off ref=0\n");
+    printf("[river][voice] preproc afe: aec=off ns=on(low) agc=on(fixed=15dB) ssl=off ref=0\n");
 }

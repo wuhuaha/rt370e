@@ -22,12 +22,15 @@
 #define RIVER_VOICE_ECHO_WARMUP_MS             96U
 #define RIVER_VOICE_ECHO_TASK_STACK            (1024U * 12U)
 #define RIVER_VOICE_ECHO_TASK_PRIORITY         4U
-#define RIVER_VOICE_ECHO_CAPTURE_VOLUME        0x28U
+#define RIVER_VOICE_ECHO_CAPTURE_VOLUME        0x30U
 #define RIVER_VOICE_ECHO_CAPTURE_HPF_FC        0U
 #define RIVER_VOICE_ECHO_DIAG_WINDOW_MS        1000U
-#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.65f
+#define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.80f
 #define RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME    1.00f
 #define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     2U
+#define RIVER_VOICE_ECHO_POST_AGC_GATE         96U
+#define RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK  12000U
+#define RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN     4U
 
 typedef struct {
     bool running;
@@ -62,6 +65,7 @@ typedef struct {
     uint32_t diag_chunks_until_log;
     uint16_t diag_capture_peak_ch0;
     uint16_t diag_capture_peak_ch1;
+    uint16_t diag_enhanced_peak;
     uint16_t diag_playback_peak_ch0;
     uint16_t diag_playback_peak_ch1;
 } river_voice_echo_context_t;
@@ -165,6 +169,7 @@ static void river_voice_echo_reset_diag_counters(void)
     g_river_voice_echo.diag_partial_proc = 0U;
     g_river_voice_echo.diag_capture_peak_ch0 = 0U;
     g_river_voice_echo.diag_capture_peak_ch1 = 0U;
+    g_river_voice_echo.diag_enhanced_peak = 0U;
     g_river_voice_echo.diag_playback_peak_ch0 = 0U;
     g_river_voice_echo.diag_playback_peak_ch1 = 0U;
     g_river_voice_echo.diag_chunks_until_log = RIVER_VOICE_ECHO_DIAG_WINDOW_MS /
@@ -184,9 +189,10 @@ static void river_voice_echo_log_diagnostics_if_needed(void)
         return;
     }
 
-    printf("[river][voice][diag] cap_peak=[%u,%u] play_peak=[%u,%u] read_ok=%lu proc_ok=%lu write_ok=%lu read_fail=%lu proc_fail=%lu write_fail=%lu partial_read=%lu partial_proc=%lu\n",
+    printf("[river][voice][diag] cap_peak=[%u,%u] afe_peak=%u play_peak=[%u,%u] read_ok=%lu proc_ok=%lu write_ok=%lu read_fail=%lu proc_fail=%lu write_fail=%lu partial_read=%lu partial_proc=%lu\n",
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch1,
+           (unsigned int)g_river_voice_echo.diag_enhanced_peak,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch1,
            (unsigned long)g_river_voice_echo.diag_read_ok,
@@ -238,6 +244,53 @@ static void river_voice_echo_apply_warmup(uint8_t *buffer, size_t bytes)
     mute_bytes = river_voice_min_size(bytes, (size_t)g_river_voice_echo.warmup_bytes_remaining);
     memset(buffer, 0, mute_bytes);
     g_river_voice_echo.warmup_bytes_remaining -= (uint32_t)mute_bytes;
+}
+
+static uint16_t river_voice_echo_apply_post_agc(uint8_t *buffer, size_t bytes)
+{
+    int16_t *samples;
+    size_t sample_count;
+    size_t index;
+    uint16_t peak;
+    uint32_t gain;
+
+    if (buffer == 0 || bytes < sizeof(int16_t)) {
+        return 0U;
+    }
+
+    peak = 0U;
+    river_voice_echo_update_peak(buffer, bytes, 1U, &peak, &peak);
+    if (peak < RIVER_VOICE_ECHO_POST_AGC_GATE) {
+        return peak;
+    }
+
+    gain = 1U;
+    if (peak < RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK) {
+        gain = (RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK + peak - 1U) / peak;
+        if (gain > RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN) {
+            gain = RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN;
+        }
+    }
+    if (gain == 1U) {
+        return peak;
+    }
+
+    samples = (int16_t *)buffer;
+    sample_count = bytes / sizeof(int16_t);
+    peak = 0U;
+    for (index = 0; index < sample_count; ++index) {
+        int16_t sample;
+        uint16_t abs_peak;
+
+        sample = river_voice_echo_sat16((int32_t)samples[index] * (int32_t)gain);
+        samples[index] = sample;
+        abs_peak = river_voice_echo_abs16(sample);
+        if (abs_peak > peak) {
+            peak = abs_peak;
+        }
+    }
+
+    return peak;
 }
 
 static void river_voice_echo_expand_mono_to_stereo(uint8_t *dst, const uint8_t *src, size_t mono_bytes)
@@ -428,10 +481,13 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned long)g_river_voice_echo.actual_delay_ms,
            river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
            river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic));
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu cap=0x%02lx preproc=%s\n",
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu post_agc=target%u/maxx%lu gate=%u cap=0x%02lx preproc=%s\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,
+           (unsigned int)RIVER_VOICE_ECHO_POST_AGC_TARGET_PEAK,
+           (unsigned long)RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN,
+           (unsigned int)RIVER_VOICE_ECHO_POST_AGC_GATE,
            (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
            river_voice_preproc_backend_name());
     return RIVER_OK;
@@ -488,6 +544,16 @@ static void river_voice_echo_task(void *param)
                    0,
                    g_river_voice_echo.enhanced_chunk_bytes - enhanced_bytes);
             g_river_voice_echo.diag_partial_proc++;
+        }
+
+        {
+            uint16_t enhanced_peak;
+
+            enhanced_peak = river_voice_echo_apply_post_agc(g_river_voice_echo.enhanced_buffer,
+                                                            g_river_voice_echo.enhanced_chunk_bytes);
+            if (enhanced_peak > g_river_voice_echo.diag_enhanced_peak) {
+                g_river_voice_echo.diag_enhanced_peak = enhanced_peak;
+            }
         }
 
         river_voice_echo_apply_warmup(g_river_voice_echo.enhanced_buffer, g_river_voice_echo.enhanced_chunk_bytes);

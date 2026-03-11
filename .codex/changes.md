@@ -199,3 +199,22 @@
   - `AFE 2MIC50MM`
   - baseline `VAD/KWS/ASR` resources for later steps
 - Verified the refactored AFE-only build locally for `RTL8730E`.
+
+## Step 3.1
+- Tuned the `AFE-only` replay path for board-side intelligibility before adding VAD or AEC.
+- Updated the SDK AFE runtime policy:
+  - `NS` enabled
+  - `NS` aggressiveness kept low to reduce noise without over-distorting speech
+  - AFE fixed AGC gain raised from the default profile to `15 dB`
+- Raised the board-side listening gain:
+  - capture volume from `0x28` to `0x30`
+  - speaker hardware volume from `0.65` to `0.80`
+- Added a replay-only post-AFE adaptive gain stage in `river_voice_echo.c`:
+  - target peak `12000`
+  - max gain `x4`
+  - silence gate `96`
+- Added `afe_peak` to the serial diagnostics so the project can now distinguish:
+  - raw mic energy
+  - enhanced AFE output energy
+  - final playback energy
+- Verified the tuned build locally for `RTL8730E`.

@@ -300,6 +300,43 @@ Interpretation:
 - replay is still poor even when the diagnostics look healthy:
   - next step should be VAD plus playback-reference plumbing, not more raw-mix tuning
 
+## Step 3.1
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] preproc afe: aec=off ns=on(low) agc=on(fixed=15dB) ssl=off ref=0
+[river][voice] audio echo gain: hw=0.80 sw=1.00 pcm=x2 post_agc=target12000/maxx4 gate=96 cap=0x30 preproc=aivoice_afe
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] afe_peak=... play_peak=[..., ...] read_ok=... proc_ok=... write_ok=... read_fail=... proc_fail=... write_fail=... partial_read=... partial_proc=...
+```
+
+Manual check:
+- Speak at `20-30 cm`, then at `0.5-1.0 m`.
+- Compare with the previous AFE-only build:
+  - whether replay loudness is higher
+  - whether far-field speech is easier to distinguish
+  - whether idle noise stays acceptable
+
+Interpretation:
+- `afe_peak` is low while `cap_peak` is active:
+  - the next tuning point is AFE policy, not replay volume
+- `afe_peak` is healthy but `play_peak` is still low:
+  - the next tuning point is only replay gain
+- `afe_peak` and `play_peak` are both healthy but far-field speech is still poor:
+  - stop tuning replay gain and move next to `VAD + reference-path + AEC`
+
 ## Step 2.6.1
 Build and flash:
 ```bash
