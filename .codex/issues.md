@@ -107,6 +107,10 @@
 - The staged detector currently assumes `16 kHz` mono input and a `512-sample` model window:
   - this matches the intended streaming direction
   - but it still needs to be validated against the exact imported official artifact
+- The exact upstream artifact is now pinned, but no TFLite export exists yet:
+  - current source artifact is official ONNX
+  - current target runtime is `TFLite Micro`
+  - the host-side conversion gap is now the main migration blocker
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -195,3 +199,7 @@
   - do not compress the model before the first direct migration works
   - pin the exact upstream revision before generating any project-side artifact
   - record every export command, tool version, and checksum immediately in `/.codex/silero_vad_porting.md`
+- For the next conversion step:
+  - keep using the vendored `silero_vad_16k_op15.onnx`
+  - preserve the official `512 + 64 + state` streaming semantics during export
+  - reject any conversion shortcut that silently changes the detector window contract without documenting it

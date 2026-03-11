@@ -107,7 +107,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - recorded the first migration rule in `/.codex/silero_vad_porting.md`:
     - migrate the original model first
     - do not prune or quantize until measured resource pressure appears
+- Step 4.3 completed: official `Silero VAD` upstream is now pinned into the repository:
+  - downloaded official upstream repo and pinned commit `0dd0d85ee86b1f9d178dc26a04e60e90de26a80f`
+  - selected official `silero_vad_16k_op15.onnx` as the first conversion source
+  - vendored that exact artifact into `third_party/silero_vad/upstream/`
+  - recorded the official streaming contract:
+    - `512-sample` window
+    - `64-sample` context
+    - recurrent state `2 x batch x 128`
 - Next recommended step:
-  - fetch the official `Silero VAD` source/model and pin the exact upstream revision
-  - add the first real export / conversion path into `/.codex/silero_vad_porting.md`
+  - add the first real export / conversion path from the vendored ONNX into a TFLite/TFLM-consumable artifact
+  - record all host tool versions and checksums in `/.codex/silero_vad_porting.md`
   - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile for now

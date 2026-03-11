@@ -279,6 +279,23 @@ Expected behavior:
 - The project still boots without changing the current audio debug path.
 - Detector information is now explicit in boot logs and status output.
 - No real VAD gating is active in this step yet.
+
+## Step 4.3
+Repository-side checks:
+```bash
+cd /root/ameba-river
+sha256sum third_party/silero_vad/upstream/silero_vad_16k_op15.onnx
+git -C /tmp/silero-vad-upstream rev-parse HEAD
+```
+
+Expected result:
+- vendored ONNX checksum is `7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49`
+- pinned upstream commit is `0dd0d85ee86b1f9d178dc26a04e60e90de26a80f`
+
+Boot-time expectation after rebuild:
+```text
+[river][voice] detector backend: silero_vad staged runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model=silero_vad_16k_op15.onnx import=pending
+```
 source env.sh
 ameba.py soc RTL8730E
 ameba.py build -p

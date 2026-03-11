@@ -275,6 +275,14 @@
   - migrate the original model first
   - do not prune or quantize in the first migration step
   - only compress later if actual flash / RAM / latency measurements require it
+
+## Step 4.3
+- Downloaded the official `Silero VAD` upstream repository and pinned commit `0dd0d85ee86b1f9d178dc26a04e60e90de26a80f`.
+- Vendored the exact first conversion input into the project:
+  - `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx`
+- Added upstream metadata and checksum tracking in:
+  - `third_party/silero_vad/upstream/METADATA.md`
+- Tightened the staged detector logs so the runtime now reports the selected official source model and the official streaming contract baseline.
   - `NS mid`
   - `adaptive AGC + fixed 5 dB`
   - `RES mid`
