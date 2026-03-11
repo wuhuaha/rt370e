@@ -101,3 +101,20 @@ This keeps the current SDK-backed step and the future self-developed step aligne
   This keeps later self-developed VAD backends aligned with the same detector boundary.
 - The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.
+## Current Online-ASR Preparation State
+
+- default validation path:
+  - `capture -> preproc(asr_mainline) -> detector(silero + sdk_vad_ref) -> segment_buffer -> segment_sink -> diagnostics`
+- current intention:
+  - keep `echo` only as a board test path
+  - keep `vad_probe` as the main speech-segmentation validation path
+  - use `segment_buffer + segment_sink` as the future handoff point into online ASR transport
+- current buffering policy:
+  - detector decisions stay frame-local
+  - speech segments are reconstructed outside the detector using:
+    - pre-roll
+    - post-roll
+    - max-segment clamp
+- why this boundary matters:
+  - later replacing `Silero` with a self-developed VAD should not change online ASR upload logic
+  - later replacing `aivoice_afe` with a self-developed front-end should not change segment buffering logic

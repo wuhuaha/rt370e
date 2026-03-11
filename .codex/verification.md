@@ -259,6 +259,53 @@ Interpretation:
   - threshold is too low or the current AEC/AFE profile leaks too much non-speech energy into the detector
   - the direct speaker playback path is proven
 
+## Step 4.21
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py soc RTL8730E
+CCACHE_DISABLE=1 python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] preproc backend: ... profile=asr_mainline
+[river][voice] detector backend: silero_vad ... enter_q15=9000 exit_q15=2500 hangover=10 ema_shift=1 ...
+[river][voice] detector reference: aivoice_vad_v1 diagnostic-only ...
+[river][voice] boot vad probe diagnostics enabled
+[river][voice] boot vad probe autostart enabled
+[river][voice] vad probe segment buffer: pre=384ms post=768ms max=8000ms
+[river][voice] segment sink: online_asr_stub ...
+[river][voice] vad probe started
+[river] audio_echo=stopped
+[river] audio_vad_probe=running
+```
+
+Runtime expectation:
+```text
+[river][voice][probe] ... vad_raw_q15=... vad_prob_q15=... vad=speech|silence vad_start=... vad_end=... sdk_vad=... seg=active|ready|idle seg_pre_ms=... seg_post_left_ms=... seg_active_ms=... seg_ready_ms=...
+[river][voice][segment] ready: bytes=... ms=... pre=384ms post=768ms completed=... dropped=...
+```
+
+Manual checks:
+- Stay silent for `3-5s` and confirm `vad=silence` dominates, while `sdk_vad` also mostly stays `silence`.
+- Speak short Chinese phrases such as `打开客厅灯` and `关闭风扇`.
+- Confirm short utterances still appear in the high-frequency probe logs.
+- Confirm at least one `[river][voice][segment] ready: ...` line appears after speech ends.
+
+Interpretation:
+- `vad_raw_q15` rises but `vad_prob_q15` stays low:
+  - smoothing or decision policy is still too conservative
+- `Silero` and `sdk_vad` both stay low:
+  - inspect shared capture / AFE path before suspecting the model
+- `Silero` triggers often but `sdk_vad` never does:
+  - current `Silero` thresholds are more recall-oriented, so some extra false positives are expected
+- `segment] ready` never appears:
+  - post-roll or segment-buffer path is not finalizing correctly
+
 ## Step 4.8
 Build and flash with the project-owned NOR profile:
 ```bash

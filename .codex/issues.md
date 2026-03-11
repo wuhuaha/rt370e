@@ -278,3 +278,22 @@
 - Even that relaxed eval requirement may still be too strict for this SDK snapshot:
   - current detector now treats eval tensors as best-effort diagnostics, not as an open-time blocker
   - if future SDK updates make eval tensors reliable again, this policy can be tightened deliberately
+- The current default validation path is now `vad_probe`, not delayed replay:
+  - this is the correct path for VAD tuning
+  - but conclusions about end-to-end conversational UX still need the future online ASR path
+- Current `Silero` tuning is intentionally recall-oriented:
+  - enter threshold is lowered
+  - exit threshold is lowered
+  - hangover is extended
+  - this is expected to increase false positives while reducing missed short utterances
+- `segment_buffer` is now ready for online ASR handoff, but the actual consumer is still a stub:
+  - current sink is `online_asr_stub`
+  - ready segments are not uploaded yet
+- The EV8730EA2 user RGB LED is now explicitly treated as unresolved hardware:
+  - runtime log correctly reports `rgb indicator deferred`
+  - `R25/R27/R31` population and `LEDR/LEDG/LEDB` GPIO mapping still need hardware confirmation
+
+## Latest Mitigation Additions
+- Keep the current VAD policy recall-oriented until online-ASR segment loss is no longer the dominant risk, then tighten thresholds using probe logs and real utterance captures.
+- Keep `segment_buffer -> segment_sink` as the only allowed handoff path into future online ASR code so `vad_probe` remains a validation path, not business-logic glue.
+- Do not re-enable RGB runtime driving until the passive RGB hardware path is confirmed on the actual board revision.

@@ -197,10 +197,24 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - active preproc profile is changed to `asr_mainline`
   - `AEC` and playback reference are removed from the default validation path
   - diagnostics now print at about `240 ms` cadence so short utterances are less likely to be missed
+- Step 4.21 completed: pure VAD validation is now shifted toward online-ASR staging instead of probe-only visibility:
+  - added `river_voice_segment_buffer` as a reusable front/back buffered utterance cache
+  - added `river_voice_segment_sink` as the future online-ASR handoff point, currently backed by a stub implementation
+  - `vad_probe` now keeps:
+    - `384 ms` pre-roll
+    - `768 ms` post-roll
+    - up to `8000 ms` per ready segment
+  - probe diagnostics are now denser and more decision-oriented:
+    - window reduced again to about `96 ms`
+    - logs now expose `vad_start/vad_end`
+    - logs now expose segment prebuffer / post-roll / ready-state counters
+  - `Silero` is tuned more aggressively for recall:
+    - enter threshold `9000`
+    - exit threshold `2500`
+    - hangover `10`
+    - EMA shift `1`
+  - current default validation path is therefore no longer just "does VAD run", but "does VAD produce ASR-usable buffered speech segments"
 - Next recommended step:
-  - flash the pure `vad_probe` image and compare:
-    - `Silero` raw probability
-    - `Silero` smoothed decision
-    - SDK VAD reference events
-  - if both detectors remain unstable on the same enhanced mono stream, inspect the shared input chain first
-  - if the SDK reference is stable while `Silero` is not, continue tuning or auditing the `Silero` stream/state handling
+  - keep validating the pure `vad_probe` path with short Chinese utterances and room-noise samples
+  - if `Silero` still drops too many short utterances, keep tuning decision policy before touching the model
+  - next feature step should connect `segment_buffer ready` data to the future online ASR uplink boundary

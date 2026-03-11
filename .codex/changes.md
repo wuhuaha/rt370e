@@ -258,6 +258,37 @@
   - embedded `.tflite` artifact size: about `1.2 MB`
   - `target_img2_ap.axf` size: about `14 MB`
   - `target_img2_ap.axf` sections:
+
+## Step 4.21
+- Added `river_voice_segment_buffer.*` as a reusable speech-segment cache module for the next online ASR step.
+- `vad_probe` now writes enhanced mono frames into that segment buffer and emits:
+  - ready-segment size
+  - ready-segment duration
+  - completed / dropped segment counters
+- Added `river_voice_segment_sink.*` as a stable handoff boundary between buffered local speech segments and future online ASR transport.
+- Current sink backend is `online_asr_stub`, so the buffered path is exercised without coupling the voice path to a cloud implementation yet.
+- The default pure-VAD path now keeps buffered context around speech:
+  - pre-roll `384 ms`
+  - post-roll `768 ms`
+  - max segment `8000 ms`
+- Lowered `Silero` decision thresholds to favor recall over precision:
+  - enter threshold `9000`
+  - exit threshold `2500`
+  - hangover `10`
+  - EMA shift kept at `1` for fast reaction
+- Reduced the pure-probe diagnostic window to about `96 ms` and added:
+  - `vad_start`
+  - `vad_end`
+  - segment prebuffer / post-roll state
+- Added a dedicated Chinese migration record:
+  - `/.codex/silero_vad_migration_zh.md`
+- The Chinese migration note now explains:
+  - official upstream selection
+  - host conversion path
+  - device runtime integration
+  - `RTL8730E SDK` compatibility fixes
+  - flash profile changes
+  - reproduction and audit procedure
     - `text=2355576`
     - `data=38868`
     - `bss=87680`
