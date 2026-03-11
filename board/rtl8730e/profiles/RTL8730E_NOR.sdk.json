@@ -1,0 +1,41 @@
+{
+  "Images": [
+    {
+      "ImageName": "km4_boot_all.bin",
+      "StartAddress": 134217728,
+      "EndAddress": 134479872,
+      "FullErase": false,
+      "MemoryType": 1,
+      "Mandatory": true,
+      "Description": "KM4 bootloader"
+    },
+    {
+      "ImageName": "km0_km4_ca32_app.bin",
+      "StartAddress": 134479872,
+      "EndAddress": 137363456,
+      "FullErase": false,
+      "MemoryType": 1,
+      "Mandatory": true,
+      "Description": "KM0 and KM4 non-secure,KM4 secure application and AP firmware package"
+    }
+  ],
+  "DefaultEfuseMap": [
+    {
+      "Value": "MIcAAAAAAAAAAAAAAAAAAA==",
+      "Offset": 0
+    }
+  ],
+  "Version": "1.1.1",
+  "DeviceName": "RTL8730E",
+  "DeviceID": 26232,
+  "MemoryType": 1,
+  "SupportUsbDownload": true,
+  "FlashStartAddress": 134217728,
+  "RamStartAddress": 536870912,
+  "Floader": "floader_amebasmart.bin",
+  "FloaderAddress": 805318656,
+  "HandshakeBaudrate": 115200,
+  "LogBaudrate": 1500000,
+  "LogicalEfuseLen": 1024,
+  "PhysicalEfuseLen": 2048
+}

@@ -145,10 +145,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - diagnostics now expose `vad_prob_q15`, `vad=speech|silence`, and detector success/failure counters
   - first build-time resource baseline is now recorded before any compression decision:
     - `.tflite` artifact about `1.2 MB`
-    - packaged app image about `2.8 MB`
-    - `target_img2_ap.axf` text about `2.36 MB`
+  - packaged app image about `2.8 MB`
+  - `target_img2_ap.axf` text about `2.36 MB`
+- Step 4.8 completed: project-owned flash profiles are now in place for the oversized development image:
+  - copied the stock `RTL8730E NOR` profile into the project in decrypted form for traceability
+  - created a development single-slot NOR profile that expands the combined app package range to `0x08600000`
+  - added `tools/river_flash.py` so flashing can use the project profile without patching the SDK
+  - added `tools/generate_rdev.py` so the encrypted `.rdev` stays reproducible from project JSON
 - Next recommended step:
-  - flash the new build to the board and confirm `Silero` runtime boot logs appear
+  - flash the new build with the project flash wrapper and confirm `Silero` runtime boot logs appear
   - capture near-field, far-field, and silence diagnostics using the new `vad_*` counters
   - measure whether `256 KB` tensor arena is sufficient under sustained runtime
   - only then decide whether compression is necessary

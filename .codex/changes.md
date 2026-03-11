@@ -263,6 +263,24 @@
     - `bss=87680`
   - packaged app image `km0_km4_ca32_app.bin`: about `2.8 MB`
 
+## Step 4.8
+- Copied the `RTL8730E NOR` device profile into the project and turned it into a project-owned flash profile flow.
+- Added project-side profile sources under `board/rtl8730e/profiles/`:
+  - `RTL8730E_NOR.sdk.json`: decrypted SDK stock baseline
+  - `RTL8730E_NOR.json`: project development profile source
+  - `RTL8730E_NOR.rdev`: encrypted profile generated from the project JSON
+- Added profile tooling:
+  - `tools/generate_rdev.py`: regenerate encrypted `.rdev` from project JSON
+  - `tools/river_flash.py`: project-owned flash wrapper that prefers the local profile over the SDK profile
+- The development NOR profile expands the app package download range:
+  - SDK stock: `0x08040000-0x08300000`
+  - project dev: `0x08040000-0x08600000`
+- Why this was required:
+  - current `km0_km4_ca32_app.bin` size: `2929664`
+  - SDK stock slot size: `2883584`
+  - overflow: `46080`
+- The new profile is explicitly marked as development-only because it consumes the OTA2 area for extra app space.
+
 ## Step 3.1.1
 - Reverted the experimental detector-gated replay step after user feedback showed this direction was not wanted for the current phase.
 - Kept the architecture prepared for future `VAD`, but restored the active runtime path to:

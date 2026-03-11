@@ -218,6 +218,16 @@
   - Future conversion commands must never target `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx` directly.
   - They must first stage a temporary copy under `/tmp` and operate on that copy only.
 - The next reconstruction step still needs one careful conversion detail:
+- The current `Silero VAD` package makes the combined NOR application image exceed the stock SDK flash-profile envelope:
+  - stock `RTL8730E_NOR.rdev` app range is `0x08040000-0x08300000`
+  - current `km0_km4_ca32_app.bin` is larger than that slot by about `45 KB`
+- A project-owned development NOR flash profile is now added to unblock flashing, but it is intentionally not a production layout:
+  - the development profile expands the app download range to `0x08600000`
+  - this consumes the SDK `OTA2` area for a larger single-slot image
+  - this is acceptable for current local bring-up only
+- The project-owned `.rdev` only changes the flash-tool envelope.
+  - it does not by itself redefine the firmware-side flash map in the SDK
+  - if future OTA, dual-slot update, or filesystem growth is needed, the SDK flash layout and project profile must be redesigned together
   - `decoder.lstm.W/R/B` can now be reconstructed from the ONNX slice/concat graph
   - but `Keras` gate ordering must be aligned explicitly instead of being assumed from PyTorch defaults
 - The restored official ONNX layout is also a reminder not to rely on mutated local graphs:

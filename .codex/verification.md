@@ -258,6 +258,38 @@ Interpretation:
 - `vad_prob_q15` stays high in silence:
   - threshold is too low or the current AEC/AFE profile leaks too much non-speech energy into the detector
   - the direct speaker playback path is proven
+
+## Step 4.8
+Build and flash with the project-owned NOR profile:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Expected wrapper output:
+```text
+[river_flash] profile=/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev
+[river_flash] image_dir=/root/ameba-river/build_RTL8730E/build/project_hp/image
+```
+
+Expected profile behavior:
+- flashing uses the project-owned development NOR profile instead of the SDK stock `RTL8730E_NOR.rdev`
+- `km4_boot_all.bin` still downloads into `0x08000000-0x08040000`
+- `km0_km4_ca32_app.bin` is allowed to download into `0x08040000-0x08600000`
+
+Manual check:
+- confirm that the previous "bin too large" flash rejection no longer appears
+- after flashing, monitor the board and confirm the normal boot log still appears
+
+Interpretation:
+- flashing still reports the image is too large:
+  - confirm the wrapper printed the project profile path, not the SDK path
+- boot fails after flashing:
+  - treat this as a flash-layout compatibility issue, not a wrapper bug
+  - compare the downloaded image size and any boot-stage fault log before enlarging the profile further
   - remaining echo issues should be traced to capture routing or echo processing, not basic playback hardware
 
 ## Step 2.6
