@@ -499,3 +499,21 @@
   - dump the interpreter I/O tensor inventory on binding failure so future mismatches are immediately visible on serial logs
 - Revalidated the changed detector component locally:
   - `CCACHE_DISABLE=1 cmake --build ... --target river_voice_target_img2_ap` passes
+
+## Step 4.11
+- Collected the next board-side tensor inventory from the real `RTL8730E` SDK `TFLite Micro` runtime:
+  - `inputs=2`, `outputs=2` are reported correctly
+  - tensor structs are non-null
+  - tensor `type=float32` is still valid
+  - but tensor `dims` and `name` metadata are not usable on-device for this model
+- Updated `river_voice_detector_silero.cc` to stop depending on tensor shape metadata at runtime:
+  - trust the pinned interpreter I/O order first
+  - validate tensor buffer availability through:
+    - `data` pointer
+    - `bytes` lower bound
+    - element type
+  - keep failure logs for `data` and `bytes` so future SDK/runtime differences remain diagnosable
+- Rebuilt the full `RTL8730E` image successfully after this compatibility fix.
+- Current expected next board behavior:
+  - detector should advance past `silero_vad tensor binding failed`
+  - next useful milestone log is `silero_vad runtime ready`

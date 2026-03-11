@@ -918,3 +918,37 @@ Expected current result:
   - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
 - generated artifact checksum should be:
   - `5a532943646b1dd71930fb02e26e0600ba97ee80990302726294aef8a3142a05`
+
+## Step 4.11
+Rebuild the latest detector-compatibility image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash the project-owned NOR profile and monitor boot:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected current result:
+- boot should still report:
+  - `detector backend: silero_vad runtime=tflite_micro`
+- boot should no longer stop at:
+  - `silero_vad tensor binding failed`
+- next expected milestone is:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+
+If the detector still fails, the serial log should now include additional tensor buffer details:
+- `silero_vad input[...] data=... bytes=...`
+- `silero_vad output[...] data=... bytes=...`
+
+Interpretation:
+- `data != NULL` and `bytes` large enough:
+  - detector should now be able to bind without tensor shape metadata
+- `data == NULL` for one or more tensors:
+  - next suspect is allocation / arena pressure rather than tensor ordering

@@ -348,3 +348,36 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Local code validation:
   - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap`
   - result: passed
+
+## SDK Tensor Metadata Compatibility
+- Next board-side log after the fixed-order binding update:
+  - `silero_vad interpreter io: inputs=2 outputs=2`
+  - each `TfLiteTensor *` is non-null
+  - `type=0` (`kTfLiteFloat32`) is present
+  - but `dims->size` is reported unusably and tensor `name` is empty / null on-device
+- Interpretation:
+  - the `RTL8730E` SDK snapshot of `TFLite Micro` cannot be treated as exposing reliable runtime tensor metadata for this model
+  - the board runtime should not require `dims/name` for detector binding
+- Device-side action:
+  - removed runtime dependence on tensor shape metadata for the primary binding path
+  - keep using the pinned interpreter order:
+    - input 0 = state
+    - input 1 = audio
+    - output 0 = probability
+    - output 1 = next state
+  - validate tensors by:
+    - non-null tensor pointer
+    - `float32` element type
+    - non-null `data` pointer
+    - `bytes` large enough for the expected payload
+  - added extra failure logging for tensor `data` and `bytes`
+- Local code validation after this change:
+  ```bash
+  cd /root/ameba-river
+  source env.sh
+  CCACHE_DISABLE=1 ameba.py build -p
+  ```
+  - result: passed
+- Next board-side validation target:
+  - confirm boot advances past `silero_vad tensor binding failed`
+  - expect `silero_vad runtime ready` if the buffer-based binding is sufficient

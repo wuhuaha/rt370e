@@ -169,3 +169,11 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - measure whether `256 KB` tensor arena is sufficient under sustained runtime
   - only then decide whether compression is necessary
   - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile while detector migration continues
+- Step 4.11 completed: board runtime compatibility is now adjusted to the actual `RTL8730E` SDK `TFLite Micro` behavior:
+  - on-device tensor `dims/name` metadata turned out to be unusable for this model even though tensor structs and types are valid
+  - detector binding now validates fixed I/O order plus tensor buffer readiness instead of requiring runtime shape metadata
+  - full `RTL8730E` image rebuild after this fix passed locally
+- Next recommended step:
+  - flash the newly rebuilt image and confirm the detector now reaches `silero_vad runtime ready`
+  - if it does, collect silence / near-field / far-field `vad_prob_q15` diagnostics
+  - if it still fails, use the new `data/bytes` tensor dump to decide whether arena size or tensor allocation order is the next blocker

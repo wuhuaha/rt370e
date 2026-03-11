@@ -264,3 +264,7 @@
   - missing `TFLITE_*` feature macros are defined in the file itself
   - `river_voice` target suppresses `-Wunused-parameter` locally for `TFLite Micro` headers
   - if the SDK `tflite_micro` snapshot changes, this module should be checked first
+- The current `RTL8730E` SDK `TFLite Micro` runtime should not be assumed to expose reliable tensor metadata:
+  - board logs showed valid tensor structs and valid `float32` types
+  - but `dims/name` were unusable for the embedded `Silero` model
+  - runtime binding should therefore prefer pinned I/O order plus buffer readiness over metadata-dependent matching
