@@ -700,3 +700,21 @@
   - current runtime runs on `RTL8730E` `CA32`, so generic Cortex-M FPU flags are not directly applicable
   - generic `SCB_InvalidateDCache_by_Addr()` examples are not the current CA32 cache API
   - dynamic tensor-arena allocation needs allocator-level alignment scrutiny rather than static-array assumptions
+
+## Step 4.20
+- Switched the default validation runtime from echo replay to a pure detector probe path:
+  - added `components/river_voice/river_voice_vad_probe.c`
+  - added new public control APIs in `include/river/river_voice.h`
+  - added `river audio probe <start|stop|status>` monitor handling
+- Changed default boot mode:
+  - disabled `CONFIG_RIVER_AUDIO_ECHO_AUTOSTART`
+  - enabled `CONFIG_RIVER_VAD_PROBE_AUTOSTART`
+  - selected `CONFIG_RIVER_VAD_PROBE_DIAG_DEFAULT_ON`
+  - switched preproc validation from `asr_barge_in_aec` to `asr_mainline`
+- Probe-path design:
+  - `capture -> aivoice_afe(asr_mainline) -> silero + sdk_vad_ref -> serial diagnostics`
+  - no speaker playback
+  - no delay ring
+  - no playback reference
+  - no `AEC` in the validation path
+- Raised diagnostic cadence from roughly `1s` windows to about `240ms` windows in the probe runtime so short utterances are easier to catch in serial logs.

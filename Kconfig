@@ -20,6 +20,14 @@ config RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     bool "Enable audio echo diagnostics by default"
     default n
 
+config RIVER_VAD_PROBE_AUTOSTART
+    bool "Autostart pure VAD probe at boot"
+    default n
+
+config RIVER_VAD_PROBE_DIAG_DEFAULT_ON
+    bool "Enable VAD probe diagnostics by default"
+    default n
+
 config RIVER_BOARD_RGB_VAD_INDICATOR_EN
     bool "Enable RGB VAD status indicator"
     default y

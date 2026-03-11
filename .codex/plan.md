@@ -192,3 +192,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - flash the newly rebuilt image and confirm the detector now reaches `silero_vad runtime ready`
   - if it does, collect silence / near-field / far-field `vad_prob_q15` diagnostics
   - if it still fails, inspect whether invoke-time tensor contents or arena pressure, not binding, is the next blocker
+- Step 4.20 completed: default validation is now switched to a pure VAD probe path:
+  - boot autostart runs `vad_probe`, not delayed speaker replay
+  - active preproc profile is changed to `asr_mainline`
+  - `AEC` and playback reference are removed from the default validation path
+  - diagnostics now print at about `240 ms` cadence so short utterances are less likely to be missed
+- Next recommended step:
+  - flash the pure `vad_probe` image and compare:
+    - `Silero` raw probability
+    - `Silero` smoothed decision
+    - SDK VAD reference events
+  - if both detectors remain unstable on the same enhanced mono stream, inspect the shared input chain first
+  - if the SDK reference is stable while `Silero` is not, continue tuning or auditing the `Silero` stream/state handling

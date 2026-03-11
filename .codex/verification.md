@@ -1188,3 +1188,51 @@ Interpretation:
   - focus on `Silero` threshold / stream framing / state handling
 - if RGB remains dark and boot prints the deferred message:
   - that is expected until the actual `LEDR/LEDG/LEDB` mapping is implemented
+
+## Step 4.20
+Rebuild the pure VAD probe image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot log changes:
+- preproc profile should switch to:
+  - `profile=asr_mainline`
+  - `aec=off`
+- boot should print:
+  - `boot vad probe diagnostics enabled`
+  - `boot vad probe autostart enabled`
+  - `vad probe config: ... detector-only ... diag_window~240ms`
+- app status should show:
+  - `audio_vad_probe=running`
+  - `audio_echo=stopped`
+
+Expected runtime diagnostics:
+- logs should move from:
+  - `[river][voice][diag] ...`
+- to:
+  - `[river][voice][probe] ...`
+- every log line should still include:
+  - `vad_raw_q15`
+  - `vad_prob_q15`
+  - `vad=speech|silence`
+  - `sdk_vad=speech|silence|disabled`
+  - `sdk_events/sdk_start/sdk_end/sdk_offset_ms`
+
+Interpretation:
+- if short utterances are still missing entirely:
+  - inspect whether the issue is already visible in `vad_raw_q15`
+- if `Silero` and SDK VAD both improve noticeably in pure probe mode:
+  - previous instability was mainly caused by the `AEC + playback` validation path
+- if `Silero` remains much less stable than SDK VAD on the same probe stream:
+  - continue tuning `Silero` thresholds / smoothing / stream-state handling

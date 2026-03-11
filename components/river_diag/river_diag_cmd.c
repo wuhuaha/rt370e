@@ -18,6 +18,7 @@ static void river_diag_help(void)
     printf("\triver echo <text>\n");
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
+    printf("\triver audio probe <start|stop|status>\n");
     printf("\triver audio diag <on|off|status>\n");
     printf("\triver device <light|fan|curtain|socket> <on|off|toggle>\n");
 }
@@ -122,6 +123,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
             if (strcmp(audio_action, "status") == 0) {
                 river_voice_echo_dump_status();
+                river_voice_vad_probe_dump_status();
                 return 0;
             }
 
@@ -135,6 +137,33 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
                 return 0;
             }
             audio_action = (const char *)argv[2];
+        } else if (strcmp((const char *)argv[1], "probe") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river audio probe <start|stop|status>\n");
+                return 0;
+            }
+            audio_action = (const char *)argv[2];
+            if (strcmp(audio_action, "status") == 0) {
+                river_voice_vad_probe_dump_status();
+                return 0;
+            }
+
+            if (strcmp(audio_action, "start") == 0) {
+                if (river_voice_vad_probe_start() != RIVER_OK) {
+                    printf("[river][diag] vad probe start failed\n");
+                }
+                return 0;
+            }
+
+            if (strcmp(audio_action, "stop") == 0) {
+                if (river_voice_vad_probe_stop() != RIVER_OK) {
+                    printf("[river][diag] vad probe stop failed\n");
+                }
+                return 0;
+            }
+
+            printf("[river][diag] usage: river audio probe <start|stop|status>\n");
+            return 0;
         } else {
             audio_action = (const char *)argv[1];
         }

@@ -56,6 +56,21 @@ river_status_t river_app_boot(void)
     printf("[river][voice] boot audio echo diagnostics enabled\n");
 #endif
 
+#ifdef CONFIG_RIVER_VAD_PROBE_DIAG_DEFAULT_ON
+    river_voice_vad_probe_set_diag_enabled(true);
+    printf("[river][voice] boot vad probe diagnostics enabled\n");
+#endif
+
+#ifdef CONFIG_RIVER_VAD_PROBE_AUTOSTART
+    printf("[river][voice] boot vad probe autostart enabled\n");
+    if (river_voice_vad_probe_start() != RIVER_OK) {
+        printf("[river][voice] boot vad probe autostart failed\n");
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
+    }
+#endif
+
 #ifdef CONFIG_RIVER_AUDIO_ECHO_AUTOSTART
     printf("[river][voice] boot audio echo autostart enabled\n");
     if (river_voice_echo_start() != RIVER_OK) {
@@ -89,5 +104,6 @@ void river_app_print_status(void)
     printf("[river] online_control=disabled\n");
 #endif
     river_voice_echo_dump_status();
+    river_voice_vad_probe_dump_status();
     river_online_control_dump_status();
 }
