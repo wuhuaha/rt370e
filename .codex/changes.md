@@ -482,3 +482,20 @@
 - Revalidated the code-side fix locally:
   - `river_voice_detector_silero.o` rebuilds successfully with `CCACHE_DISABLE=1`
   - the earlier build interruption was due to host `ccache` permission on `/run/user/0`, not due to this source change
+
+## Step 4.10
+- Collected the next board-side runtime failure after the constructor fix:
+  - detector now gets past the previous data abort
+  - boot log reaches `silero_vad tensor binding failed`
+- Cross-checked the exported `.tflite` artifact in the host conversion venv:
+  - input 0: `serving_default_state:0` `[2,1,128]` `float32`
+  - input 1: `serving_default_input:0` `[1,576]` `float32`
+  - output 0: `PartitionedCall:0` `[1,1]` `float32`
+  - output 1: `PartitionedCall:1` `[2,1,128]` `float32`
+- Updated the device runtime binding logic accordingly:
+  - bind inputs and outputs by the pinned artifact's actual interpreter index order first
+  - keep shape-based fallback only as a secondary path
+  - accept scalar-like probability outputs as either `[1]` or `[1,1]`
+  - dump the interpreter I/O tensor inventory on binding failure so future mismatches are immediately visible on serial logs
+- Revalidated the changed detector component locally:
+  - `CCACHE_DISABLE=1 cmake --build ... --target river_voice_target_img2_ap` passes

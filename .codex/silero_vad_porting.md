@@ -319,3 +319,32 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Validation after fix:
   - `river_voice_detector_silero.o` rebuilds locally
   - remaining board-side validation item is whether runtime now reaches `silero_vad runtime ready`
+
+## Tensor Binding Alignment
+- Next board-side boot no longer crashed, but detector open still failed with:
+  - `silero_vad tensor binding failed`
+- Host-side inspection of the pinned exported artifact in the conversion venv shows the real `TFLite` I/O contract:
+  - input 0:
+    - `serving_default_state:0`
+    - `[2, 1, 128]`
+    - `float32`
+  - input 1:
+    - `serving_default_input:0`
+    - `[1, 576]`
+    - `float32`
+  - output 0:
+    - `PartitionedCall:0`
+    - `[1, 1]`
+    - `float32`
+  - output 1:
+    - `PartitionedCall:1`
+    - `[2, 1, 128]`
+    - `float32`
+- Device-side action:
+  - changed runtime binding to prefer this fixed interpreter order directly
+  - kept shape-based search only as fallback
+  - relaxed probability-output validation to accept scalar-like `[1]` or `[1,1]`
+  - added interpreter I/O dump logging on binding failure
+- Local code validation:
+  - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap`
+  - result: passed

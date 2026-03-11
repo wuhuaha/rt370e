@@ -92,6 +92,100 @@ static bool river_silero_vad_tensor_shape_matches(const TfLiteTensor *tensor,
     return true;
 }
 
+static bool river_silero_vad_tensor_shape_matches_1d_or_2d(const TfLiteTensor *tensor,
+                                                           int samples)
+{
+    if (tensor == NULL || tensor->dims == NULL) {
+        return false;
+    }
+
+    if (tensor->dims->size == 1) {
+        return tensor->dims->data[0] == samples;
+    }
+
+    if (tensor->dims->size == 2) {
+        return tensor->dims->data[0] == 1 && tensor->dims->data[1] == samples;
+    }
+
+    return false;
+}
+
+static bool river_silero_vad_tensor_shape_matches_scalar_or_vec1(const TfLiteTensor *tensor)
+{
+    if (tensor == NULL || tensor->dims == NULL) {
+        return false;
+    }
+
+    if (tensor->dims->size == 0) {
+        return true;
+    }
+
+    if (tensor->dims->size == 1) {
+        return tensor->dims->data[0] == 1;
+    }
+
+    if (tensor->dims->size == 2) {
+        return tensor->dims->data[0] == 1 && tensor->dims->data[1] == 1;
+    }
+
+    return false;
+}
+
+static void river_silero_vad_dump_tensor(const char *prefix,
+                                         size_t index,
+                                         const TfLiteTensor *tensor)
+{
+    int dim0 = -1;
+    int dim1 = -1;
+    int dim2 = -1;
+    int dims_size = -1;
+
+    if (tensor != NULL && tensor->dims != NULL) {
+        dims_size = tensor->dims->size;
+        if (dims_size > 0) {
+            dim0 = tensor->dims->data[0];
+        }
+        if (dims_size > 1) {
+            dim1 = tensor->dims->data[1];
+        }
+        if (dims_size > 2) {
+            dim2 = tensor->dims->data[2];
+        }
+    }
+
+    printf("[river][voice] silero_vad %s[%lu]: ptr=%p type=%d dims=%d [%d,%d,%d] name=%s\n",
+           prefix,
+           (unsigned long)index,
+           (const void *)tensor,
+           tensor != NULL ? tensor->type : -1,
+           dims_size,
+           dim0,
+           dim1,
+           dim2,
+           (tensor != NULL && tensor->name != NULL) ? tensor->name : "(null)");
+}
+
+static void river_silero_vad_dump_interpreter_io(tflite::MicroInterpreter *interpreter)
+{
+    size_t index;
+
+    if (interpreter == NULL) {
+        return;
+    }
+
+    printf("[river][voice] silero_vad interpreter io: inputs=%lu outputs=%lu\n",
+           (unsigned long)interpreter->inputs_size(),
+           (unsigned long)interpreter->outputs_size());
+
+    for (index = 0; index < interpreter->inputs_size(); ++index) {
+        river_silero_vad_dump_tensor("input", index, interpreter->input(index));
+    }
+
+    for (index = 0; index < interpreter->outputs_size(); ++index) {
+        river_silero_vad_dump_tensor("output", index, interpreter->output(index));
+    }
+}
+
 static TfLiteTensor *river_silero_vad_find_input_tensor(tflite::MicroInterpreter *interpreter,
                                                         int dims_size,
                                                         int dim0,
@@ -261,14 +355,25 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         return RIVER_ERR_NO_MEMORY;
     }
 
-    context->audio_input_tensor =
-        river_silero_vad_find_input_tensor(context->interpreter, 2, 1, 576, 0);
-    context->state_input_tensor =
-        river_silero_vad_find_input_tensor(context->interpreter, 3, 2, 1, 128);
-    context->prob_output_tensor =
-        river_silero_vad_find_output_tensor(context->interpreter, 2, 1, 1, 0);
-    context->state_output_tensor =
-        river_silero_vad_find_output_tensor(context->interpreter, 3, 2, 1, 128);
+    if (context->interpreter->inputs_size() >= 2) {
+        context->state_input_tensor = context->interpreter->input(0);
+        context->audio_input_tensor = context->interpreter->input(1);
+    } else {
+        context->audio_input_tensor =
+            river_silero_vad_find_input_tensor(context->interpreter, 2, 1, 576, 0);
+        context->state_input_tensor =
+            river_silero_vad_find_input_tensor(context->interpreter, 3, 2, 1, 128);
+    }
+
+    if (context->interpreter->outputs_size() >= 2) {
+        context->prob_output_tensor = context->interpreter->output(0);
+        context->state_output_tensor = context->interpreter->output(1);
+    } else {
+        context->prob_output_tensor =
+            river_silero_vad_find_output_tensor(context->interpreter, 2, 1, 1, 0);
+        context->state_output_tensor =
+            river_silero_vad_find_output_tensor(context->interpreter, 3, 2, 1, 128);
+    }
 
     if (context->audio_input_tensor == NULL ||
         context->state_input_tensor == NULL ||
@@ -277,7 +382,13 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         context->audio_input_tensor->type != kTfLiteFloat32 ||
         context->state_input_tensor->type != kTfLiteFloat32 ||
         context->prob_output_tensor->type != kTfLiteFloat32 ||
-        context->state_output_tensor->type != kTfLiteFloat32) {
+        context->state_output_tensor->type != kTfLiteFloat32 ||
+        !river_silero_vad_tensor_shape_matches_1d_or_2d(context->audio_input_tensor,
+                                                        RIVER_SILERO_VAD_MODEL_INPUT_SAMPLES) ||
+        !river_silero_vad_tensor_shape_matches(context->state_input_tensor, 3, 2, 1, 128) ||
+        !river_silero_vad_tensor_shape_matches_scalar_or_vec1(context->prob_output_tensor) ||
+        !river_silero_vad_tensor_shape_matches(context->state_output_tensor, 3, 2, 1, 128)) {
+        river_silero_vad_dump_interpreter_io(context->interpreter);
         context->interpreter->~MicroInterpreter();
         context->op_resolver.~river_silero_vad_op_resolver_t();
         river_silero_vad_free_tensor_arena(context);

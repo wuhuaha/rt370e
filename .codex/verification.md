@@ -315,6 +315,36 @@ Interpretation:
   - the next suspect is tensor binding or `AllocateTensors`, not the previous `MicroMutableOpResolver` lifetime bug
 - the runtime-ready line appears and diagnostics continue:
   - the first board-side `Silero` boot crash is resolved
+
+## Step 4.10
+Build and flash after the tensor-binding alignment fix:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot-time behavior:
+- the previous
+  ```text
+  [river][voice] silero_vad tensor binding failed
+  ```
+  line should disappear
+- boot should now continue to:
+  ```text
+  [river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=256KB used=...B threshold_q15=16384
+  ```
+
+If binding still fails:
+- the serial log should now include:
+  - input count
+  - output count
+  - per-tensor type
+  - per-tensor dims
+  - tensor name
+- use that dump as the next source of truth; do not guess shapes from the host export
   - remaining echo issues should be traced to capture routing or echo processing, not basic playback hardware
 
 ## Step 2.6

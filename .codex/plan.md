@@ -156,6 +156,13 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - root cause was an unconstructed `tflite::MicroMutableOpResolver` stored inside a zero-initialized C struct
   - fixed by explicit placement construction / destruction in `river_voice_detector_silero.cc`
   - also fixed tensor-arena free symmetry for both DRAM-typed and generic heap allocation fallbacks
+- Step 4.10 completed: detector tensor binding is now aligned with the real exported `TFLite` artifact:
+  - confirmed the batch=`1` artifact uses interpreter order:
+    - input 0 = recurrent state
+    - input 1 = audio `[1,576]`
+    - output 0 = probability `[1,1]`
+    - output 1 = next recurrent state
+  - updated device-side binding to follow that order directly and emit a tensor inventory dump on any future mismatch
 - Next recommended step:
   - flash the new build with the project flash wrapper and confirm `Silero` runtime now reaches `runtime ready`
   - capture near-field, far-field, and silence diagnostics using the new `vad_*` counters
