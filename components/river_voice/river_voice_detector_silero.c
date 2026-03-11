@@ -12,6 +12,8 @@
 #define RIVER_SILERO_VAD_FEED_SAMPLES 256U
 #define RIVER_SILERO_VAD_WINDOW_SAMPLES 512U
 #define RIVER_SILERO_VAD_CONTEXT_SAMPLES 64U
+#define RIVER_SILERO_VAD_MODEL_INPUT_SAMPLES \
+    (RIVER_SILERO_VAD_WINDOW_SAMPLES + RIVER_SILERO_VAD_CONTEXT_SAMPLES)
 
 typedef struct {
     uint32_t frames_seen;
@@ -93,6 +95,6 @@ void river_voice_detector_silero_close(river_voice_detector_t *detector)
 
 void river_voice_detector_silero_dump_profile(void)
 {
-    printf("[river][voice] detector backend: silero_vad staged runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model=silero_vad_16k_op15.onnx import=pending\n");
+    printf("[river][voice] detector backend: silero_vad staged runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_op15.onnx import=pending\n");
     printf("[river][voice] detector policy: migrate original model first, defer pruning/quantization until measured RAM/flash/latency pressure appears\n");
 }

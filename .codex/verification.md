@@ -688,3 +688,86 @@ Quick interpretation:
   - current AGC / gain move is helping, but real compressor / AFE is the next step
 - far speech is still weak while `cap_peak` is also low:
   - capture sensitivity is still the main bottleneck, so next step should compare another mic path or AFE front-end
+
+## Step 4.4
+Host-side reproducibility checks:
+```bash
+cd /root/ameba-river
+python3.10 -m venv /root/ameba-river/.venv-silero-convert
+/root/ameba-river/.venv-silero-convert/bin/pip install --upgrade \
+  pip setuptools wheel \
+  onnx==1.17.0 onnxruntime==1.20.1 onnxsim==0.4.36 onnxoptimizer==0.3.13 \
+  onnx-graphsurgeon==0.5.8 sng4onnx==1.0.4 \
+  tensorflow-cpu==2.19.0 tensorflow==2.19.1 tf_keras==2.19.0 \
+  onnx2tf==1.28.3 ai_edge_litert==1.2.0 \
+  psutil==6.1.1 h5py==3.12.1 protobuf==5.29.3 flatbuffers==25.1.24 ml_dtypes==0.5.1
+```
+
+Inspect the vendored official ONNX:
+```bash
+cd /root/ameba-river
+source /root/ameba-river/.venv-silero-convert/bin/activate
+python tools/silero_vad/extract_onnx_manifest.py \
+  --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+  --output third_party/silero_vad/upstream/silero_vad_16k_op15_manifest.json
+```
+
+Expected host-side findings:
+- ONNX inputs:
+  - `input`
+  - `state`
+  - `sr`
+- ONNX outputs:
+  - `output`
+  - `stateN`
+- top-level initializers include:
+  - `model.stft.forward_basis_buffer`
+  - `model.encoder.*`
+  - `model.decoder.decoder.2.*`
+
+Direct conversion probe:
+```bash
+cd /root/ameba-river
+source /root/ameba-river/.venv-silero-convert/bin/activate
+onnx2tf \
+  -i third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+  -o /tmp/silero_vad_16k_op15_tflite_576 \
+  -b 1 \
+  -ois input:1,576 state:2,1,128 \
+  -coion
+```
+
+Expected current result:
+- conversion is still expected to fail
+- first failure point should be `wa/model/stft/Conv`
+- after graph-specific transpose repair, the next failure point should move to `wa/model/decoder/Squeeze`
+- this failure is a graph-layout problem, not a target-memory problem
+
+Protect the vendored source before any future conversion:
+```bash
+cd /root/ameba-river
+source /root/ameba-river/.venv-silero-convert/bin/activate
+python tools/silero_vad/stage_conversion_source.py \
+  --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+  --output /tmp/silero_vad_16k_op15.stage.onnx
+```
+
+Extract reconstruction-oriented tensor metadata:
+```bash
+cd /root/ameba-river
+source /root/ameba-river/.venv-silero-convert/bin/activate
+python tools/silero_vad/extract_reconstruction_tensors.py \
+  --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+  --output third_party/silero_vad/upstream/silero_vad_16k_op15_reconstruction_manifest.json
+```
+
+Expected current result:
+- the staged source copy should report the same sha256 as the vendored official ONNX
+- the reconstruction manifest should include:
+  - `model.stft.forward_basis_buffer`
+  - `model.encoder.*`
+  - `model.decoder.rnn.*`
+  - `model.decoder.decoder.2.*`
+  - `decoder.lstm.W`
+  - `decoder.lstm.R`
+  - `decoder.lstm.B`

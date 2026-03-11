@@ -112,10 +112,28 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - selected official `silero_vad_16k_op15.onnx` as the first conversion source
   - vendored that exact artifact into `third_party/silero_vad/upstream/`
   - recorded the official streaming contract:
-    - `512-sample` window
+    - `512-sample` logical window
     - `64-sample` context
     - recurrent state `2 x batch x 128`
+- Step 4.4 completed: host-side `Silero` conversion bring-up is now reproducible and the first direct path has been de-risked:
+  - created a dedicated host conversion venv under the project instead of mixing conversion tools into the SDK environment
+  - installed and pinned the first `onnx/onnxruntime/onnx2tf/tensorflow` conversion stack
+  - corrected the actual official ONNX input contract:
+    - current chunk `512`
+    - rolling context `64`
+    - real model input tensor `576`
+  - verified that direct `onnx2tf` on the vendored `op15` graph is not yet stable:
+    - base failure: `wa/model/stft/Conv`
+    - after manual graph-specific transpose fixes: `wa/model/decoder/Squeeze`
+- Step 4.5 completed: source-artifact hygiene and reconstruction scaffolding are now in place:
+  - detected that host conversion tooling had mutated the vendored ONNX in place
+  - restored `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx` from the pinned upstream checkout
+  - added a staging tool so future conversion runs always operate on a temporary copy instead of the vendored source
+  - added a reconstruction-oriented tensor extractor that emits:
+    - source tensor metadata
+    - decoder `LSTM` tensors after the ONNX slice/concat layout
 - Next recommended step:
-  - add the first real export / conversion path from the vendored ONNX into a TFLite/TFLM-consumable artifact
-  - record all host tool versions and checksums in `/.codex/silero_vad_porting.md`
-  - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile for now
+  - stop forcing the old ONNX graph through `onnx2tf`
+  - use the new tensor extractor output to reconstruct the official `Silero VAD` network in host-side `Keras` from the published `tinygrad` skeleton
+  - export that reconstructed model to `.tflite`
+  - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile while detector migration continues

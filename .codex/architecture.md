@@ -70,5 +70,19 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 - The project now pins an exact official upstream detector source artifact:
   - `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx`
   This is the only approved starting point for the first embedded conversion path.
+- The detector contract now distinguishes two different sizes explicitly:
+  - logical VAD chunk: `512` samples
+  - real official model input tensor: `576` samples
+  This is required because the official wrapper prepends `64` rolling-context samples before inference.
+- Direct `onnx2tf` on the pinned `op15` graph is currently treated as an investigation path, not a stable production export path.
+  The next preferred migration step is to reconstruct the official published network structure in host-side `Keras` from:
+  - `tinygrad_model.py`
+  - the pinned ONNX weights and constants
+- The vendored ONNX source artifact must now be treated as immutable project input.
+  - Host-side conversion tools are required to run against a staged copy under `/tmp`.
+  - This prevents future graph-repair experiments from silently corrupting the pinned upstream baseline.
+- Reconstruction will no longer start from opaque ONNX conversion guesses alone.
+  - The project now has a dedicated extractor that derives the decoder `LSTM` tensors exactly as the ONNX graph feeds them.
+  - The next `Keras` step should use that derived tensor map instead of re-slicing weights ad hoc.
 - The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

@@ -1,0 +1,268 @@
+{
+  "source_file": "/root/ameba-river/third_party/silero_vad/upstream/silero_vad_16k_op15.onnx",
+  "source_sha256": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+  "decoder_reconstruction_branch": "/model/decoder/If_1:then_branch",
+  "tensors": [
+    {
+      "name": "decoder.lstm.B",
+      "kind": "derived",
+      "shape": [
+        1024
+      ],
+      "dtype": "float32",
+      "size": 1024,
+      "nbytes": 4096,
+      "sha256": "dd3dd4b625e9f11e9ca5287495204176c5eb51e4340341021e35016a3cd3ec62",
+      "min": -0.6653345823287964,
+      "max": 0.8349428772926331
+    },
+    {
+      "name": "decoder.lstm.R",
+      "kind": "derived",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "float32",
+      "size": 65536,
+      "nbytes": 262144,
+      "sha256": "3320c74bd1592b0833174b11e187f50dcbb20c9d664173457d57ec9e0f91bfd8",
+      "min": -2.6020333766937256,
+      "max": 2.5532798767089844
+    },
+    {
+      "name": "decoder.lstm.W",
+      "kind": "derived",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "float32",
+      "size": 65536,
+      "nbytes": 262144,
+      "sha256": "2aec2e81b6cb9a9d65fecc4672d04ae0ade469e53d4226a45dc4cc8a76863c42",
+      "min": -2.4822752475738525,
+      "max": 3.053255558013916
+    },
+    {
+      "name": "model.decoder.decoder.2.bias",
+      "kind": "source",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "size": 1,
+      "nbytes": 4,
+      "sha256": "544d9b7ad69153374a902584a96f6a8b65af300157b9502bdfb5432bfc2f073a",
+      "min": -0.6245977282524109,
+      "max": -0.6245977282524109
+    },
+    {
+      "name": "model.decoder.decoder.2.weight",
+      "kind": "source",
+      "shape": [
+        1,
+        128,
+        1
+      ],
+      "dtype": "float32",
+      "size": 128,
+      "nbytes": 512,
+      "sha256": "b76c4ea9c597f211bf7899ee8fb0f542a25003137b51a1c799887de571a0e7a0",
+      "min": -4.714168548583984,
+      "max": 2.278252363204956
+    },
+    {
+      "name": "model.decoder.rnn.bias_hh",
+      "kind": "source",
+      "shape": [
+        512
+      ],
+      "dtype": "float32",
+      "size": 512,
+      "nbytes": 2048,
+      "sha256": "706e548f6da853804e984dcd410c70c7a9fc00f22d79178a2d1da67b4661b529",
+      "min": -0.6653345823287964,
+      "max": 0.7328920960426331
+    },
+    {
+      "name": "model.decoder.rnn.bias_ih",
+      "kind": "source",
+      "shape": [
+        512
+      ],
+      "dtype": "float32",
+      "size": 512,
+      "nbytes": 2048,
+      "sha256": "746fbcc00bc7bbe586c688d13b0ec2df8dca1c948c18e3fec1182e8aaa69435c",
+      "min": -0.6499969959259033,
+      "max": 0.8349428772926331
+    },
+    {
+      "name": "model.decoder.rnn.weight_hh",
+      "kind": "source",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "float32",
+      "size": 65536,
+      "nbytes": 262144,
+      "sha256": "0abcd16bb107ed57e44a57d812e6b55852f1d36cb9017e6d1d7845d4e1d66ab2",
+      "min": -2.6020333766937256,
+      "max": 2.5532798767089844
+    },
+    {
+      "name": "model.decoder.rnn.weight_ih",
+      "kind": "source",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "float32",
+      "size": 65536,
+      "nbytes": 262144,
+      "sha256": "f7d6d5585cccf1a510e2907f6f9475337bdb93c1e1edcd560a175d3574c4ff2d",
+      "min": -2.4822752475738525,
+      "max": 3.053255558013916
+    },
+    {
+      "name": "model.encoder.0.reparam_conv.bias",
+      "kind": "source",
+      "shape": [
+        128
+      ],
+      "dtype": "float32",
+      "size": 128,
+      "nbytes": 512,
+      "sha256": "28af8d67b0d3c5ef2697b4d2d2a3966db951548099769dcd26209d49670cb47e",
+      "min": -19.002546310424805,
+      "max": 2.813870906829834
+    },
+    {
+      "name": "model.encoder.0.reparam_conv.weight",
+      "kind": "source",
+      "shape": [
+        128,
+        129,
+        3
+      ],
+      "dtype": "float32",
+      "size": 49536,
+      "nbytes": 198144,
+      "sha256": "e493f78d769da4767063184ec6fc30063e6d2b60d3023289980c4b4081275262",
+      "min": -14.516426086425781,
+      "max": 1.6954807043075562
+    },
+    {
+      "name": "model.encoder.1.reparam_conv.bias",
+      "kind": "source",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "size": 64,
+      "nbytes": 256,
+      "sha256": "82bfd0614cadac179bf25f3d6a9e1031500709a09aac3a5be4b49bcbcbb9c36d",
+      "min": -8.965876579284668,
+      "max": 4.3062567710876465
+    },
+    {
+      "name": "model.encoder.1.reparam_conv.weight",
+      "kind": "source",
+      "shape": [
+        64,
+        128,
+        3
+      ],
+      "dtype": "float32",
+      "size": 24576,
+      "nbytes": 98304,
+      "sha256": "dde187be6eddb36eb37ae122b5d1755a6511778c578e2fc56bf23ba325c2ab5a",
+      "min": -1.2779861688613892,
+      "max": 1.38825261592865
+    },
+    {
+      "name": "model.encoder.2.reparam_conv.bias",
+      "kind": "source",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "size": 64,
+      "nbytes": 256,
+      "sha256": "0865dacfe50a12cdd53b2fce292aa03a15b71118e81252404f9d99deb977555e",
+      "min": -18.119848251342773,
+      "max": 10.61710262298584
+    },
+    {
+      "name": "model.encoder.2.reparam_conv.weight",
+      "kind": "source",
+      "shape": [
+        64,
+        64,
+        3
+      ],
+      "dtype": "float32",
+      "size": 12288,
+      "nbytes": 49152,
+      "sha256": "518ea6a5d3a72db643a6462bd374c3aec406d9d978314023d704e0b7a5470832",
+      "min": -3.1903018951416016,
+      "max": 21.883508682250977
+    },
+    {
+      "name": "model.encoder.3.reparam_conv.bias",
+      "kind": "source",
+      "shape": [
+        128
+      ],
+      "dtype": "float32",
+      "size": 128,
+      "nbytes": 512,
+      "sha256": "f2de1ebf2b43240a1c9557264accf8fb66c352a85db3971b12874af8cd55d27e",
+      "min": -4.477147102355957,
+      "max": 1.9329780340194702
+    },
+    {
+      "name": "model.encoder.3.reparam_conv.weight",
+      "kind": "source",
+      "shape": [
+        128,
+        64,
+        3
+      ],
+      "dtype": "float32",
+      "size": 24576,
+      "nbytes": 98304,
+      "sha256": "49dab044981cee046c0ef015456fa03cee898b75e800da9d4df3fb3b933609c4",
+      "min": -1.9557267427444458,
+      "max": 54.882293701171875
+    },
+    {
+      "name": "model.stft.forward_basis_buffer",
+      "kind": "source",
+      "shape": [
+        258,
+        1,
+        256
+      ],
+      "dtype": "float32",
+      "size": 66048,
+      "nbytes": 264192,
+      "sha256": "3b69ddad309d34245d2960d93be421e5a99360c26e200e7efb309da25b6eecd9",
+      "min": -1.0,
+      "max": 1.0
+    },
+    {
+      "name": "self.model.stft.hop_length",
+      "kind": "source",
+      "shape": [],
+      "dtype": "int64",
+      "size": 1,
+      "nbytes": 8,
+      "sha256": "b1b0bee5378188f5250138bcce25855f2617f9c55b20b9628e13d367c47404a9",
+      "min": 128.0,
+      "max": 128.0
+    }
+  ]
+}

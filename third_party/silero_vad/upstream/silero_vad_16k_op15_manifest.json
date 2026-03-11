@@ -1,0 +1,907 @@
+{
+  "source_file": "/root/ameba-river/third_party/silero_vad/upstream/silero_vad_16k_op15.onnx",
+  "sha256": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+  "ir_version": 8,
+  "producer_name": "pytorch",
+  "producer_version": "2.3.1",
+  "model_version": 0,
+  "opset_imports": [
+    {
+      "domain": "",
+      "version": 15
+    }
+  ],
+  "top_level_inputs": [
+    {
+      "name": "input",
+      "shape": [
+        "batch",
+        "sequence"
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "state",
+      "shape": [
+        2,
+        "batch",
+        128
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "sr",
+      "shape": [],
+      "dtype": "INT64"
+    }
+  ],
+  "top_level_outputs": [
+    {
+      "name": "output",
+      "shape": [
+        "batch",
+        1
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "stateN",
+      "shape": [
+        "AddstateN_dim_0",
+        "batch",
+        "AddstateN_dim_2"
+      ],
+      "dtype": "FLOAT"
+    }
+  ],
+  "top_level_initializers": [
+    {
+      "name": "model.stft.forward_basis_buffer",
+      "shape": [
+        258,
+        1,
+        256
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.0.reparam_conv.weight",
+      "shape": [
+        128,
+        129,
+        3
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.0.reparam_conv.bias",
+      "shape": [
+        128
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.1.reparam_conv.weight",
+      "shape": [
+        64,
+        128,
+        3
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.1.reparam_conv.bias",
+      "shape": [
+        64
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.2.reparam_conv.weight",
+      "shape": [
+        64,
+        64,
+        3
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.2.reparam_conv.bias",
+      "shape": [
+        64
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.3.reparam_conv.weight",
+      "shape": [
+        128,
+        64,
+        3
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.encoder.3.reparam_conv.bias",
+      "shape": [
+        128
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.rnn.weight_ih",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.rnn.weight_hh",
+      "shape": [
+        512,
+        128
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.rnn.bias_ih",
+      "shape": [
+        512
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.rnn.bias_hh",
+      "shape": [
+        512
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.decoder.2.weight",
+      "shape": [
+        1,
+        128,
+        1
+      ],
+      "dtype": "FLOAT"
+    },
+    {
+      "name": "model.decoder.decoder.2.bias",
+      "shape": [
+        1
+      ],
+      "dtype": "FLOAT"
+    }
+  ],
+  "graph": {
+    "path": "main",
+    "inputs": [
+      {
+        "name": "input",
+        "shape": [
+          "batch",
+          "sequence"
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "state",
+        "shape": [
+          2,
+          "batch",
+          128
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "sr",
+        "shape": [],
+        "dtype": "INT64"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "output",
+        "shape": [
+          "batch",
+          1
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "stateN",
+        "shape": [
+          "AddstateN_dim_0",
+          "batch",
+          "AddstateN_dim_2"
+        ],
+        "dtype": "FLOAT"
+      }
+    ],
+    "node_count": 121,
+    "op_counts": {
+      "Add": 2,
+      "Cast": 7,
+      "Concat": 2,
+      "Constant": 49,
+      "ConstantOfShape": 1,
+      "Conv": 6,
+      "Equal": 2,
+      "Gather": 4,
+      "If": 3,
+      "Mul": 2,
+      "Pad": 1,
+      "Pow": 2,
+      "ReduceMean": 1,
+      "Relu": 5,
+      "Reshape": 2,
+      "Shape": 4,
+      "Sigmoid": 1,
+      "Slice": 6,
+      "Sqrt": 1,
+      "Squeeze": 1,
+      "Sub": 1,
+      "Transpose": 1,
+      "Unsqueeze": 17
+    },
+    "initializer_count": 15,
+    "initializers": [
+      {
+        "name": "model.stft.forward_basis_buffer",
+        "shape": [
+          258,
+          1,
+          256
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.0.reparam_conv.weight",
+        "shape": [
+          128,
+          129,
+          3
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.0.reparam_conv.bias",
+        "shape": [
+          128
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.1.reparam_conv.weight",
+        "shape": [
+          64,
+          128,
+          3
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.1.reparam_conv.bias",
+        "shape": [
+          64
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.2.reparam_conv.weight",
+        "shape": [
+          64,
+          64,
+          3
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.2.reparam_conv.bias",
+        "shape": [
+          64
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.3.reparam_conv.weight",
+        "shape": [
+          128,
+          64,
+          3
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.encoder.3.reparam_conv.bias",
+        "shape": [
+          128
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.rnn.weight_ih",
+        "shape": [
+          512,
+          128
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.rnn.weight_hh",
+        "shape": [
+          512,
+          128
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.rnn.bias_ih",
+        "shape": [
+          512
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.rnn.bias_hh",
+        "shape": [
+          512
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.decoder.2.weight",
+        "shape": [
+          1,
+          128,
+          1
+        ],
+        "dtype": "FLOAT"
+      },
+      {
+        "name": "model.decoder.decoder.2.bias",
+        "shape": [
+          1
+        ],
+        "dtype": "FLOAT"
+      }
+    ],
+    "subgraphs": [
+      {
+        "path": "main//model/decoder/If:then_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/decoder/Squeeze_output_0",
+            "shape": [
+              "Squeeze/model/decoder/Squeeze_output_0_dim_0",
+              128
+            ],
+            "dtype": "FLOAT"
+          }
+        ],
+        "node_count": 2,
+        "op_counts": {
+          "Constant": 1,
+          "Squeeze": 1
+        },
+        "initializer_count": 0,
+        "initializers": []
+      },
+      {
+        "path": "main//model/decoder/If:else_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/decoder/Identity_output_0",
+            "shape": [
+              "Squeeze/model/decoder/Squeeze_output_0_dim_0",
+              128,
+              "Identity/model/decoder/Identity_output_0_dim_2"
+            ],
+            "dtype": "FLOAT"
+          }
+        ],
+        "node_count": 1,
+        "op_counts": {
+          "Identity": 1
+        },
+        "initializer_count": 0,
+        "initializers": []
+      },
+      {
+        "path": "main//model/decoder/If_1:then_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/decoder/rnn/If_4_output_0",
+            "shape": [],
+            "dtype": "UNDEFINED"
+          },
+          {
+            "name": "/model/decoder/rnn/If_4_output_1",
+            "shape": [],
+            "dtype": "UNDEFINED"
+          }
+        ],
+        "node_count": 83,
+        "op_counts": {
+          "Cast": 3,
+          "Concat": 5,
+          "Constant": 45,
+          "Equal": 1,
+          "Gather": 2,
+          "If": 3,
+          "LSTM": 1,
+          "Not": 1,
+          "Shape": 1,
+          "Size": 1,
+          "Slice": 12,
+          "Squeeze": 2,
+          "Unsqueeze": 6
+        },
+        "initializer_count": 0,
+        "initializers": [],
+        "subgraphs": [
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If:then_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/Unsqueeze_output_0",
+                "shape": [
+                  1,
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 2,
+            "op_counts": {
+              "Constant": 1,
+              "Unsqueeze": 1
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If:else_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/Identity_output_0",
+                "shape": [
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 1,
+            "op_counts": {
+              "Identity": 1
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_1:then_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/Unsqueeze_1_output_0",
+                "shape": [
+                  1,
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_1_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              },
+              {
+                "name": "/model/decoder/rnn/Unsqueeze_2_output_0",
+                "shape": [
+                  1,
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_1_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 4,
+            "op_counts": {
+              "Constant": 2,
+              "Unsqueeze": 2
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_1:else_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/Identity_1_output_0",
+                "shape": [
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_1_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              },
+              {
+                "name": "/model/decoder/rnn/Identity_2_output_0",
+                "shape": [
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_1_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 2,
+            "op_counts": {
+              "Identity": 2
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:then_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/If_2_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              },
+              {
+                "name": "/model/decoder/rnn/If_3_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              }
+            ],
+            "node_count": 12,
+            "op_counts": {
+              "Constant": 4,
+              "Equal": 2,
+              "Gather": 2,
+              "If": 2,
+              "Shape": 2
+            },
+            "initializer_count": 0,
+            "initializers": [],
+            "subgraphs": [
+              {
+                "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:then_branch//model/decoder/rnn/If_2:then_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn/Squeeze_2_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 2,
+                "op_counts": {
+                  "Constant": 1,
+                  "Squeeze": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:then_branch//model/decoder/rnn/If_2:else_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn/Identity_3_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 1,
+                "op_counts": {
+                  "Identity": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:then_branch//model/decoder/rnn/If_3:then_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn/Squeeze_3_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 2,
+                "op_counts": {
+                  "Constant": 1,
+                  "Squeeze": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:then_branch//model/decoder/rnn/If_3:else_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn/Identity_4_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 1,
+                "op_counts": {
+                  "Identity": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              }
+            ]
+          },
+          {
+            "path": "main//model/decoder/If_1:then_branch//model/decoder/rnn/If_4:else_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn/Identity_5_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              },
+              {
+                "name": "/model/decoder/rnn/Identity_6_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              }
+            ],
+            "node_count": 2,
+            "op_counts": {
+              "Identity": 2
+            },
+            "initializer_count": 0,
+            "initializers": []
+          }
+        ]
+      },
+      {
+        "path": "main//model/decoder/If_1:else_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/decoder/rnn_1/If_3_output_0",
+            "shape": [],
+            "dtype": "UNDEFINED"
+          },
+          {
+            "name": "/model/decoder/rnn_1/If_3_output_1",
+            "shape": [],
+            "dtype": "UNDEFINED"
+          }
+        ],
+        "node_count": 88,
+        "op_counts": {
+          "Cast": 2,
+          "Concat": 6,
+          "Constant": 48,
+          "ConstantOfShape": 1,
+          "Equal": 1,
+          "Gather": 1,
+          "If": 2,
+          "LSTM": 1,
+          "Not": 1,
+          "Shape": 2,
+          "Size": 1,
+          "Slice": 12,
+          "Squeeze": 2,
+          "Unsqueeze": 8
+        },
+        "initializer_count": 0,
+        "initializers": [],
+        "subgraphs": [
+          {
+            "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If:then_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn_1/Unsqueeze_output_0",
+                "shape": [
+                  1,
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 2,
+            "op_counts": {
+              "Constant": 1,
+              "Unsqueeze": 1
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If:else_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn_1/Identity_output_0",
+                "shape": [
+                  "Unsqueeze/model/decoder/rnn/Unsqueeze_output_0_dim_1",
+                  128
+                ],
+                "dtype": "FLOAT"
+              }
+            ],
+            "node_count": 1,
+            "op_counts": {
+              "Identity": 1
+            },
+            "initializer_count": 0,
+            "initializers": []
+          },
+          {
+            "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:then_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn_1/If_1_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              },
+              {
+                "name": "/model/decoder/rnn_1/If_2_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              }
+            ],
+            "node_count": 12,
+            "op_counts": {
+              "Constant": 4,
+              "Equal": 2,
+              "Gather": 2,
+              "If": 2,
+              "Shape": 2
+            },
+            "initializer_count": 0,
+            "initializers": [],
+            "subgraphs": [
+              {
+                "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:then_branch//model/decoder/rnn_1/If_1:then_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn_1/Squeeze_2_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 2,
+                "op_counts": {
+                  "Constant": 1,
+                  "Squeeze": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:then_branch//model/decoder/rnn_1/If_1:else_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn_1/Identity_1_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 1,
+                "op_counts": {
+                  "Identity": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:then_branch//model/decoder/rnn_1/If_2:then_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn_1/Squeeze_3_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 2,
+                "op_counts": {
+                  "Constant": 1,
+                  "Squeeze": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              },
+              {
+                "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:then_branch//model/decoder/rnn_1/If_2:else_branch",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "/model/decoder/rnn_1/Identity_2_output_0",
+                    "shape": [],
+                    "dtype": "UNDEFINED"
+                  }
+                ],
+                "node_count": 1,
+                "op_counts": {
+                  "Identity": 1
+                },
+                "initializer_count": 0,
+                "initializers": []
+              }
+            ]
+          },
+          {
+            "path": "main//model/decoder/If_1:else_branch//model/decoder/rnn_1/If_3:else_branch",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "/model/decoder/rnn_1/Identity_3_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              },
+              {
+                "name": "/model/decoder/rnn_1/Identity_4_output_0",
+                "shape": [],
+                "dtype": "UNDEFINED"
+              }
+            ],
+            "node_count": 2,
+            "op_counts": {
+              "Identity": 2
+            },
+            "initializer_count": 0,
+            "initializers": []
+          }
+        ]
+      },
+      {
+        "path": "main//model/If:then_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/Squeeze_output_0",
+            "shape": [],
+            "dtype": "FLOAT"
+          }
+        ],
+        "node_count": 2,
+        "op_counts": {
+          "Constant": 1,
+          "Squeeze": 1
+        },
+        "initializer_count": 0,
+        "initializers": []
+      },
+      {
+        "path": "main//model/If:else_branch",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "/model/Identity_output_0",
+            "shape": [],
+            "dtype": "FLOAT"
+          }
+        ],
+        "node_count": 1,
+        "op_counts": {
+          "Identity": 1
+        },
+        "initializer_count": 0,
+        "initializers": []
+      }
+    ]
+  }
+}

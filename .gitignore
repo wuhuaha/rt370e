@@ -1,6 +1,9 @@
 build_*/
 menuconfig/
 soc_info.json
+.venv-silero-convert/
+__pycache__/
+*.pyc
 *.bin
 *.axf
 *.map

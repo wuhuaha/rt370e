@@ -34,10 +34,38 @@ It must be updated during every migration step so the port can be rebuilt later 
      - inference: expected input range is normalized PCM `[-1.0, 1.0]`
    - output semantics: speech probability + stable speech / silence decision
 3. Conversion / export
-   - host environment: pending actual import
-   - tool versions: pending actual import
-   - export command: pending actual import
-   - post-processing command: pending actual import
+   - host environment:
+     - dedicated venv: `/root/ameba-river/.venv-silero-convert`
+     - interpreter: `Python 3.10.12`
+   - tool versions:
+     - `onnx==1.17.0`
+     - `onnxruntime==1.20.1`
+     - `onnxsim==0.4.36`
+     - `onnxoptimizer==0.3.13`
+     - `onnx-graphsurgeon==0.5.8`
+     - `onnx2tf==1.28.3`
+     - `tensorflow==2.19.1`
+     - `tensorflow-cpu==2.19.0`
+     - `tf_keras==2.19.0`
+   - export command:
+     - first direct probe:
+       ```bash
+       source /root/ameba-river/.venv-silero-convert/bin/activate
+       onnx2tf \
+         -i /root/ameba-river/third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+         -o /tmp/silero_vad_16k_op15_tflite_576 \
+         -b 1 \
+         -ois input:1,576 state:2,1,128 \
+         -coion
+       ```
+   - post-processing command:
+     - manual parameter-replacement probe also tested:
+       - `wa/model/stft/padding/Transpose perm -> [0,1]`
+       - `wa/model/stft/Unsqueeze_output_0 post transpose -> [0,2,1]`
+   - current export status:
+     - direct `onnx2tf` is not yet stable for this graph
+     - failure point `1`: `wa/model/stft/Conv`
+     - failure point `2` after manual fix: `wa/model/decoder/Squeeze`
    - generated artifact checksum: pending actual import
 4. Embedded runtime choice
    - runtime backend: `TensorFlow Lite Micro`
@@ -54,6 +82,7 @@ It must be updated during every migration step so the port can be rebuilt later 
    - buffering strategy:
      - keep `preproc -> detector` at `16 ms`
      - stage `Silero` ingestion as `2 x 16 ms -> 32 ms`
+     - assemble official model input as `64-sample context + 512-sample current window = 576 samples`
    - timestamp strategy: carry frame cadence from `preproc`; add sample-accurate detector timestamps when the real backend lands
 6. Validation
    - near-field test result:
@@ -96,6 +125,71 @@ It must be updated during every migration step so the port can be rebuilt later 
   - this file is smaller than the generic official ONNX
   - it stays inside official upstream rather than relying on third-party exports
 - The staged detector boundary must honor the official streaming contract:
-  - `512-sample` model window
+  - `512-sample` logical decision window
   - `64-sample` rolling context
+  - `576-sample` real model input tensor
   - recurrent state `2 x batch x 128`
+
+## Step 2 Host Conversion Bring-Up
+- Built a dedicated host-side conversion environment instead of reusing the SDK venv:
+  ```bash
+  python3.10 -m venv /root/ameba-river/.venv-silero-convert
+  /root/ameba-river/.venv-silero-convert/bin/pip install --upgrade \
+    pip setuptools wheel \
+    onnx==1.17.0 onnxruntime==1.20.1 onnxsim==0.4.36 onnxoptimizer==0.3.13 \
+    onnx-graphsurgeon==0.5.8 sng4onnx==1.0.4 \
+    tensorflow-cpu==2.19.0 tensorflow==2.19.1 tf_keras==2.19.0 \
+    onnx2tf==1.28.3 ai_edge_litert==1.2.0 \
+    psutil==6.1.1 h5py==3.12.1 protobuf==5.29.3 flatbuffers==25.1.24 ml_dtypes==0.5.1
+  ```
+- Confirmed the official ONNX runtime I/O contract:
+  - inputs:
+    - `input`: `[batch, sequence]`
+    - `state`: `[2, batch, 128]`
+    - `sr`: scalar `int64`
+  - outputs:
+    - `output`: `[batch, 1]`
+    - `stateN`: `[2, batch, 128]` at runtime
+- Corrected an earlier staging mistake:
+  - `512` is only the current chunk size
+  - the real model input is `576` because official wrapper prepends `64` context samples before inference
+- Direct `onnx2tf` result on `2026-03-11`:
+  - probe command with `input:1,576 state:2,1,128`
+  - failed at `wa/model/stft/Conv`
+- Manual parameter-replacement probe result on `2026-03-11`:
+  - fixed `STFT` conversion enough to pass the first `Conv`
+  - next failure moved to `wa/model/decoder/Squeeze`
+- Current decision:
+  - stop assuming the old ONNX graph can be pushed through `onnx2tf` without graph-specific repair
+  - next implementation path should reconstruct the official network from the published `tinygrad` skeleton and ONNX-extracted weights
+- Source hygiene correction on `2026-03-11`:
+  - the vendored ONNX was found to have been modified in place by local host-side tooling during earlier experiments
+  - the repository copy must remain an immutable official source artifact
+  - all future conversion experiments must stage a temporary copy first
+  - staging helper:
+    ```bash
+    cd /root/ameba-river
+    source /root/ameba-river/.venv-silero-convert/bin/activate
+    python tools/silero_vad/stage_conversion_source.py \
+      --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+      --output /tmp/silero_vad_16k_op15.stage.onnx
+    ```
+- Reconstruction scaffolding on `2026-03-11`:
+  - added `tools/silero_vad/extract_reconstruction_tensors.py`
+  - this extractor emits:
+    - direct source tensor summaries
+    - decoder `LSTM` tensors after the ONNX slice/concat graph layout
+  - confirmed from the restored official ONNX that:
+    - `model.decoder.rnn.weight_ih`
+    - `model.decoder.rnn.weight_hh`
+    - `model.decoder.rnn.bias_ih`
+    - `model.decoder.rnn.bias_hh`
+    live as top-level initializers in the canonical upstream artifact
+  - first reproducible invocation:
+    ```bash
+    cd /root/ameba-river
+    source /root/ameba-river/.venv-silero-convert/bin/activate
+    python tools/silero_vad/extract_reconstruction_tensors.py \
+      --input third_party/silero_vad/upstream/silero_vad_16k_op15.onnx \
+      --output third_party/silero_vad/upstream/silero_vad_16k_op15_reconstruction_manifest.json
+    ```

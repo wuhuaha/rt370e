@@ -341,3 +341,53 @@
   - current preproc backend
   - current preproc profile
   - `Silero VAD` still pending
+
+## Step 4.4
+- Built a dedicated host-side Silero conversion environment under:
+  - `/root/ameba-river/.venv-silero-convert`
+- Pinned the first host conversion toolchain in that environment:
+  - `onnx`
+  - `onnxruntime`
+  - `onnxsim`
+  - `onnxoptimizer`
+  - `onnx-graphsurgeon`
+  - `onnx2tf`
+  - `tensorflow`
+  - `tf_keras`
+- Corrected the staged detector contract and documentation:
+  - `512` is the logical current window
+  - `64` is the rolling context
+  - `576` is the real official model input tensor
+- Added a reproducible ONNX inspection tool:
+  - `tools/silero_vad/extract_onnx_manifest.py`
+- Added a generated manifest for the vendored official source model:
+  - `third_party/silero_vad/upstream/silero_vad_16k_op15_manifest.json`
+- Proved that direct `onnx2tf` conversion is currently unstable for the pinned `op15` graph:
+  - direct probe fails at `wa/model/stft/Conv`
+  - a manual transpose repair gets past `STFT` but then fails at `wa/model/decoder/Squeeze`
+- Based on the official published `tinygrad` skeleton, the next migration path is now explicitly:
+  - rebuild the official network structure in host-side `Keras`
+  - load weights from the official ONNX graph
+  - export that reconstructed model to `.tflite`
+
+## Step 4.5
+- Found and corrected a source-hygiene issue during host-side migration:
+  - the vendored `silero_vad_16k_op15.onnx` had been modified in place by local tooling
+  - restored it from the pinned upstream checkout so the repository copy is again the official baseline
+- Added a guarded staging tool:
+  - `tools/silero_vad/stage_conversion_source.py`
+  - purpose: always copy the vendored ONNX into a temporary conversion path before running host tooling
+- Added a reconstruction-oriented extractor:
+  - `tools/silero_vad/extract_reconstruction_tensors.py`
+  - purpose: emit source tensor metadata plus derived decoder `LSTM` tensors after the ONNX slice/concat layout
+- Confirmed one important canonical-layout detail from the restored official ONNX:
+  - `model.decoder.rnn.weight_ih`
+  - `model.decoder.rnn.weight_hh`
+  - `model.decoder.rnn.bias_ih`
+  - `model.decoder.rnn.bias_hh`
+  are top-level initializers in the real upstream artifact
+- Added a generated reconstruction manifest:
+  - `third_party/silero_vad/upstream/silero_vad_16k_op15_reconstruction_manifest.json`
+- This step intentionally does not add a `.tflite` model yet.
+  - it narrows the migration by proving that the pinned official source can now be treated as immutable
+  - and that the next `Keras` reconstruction step has a reproducible tensor map to start from

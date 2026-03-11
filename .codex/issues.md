@@ -201,5 +201,25 @@
   - record every export command, tool version, and checksum immediately in `/.codex/silero_vad_porting.md`
 - For the next conversion step:
   - keep using the vendored `silero_vad_16k_op15.onnx`
-  - preserve the official `512 + 64 + state` streaming semantics during export
+  - preserve the official `512 current + 64 context + state` streaming semantics during export
   - reject any conversion shortcut that silently changes the detector window contract without documenting it
+- The first direct `onnx2tf` path for the pinned official `op15` graph is not stable yet:
+  - direct probe fails at `wa/model/stft/Conv`
+  - after a local transpose repair, conversion moves forward but then fails at `wa/model/decoder/Squeeze`
+  - this means the blocker is graph-layout conversion, not model size or target resource pressure
+- The staged detector log originally described `512` as the model input size; that was inaccurate.
+  - official wrapper behavior shows the real model input tensor is `576`:
+    - `64` rolling context
+    - `512` current chunk
+- The current lowest-risk path is no longer "keep pushing old ONNX through `onnx2tf`".
+  - The official repository publishes a `tinygrad` network skeleton that matches the ONNX topology closely.
+  - Reconstructing that official structure in host-side `Keras` and loading ONNX weights is now the preferred next step.
+- Host-side tooling has already proven capable of mutating the vendored ONNX source artifact in place.
+  - Future conversion commands must never target `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx` directly.
+  - They must first stage a temporary copy under `/tmp` and operate on that copy only.
+- The next reconstruction step still needs one careful conversion detail:
+  - `decoder.lstm.W/R/B` can now be reconstructed from the ONNX slice/concat graph
+  - but `Keras` gate ordering must be aligned explicitly instead of being assumed from PyTorch defaults
+- The restored official ONNX layout is also a reminder not to rely on mutated local graphs:
+  - canonical upstream keeps `model.decoder.rnn.*` at the top level
+  - any graph that moves those tensors into subgraphs should be treated as an experimental derivative, not the pinned baseline
