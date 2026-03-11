@@ -337,6 +337,39 @@ Interpretation:
 - `afe_peak` and `play_peak` are both healthy but far-field speech is still poor:
   - stop tuning replay gain and move next to `VAD + reference-path + AEC`
 
+## Step 3.2
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] detector backend: energy_vad ...
+[river] local_detector=energy_vad
+[river][voice] audio echo gain: ... detector=energy_vad
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] afe_peak=... vad_avg=... vad=speech|silence speech_frames=... silence_frames=... play_peak=[..., ...] ...
+```
+
+Manual check:
+- First keep the room quiet and do not speak for a few seconds.
+- Then speak at `20-30 cm`.
+- Then test again at `0.5-1.0 m`.
+
+Expected result:
+- idle speaker hiss/noise should drop clearly compared with the previous build
+- replay should open when speaking and stay open briefly after speech end
+- if speech becomes too choppy, the next tuning point is detector thresholds / hangover, not AFE geometry
+
 ## Step 2.6.1
 Build and flash:
 ```bash

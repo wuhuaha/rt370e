@@ -58,6 +58,11 @@
   - it helps the board speaker test path
   - it should not be treated as the final production gain-control strategy
   - once VAD/AEC/local ASR are in place, gain staging should move back toward the front-end policy instead of the replay sink
+- The current detector is an energy gate, not the SDK `AIVoice VAD_V1`.
+- This is deliberate for the current step:
+  - it gives an immediate and debuggable noise reduction benefit
+  - it creates the detector swap point first
+  - the next detector upgrade can replace the backend without touching `echo`, `capture`, or `preproc`
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -117,3 +122,7 @@
 - For the current far-field tuning round on top of AFE:
   - prefer modest `NS + AGC + post-AFE replay gain` over reverting to raw dual-mic mixing
   - use `afe_peak` to decide whether the next issue is in enhancement output or only in replay loudness
+- For the new detector round:
+  - keep the detector after `AFE` so it operates on cleaner mono speech
+  - do not move detection back onto raw dual-mic data
+  - once the gate behavior is validated, the backend can be upgraded from `energy_vad` to SDK `VAD_V1`

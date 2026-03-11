@@ -65,3 +65,8 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - AFE fixed AGC gain is raised to `15 dB`
   - echo replay now applies a light post-AFE adaptive gain stage
   - diagnostics now expose `afe_peak` to separate AFE output strength from raw capture and playback gain
+- Step 3.2 completed: a detector layer is introduced between `preproc` and replay:
+  - current detector backend is `energy_vad`
+  - it gates the enhanced mono replay when no speech is present
+  - this reduces idle noise without changing the `capture` or `preproc` interfaces
+  - the new detector boundary is the planned swap point for future SDK `VAD_V1` or self-developed `TFLite` VAD
