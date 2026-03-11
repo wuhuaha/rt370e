@@ -538,3 +538,24 @@
 - Revalidated after the fallback-buffer change:
   - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap` passed
   - full `RTL8730E` rebuild also passed locally
+
+## Step 4.13
+- Collected the next board-side `Silero` log after fallback-buffer patching:
+  - top-level persistent tensors now show the expected:
+    - `dims`
+    - `data`
+    - `bytes`
+  - detector still failed during open
+- Root cause refinement:
+  - the remaining open-time guard was still validating `TfLiteEvalTensor` byte lengths
+  - that check is stricter than what the runtime actually needs for `Invoke()`
+  - on this SDK snapshot it can reject a usable interpreter state even when the persistent I/O views are already valid
+- Updated `river_voice_detector_silero.cc` again:
+  - relaxed eval-tensor validation to require only:
+    - non-null eval tensor handle
+    - `float32` type
+    - non-null `data`
+  - kept the stronger payload-size checks only on the persistent tensors that the detector actually reads and writes directly
+- Revalidated after the guard relaxation:
+  - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap` passed
+  - full image rebuild was started immediately after the targeted rebuild

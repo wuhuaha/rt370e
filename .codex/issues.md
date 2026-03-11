@@ -272,3 +272,6 @@
   - board logs showed all `Silero` I/O tensors with correct `bytes` but `data=NULL`
   - current detector therefore patches fallback buffers into both eval tensors and persistent tensor views during open
   - if the SDK `tflite_micro` snapshot changes later, this workaround should be revisited before simplifying detector buffer ownership
+- The eval-tensor views on this SDK snapshot are still not trustworthy enough for strict byte-length gating during open:
+  - current detector keeps strong size checks on the persistent tensors it uses directly
+  - eval tensors are only required to exist, be `float32`, and expose non-null `data`

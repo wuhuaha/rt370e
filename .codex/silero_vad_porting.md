@@ -413,3 +413,33 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Next board-side validation target:
   - confirm boot now reaches `silero_vad runtime ready`
   - only if it still fails, move on to arena-pressure or invoke-time debugging
+
+## Eval-Tensor Guard Relaxation
+- Next board-side log after fallback-buffer patching showed:
+  - persistent `Silero` tensors now have valid:
+    - `dims`
+    - `data`
+    - `bytes`
+  - but detector open still failed before runtime-ready
+- Interpretation:
+  - the remaining failure was not top-level I/O binding anymore
+  - the extra eval-tensor byte-length guard was stricter than necessary for the actual detector runtime path
+- Device-side action on `2026-03-11`:
+  - keep strong buffer-size checks only on the persistent tensors used directly by:
+    - input preparation
+    - recurrent-state copy
+    - probability readback
+  - reduce eval-tensor validation to:
+    - non-null handle
+    - `float32` type
+    - non-null `data`
+- Local validation after this change:
+  ```bash
+  cd /root/ameba-river
+  source env.sh
+  CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap
+  ```
+  - result: passed
+- Next board-side validation target:
+  - confirm boot reaches `silero_vad runtime ready`
+  - if not, move the investigation to `Invoke()` behavior or arena headroom

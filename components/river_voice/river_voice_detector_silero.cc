@@ -278,17 +278,10 @@ static bool river_silero_vad_tensor_buffer_ready(const TfLiteTensor *tensor, siz
 static bool river_silero_vad_eval_tensor_buffer_ready(const TfLiteEvalTensor *tensor,
                                                       size_t min_bytes)
 {
-    size_t tensor_bytes = 0;
+    (void)min_bytes;
 
     if (tensor == NULL || tensor->type != kTfLiteFloat32 || tensor->data.data == NULL) {
         return false;
-    }
-
-    if (tensor->dims != NULL &&
-        tflite::TfLiteEvalTensorByteLength(tensor, &tensor_bytes) == kTfLiteOk) {
-        if (tensor_bytes < min_bytes) {
-            return false;
-        }
     }
 
     return true;

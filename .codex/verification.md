@@ -983,3 +983,32 @@ Interpretation:
 - if binding still fails:
   - collect the next `silero_vad` log block
   - the problem is no longer tensor order or missing metadata, and is more likely in arena layout or invoke-time buffer ownership
+
+## Step 4.13
+Rebuild the relaxed-eval-guard image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected current result:
+- boot should now advance past:
+  - `silero_vad tensor binding failed`
+- next expected milestone remains:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+
+Interpretation:
+- if runtime now opens:
+  - the remaining blocker was the open-time eval-tensor guard, not model I/O binding
+- if open still fails:
+  - collect the next `silero_vad` block
+  - the next suspect becomes invoke-time behavior or arena pressure, not tensor metadata or top-level buffers
