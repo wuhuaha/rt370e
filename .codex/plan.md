@@ -152,8 +152,12 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - created a development single-slot NOR profile that expands the combined app package range to `0x08600000`
   - added `tools/river_flash.py` so flashing can use the project profile without patching the SDK
   - added `tools/generate_rdev.py` so the encrypted `.rdev` stays reproducible from project JSON
+- Step 4.9 completed: first real board-side `Silero` boot crash is now fixed at the detector runtime boundary:
+  - root cause was an unconstructed `tflite::MicroMutableOpResolver` stored inside a zero-initialized C struct
+  - fixed by explicit placement construction / destruction in `river_voice_detector_silero.cc`
+  - also fixed tensor-arena free symmetry for both DRAM-typed and generic heap allocation fallbacks
 - Next recommended step:
-  - flash the new build with the project flash wrapper and confirm `Silero` runtime boot logs appear
+  - flash the new build with the project flash wrapper and confirm `Silero` runtime now reaches `runtime ready`
   - capture near-field, far-field, and silence diagnostics using the new `vad_*` counters
   - measure whether `256 KB` tensor arena is sufficient under sustained runtime
   - only then decide whether compression is necessary

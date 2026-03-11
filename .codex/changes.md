@@ -469,3 +469,16 @@
 - This is the first project-side `Silero VAD` detector artifact that is both:
   - directly derived from the pinned official upstream model
   - numerically checked against the original ONNX
+
+## Step 4.9
+- Root-caused the first board-side `Silero VAD` boot crash after flashing the oversized image:
+  - the fault occurred inside `river_voice_detector_silero_open`
+  - the crash address mapped into `tflite::MicroMutableOpResolver<16>::AddBuiltin`
+  - the actual bug was object lifetime, not model size or flash layout
+- Fixed `river_voice_detector_silero.cc` so C++ runtime objects are constructed and destroyed correctly:
+  - explicitly placement-construct `op_resolver` before registering kernels
+  - explicitly destroy `op_resolver` on every early-return and close path
+  - make tensor-arena freeing symmetric for both allocation backends
+- Revalidated the code-side fix locally:
+  - `river_voice_detector_silero.o` rebuilds successfully with `CCACHE_DISABLE=1`
+  - the earlier build interruption was due to host `ccache` permission on `/run/user/0`, not due to this source change

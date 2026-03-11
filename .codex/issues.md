@@ -228,6 +228,9 @@
 - The project-owned `.rdev` only changes the flash-tool envelope.
   - it does not by itself redefine the firmware-side flash map in the SDK
   - if future OTA, dual-slot update, or filesystem growth is needed, the SDK flash layout and project profile must be redesigned together
+- The first board-side `Silero VAD` runtime bring-up exposed a C++ object-lifetime trap:
+  - `MicroMutableOpResolver` cannot be treated as plain zeroed storage inside a `zmalloc`-allocated context
+  - if future self-developed detector backends embed non-trivial C++ types inside C-style structs, they must also use explicit construction and destruction
   - `decoder.lstm.W/R/B` can now be reconstructed from the ONNX slice/concat graph
   - but `Keras` gate ordering must be aligned explicitly instead of being assumed from PyTorch defaults
 - The restored official ONNX layout is also a reminder not to rely on mutated local graphs:

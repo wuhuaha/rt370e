@@ -290,6 +290,31 @@ Interpretation:
 - boot fails after flashing:
   - treat this as a flash-layout compatibility issue, not a wrapper bug
   - compare the downloaded image size and any boot-stage fault log before enlarging the profile further
+
+## Step 4.9
+Build and flash after the `Silero` runtime construction fix:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot-time behavior:
+- boot should no longer abort before detector runtime initialization
+- these lines should now appear after the `AIVOICE` banner:
+
+```text
+[river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=256KB used=...B threshold_q15=16384
+[river] local_detector=silero_vad
+```
+
+Interpretation:
+- the board still aborts before `silero_vad runtime ready`:
+  - the next suspect is tensor binding or `AllocateTensors`, not the previous `MicroMutableOpResolver` lifetime bug
+- the runtime-ready line appears and diagnostics continue:
+  - the first board-side `Silero` boot crash is resolved
   - remaining echo issues should be traced to capture routing or echo processing, not basic playback hardware
 
 ## Step 2.6

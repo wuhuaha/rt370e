@@ -298,3 +298,24 @@ It must be updated during every migration step so the port can be rebuilt later 
     - confirm `silero_vad runtime ready`
     - observe `vad_prob_q15` in silence / near-field / far-field
     - confirm `256 KB` arena is stable on real firmware
+
+## Runtime Bring-up Fix
+- First real board-side boot after integrating the embedded detector crashed before the runtime-ready log.
+- Crash signature:
+  - data abort on CA32
+  - PC around `0x6034bc84`
+  - falls inside `river_voice_detector_silero_open`
+  - disassembly maps the fault into the first `AddReshape()` path of `tflite::MicroMutableOpResolver<16>`
+- Root cause:
+  - `river_voice_detector_silero_context_t` was allocated with `rtos_mem_zmalloc`
+  - `op_resolver` is a non-trivial C++ object stored inline in that struct
+  - it was used without running its constructor
+- Fix:
+  - explicitly placement-construct `op_resolver`
+  - explicitly destroy it on every error path and normal close path
+  - also make tensor-arena free symmetric for:
+    - `rtos_heap_types_zmalloc(..., TYPE_DRAM)`
+    - fallback `rtos_mem_zmalloc(...)`
+- Validation after fix:
+  - `river_voice_detector_silero.o` rebuilds locally
+  - remaining board-side validation item is whether runtime now reaches `silero_vad runtime ready`

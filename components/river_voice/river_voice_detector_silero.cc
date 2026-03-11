@@ -57,6 +57,8 @@ typedef struct {
     uint32_t arena_size_bytes;
     uint32_t arena_used_bytes;
     bool model_imported;
+    bool op_resolver_constructed;
+    bool tensor_arena_from_heap_types;
     int16_t pending_window[RIVER_SILERO_VAD_WINDOW_SAMPLES];
     int16_t context_window[RIVER_SILERO_VAD_CONTEXT_SAMPLES];
     float recurrent_state[RIVER_SILERO_VAD_STATE_FLOATS];
@@ -175,6 +177,22 @@ static void river_silero_vad_prepare_input(const int16_t *context_window,
     }
 }
 
+static void river_silero_vad_free_tensor_arena(river_voice_detector_silero_context_t *context)
+{
+    if (context == NULL || context->tensor_arena == NULL) {
+        return;
+    }
+
+    if (context->tensor_arena_from_heap_types) {
+        rtos_heap_types_free(context->tensor_arena);
+    } else {
+        rtos_mem_free(context->tensor_arena);
+    }
+
+    context->tensor_arena = NULL;
+    context->tensor_arena_from_heap_types = false;
+}
+
 extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_t *detector)
 {
     river_voice_detector_silero_context_t *context;
@@ -197,6 +215,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
     context->arena_size_bytes = RIVER_SILERO_VAD_ARENA_BYTES;
     context->tensor_arena =
         (uint8_t *)rtos_heap_types_zmalloc(context->arena_size_bytes, TYPE_DRAM);
+    context->tensor_arena_from_heap_types = (context->tensor_arena != NULL);
     if (context->tensor_arena == NULL) {
         context->tensor_arena = (uint8_t *)rtos_mem_zmalloc(context->arena_size_bytes);
     }
@@ -207,15 +226,19 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
 
     context->model = tflite::GetModel(g_river_silero_vad_model_data);
     if (context->model == NULL || context->model->version() != TFLITE_SCHEMA_VERSION) {
-        rtos_heap_types_free(context->tensor_arena);
+        river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
         printf("[river][voice] silero_vad model schema mismatch\n");
         return RIVER_ERR_UNSUPPORTED;
     }
 
+    new (&context->op_resolver) river_silero_vad_op_resolver_t();
+    context->op_resolver_constructed = true;
+
     status = river_silero_vad_register_ops(&context->op_resolver);
     if (status != RIVER_OK) {
-        rtos_heap_types_free(context->tensor_arena);
+        context->op_resolver.~river_silero_vad_op_resolver_t();
+        river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
         printf("[river][voice] silero_vad op registration failed\n");
         return status;
@@ -231,7 +254,8 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
                                  false);
     if (context->interpreter->AllocateTensors() != kTfLiteOk) {
         context->interpreter->~MicroInterpreter();
-        rtos_heap_types_free(context->tensor_arena);
+        context->op_resolver.~river_silero_vad_op_resolver_t();
+        river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
         printf("[river][voice] silero_vad AllocateTensors failed\n");
         return RIVER_ERR_NO_MEMORY;
@@ -255,7 +279,8 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         context->prob_output_tensor->type != kTfLiteFloat32 ||
         context->state_output_tensor->type != kTfLiteFloat32) {
         context->interpreter->~MicroInterpreter();
-        rtos_heap_types_free(context->tensor_arena);
+        context->op_resolver.~river_silero_vad_op_resolver_t();
+        river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
         printf("[river][voice] silero_vad tensor binding failed\n");
         return RIVER_ERR_UNSUPPORTED;
@@ -378,10 +403,11 @@ extern "C" void river_voice_detector_silero_close(river_voice_detector_t *detect
             context->interpreter->~MicroInterpreter();
             context->interpreter = NULL;
         }
-        if (context->tensor_arena != NULL) {
-            rtos_heap_types_free(context->tensor_arena);
-            context->tensor_arena = NULL;
+        if (context->op_resolver_constructed) {
+            context->op_resolver.~river_silero_vad_op_resolver_t();
+            context->op_resolver_constructed = false;
         }
+        river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
     }
     detector->backend_ctx = NULL;
