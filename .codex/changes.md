@@ -611,3 +611,17 @@
 - Next expected milestone:
   - boot should advance past `silero_vad tensor binding failed`
   - next useful log should be `silero_vad runtime ready: ...`
+
+## Knowledge Update
+- Triaged an additional external `Float32-first Silero deployment` reference into `.codex/knowledge.md`.
+- Recorded the parts that are valid for current `RTL8730E` work:
+  - keep `Float32` first
+  - measure real arena / latency / heap before compression
+  - keep `int16 -> float32` normalization and simple state copy
+- Recorded the parts that need correction for this project:
+  - `CA32` uses `-mfpu=neon -mfloat-abi=hard`, not `KM4`'s `fpv5-sp-d16`
+  - cache-maintenance guidance is relevant, but `Cortex-M` APIs are not drop-in for current `CA32`
+  - `AllOpsResolver` is not preferred for current embedded budget
+- Added a standing rule:
+  - future external references should be triaged directly into `.codex/knowledge.md`
+  - store actionable conclusions rather than raw prose

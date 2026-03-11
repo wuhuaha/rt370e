@@ -209,3 +209,73 @@
   - prefer Realtek examples for Ameba-specific driver and bring-up behavior
   - prefer upstream `tflite-micro` examples for model-runtime architecture
   - use ARM ML kit mainly when optimization or later `KWS/ASR` pipeline refinement becomes the bottleneck
+
+## Float32-First Silero Guidance For RTL8730E
+- Reference value:
+  - high as an engineering strategy note
+  - medium as direct implementation guidance
+- Core recommendation worth keeping:
+  - `make it work before make it fast` is the right policy for current `Silero VAD` migration
+  - first stabilize:
+    - model import
+    - `TFLite Micro` runtime
+    - board-side audio / task / cache behavior
+  - only then decide whether quantization or pruning is necessary
+
+### Directly Applicable To `ameba-river`
+- Keep `Float32` as the first-stage deployment target.
+  - this matches the current project decision
+  - it avoids mixing model-compression error with runtime-integration bugs
+- Convert microphone `int16` PCM to normalized `float32` before `Invoke()`.
+  - current `Silero` detector already follows this rule
+- Keep recurrent state as `float32` and update it with plain `memcpy`.
+  - current `Silero` detector already follows this rule
+- Measure real on-device cost before compressing.
+  - required metrics:
+    - flash size
+    - tensor arena usage
+    - runtime latency
+    - steady-state heap headroom
+- Budget tensor arena generously during bring-up, then shrink later.
+  - current starting point is `256KB`
+
+### Important RTL8730E-Specific Corrections
+- Do not copy `Cortex-M` FPU flags into the current `CA32` path.
+  - current `RTL8730E` `AP/CA32` build uses:
+    - `-mcpu=cortex-a32`
+    - `-mfpu=neon`
+    - `-mfloat-abi=hard`
+  - `-mfpu=fpv5-sp-d16` applies to `KM4`, not to the current `Silero` runtime path
+- Do not copy `SCB_InvalidateDCache_by_Addr()` examples directly.
+  - the cache-consistency warning is absolutely relevant
+  - but the actual maintenance API must follow the `CA32` / Realtek SDK path, not a generic `Cortex-M` snippet
+- Do not switch to `AllOpsResolver`.
+  - current project should keep a minimal `MicroMutableOpResolver`
+  - resolver bloat increases memory pressure without helping current bring-up
+- Do not treat a simple latency threshold as a release decision by itself.
+  - final acceptability depends on:
+    - concurrent `AIVoice` load
+    - Wi-Fi load
+    - long-run stability
+    - total voice-pipeline latency
+
+### Current Project Implications
+- This reference supports the existing decision:
+  - migrate original `Silero VAD` first
+  - defer quantization / pruning
+- This reference does not directly solve the current `RTL8730E` blocker:
+  - current issue is SDK-specific `TFLite Micro` tensor compatibility
+  - not model precision or quantization drift
+- The next high-value additions for current `Silero` work are:
+  - `Invoke()` latency instrumentation
+  - tensor-arena usage reporting
+  - task-stack watermark reporting
+  - CA32-appropriate DMA/cache-consistency checks
+
+## Future Reference Intake Rule
+- For future external materials, record them directly into `.codex/knowledge.md` after triage.
+- Default triage format:
+  - `useful as-is`
+  - `useful with RTL8730E-specific corrections`
+  - `not suitable for direct reuse`
+- Prefer storing actionable conclusions over preserving raw prose.
