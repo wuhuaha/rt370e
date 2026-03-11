@@ -218,6 +218,45 @@ Manual check:
 
 Interpretation:
 - The repeating beep is clean and recognizable:
+
+## Step 4.7
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] detector backend: silero_vad runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_b1_fp32.tflite threshold_q15=16384 arena=256KB
+[river][voice] detector policy: direct official-model migration is complete; compression stays deferred until on-device flash/heap/latency data requires it
+[river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=256KB used=...B threshold_q15=16384
+[river] local_detector=silero_vad
+```
+
+Runtime diagnostics expectation:
+```text
+[river][voice][diag] ... vad_prob_q15=... vad=silence|speech vad_decisions=... vad_speech=... det_ok=... det_fail=...
+```
+
+Manual check:
+- Stay silent for `3-5s` and confirm `vad=silence` dominates.
+- Speak near-field for `2-3s` and confirm `vad_prob_q15` rises and `vad_speech` increments.
+- Speak at `0.5-1.0m` and compare whether speech probability is still meaningfully above silence.
+
+Interpretation:
+- `silero_vad runtime ready` does not appear:
+  - detector did not initialize on-device; inspect tensor arena and boot logs first
+- `det_fail` increments:
+  - detector inference is unstable; do not tune threshold yet
+- `det_ok` increments but `vad_prob_q15` stays near `0` even during speech:
+  - enhancement output or detector feed cadence is wrong
+- `vad_prob_q15` stays high in silence:
+  - threshold is too low or the current AEC/AFE profile leaks too much non-speech energy into the detector
   - the direct speaker playback path is proven
   - remaining echo issues should be traced to capture routing or echo processing, not basic playback hardware
 

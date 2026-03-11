@@ -139,8 +139,17 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
     - state max abs diff `1.67e-06`
   - exported a batch=`1` `TFLite` artifact:
     - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
+- Step 4.7 completed: the verified `Silero` artifact now runs inside the device-side detector backend:
+  - `river_voice_detector_silero.cc` now embeds and executes `silero_vad_16k_b1_fp32.tflite` through `TFLite Micro`
+  - the echo task now feeds enhanced mono `16 ms` frames into the detector while preserving detector/replay separation
+  - diagnostics now expose `vad_prob_q15`, `vad=speech|silence`, and detector success/failure counters
+  - first build-time resource baseline is now recorded before any compression decision:
+    - `.tflite` artifact about `1.2 MB`
+    - packaged app image about `2.8 MB`
+    - `target_img2_ap.axf` text about `2.36 MB`
 - Next recommended step:
-  - integrate the verified `TFLite` artifact into `river_voice_detector_silero`
-  - measure tensor arena, heap delta, flash delta, and per-window latency on `RTL8730E`
+  - flash the new build to the board and confirm `Silero` runtime boot logs appear
+  - capture near-field, far-field, and silence diagnostics using the new `vad_*` counters
+  - measure whether `256 KB` tensor arena is sufficient under sustained runtime
   - only then decide whether compression is necessary
   - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile while detector migration continues

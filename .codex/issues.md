@@ -228,3 +228,26 @@
   - state input `[2, 1, 128]`
   - this is acceptable for the first embedded detector integration because the device runtime is also batch `1`
   - if multi-batch host evaluation is needed later, it should be treated as a separate export target instead of changing the embedded baseline
+- The first on-device `Silero` runtime integration now builds, but acoustic validation is still missing:
+  - boot-time runtime initialization
+  - silence false-positive behavior
+  - far-field recall
+  - stability under `Wi-Fi + AIVoice AEC`
+- The first detector threshold is only a bootstrap value:
+  - `CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15=16384`
+  - it has not been tuned against real board speech/noise yet
+- The first tensor-arena budget is also a bootstrap value:
+  - `CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB=256`
+  - local build passes, but runtime headroom still needs board confirmation
+- The embedded detector artifact is intentionally still full-precision:
+  - `silero_vad_16k_b1_fp32.tflite` is about `1.2 MB`
+  - packaged image is about `2.8 MB`
+  - later quantization should be triggered by measured pressure, not by assumption
+- The current detector integration is observational only:
+  - it runs on enhanced mono frames inside the echo task
+  - it does not yet gate replay
+  - it does not yet emit router-facing VAD events for `KWS/ASR`
+- `river_voice_detector_silero.cc` depends on a local SDK-compatibility shim:
+  - missing `TFLITE_*` feature macros are defined in the file itself
+  - `river_voice` target suppresses `-Wunused-parameter` locally for `TFLite Micro` headers
+  - if the SDK `tflite_micro` snapshot changes, this module should be checked first

@@ -88,5 +88,16 @@ This keeps the current SDK-backed step and the future self-developed step aligne
   - a batch=`1` `TFLite` artifact exists
   - it stays numerically aligned with the pinned ONNX baseline
   - the next architecture step is runtime integration, not another export experiment
+- That runtime step is now also landed:
+  - `river_voice_detector_silero.cc` embeds and executes the verified `TFLite` artifact through `TFLite Micro`
+  - detector feed stays on enhanced mono output, not on raw array PCM
+  - detector is intentionally observational first:
+    - no replay gating
+    - no router event emission yet
+    - only diagnostics and runtime validation
+- The current detector tuning knobs are project-owned config, not hard-coded model policy:
+  - `CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB`
+  - `CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15`
+  This keeps later self-developed VAD backends aligned with the same detector boundary.
 - The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

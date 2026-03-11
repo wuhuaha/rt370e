@@ -206,3 +206,95 @@ It must be updated during every migration step so the port can be rebuilt later 
     - `/root/ameba-river/third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
     - sha256 `5a532943646b1dd71930fb02e26e0600ba97ee80990302726294aef8a3142a05`
     - size `1248388` bytes
+
+## Step 3 On-Device Runtime Integration
+- Date: `2026-03-11`
+- Goal:
+  - move `Silero VAD` from "verified host artifact" to "real detector backend inside firmware"
+  - keep the detector observational first
+  - do not couple policy or replay gating to it yet
+- New project files:
+  - generator:
+    - `/root/ameba-river/tools/silero_vad/generate_model_data.py`
+  - generated embedded model:
+    - `/root/ameba-river/components/river_voice/generated/river_silero_vad_model_data.h`
+    - `/root/ameba-river/components/river_voice/generated/river_silero_vad_model_data.cc`
+  - runtime backend:
+    - `/root/ameba-river/components/river_voice/river_voice_detector_silero.cc`
+- Embedded model generation command:
+  ```bash
+  source /root/ameba-river/.venv-silero-convert/bin/activate
+  python /root/ameba-river/tools/silero_vad/generate_model_data.py \
+    --input /root/ameba-river/third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite \
+    --header /root/ameba-river/components/river_voice/generated/river_silero_vad_model_data.h \
+    --source /root/ameba-river/components/river_voice/generated/river_silero_vad_model_data.cc \
+    --symbol river_silero_vad_model_data
+  ```
+- Runtime contract implemented on device:
+  - feed cadence:
+    - enhanced mono `PCM16`
+    - `16 kHz`
+    - `256 samples / 16 ms`
+  - detector accumulation:
+    - `2 x 256` feed frames -> `512` current-window samples
+    - prepend `64` rolling-context samples
+    - total audio input tensor `[1, 576]`
+  - recurrent state tensors:
+    - input `[2, 1, 128]`
+    - output `[2, 1, 128]`
+- TFLite Micro op set actually registered in firmware:
+  - `RESHAPE`
+  - `MIRROR_PAD`
+  - `CONV_2D`
+  - `STRIDED_SLICE`
+  - `SQUARE`
+  - `ADD`
+  - `SQRT`
+  - `PAD`
+  - `FULLY_CONNECTED`
+  - `SPLIT`
+  - `LOGISTIC`
+  - `MUL`
+  - `TANH`
+  - `RELU`
+  - `MEAN`
+  - `PACK`
+- Local SDK compatibility adjustments required:
+  - define the following macros locally before including current SDK `TFLite` headers:
+    - `TFLITE_WITH_STABLE_ABI=0`
+    - `TFLITE_USE_OPAQUE_DELEGATE=0`
+    - `TFLITE_SINGLE_ROUNDING=0`
+  - suppress `-Wunused-parameter` only for the local `river_voice` target because current SDK `tflite_micro` headers trigger it under project `-Werror`
+  - no SDK source files were modified for this step
+- First runtime tuning configs:
+  - `CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB=256`
+  - `CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15=16384`
+- Echo-path integration strategy:
+  - run detector on the enhanced mono frame
+  - do it before replay-only post-AGC / warmup modifies the frame
+  - keep detector output observational:
+    - update diagnostics
+    - do not gate playback
+    - do not emit product events yet
+- New runtime diagnostics added:
+  - `vad_prob_q15`
+  - `vad=speech|silence`
+  - `vad_decisions`
+  - `vad_speech`
+  - `det_ok`
+  - `det_fail`
+- First build result:
+  - full local `RTL8730E` firmware build passed
+  - `target_img2_ap.axf` section summary:
+    - `text=2355576`
+    - `data=38868`
+    - `bss=87680`
+  - packaged app image:
+    - `/root/ameba-river/build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+    - about `2.8 MB`
+- Current decision after runtime integration:
+  - still do **not** quantize or prune yet
+  - next step must be board-side runtime validation:
+    - confirm `silero_vad runtime ready`
+    - observe `vad_prob_q15` in silence / near-field / far-field
+    - confirm `256 KB` arena is stable on real firmware

@@ -219,6 +219,50 @@
   - final playback energy
 - Verified the tuned build locally for `RTL8730E`.
 
+## Step 4.7
+- Integrated the verified `Silero VAD` artifact into the on-device `RTL8730E` runtime instead of leaving the detector in staged mode only.
+- Added host-side model-data generation:
+  - `tools/silero_vad/generate_model_data.py`
+  - generated embedded model files:
+    - `components/river_voice/generated/river_silero_vad_model_data.h`
+    - `components/river_voice/generated/river_silero_vad_model_data.cc`
+- Replaced the staged C detector shim with a real `TFLite Micro` runtime implementation:
+  - `components/river_voice/river_voice_detector_silero.cc`
+  - embeds `silero_vad_16k_b1_fp32.tflite`
+  - uses official streaming semantics:
+    - `256`-sample feed
+    - `512`-sample decision window
+    - `64`-sample rolling context
+    - recurrent state `2 x 1 x 128`
+- Added project configs for first board-side tuning:
+  - `CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB=256`
+  - `CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15=16384`
+- Integrated detector execution into the active debug pipeline:
+  - echo task now runs `detector_process()` on the enhanced mono frame before replay-only AGC/warmup changes it
+  - boot/runtime diagnostics now report:
+    - `vad_prob_q15`
+    - `vad=speech|silence`
+    - `vad_decisions`
+    - `vad_speech`
+    - `det_ok`
+    - `det_fail`
+- Kept detector output observational in this step:
+  - no playback gating
+  - no ASR routing decision yet
+  - goal is first on-device `Silero` visibility, not policy coupling
+- Added local C++-side compatibility handling instead of patching the SDK:
+  - define missing `TFLITE_*` feature macros expected by the current SDK header set
+  - suppress `unused-parameter` only for the local `river_voice` target so `TFLite Micro` headers compile cleanly under project `-Werror`
+- Verified a full local `RTL8730E` build after runtime integration.
+- Captured first resource baseline from the successful build:
+  - embedded `.tflite` artifact size: about `1.2 MB`
+  - `target_img2_ap.axf` size: about `14 MB`
+  - `target_img2_ap.axf` sections:
+    - `text=2355576`
+    - `data=38868`
+    - `bss=87680`
+  - packaged app image `km0_km4_ca32_app.bin`: about `2.8 MB`
+
 ## Step 3.1.1
 - Reverted the experimental detector-gated replay step after user feedback showed this direction was not wanted for the current phase.
 - Kept the architecture prepared for future `VAD`, but restored the active runtime path to:

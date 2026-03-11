@@ -14,6 +14,7 @@
 #include "river/river_voice.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
+#include "river/river_voice_detector.h"
 #include "river/river_voice_preproc.h"
 #include "river/river_voice_ref.h"
 
@@ -42,6 +43,7 @@ typedef struct {
     rtos_task_t task;
     river_voice_capture_t capture;
     river_voice_preproc_t preproc;
+    river_voice_detector_t detector;
     struct AudioTrack *track;
     uint8_t *delay_buffer;
     uint8_t *capture_buffer;
@@ -69,12 +71,18 @@ typedef struct {
     uint32_t diag_ref_read_miss;
     uint32_t diag_ref_write_ok;
     uint32_t diag_ref_write_fail;
+    uint32_t diag_det_ok;
+    uint32_t diag_det_fail;
+    uint32_t diag_vad_decisions;
+    uint32_t diag_vad_speech;
     uint32_t diag_chunks_until_log;
     uint16_t diag_capture_peak_ch0;
     uint16_t diag_capture_peak_ch1;
     uint16_t diag_enhanced_peak;
     uint16_t diag_playback_peak_ch0;
     uint16_t diag_playback_peak_ch1;
+    uint16_t diag_vad_probability_q15;
+    bool diag_vad_is_speech;
 } river_voice_echo_context_t;
 
 static river_voice_echo_context_t g_river_voice_echo;
@@ -178,11 +186,17 @@ static void river_voice_echo_reset_diag_counters(void)
     g_river_voice_echo.diag_ref_read_miss = 0U;
     g_river_voice_echo.diag_ref_write_ok = 0U;
     g_river_voice_echo.diag_ref_write_fail = 0U;
+    g_river_voice_echo.diag_det_ok = 0U;
+    g_river_voice_echo.diag_det_fail = 0U;
+    g_river_voice_echo.diag_vad_decisions = 0U;
+    g_river_voice_echo.diag_vad_speech = 0U;
     g_river_voice_echo.diag_capture_peak_ch0 = 0U;
     g_river_voice_echo.diag_capture_peak_ch1 = 0U;
     g_river_voice_echo.diag_enhanced_peak = 0U;
     g_river_voice_echo.diag_playback_peak_ch0 = 0U;
     g_river_voice_echo.diag_playback_peak_ch1 = 0U;
+    g_river_voice_echo.diag_vad_probability_q15 = 0U;
+    g_river_voice_echo.diag_vad_is_speech = false;
     g_river_voice_echo.diag_chunks_until_log = RIVER_VOICE_ECHO_DIAG_WINDOW_MS /
                                                river_voice_board_array_profile()->frame_ms;
 }
@@ -200,14 +214,19 @@ static void river_voice_echo_log_diagnostics_if_needed(void)
         return;
     }
 
-    printf("[river][voice][diag] cap_peak=[%u,%u] afe_peak=%u play_peak=[%u,%u] read_ok=%lu proc_ok=%lu write_ok=%lu ref_read_ok=%lu ref_read_miss=%lu ref_write_ok=%lu ref_write_fail=%lu read_fail=%lu proc_fail=%lu write_fail=%lu partial_read=%lu partial_proc=%lu\n",
+    printf("[river][voice][diag] cap_peak=[%u,%u] afe_peak=%u play_peak=[%u,%u] vad_prob_q15=%u vad=%s vad_decisions=%lu vad_speech=%lu read_ok=%lu proc_ok=%lu det_ok=%lu write_ok=%lu ref_read_ok=%lu ref_read_miss=%lu ref_write_ok=%lu ref_write_fail=%lu read_fail=%lu proc_fail=%lu det_fail=%lu write_fail=%lu partial_read=%lu partial_proc=%lu\n",
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_capture_peak_ch1,
            (unsigned int)g_river_voice_echo.diag_enhanced_peak,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch0,
            (unsigned int)g_river_voice_echo.diag_playback_peak_ch1,
+           (unsigned int)g_river_voice_echo.diag_vad_probability_q15,
+           g_river_voice_echo.diag_vad_is_speech ? "speech" : "silence",
+           (unsigned long)g_river_voice_echo.diag_vad_decisions,
+           (unsigned long)g_river_voice_echo.diag_vad_speech,
            (unsigned long)g_river_voice_echo.diag_read_ok,
            (unsigned long)g_river_voice_echo.diag_proc_ok,
+           (unsigned long)g_river_voice_echo.diag_det_ok,
            (unsigned long)g_river_voice_echo.diag_write_ok,
            (unsigned long)g_river_voice_echo.diag_ref_read_ok,
            (unsigned long)g_river_voice_echo.diag_ref_read_miss,
@@ -215,6 +234,7 @@ static void river_voice_echo_log_diagnostics_if_needed(void)
            (unsigned long)g_river_voice_echo.diag_ref_write_fail,
            (unsigned long)g_river_voice_echo.diag_read_fail,
            (unsigned long)g_river_voice_echo.diag_proc_fail,
+           (unsigned long)g_river_voice_echo.diag_det_fail,
            (unsigned long)g_river_voice_echo.diag_write_fail,
            (unsigned long)g_river_voice_echo.diag_partial_read,
            (unsigned long)g_river_voice_echo.diag_partial_proc);
@@ -347,6 +367,7 @@ static void river_voice_echo_close_audio(void)
         g_river_voice_echo.track = 0;
     }
 
+    river_voice_detector_close(&g_river_voice_echo.detector);
     river_voice_preproc_close(&g_river_voice_echo.preproc);
     river_voice_capture_close(&g_river_voice_echo.capture);
     river_voice_ref_close();
@@ -463,6 +484,18 @@ static river_status_t river_voice_echo_open_audio(void)
         return RIVER_ERR_UNSUPPORTED;
     }
 
+    if (river_voice_detector_open(&g_river_voice_echo.detector) != RIVER_OK) {
+        printf("[river][voice] detector open failed\n");
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (river_voice_detector_input_frame_bytes(&g_river_voice_echo.detector) !=
+        river_voice_preproc_output_frame_bytes(&g_river_voice_echo.preproc)) {
+        printf("[river][voice] detector/preproc frame mismatch: detector=%luB preproc=%luB\n",
+               (unsigned long)river_voice_detector_input_frame_bytes(&g_river_voice_echo.detector),
+               (unsigned long)river_voice_preproc_output_frame_bytes(&g_river_voice_echo.preproc));
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
     use_reference = river_voice_preproc_reference_enabled(&g_river_voice_echo.preproc);
     if (use_reference &&
         river_voice_ref_open(g_river_voice_echo.capture.sample_rate,
@@ -529,7 +562,7 @@ static river_status_t river_voice_echo_open_audio(void)
                river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
                river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic));
     }
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu post_agc=target%u/maxx%lu floor=%u cap=0x%02lx preproc=%s\n",
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu post_agc=target%u/maxx%lu floor=%u cap=0x%02lx preproc=%s detector=%s\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,
@@ -537,7 +570,8 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned long)RIVER_VOICE_ECHO_POST_AGC_MAX_GAIN,
            (unsigned int)RIVER_VOICE_ECHO_POST_AGC_GATE,
            (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
-           river_voice_preproc_backend_name());
+           river_voice_preproc_backend_name(),
+           river_voice_detector_backend_name());
     printf("[river][voice] audio echo ref: backend=%s source=post-delay mono history=%lums aec=%s\n",
            river_voice_ref_backend_name(),
            (unsigned long)RIVER_VOICE_ECHO_REF_HISTORY_MS,
@@ -554,6 +588,7 @@ static void river_voice_echo_task(void *param)
     while (!g_river_voice_echo.stop_requested) {
         int32_t bytes_read;
         size_t enhanced_bytes;
+        river_voice_detector_result_t detector_result;
 
         memset(g_river_voice_echo.capture_buffer, 0, g_river_voice_echo.capture_chunk_bytes);
         if (use_reference && g_river_voice_echo.reference_buffer != 0) {
@@ -612,6 +647,25 @@ static void river_voice_echo_task(void *param)
                    0,
                    g_river_voice_echo.enhanced_chunk_bytes - enhanced_bytes);
             g_river_voice_echo.diag_partial_proc++;
+        }
+
+        if (river_voice_detector_process(&g_river_voice_echo.detector,
+                                         g_river_voice_echo.enhanced_buffer,
+                                         g_river_voice_echo.enhanced_chunk_bytes,
+                                         &detector_result) != RIVER_OK) {
+            g_river_voice_echo.diag_det_fail++;
+            river_voice_echo_log_diagnostics_if_needed();
+            printf("[river][voice] detector process failed\n");
+            continue;
+        }
+        g_river_voice_echo.diag_det_ok++;
+        if (detector_result.decision_valid) {
+            g_river_voice_echo.diag_vad_probability_q15 = detector_result.speech_probability_q15;
+            g_river_voice_echo.diag_vad_is_speech = detector_result.is_speech;
+            g_river_voice_echo.diag_vad_decisions++;
+            if (detector_result.is_speech) {
+                g_river_voice_echo.diag_vad_speech++;
+            }
         }
 
         {

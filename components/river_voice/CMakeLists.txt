@@ -19,12 +19,13 @@ ameba_list_append(private_sources
     river_voice_board.c
     river_voice_capture.c
     river_voice_detector.c
-    river_voice_detector_silero.c
+    river_voice_detector_silero.cc
     river_voice_frontend.c
     river_voice_echo.c
     river_voice_preproc.c
     river_voice_preproc_aivoice.c
     river_voice_ref.c
+    generated/river_silero_vad_model_data.cc
 )
 
 ameba_list_append(private_includes
@@ -41,4 +42,5 @@ ameba_add_internal_library(river_voice
         ${private_definitions}
     p_COMPILE_OPTIONS
         ${private_compile_options}
+        -Wno-unused-parameter
 )

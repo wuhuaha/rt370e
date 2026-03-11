@@ -50,6 +50,18 @@ config RIVER_VOICE_DETECTOR_SILERO_VAD
 
 endchoice
 
+config RIVER_SILERO_VAD_TENSOR_ARENA_KB
+    int "Silero VAD tensor arena size in KB"
+    range 64 1024
+    default 256
+    depends on RIVER_VOICE_DETECTOR_SILERO_VAD
+
+config RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15
+    int "Silero VAD speech threshold in q15"
+    range 1 32767
+    default 16384
+    depends on RIVER_VOICE_DETECTOR_SILERO_VAD
+
 config RIVER_OFFLINE_ASR_RESERVED
     bool "Reserve offline ASR integration points"
     default y
