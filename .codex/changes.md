@@ -258,6 +258,23 @@
   - `AFE_FOR_COM`
   - `enable_aec = true`
   - `ref_num = 1`
+
+## Step 4.2
+- Added `river_voice_detector.*` as a first-class local detector boundary for the upcoming `Silero VAD` migration.
+- Added `river_voice_detector_silero.c` as the staged default backend:
+  - current step validates interface shape and frame organization only
+  - current step does not yet import or run the real model blob
+- Fixed the detector-side cadence and window assumptions in code and docs:
+  - input from `preproc`: mono `PCM16`, `16 kHz`, `256 samples / 16 ms`
+  - staged detector window: `512 samples / 32 ms`
+- Enabled `TFLite Micro` in project config so the runtime direction is explicit from the start.
+- Extended boot/status logs so the current detector backend is visible:
+  - `local_detector=silero_vad`
+  - detector profile dump now reports `runtime=tflite_micro`
+- Updated the dedicated `Silero` porting record with the first hard decisions:
+  - migrate the original model first
+  - do not prune or quantize in the first migration step
+  - only compress later if actual flash / RAM / latency measurements require it
   - `NS mid`
   - `adaptive AGC + fixed 5 dB`
   - `RES mid`

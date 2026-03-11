@@ -258,6 +258,27 @@ Manual check:
 Build and flash:
 ```bash
 cd /root/ameba-river
+
+## Step 4.2
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Boot-time expectation:
+```text
+[river][voice] detector backend: silero_vad staged runtime=tflite_micro feed=256 samples window=512 samples model=import-pending
+[river][voice] detector policy: migrate original model first, defer pruning/quantization until measured RAM/flash/latency pressure appears
+[river] local_detector=silero_vad
+```
+
+Expected behavior:
+- The project still boots without changing the current audio debug path.
+- Detector information is now explicit in boot logs and status output.
+- No real VAD gating is active in this step yet.
 source env.sh
 ameba.py soc RTL8730E
 ameba.py build -p

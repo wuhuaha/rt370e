@@ -66,5 +66,6 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 - `AEC` is now a priority feature, but it must remain an adapter behind `river_voice_preproc_*` so the SDK backend can be replaced later.
 - The playback reference remains a project-owned component because future self-developed `AEC` also needs the same `mic + ref` boundary.
 - `VAD` must not be tied to SDK `aivoice`; the target direction is `Silero VAD` first, then future self-developed VAD on the same detector interface.
+- `Silero VAD` is now staged behind `river_voice_detector_*`; later self-developed VAD must replace that detector backend, not modify `app`, `echo`, or `preproc`.
 - The old direct speaker self-test path has been removed from the mainline codebase because it was only a bring-up tool, not part of the final product architecture.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.

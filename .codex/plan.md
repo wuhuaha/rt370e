@@ -97,7 +97,17 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
     - `asr_barge_in_aec`
   - current default profile is now `asr_barge_in_aec`, still based on `AFE_FOR_ASR`
   - the runtime logs now describe the real product direction instead of reporting `vad` before any detector exists
+- Step 4.2 completed: `Silero VAD` migration staging has started:
+  - added a first-class `river_voice_detector` boundary instead of letting future VAD logic leak into `echo` or `app`
+  - staged `Silero VAD` as the default detector backend
+  - fixed the first runtime choice to `TensorFlow Lite Micro` because `RTL8730E` SDK already ships it and this matches the later self-developed model direction
+  - kept the detector runtime non-invasive for now:
+    - no actual model blob is imported in this step
+    - no runtime gating is added to the audio path in this step
+  - recorded the first migration rule in `/.codex/silero_vad_porting.md`:
+    - migrate the original model first
+    - do not prune or quantize until measured resource pressure appears
 - Next recommended step:
-  - start the actual `Silero VAD` migration on top of the new detector boundary
+  - fetch the official `Silero VAD` source/model and pin the exact upstream revision
+  - add the first real export / conversion path into `/.codex/silero_vad_porting.md`
   - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile for now
-  - add a first reproducible import / conversion / integration record into `/.codex/silero_vad_porting.md`

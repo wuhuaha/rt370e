@@ -99,6 +99,14 @@
 - The current `ASR-first` profile follows the SDK baseline and therefore keeps `NS` off:
   - this may preserve more speech detail for KWS/ASR
   - but it can also make idle noise more audible during the current speaker replay debug phase
+- The `Silero VAD` detector backend is now only staged:
+  - no upstream model is pinned locally yet
+  - no export / conversion result is recorded yet
+  - no runtime inference is active yet
+- The first embedded runtime choice is `TFLite Micro`, but actual tensor arena size is still unknown until the real model is imported.
+- The staged detector currently assumes `16 kHz` mono input and a `512-sample` model window:
+  - this matches the intended streaming direction
+  - but it still needs to be validated against the exact imported official artifact
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -183,3 +191,7 @@
   - do not reintroduce SDK `VAD`
   - build the detector layer directly for `Silero VAD`
   - keep the new `preproc` profile abstraction stable so custom `AEC` can later replace SDK `aivoice`
+- For the current `Silero` staging step:
+  - do not compress the model before the first direct migration works
+  - pin the exact upstream revision before generating any project-side artifact
+  - record every export command, tool version, and checksum immediately in `/.codex/silero_vad_porting.md`

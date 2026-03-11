@@ -41,6 +41,15 @@ config RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
 
 endchoice
 
+choice RIVER_VOICE_DETECTOR_BACKEND
+    prompt "Local voice detector backend"
+    default RIVER_VOICE_DETECTOR_SILERO_VAD
+
+config RIVER_VOICE_DETECTOR_SILERO_VAD
+    bool "Silero VAD"
+
+endchoice
+
 config RIVER_OFFLINE_ASR_RESERVED
     bool "Reserve offline ASR integration points"
     default y

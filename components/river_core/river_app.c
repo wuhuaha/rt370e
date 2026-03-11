@@ -57,6 +57,7 @@ void river_app_print_status(void)
     printf("[river] local_frontend=%s\n", river_voice_frontend_mode_name());
     printf("[river] local_preproc=%s\n", river_voice_preproc_backend_name());
     printf("[river] local_preproc_profile=%s\n", river_voice_preproc_profile_name());
+    printf("[river] local_detector=%s\n", river_voice_detector_backend_name());
     printf("[river] local_playback_ref=%s\n", river_voice_ref_backend_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED
     printf("[river] offline_asr=reserved\n");
