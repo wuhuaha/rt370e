@@ -65,6 +65,15 @@
   - source is the mono frame queued for speaker playback inside the application
   - it is not a hardware loopback or codec-side echo reference
   - alignment still needs to be validated when `AEC` is enabled
+- The current `AEC` path is now enabled, but the reference is still application-side and post-delay:
+  - this is good enough for staged bring-up
+  - it may not match the true analog speaker latency exactly
+  - some residual echo or over-cancellation may still appear until timing is tuned
+- The new AIVoice feed format now depends on `3-channel` interleaving:
+  - `AMIC1`
+  - `AMIC3`
+  - `playback_ref`
+  if this assumption is wrong for a specific SDK release, the build will still pass but runtime quality will degrade sharply
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -133,3 +142,7 @@
   - keep the reference path behind `river_voice_ref.*`
   - keep `AEC` disabled until reference counters and timing look stable
   - enable `AEC` through `river_voice_preproc`, not by letting playback code call SDK `aivoice` directly
+- For the current `AEC` round:
+  - validate `ref_read_ok/ref_write_ok` first before judging acoustic quality
+  - treat `AEC` as a quality-improvement layer on top of a known-good `AFE` path, not as a replacement for future beamforming
+  - if far-field speech drops too much, tune reference timing and COM-profile gains before reintroducing any detector or VAD logic

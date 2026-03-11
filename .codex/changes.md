@@ -247,3 +247,26 @@
   - `ref_write_ok`
   - `ref_write_fail`
 - Verified the staged-reference build locally for `RTL8730E`.
+
+## Step 3.3
+- Enabled `AEC` on top of the already-staged playback-reference path instead of changing the application-layer voice pipeline.
+- Updated `river_voice_preproc_aivoice.c` so the active AIVoice feed frame is now interleaved as:
+  - `mic0`
+  - `mic1`
+  - `playback_ref`
+- Switched the runtime AFE policy to a communication-oriented profile:
+  - `AFE_FOR_COM`
+  - `enable_aec = true`
+  - `ref_num = 1`
+  - `NS mid`
+  - `adaptive AGC + fixed 5 dB`
+  - `RES mid`
+  - `SSL off`
+- Kept the project-side front-end boundary unchanged:
+  - `river_voice_capture` still owns raw dual-mic capture
+  - `river_voice_ref` still owns the playback reference ring
+  - `river_voice_preproc_process(preproc, mic, ref, ...)` remains the only place where SDK `AEC` is bound
+- Updated boot-time logs so the running profile clearly states:
+  - `capture dual-mic + 1ch ref -> AEC/AFE 1ch`
+  - `audio echo ref ... aec=on`
+- Verified the `AEC`-enabled build locally for `RTL8730E`.

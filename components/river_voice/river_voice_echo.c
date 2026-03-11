@@ -507,7 +507,7 @@ static river_status_t river_voice_echo_open_audio(void)
     }
     g_river_voice_echo.track_started = true;
 
-    printf("[river][voice] audio echo config: %lu Hz capture dual-mic -> AFE 1ch -> %lu Hz playback dual-mono, %lu ms delay, %s+%s -> speaker\n",
+    printf("[river][voice] audio echo config: %lu Hz capture dual-mic + 1ch ref -> AEC/AFE 1ch -> %lu Hz playback dual-mono, %lu ms delay, %s+%s -> speaker\n",
            (unsigned long)g_river_voice_echo.capture.sample_rate,
            (unsigned long)g_river_voice_echo.capture.sample_rate,
            (unsigned long)g_river_voice_echo.actual_delay_ms,
@@ -522,7 +522,7 @@ static river_status_t river_voice_echo_open_audio(void)
            (unsigned int)RIVER_VOICE_ECHO_POST_AGC_GATE,
            (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
            river_voice_preproc_backend_name());
-    printf("[river][voice] audio echo ref: backend=%s source=post-delay mono history=%lums aec=off\n",
+    printf("[river][voice] audio echo ref: backend=%s source=post-delay mono history=%lums aec=on\n",
            river_voice_ref_backend_name(),
            (unsigned long)RIVER_VOICE_ECHO_REF_HISTORY_MS);
     return RIVER_OK;

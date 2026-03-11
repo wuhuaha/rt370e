@@ -14,6 +14,12 @@
 typedef struct {
     const struct rtk_aivoice_iface *iface;
     void *handle;
+    uint8_t *feed_buffer;
+    size_t feed_buffer_bytes;
+    uint32_t frame_samples;
+    uint32_t input_channels;
+    uint32_t reference_channels;
+    bool reference_enabled;
     uint8_t output_buffer[256U * sizeof(int16_t)];
     size_t output_bytes;
     bool output_ready;
@@ -55,6 +61,30 @@ static int river_voice_preproc_aivoice_callback(void *user_data,
     return 0;
 }
 
+static void river_voice_preproc_aivoice_pack_frame(river_voice_preproc_aivoice_context_t *context,
+                                                   const uint8_t *input,
+                                                   const uint8_t *reference)
+{
+    const int16_t *input_samples;
+    const int16_t *reference_samples;
+    int16_t *feed_samples;
+    size_t frame_index;
+    uint32_t channel_index;
+
+    input_samples = (const int16_t *)input;
+    reference_samples = (const int16_t *)reference;
+    feed_samples = (int16_t *)context->feed_buffer;
+
+    for (frame_index = 0; frame_index < context->frame_samples; ++frame_index) {
+        for (channel_index = 0; channel_index < context->input_channels; ++channel_index) {
+            *feed_samples++ = *input_samples++;
+        }
+        for (channel_index = 0; channel_index < context->reference_channels; ++channel_index) {
+            *feed_samples++ = *reference_samples++;
+        }
+    }
+}
+
 river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
 {
     const river_voice_board_array_profile_t *profile;
@@ -75,18 +105,24 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
 
     memset(&config, 0, sizeof(config));
     afe_param = (struct afe_config)AFE_CONFIG_ASR_DEFAULT_2MIC50MM();
+    afe_param.afe_mode = AFE_FOR_COM;
     afe_param.mic_array = AFE_LINEAR_2MIC_50MM;
-    afe_param.ref_num = 0;
+    afe_param.ref_num = 1;
     afe_param.sample_rate = (int)profile->sample_rate;
     afe_param.frame_size = (int)((profile->sample_rate * profile->frame_ms) / 1000U);
-    afe_param.enable_aec = false;
+    afe_param.enable_aec = true;
     afe_param.enable_ns = true;
     afe_param.enable_agc = true;
     afe_param.enable_ssl = false;
     afe_param.ns_mode = AFE_NS_SIGNAL_SET();
     afe_param.ns_aggressive_mode = AFE_NS_AGGR_MID;
     afe_param.ns_cost_mode = AFE_NS_COST_HIGH;
-    afe_param.agc_fixed_gain = 9;
+    afe_param.aec_enable_threshold = 5;
+    afe_param.enable_res = true;
+    afe_param.aec_cost = AFE_AEC_FILTER_MID;
+    afe_param.res_aggressive_mode = AFE_AEC_RES_MID;
+    afe_param.agc_fixed_gain = 5;
+    afe_param.enable_adaptive_agc = true;
     common_param = (struct aivoice_sdk_config)AIVOICE_SDK_CONFIG_DEFAULT();
     common_param.timeout = 5;
 
@@ -99,6 +135,24 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
         rtos_mem_free(context);
         printf("[river][voice] aivoice AFE create failed\n");
         return RIVER_ERR_UNSUPPORTED;
+    }
+
+    preproc->reference_enabled = true;
+    preproc->reference_channels = 1U;
+    preproc->reference_frame_bytes = preproc->output_frame_bytes;
+    preproc->feed_frame_bytes = preproc->input_frame_bytes + preproc->reference_frame_bytes;
+
+    context->frame_samples = (uint32_t)afe_param.frame_size;
+    context->input_channels = preproc->input_channels;
+    context->reference_channels = preproc->reference_channels;
+    context->reference_enabled = true;
+    context->feed_buffer_bytes = preproc->feed_frame_bytes;
+    context->feed_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)context->feed_buffer_bytes);
+    if (context->feed_buffer == 0) {
+        context->iface->destroy(context->handle);
+        rtos_mem_free(context);
+        printf("[river][voice] aivoice AFE feed buffer alloc failed\n");
+        return RIVER_ERR_NO_MEMORY;
     }
 
     rtk_aivoice_register_callback(context->handle, river_voice_preproc_aivoice_callback, context);
@@ -122,16 +176,21 @@ river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *prepro
         return RIVER_ERR_ARG;
     }
 
-    (void)reference;
-    (void)reference_bytes;
     context = (river_voice_preproc_aivoice_context_t *)preproc->backend_ctx;
     if (context == 0 || context->handle == 0) {
         return RIVER_ERR_UNSUPPORTED;
     }
+    if (reference == 0 || reference_bytes != preproc->reference_frame_bytes ||
+        input_bytes != preproc->input_frame_bytes || context->feed_buffer == 0) {
+        return RIVER_ERR_ARG;
+    }
 
     context->output_ready = false;
     context->output_bytes = 0U;
-    feed_ret = context->iface->feed(context->handle, (char *)input, (int)input_bytes);
+    river_voice_preproc_aivoice_pack_frame(context, input, reference);
+    feed_ret = context->iface->feed(context->handle,
+                                    (char *)context->feed_buffer,
+                                    (int)context->feed_buffer_bytes);
     if (feed_ret != 0) {
         return RIVER_ERR_IO;
     }
@@ -167,6 +226,11 @@ void river_voice_preproc_aivoice_close(river_voice_preproc_t *preproc)
         context->handle = 0;
     }
 
+    if (context->feed_buffer != 0) {
+        rtos_mem_free(context->feed_buffer);
+        context->feed_buffer = 0;
+    }
+
     rtos_mem_free(context);
     preproc->backend_ctx = 0;
 }
@@ -181,5 +245,5 @@ void river_voice_preproc_aivoice_dump_profile(void)
            (unsigned long)profile->sample_rate,
            (unsigned long)profile->frame_ms,
            (unsigned long)profile->capture_channels);
-    printf("[river][voice] preproc afe: aec=off ns=on(mid) agc=on(fixed=9dB) ssl=off ref=staged(1ch)\n");
+    printf("[river][voice] preproc afe: mode=com aec=on(mid,res=mid) ns=on(mid) agc=on(adaptive+5dB) ssl=off ref=playback_ring(1ch)\n");
 }

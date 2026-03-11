@@ -72,7 +72,12 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - the active echo task now publishes the actual delayed mono playback frame into that reference ring
   - `river_voice_preproc` is widened to accept optional reference audio on the same stable interface that future `AEC` will use
   - `AEC` remains disabled in this step, so the current backend still behaves as `AFE-only`
+- Step 3.3 completed: `AEC` is now enabled through the existing `preproc(mic, ref)` boundary:
+  - `river_voice_preproc_aivoice` now packs `AMIC1 + AMIC3 + playback_ref` into the SDK AIVoice feed frame
+  - the active AFE policy is switched from `ASR`-style enhancement to `COM`-style enhancement with `AEC + NS + adaptive AGC`
+  - the application still only knows `capture -> preproc -> replay`; SDK `AEC` details remain local to the preproc backend
+  - diagnostics from Step `3.2` are kept so the new reference-driven path can be validated before any beamforming or VAD work
 - Next recommended step:
-  - validate that the playback-reference path is alive and stable in diagnostics
-  - then enable `AEC` through the existing `preproc(mic, ref)` boundary
-  - revisit `VAD` only after the `AEC/reference` path is stable; do not reintroduce detector-style gating before that
+  - validate that the `AEC` path reduces near-end replay noise and speaker leakage without killing far-field speech
+  - if reference timing is stable, add an explicit `beamforming-ready` mode boundary inside `preproc`
+  - keep `VAD` as a separate later step; do not couple it back into the current `AEC` debug loop

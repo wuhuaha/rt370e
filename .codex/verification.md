@@ -415,6 +415,49 @@ Interpretation:
 - audible quality changes sharply in this step:
   - that is unexpected; inspect the new reference counters first before touching `AEC`
 
+## Step 3.3
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] preproc afe: mode=com aec=on(mid,res=mid) ns=on(mid) agc=on(adaptive+5dB) ssl=off ref=playback_ring(1ch)
+[river][voice] audio echo config: 16000 Hz capture dual-mic + 1ch ref -> AEC/AFE 1ch -> 16000 Hz playback dual-mono, 1000 ms delay, AMIC1+AMIC3 -> speaker
+[river][voice] audio echo ref: backend=playback_ring source=post-delay mono history=1536ms aec=on
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] afe_peak=... play_peak=[..., ...] read_ok=... proc_ok=... write_ok=... ref_read_ok=... ref_read_miss=... ref_write_ok=... ref_write_fail=... read_fail=... proc_fail=... write_fail=...
+```
+
+Manual check:
+- First listen in a quiet room for `3-5` seconds:
+  - compare idle hiss with Step `3.1.1`
+- Then speak at `20-30 cm`
+- Then speak again at `0.5-1.0 m`
+- Compare with the previous AFE-only round:
+  - whether idle noise drops
+  - whether near speech still stays clear enough
+  - whether farther speech is preserved or becomes too suppressed
+
+Interpretation:
+- `ref_write_ok` and `ref_read_ok` are stable, while idle hiss is lower:
+  - the `AEC` path is alive and helping
+- reference counters are healthy but speech becomes thin or unstable:
+  - tune `AEC` policy or reference timing next, not `VAD`
+- `proc_fail` grows after `AEC` is enabled:
+  - treat this as a preproc integration issue before changing capture or speaker routing
+- `ref_read_miss` keeps growing after startup:
+  - the reference ring is not keeping pace; do not start beamforming work yet
+
 ## Step 2.6.1
 Build and flash:
 ```bash

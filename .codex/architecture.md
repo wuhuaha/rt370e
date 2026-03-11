@@ -57,5 +57,6 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 ## Current RTL8730E Policy
 - Frame cadence is fixed to `16 ms` because SDK AIVoice AFE requires `256 samples @ 16 kHz`.
 - Board geometry is fixed to `AMIC1 + AMIC3`, `2mic50mm`, matching the SDK `speechmind` / `aivoice` baseline for `AmebaSmart`.
-- `AEC` is not enabled yet because there is no dedicated playback-reference path in the project.
+- `AEC` is now enabled through the `preproc` boundary with a staged `playback_ring` reference, but the application still does not know any SDK-specific `AEC` details.
+- The playback reference remains a project-owned component, not a codec-side hard dependency, so future self-developed DSP or `TFLite` can consume the same `mic + ref` interface.
 - The current echo path is no longer the architecture center; it is only the first debug consumer of the reusable front-end.
