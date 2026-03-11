@@ -625,3 +625,12 @@
 - Added a standing rule:
   - future external references should be triaged directly into `.codex/knowledge.md`
   - store actionable conclusions rather than raw prose
+
+## Tag Update
+- Added milestone note:
+  - `.codex/tags/m1-silero-vad-runtime-ready.md`
+- Purpose of this tag note:
+  - freeze the first verified `RTL8730E` milestone where:
+    - `Silero VAD` reaches `runtime ready`
+    - on-device detector decisions are produced
+    - the project is ready to move from runtime bring-up into policy tuning
