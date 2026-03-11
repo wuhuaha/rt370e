@@ -26,10 +26,15 @@
 #define RIVER_VOICE_ECHO_CAPTURE_VOLUME        0x20U
 #define RIVER_VOICE_ECHO_DIAG_WINDOW_MS        1000U
 #define RIVER_VOICE_ECHO_CAPTURE_HPF_FC        0U
-#define RIVER_VOICE_ECHO_NOISE_GATE_PEAK       1024U
+#define RIVER_VOICE_ECHO_NOISE_GATE_PEAK       256U
 #define RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME    0.60f
 #define RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME    1.00f
-#define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     4U
+#define RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN     2U
+#define RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT   3U
+#define RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT       1U
+#define RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT   140U
+#define RIVER_VOICE_ECHO_AGC_TARGET_PEAK       6000U
+#define RIVER_VOICE_ECHO_AGC_MAX_GAIN          8U
 
 typedef struct {
     bool running;
@@ -154,6 +159,16 @@ static uint16_t river_voice_echo_update_peak(const uint8_t *buffer,
     }
 
     return max_peak;
+}
+
+static uint16_t river_voice_echo_measure_peak(const uint8_t *buffer, size_t bytes, uint32_t channels)
+{
+    uint16_t peak_ch0;
+    uint16_t peak_ch1;
+
+    peak_ch0 = 0U;
+    peak_ch1 = 0U;
+    return river_voice_echo_update_peak(buffer, bytes, channels, &peak_ch0, &peak_ch1);
 }
 
 static void river_voice_echo_apply_noise_gate(uint8_t *buffer, size_t bytes, uint16_t peak)
@@ -373,16 +388,21 @@ static void river_voice_echo_expand_mono_to_stereo(uint8_t *dst, const uint8_t *
     }
 }
 
-static uint16_t river_voice_echo_downmix_to_mono(uint8_t *dst,
-                                                 const uint8_t *src,
-                                                 size_t capture_bytes,
-                                                 uint32_t capture_channels)
+static uint16_t river_voice_echo_mix_dual_mic_focus_to_mono(uint8_t *dst,
+                                                            const uint8_t *src,
+                                                            size_t capture_bytes,
+                                                            uint32_t capture_channels)
 {
     const int16_t *src_samples;
     int16_t *dst_samples;
     size_t frame_count;
     size_t index;
     uint16_t max_peak;
+    uint32_t sum_abs0;
+    uint32_t sum_abs1;
+    uint32_t weight0;
+    uint32_t weight1;
+    uint32_t weight_sum;
 
     if (dst == 0 || src == 0) {
         return 0U;
@@ -390,17 +410,31 @@ static uint16_t river_voice_echo_downmix_to_mono(uint8_t *dst,
 
     if (capture_channels == 1U) {
         memcpy(dst, src, capture_bytes);
-        return river_voice_echo_update_peak(dst,
-                                            capture_bytes,
-                                            1U,
-                                            &g_river_voice_echo.diag_playback_peak_ch0,
-                                            &g_river_voice_echo.diag_playback_peak_ch1);
+        return river_voice_echo_measure_peak(dst, capture_bytes, 1U);
     }
 
     src_samples = (const int16_t *)src;
     dst_samples = (int16_t *)dst;
     frame_count = capture_bytes / (sizeof(int16_t) * capture_channels);
     max_peak = 0U;
+    sum_abs0 = 0U;
+    sum_abs1 = 0U;
+
+    for (index = 0; index < frame_count; ++index) {
+        sum_abs0 += river_voice_echo_abs16(src_samples[index * capture_channels]);
+        sum_abs1 += river_voice_echo_abs16(src_samples[(index * capture_channels) + 1U]);
+    }
+
+    weight0 = 1U;
+    weight1 = 1U;
+    if ((sum_abs0 * 100U) >= (sum_abs1 * RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT)) {
+        weight0 = RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT;
+        weight1 = RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT;
+    } else if ((sum_abs1 * 100U) >= (sum_abs0 * RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT)) {
+        weight0 = RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT;
+        weight1 = RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT;
+    }
+    weight_sum = weight0 + weight1;
 
     for (index = 0; index < frame_count; ++index) {
         int32_t sample0;
@@ -410,7 +444,7 @@ static uint16_t river_voice_echo_downmix_to_mono(uint8_t *dst,
 
         sample0 = src_samples[index * capture_channels];
         sample1 = src_samples[(index * capture_channels) + 1U];
-        mixed = (sample0 + sample1) / 2;
+        mixed = ((sample0 * (int32_t)weight0) + (sample1 * (int32_t)weight1)) / (int32_t)weight_sum;
         dst_samples[index] = (int16_t)mixed;
         peak = river_voice_echo_abs16(mixed);
         if (peak > max_peak) {
@@ -419,6 +453,44 @@ static uint16_t river_voice_echo_downmix_to_mono(uint8_t *dst,
     }
 
     return max_peak;
+}
+
+static uint16_t river_voice_echo_apply_agc(uint8_t *buffer, size_t bytes)
+{
+    int16_t *samples;
+    size_t sample_count;
+    size_t index;
+    uint16_t peak;
+    uint32_t gain;
+
+    if (buffer == 0 || bytes < sizeof(int16_t)) {
+        return 0U;
+    }
+
+    peak = river_voice_echo_measure_peak(buffer, bytes, 1U);
+    if (peak == 0U) {
+        return 0U;
+    }
+
+    gain = (uint32_t)(RIVER_VOICE_ECHO_AGC_TARGET_PEAK / peak);
+    if (gain == 0U) {
+        gain = 1U;
+    }
+    if (gain > RIVER_VOICE_ECHO_AGC_MAX_GAIN) {
+        gain = RIVER_VOICE_ECHO_AGC_MAX_GAIN;
+    }
+
+    if (gain == 1U) {
+        return peak;
+    }
+
+    samples = (int16_t *)buffer;
+    sample_count = bytes / sizeof(int16_t);
+    for (index = 0; index < sample_count; ++index) {
+        samples[index] = river_voice_echo_sat16((int32_t)samples[index] * (int32_t)gain);
+    }
+
+    return river_voice_echo_measure_peak(buffer, bytes, 1U);
 }
 
 static river_status_t river_voice_echo_open_audio(void)
@@ -522,14 +594,19 @@ static river_status_t river_voice_echo_open_audio(void)
            profile->aivoice_geometry_name,
            river_voice_board_mic_name(profile->aux_mic),
            profile->aux_mic_reserved ? "(reserved)" : "");
-    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu cap=0x%02lx gate=%lu micbst=[%s,%s]\n",
+    printf("[river][voice] audio echo gain: hw=%.2f sw=%.2f pcm=x%lu agc_target=%lu agc_max=x%lu gate=%lu micbst=[%s,%s]\n",
            (double)RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME,
            (double)RIVER_VOICE_ECHO_PLAYBACK_SW_VOLUME,
            (unsigned long)RIVER_VOICE_ECHO_PLAYBACK_PCM_GAIN,
-           (unsigned long)RIVER_VOICE_ECHO_CAPTURE_VOLUME,
+           (unsigned long)RIVER_VOICE_ECHO_AGC_TARGET_PEAK,
+           (unsigned long)RIVER_VOICE_ECHO_AGC_MAX_GAIN,
            (unsigned long)RIVER_VOICE_ECHO_NOISE_GATE_PEAK,
            river_voice_board_mic_gain_name(profile->primary_mic_gain),
            river_voice_board_mic_gain_name(profile->secondary_mic_gain));
+    printf("[river][voice] audio echo mix: dominant=%lu weak=%lu focus_ratio=%lu%%\n",
+           (unsigned long)RIVER_VOICE_ECHO_MIX_DOMINANT_WEIGHT,
+           (unsigned long)RIVER_VOICE_ECHO_MIX_WEAK_WEIGHT,
+           (unsigned long)RIVER_VOICE_ECHO_MIX_FOCUS_RATIO_PCT);
     return RIVER_OK;
 }
 
@@ -567,14 +644,15 @@ static void river_voice_echo_task(void *param)
                                                     profile->capture_channels,
                                                     &g_river_voice_echo.diag_capture_peak_ch0,
                                                     &g_river_voice_echo.diag_capture_peak_ch1);
-        river_voice_echo_downmix_to_mono(g_river_voice_echo.mix_buffer,
-                                         g_river_voice_echo.capture_buffer,
-                                         g_river_voice_echo.capture_chunk_bytes,
-                                         profile->capture_channels);
+        capture_peak = river_voice_echo_mix_dual_mic_focus_to_mono(g_river_voice_echo.mix_buffer,
+                                                                   g_river_voice_echo.capture_buffer,
+                                                                   g_river_voice_echo.capture_chunk_bytes,
+                                                                   profile->capture_channels);
         river_voice_echo_apply_warmup(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
         river_voice_echo_apply_noise_gate(g_river_voice_echo.mix_buffer,
                                           g_river_voice_echo.mix_chunk_bytes,
                                           capture_peak);
+        river_voice_echo_apply_agc(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
         river_voice_echo_ring_read(g_river_voice_echo.playback_buffer, g_river_voice_echo.mix_chunk_bytes);
         river_voice_echo_ring_write(g_river_voice_echo.mix_buffer, g_river_voice_echo.mix_chunk_bytes);
         river_voice_echo_expand_mono_to_stereo(g_river_voice_echo.track_buffer,

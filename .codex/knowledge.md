@@ -73,6 +73,10 @@
   - the safest dual-mic starting point is `AMIC1 + AMIC3`
   - software geometry should start at `linear-2mic-50mm` to stay aligned with future `aivoice` AFE resources
   - `AMIC5` should stay reserved as an auxiliary raw tap until there is a concrete need for 3-channel dump, calibration, or debugging
+- Current raw-array debug tuning in `ameba-river`:
+  - analog mic boost currently set to `20dB` on `AMIC1 + AMIC3`
+  - raw replay does not use beamforming yet
+  - instead, it uses a focused two-mic mix plus lightweight AGC only for bring-up and listening tests
 - Important limitation:
   - `50mm` is currently a software compatibility baseline, not a physically measured spacing from the user's exact board revision
   - if later SSL / beamforming accuracy matters, the actual microphone spacing and orientation should be measured and revalidated

@@ -336,3 +336,42 @@ Quick interpretation:
   - one array leg or its gain/routing still needs adjustment
 - delayed playback is present but noisy:
   - the dual-mic digital path works, but this raw average still needs AFE / beamforming / gain tuning
+
+## Step 2.8
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-time expectation:
+```text
+[river][voice] audio echo gain: hw=0.60 sw=1.00 pcm=x2 agc_target=6000 agc_max=x8 gate=256 micbst=[20dB,20dB]
+[river][voice] audio echo mix: dominant=3 weak=1 focus_ratio=140%
+```
+
+Manual check:
+- Stand at several distances and compare:
+  - near field: `20-30 cm`
+  - moderate field: about `50-100 cm`
+- Speak in front of the board for `2-3` seconds each time.
+- Wait about `1 second` and compare with Step 2.7:
+  - whether replay loudness improved
+  - whether moderate-distance speech is still audible
+  - whether background hiss or clipping became worse
+
+Expected diagnostics:
+```text
+[river][voice][diag] cap_peak=[..., ...] play_peak=[..., ...] read_ok=50 write_ok=50 read_fail=0 write_fail=0 partial=0
+```
+
+Quick interpretation:
+- moderate-distance speech becomes audible and `cap_peak` stays nonzero:
+  - the raw dual-mic debug path is good enough to move on to AFE integration
+- loud near-field speech becomes harsh but farther speech improves:
+  - current AGC / gain move is helping, but real compressor / AFE is the next step
+- far speech is still weak while `cap_peak` is also low:
+  - capture sensitivity is still the main bottleneck, so next step should compare another mic path or AFE front-end

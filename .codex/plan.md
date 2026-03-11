@@ -42,6 +42,11 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - current array geometry is `linear-2mic-50mm`
   - echo capture now uses `AMIC1 + AMIC3`
   - delayed replay uses a downmixed mono debug path so future beamforming / AFE integration can replace the mix stage cleanly
+- Step 2.8 completed: the raw dual-mic debug path is tuned for farther speech pickup before AFE integration:
+  - `AMIC1 + AMIC3` boost raised from `15dB` to `20dB`
+  - dual-mic mix is no longer plain averaging; it now biases toward the stronger mic each frame
+  - a lightweight per-frame AGC lifts low-level speech before replay
+  - noise gate is lowered so farther speech is less likely to be muted
 - Next recommended step depends on the dual-mic echo result:
-  - if delayed speech is intelligible, keep this as the permanent raw-array bring-up mode and start adding AFE adapter hooks
-  - if audio is still noisy or weak, keep the dual-mic route but compare mix policy, gain balance, and the reserved `AMIC5` raw tap
+  - if delayed speech is now usable at moderate distance, keep this as the raw-array debug mode and start adding AFE adapter hooks
+  - if audio is still weak or noisy, keep the dual-mic route and move next to either `AMIC5` comparative capture or real AFE preprocessing

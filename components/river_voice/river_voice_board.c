@@ -16,8 +16,8 @@ static const river_voice_board_array_profile_t g_river_voice_board_array_profile
     .primary_mic = AUDIO_AMIC1,
     .secondary_mic = AUDIO_AMIC3,
     .aux_mic = AUDIO_AMIC5,
-    .primary_mic_gain = AUDIO_MICBST_GAIN_15DB,
-    .secondary_mic_gain = AUDIO_MICBST_GAIN_15DB,
+    .primary_mic_gain = AUDIO_MICBST_GAIN_20DB,
+    .secondary_mic_gain = AUDIO_MICBST_GAIN_20DB,
     .aux_mic_gain = AUDIO_MICBST_GAIN_5DB,
     .aux_mic_reserved = true
 };

@@ -43,6 +43,10 @@
   - no AGC
   - no channel calibration
   - no per-mic delay compensation
+- The new AGC is intentionally simple and frame-local:
+  - it is suitable for board listening tests
+  - it is not a substitute for production AFE, AGC, or beamforming
+  - very loud near-field speech can still clip or sound uneven
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -90,3 +94,7 @@
   - keep `AMIC5` reserved as a future raw tap rather than pulling it into the debug mix immediately
   - treat `linear-2mic-50mm` as the software baseline required for future `aivoice` AFE integration
   - do not treat the current averaged replay as representative beamforming quality; it is only a board-validation path
+- For the current far-field tuning round:
+  - use higher analog mic boost before adding more playback gain
+  - bias the mix toward the stronger microphone instead of always averaging
+  - keep AGC simple and reversible so it can be removed cleanly once real AFE is inserted

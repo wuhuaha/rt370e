@@ -150,3 +150,18 @@
   - delayed mono PCM is expanded back to dual-mono speaker playback
   - diagnostics keep reporting both capture channels independently
 - Verified the new dual-mic-array build locally for `RTL8730E`.
+
+## Step 2.8
+- Tuned the raw dual-mic echo path for farther speech pickup and more useful board-side listening before AFE integration.
+- Raised the board-array analog mic boost:
+  - `AMIC1` from `15dB` to `20dB`
+  - `AMIC3` from `15dB` to `20dB`
+- Replaced simple `50/50` dual-mic averaging with a frame-local focused mix:
+  - if one microphone is significantly stronger, mix weights become `3:1`
+  - otherwise the path still behaves like a near-average mix
+- Added lightweight per-frame AGC on the mixed mono debug signal:
+  - target peak `6000`
+  - max gain `x8`
+- Reduced the pre-AGC noise gate threshold from `1024` to `256` so moderate-distance speech is less likely to be dropped entirely.
+- Reduced fixed playback PCM gain from `x4` to `x2` because gain is now moved earlier into the adaptive mix stage.
+- Verified the tuned build locally for `RTL8730E`.
