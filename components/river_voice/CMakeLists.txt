@@ -26,6 +26,7 @@ ameba_list_append(private_sources
     river_voice_preproc.c
     river_voice_preproc_aivoice.c
     river_voice_ref.c
+    river_voice_vad_reference.c
     generated/river_silero_vad_model_data.cc
 )
 

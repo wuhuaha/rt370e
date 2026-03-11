@@ -5,6 +5,7 @@
 #include "river/river_cloud.h"
 #include "river/river_online_control.h"
 #include "river/river_voice.h"
+#include "river/river_voice_vad_reference.h"
 
 static void river_app_on_voice_event(const river_voice_event_t *event)
 {
@@ -75,6 +76,7 @@ void river_app_print_status(void)
     printf("[river] local_preproc=%s\n", river_voice_preproc_backend_name());
     printf("[river] local_preproc_profile=%s\n", river_voice_preproc_profile_name());
     printf("[river] local_detector=%s\n", river_voice_detector_backend_name());
+    printf("[river] local_detector_reference=%s\n", river_voice_vad_reference_name());
     printf("[river] local_playback_ref=%s\n", river_voice_ref_backend_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED
     printf("[river] offline_asr=reserved\n");

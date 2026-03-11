@@ -12,6 +12,7 @@ typedef struct river_voice_detector_ops river_voice_detector_ops_t;
 typedef struct {
     bool decision_valid;
     bool is_speech;
+    uint16_t speech_probability_raw_q15;
     uint16_t speech_probability_q15;
     uint32_t consumed_samples;
 } river_voice_detector_result_t;

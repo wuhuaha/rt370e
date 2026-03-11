@@ -32,7 +32,19 @@ extern "C" {
 #endif
 
 #ifndef CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15
-#define CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15 16384
+#define CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15 12000
+#endif
+
+#ifndef CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15
+#define CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15 4500
+#endif
+
+#ifndef CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES
+#define CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES 8
+#endif
+
+#ifndef CONFIG_RIVER_SILERO_VAD_EMA_SHIFT
+#define CONFIG_RIVER_SILERO_VAD_EMA_SHIFT 2
 #endif
 
 #define RIVER_SILERO_VAD_SAMPLE_RATE_HZ 16000U
@@ -55,11 +67,14 @@ typedef struct {
     uint32_t speech_decisions;
     uint32_t invoke_failures;
     uint32_t carried_samples;
+    uint32_t smoothed_probability_q15;
+    uint32_t hangover_frames_left;
     uint32_t arena_size_bytes;
     uint32_t arena_used_bytes;
     bool model_imported;
     bool op_resolver_constructed;
     bool tensor_arena_from_heap_types;
+    bool speech_state;
     int16_t pending_window[RIVER_SILERO_VAD_WINDOW_SAMPLES];
     int16_t context_window[RIVER_SILERO_VAD_CONTEXT_SAMPLES];
     float recurrent_state[RIVER_SILERO_VAD_STATE_FLOATS];
@@ -493,10 +508,13 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
     detector->backend_ctx = context;
     detector->staged_only = false;
 
-    printf("[river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=%luKB used=%luB threshold_q15=%u\n",
+    printf("[river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=%luKB used=%luB enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u\n",
            (unsigned long)(context->arena_size_bytes / 1024U),
            (unsigned long)context->arena_used_bytes,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15);
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT);
     return RIVER_OK;
 }
 
@@ -577,10 +595,36 @@ extern "C" river_status_t river_voice_detector_silero_process(
     probability_q15 = (uint32_t)(probability * 32767.0f + 0.5f);
     context->decisions_made++;
 
+    if (context->decisions_made == 1U || CONFIG_RIVER_SILERO_VAD_EMA_SHIFT == 0) {
+        context->smoothed_probability_q15 = probability_q15;
+    } else {
+        const uint32_t ema_scale = (1UL << CONFIG_RIVER_SILERO_VAD_EMA_SHIFT);
+        const uint32_t ema_keep = ema_scale - 1U;
+
+        context->smoothed_probability_q15 =
+            ((context->smoothed_probability_q15 * ema_keep) + probability_q15) / ema_scale;
+    }
+
+    if (context->speech_state) {
+        if (context->smoothed_probability_q15 >=
+            (uint32_t)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15) {
+            context->hangover_frames_left = (uint32_t)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES;
+        } else if (context->hangover_frames_left > 0U) {
+            context->hangover_frames_left--;
+        } else {
+            context->speech_state = false;
+        }
+    } else if (context->smoothed_probability_q15 >=
+               (uint32_t)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15) {
+        context->speech_state = true;
+        context->hangover_frames_left = (uint32_t)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES;
+    }
+
     if (result != NULL) {
         result->decision_valid = true;
-        result->speech_probability_q15 = (uint16_t)probability_q15;
-        result->is_speech = probability_q15 >= (uint32_t)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15;
+        result->speech_probability_raw_q15 = (uint16_t)probability_q15;
+        result->speech_probability_q15 = (uint16_t)context->smoothed_probability_q15;
+        result->is_speech = context->speech_state;
         if (result->is_speech) {
             context->speech_decisions++;
         }
@@ -615,8 +659,11 @@ extern "C" void river_voice_detector_silero_close(river_voice_detector_t *detect
 
 extern "C" void river_voice_detector_silero_dump_profile(void)
 {
-    printf("[river][voice] detector backend: silero_vad runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_b1_fp32.tflite threshold_q15=%u arena=%uKB\n",
+    printf("[river][voice] detector backend: silero_vad runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_b1_fp32.tflite enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u arena=%uKB\n",
            (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
+           (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT,
            (unsigned int)CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB);
     printf("[river][voice] detector policy: direct official-model migration is complete; compression stays deferred until on-device flash/heap/latency data requires it\n");
 }

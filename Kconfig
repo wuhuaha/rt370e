@@ -54,6 +54,11 @@ config RIVER_VOICE_DETECTOR_SILERO_VAD
 
 endchoice
 
+config RIVER_AIVOICE_VAD_REFERENCE_EN
+    bool "Enable SDK AIVoice VAD reference logs"
+    default y
+    depends on AIVOICE_EN_MENU
+
 config RIVER_SILERO_VAD_TENSOR_ARENA_KB
     int "Silero VAD tensor arena size in KB"
     range 64 1024
@@ -61,9 +66,27 @@ config RIVER_SILERO_VAD_TENSOR_ARENA_KB
     depends on RIVER_VOICE_DETECTOR_SILERO_VAD
 
 config RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15
-    int "Silero VAD speech threshold in q15"
+    int "Silero VAD speech enter threshold in q15"
     range 1 32767
-    default 16384
+    default 12000
+    depends on RIVER_VOICE_DETECTOR_SILERO_VAD
+
+config RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15
+    int "Silero VAD speech exit threshold in q15"
+    range 1 32767
+    default 4500
+    depends on RIVER_VOICE_DETECTOR_SILERO_VAD
+
+config RIVER_SILERO_VAD_HANGOVER_FRAMES
+    int "Silero VAD hangover decisions"
+    range 0 64
+    default 8
+    depends on RIVER_VOICE_DETECTOR_SILERO_VAD
+
+config RIVER_SILERO_VAD_EMA_SHIFT
+    int "Silero VAD probability EMA shift"
+    range 0 6
+    default 2
     depends on RIVER_VOICE_DETECTOR_SILERO_VAD
 
 config RIVER_OFFLINE_ASR_RESERVED

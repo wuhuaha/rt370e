@@ -1102,3 +1102,89 @@ Interpretation:
   - current `PA_9 + WS2812` assumption is likely wrong for this exact board population
 - if blue / green switching follows speech roughly in step with `vad=silence/speech`:
   - board-side visual VAD indication is confirmed and ready for later wake-word / ASR state extension
+
+## Step 4.17
+Rebuild the stabilized-Silero image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot log changes:
+- detector profile should now print:
+  - `enter_q15=12000`
+  - `exit_q15=4500`
+  - `hangover=8`
+  - `ema_shift=2`
+- RGB should no longer claim ready; instead it should print a deferred warning:
+  - `rgb indicator deferred: EV8730EA2 USER LED is passive RGB ...`
+
+Expected runtime effect:
+- during continuous speech, `vad=speech` should persist more steadily instead of dropping back to `silence` on brief probability dips
+- the printed `vad_prob_q15` should now track the smoothed decision probability instead of the raw per-window output
+
+Interpretation:
+- if speech still drops to `silence` too often while talking continuously:
+  - further tuning should focus on:
+    - lower enter threshold
+    - larger hangover
+    - or detector-side cache / input normalization checks
+- if RGB remains deferred:
+  - next board step is hardware confirmation of:
+    - `R25`, `R27`, `R31`
+    - actual `LEDR/LEDG/LEDB` GPIO mapping
+
+## Step 4.18
+Rebuild the dual-reference detector image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot log changes:
+- detector profile should now print:
+  - `enter_q15=12000`
+  - `exit_q15=4500`
+  - `hangover=8`
+  - `ema_shift=2`
+- detector reference profile should now print:
+  - `detector reference: aivoice_vad_v1 diagnostic-only ...`
+- RGB should print a deferred warning instead of `rgb indicator ready`
+
+Expected runtime diagnostics:
+- each `[river][voice][diag]` line should now contain:
+  - `vad_raw_q15=...`
+  - `vad_prob_q15=...`
+  - `sdk_vad=speech|silence|disabled`
+  - `sdk_events=...`
+  - `sdk_start=...`
+  - `sdk_end=...`
+  - `sdk_offset_ms=...`
+
+Interpretation:
+- if `vad_raw_q15` is high while `vad_prob_q15` stays low:
+  - the smoothing / hysteresis policy is too conservative
+- if both `Silero` and `sdk_vad` mostly stay silent while speaking:
+  - first suspect the shared input chain, not only the `Silero` model
+- if `Silero` stays mostly silent while `sdk_vad` toggles normally:
+  - focus on `Silero` threshold / stream framing / state handling
+- if RGB remains dark and boot prints the deferred message:
+  - that is expected until the actual `LEDR/LEDG/LEDB` mapping is implemented

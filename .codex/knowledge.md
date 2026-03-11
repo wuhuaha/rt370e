@@ -55,26 +55,18 @@
   - then use `J3.1` and `J4.1`
 - Wrong `12V` audio power wiring can damage the PC or USB adapter.
 
-## RGB Indicator Assumption
-- The current board-side RGB status implementation assumes the onboard RGB LED is driven through the AmebaSmart `LEDC` path as a single `WS2812`-style pixel.
-- Current software baseline:
-  - `LEDC`
-  - pin `PA_9`
-  - `GRB` payload order
-- Basis for this assumption:
-  - SDK example `component/example/peripheral/raw/LEDC/raw_ledc_ws2812`
-  - for `CONFIG_AMEBASMART`, the SDK example pin is `LEDC_PIN _PA_9`
-- Current project usage:
-  - `boot` -> amber
-  - `VAD silence` -> blue
-  - `VAD speech` -> green
-  - `error` -> red
-- Important limitation:
-  - this is currently an SDK-based board assumption, not yet a schematic-confirmed fact for the user's exact `EV730EA2 RO1` population
-  - if the LED does not respond, first suspects are:
-    - RGB data pin is not actually `PA_9`
-    - onboard LED is not `WS2812`-compatible
-    - the RGB device is behind a different power or enable path
+## RGB Indicator
+- The current board-side RGB status feature is not yet enabled on real hardware.
+- Official EVB documentation indicates the board `USER LED` is a passive RGB LED circuit, not a `WS2812` serial LED.
+- Important hardware note from the official guide:
+  - if users want to use the `USER LED` circuit on the EVB, `R25`, `R27`, and `R31` should be populated with at least `470 ohm`
+  - the related control pins should drive `LEDR`, `LEDG`, and `LEDB` low to light the LED
+- Current project implication:
+  - the earlier `LEDC + PA_9 + WS2812` assumption was wrong for this EVB family
+  - runtime RGB indication is now intentionally deferred until the actual `LEDR/LEDG/LEDB` GPIO mapping is confirmed for the user's board population
+- Current software status:
+  - the project keeps the `river_board_rgb` interface so later wake / VAD / ASR states can still drive a visual indicator
+  - current boot log now reports this path as deferred instead of falsely claiming it is ready
 
 ## SDK Voice Baseline
 - SDK `aivoice` AFE explicitly supports these microphone geometries:
@@ -98,6 +90,14 @@
   - analog mic boost currently set to `20dB` on `AMIC1 + AMIC3`
   - raw replay does not use beamforming yet
   - instead, it uses a focused two-mic mix plus lightweight AGC only for bring-up and listening tests
+- SDK also exposes a standalone VAD flow:
+  - interface: `aivoice_iface_vad_v1`
+  - callback event: `AIVOICE_EVOUT_VAD`
+  - message payload: `struct aivoice_evout_vad`
+  - output semantics are edge-based only:
+    - `status=1` means silence -> speech
+    - `status=0` means speech -> silence
+  - this is suitable as a diagnostic reference alongside `Silero`, but it does not provide a per-frame probability output
 - Important limitation:
   - `50mm` is currently a software compatibility baseline, not a physically measured spacing from the user's exact board revision
   - if later SSL / beamforming accuracy matters, the actual microphone spacing and orientation should be measured and revalidated

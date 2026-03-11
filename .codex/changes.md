@@ -639,15 +639,7 @@
 - Added a board RGB indicator module:
   - `include/river/river_board_rgb.h`
   - `components/river_voice/river_board_rgb.c`
-- Reused the SDK `LEDC` / `WS2812` board assumption for `AmebaSmart`:
-  - pin `PA_9`
-  - single-pixel `GRB`
-  - CPU-mode LEDC transfer to avoid introducing new DMA/cache complexity into the VAD bring-up step
-- Current indicator mapping:
-  - `boot` -> amber
-  - `VAD silence` -> blue
-  - `VAD speech` -> green
-  - `error` -> red
+- Initial implementation attempted to reuse the SDK `LEDC` / `WS2812` example path.
 - Added project config:
   - `CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN`
 - Enabled the RGB VAD indicator in `prj.conf`.
@@ -658,3 +650,40 @@
   - detector/open/autostart failures set `error`
   - echo stop sets `off`
 - Recorded the board assumption and risk boundary in `.codex/knowledge.md` so later schematic confirmation or pin remap can be traced cleanly.
+
+## Step 4.17
+- Collected board feedback after the first RGB/VAD-status experiment:
+  - `Silero VAD` was active, but status flickered between `speech` and `silence` too aggressively for a stable indicator
+  - the RGB LED never lit even though the software path initialized
+- Refined the `Silero VAD` post-processing in `river_voice_detector_silero.cc`:
+  - lowered speech-enter threshold from `16384` to `12000`
+  - added explicit speech-exit threshold `4500`
+  - added hangover of `8` detector decisions
+  - added simple EMA smoothing with shift `2`
+  - changed exported `speech_probability_q15` to the smoothed probability so diagnostics match the actual decision logic
+- Replaced the earlier `WS2812` assumption in `river_board_rgb.c` with a deferred board-status stub.
+- Root cause for the RGB mismatch:
+  - official EVB documentation indicates `USER LED` is a passive RGB circuit using `LEDR/LEDG/LEDB`, not a serial `WS2812`
+  - documentation also says `R25`, `R27`, and `R31` should be populated to use the `USER LED` circuit
+- Current runtime behavior:
+  - the board RGB API remains in place for future use
+  - boot now prints a one-time deferred warning instead of a false `rgb indicator ready`
+
+## Step 4.18
+- Added a diagnostic-only SDK VAD reference path:
+  - `include/river/river_voice_vad_reference.h`
+  - `components/river_voice/river_voice_vad_reference.c`
+- Reference path policy:
+  - uses `aivoice_iface_vad_v1`
+  - feeds the same post-AFE enhanced mono `256-sample / 16ms` audio that `Silero` sees
+  - does not affect the main `Silero` decision or any future product logic
+  - exists only to compare detector behavior in the same runtime input chain
+- Extended `Silero` detector diagnostics:
+  - added raw probability export alongside the smoothed decision probability
+  - diagnostics can now distinguish:
+    - raw model output
+    - smoothed / hysteresis decision probability
+    - SDK VAD event state
+- Updated board RGB handling:
+  - runtime no longer assumes `PA_9 + WS2812`
+  - current board RGB path remains intentionally deferred until `LEDR/LEDG/LEDB` mapping is confirmed
