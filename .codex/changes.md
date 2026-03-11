@@ -588,3 +588,26 @@
   - which one is best for Ameba-specific audio / TFLM integration
   - which one is best for upstream pipeline architecture
   - which one is best kept as an optimization reference instead of direct reusable code
+
+## Step 4.15
+- Collected the next board-side `Silero` log from the image built at `2026-03-11 16:44:00`:
+  - persistent tensors now report valid:
+    - shapes
+    - non-null `data`
+    - expected payload sizes
+  - but all four top-level tensors still report `type=0`
+  - detector still fails in open before `runtime ready`
+- Root cause refinement:
+  - on this `RTL8730E` SDK snapshot, top-level `TfLiteTensor` / `TfLiteEvalTensor` views can arrive as `kTfLiteNoType`
+    even when the buffers themselves are valid and usable
+  - the remaining blocker is the detector's type guard, not tensor ownership or byte length
+- Updated `river_voice_detector_silero.cc`:
+  - treat `kTfLiteNoType` as a compatible transient SDK state for `Silero` top-level I/O binding
+  - normalize both persistent and eval tensor type fields to `kTfLiteFloat32` during patch-up
+  - keep hard rejection only for:
+    - null tensor handle
+    - null data pointer
+    - insufficient payload bytes
+- Next expected milestone:
+  - boot should advance past `silero_vad tensor binding failed`
+  - next useful log should be `silero_vad runtime ready: ...`

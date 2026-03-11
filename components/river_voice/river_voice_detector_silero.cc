@@ -99,6 +99,11 @@ static bool river_silero_vad_tensor_shape_matches(const TfLiteTensor *tensor,
     return true;
 }
 
+static bool river_silero_vad_tensor_type_compatible(TfLiteType type)
+{
+    return type == kTfLiteFloat32 || type == kTfLiteNoType;
+}
+
 static void river_silero_vad_dump_tensor(const char *prefix,
                                          size_t index,
                                          const TfLiteTensor *tensor)
@@ -264,7 +269,8 @@ static void river_silero_vad_free_tensor_arena(river_voice_detector_silero_conte
 
 static bool river_silero_vad_tensor_buffer_ready(const TfLiteTensor *tensor, size_t min_bytes)
 {
-    if (tensor == NULL || tensor->type != kTfLiteFloat32 || tensor->data.data == NULL) {
+    if (tensor == NULL || !river_silero_vad_tensor_type_compatible(tensor->type) ||
+        tensor->data.data == NULL) {
         return false;
     }
 
@@ -280,7 +286,8 @@ static bool river_silero_vad_eval_tensor_buffer_ready(const TfLiteEvalTensor *te
 {
     (void)min_bytes;
 
-    if (tensor == NULL || tensor->type != kTfLiteFloat32 || tensor->data.data == NULL) {
+    if (tensor == NULL || !river_silero_vad_tensor_type_compatible(tensor->type) ||
+        tensor->data.data == NULL) {
         return false;
     }
 
@@ -291,6 +298,14 @@ static void river_silero_vad_patch_tensor_buffer(TfLiteTensor *tensor,
                                                  TfLiteEvalTensor *eval_tensor,
                                                  void *buffer)
 {
+    if (eval_tensor != NULL && eval_tensor->type == kTfLiteNoType) {
+        eval_tensor->type = kTfLiteFloat32;
+    }
+
+    if (tensor != NULL && tensor->type == kTfLiteNoType) {
+        tensor->type = kTfLiteFloat32;
+    }
+
     if (eval_tensor != NULL && eval_tensor->data.data == NULL) {
         eval_tensor->data.data = buffer;
     }

@@ -459,3 +459,26 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Rationale:
   - the detector runtime itself currently reads and writes through the persistent I/O tensors
   - the next meaningful validation target is now whether real runtime reaches `Invoke()` and emits `runtime ready`
+
+## No-Type-Compatible Tensor Binding
+- Next board-side log after the eval-optional change showed:
+  - persistent top-level tensors now have valid:
+    - shapes
+    - non-null `data`
+    - expected `bytes`
+  - but all of them still report `type=0`
+  - detector open still stops at `silero_vad tensor binding failed`
+- Interpretation:
+  - on this `RTL8730E` SDK snapshot, `TfLiteTensor` / `TfLiteEvalTensor` top-level metadata can remain at `kTfLiteNoType`
+    even when the underlying buffers are already usable
+  - the remaining blocker is the detector's strict type guard, not buffer ownership or tensor ordering
+- Device-side action on `2026-03-11`:
+  - treat `kTfLiteNoType` as a compatible transient state during open-time validation
+  - normalize persistent and eval tensor `type` fields to `kTfLiteFloat32` during tensor patch-up
+  - keep hard rejection only for:
+    - null handle
+    - null data
+    - insufficient payload bytes
+- Next board-side validation target:
+  - confirm boot advances past `silero_vad tensor binding failed`
+  - next expected milestone is `silero_vad runtime ready`

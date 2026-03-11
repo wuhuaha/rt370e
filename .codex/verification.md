@@ -1035,3 +1035,32 @@ Expected current result:
 - detector open should no longer fail solely because eval tensors are incomplete
 - next expected milestone remains:
   - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+
+## Step 4.15
+Rebuild the no-type-compatible image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected current result:
+- boot should no longer fail solely because top-level tensors print:
+  - `type=0`
+- next expected milestone is:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+
+Interpretation:
+- if `runtime ready` appears:
+  - this SDK stores top-level tensor type metadata in a degraded but still usable form, and detector open has been made compatible
+- if open still fails:
+  - collect the next `silero_vad` block
+  - the next suspect shifts to invoke-time behavior or arena pressure rather than top-level tensor metadata
