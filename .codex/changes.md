@@ -227,6 +227,23 @@
   - AFE fixed AGC gain reduced from `15 dB` to `9 dB`
   - AFE `NS` aggressiveness raised from `low` to `mid`
   - replay-side post-AGC reduced from `target12000/maxx4` to `target9000/maxx2`
-  - replay-side post-AGC floor raised from `96` to `192`
-  - frames below the post-AGC floor are now muted instead of being replayed as background hiss
+- replay-side post-AGC floor raised from `96` to `192`
+- frames below the post-AGC floor are now muted instead of being replayed as background hiss
 - Verified the retuned build locally for `RTL8730E`.
+
+## Step 3.2
+- Added `river_voice_ref.*` as an independent playback-reference staging layer for future `AEC`.
+- Current reference design:
+  - source: delayed mono frame that is actually sent toward speaker playback
+  - transport: project-side ring buffer
+  - consumer boundary: `river_voice_preproc_process(preproc, mic, ref, ...)`
+- Widened `river_voice_preproc` so the active backend interface can already accept optional reference PCM without binding application logic to SDK-specific `AEC` details.
+- Kept `aivoice_afe` in `AFE-only` mode for this step:
+  - reference is staged and observable
+  - `AEC` is still disabled
+- Extended echo diagnostics with playback-reference counters so the next `AEC` step can be validated from serial:
+  - `ref_read_ok`
+  - `ref_read_miss`
+  - `ref_write_ok`
+  - `ref_write_fail`
+- Verified the staged-reference build locally for `RTL8730E`.

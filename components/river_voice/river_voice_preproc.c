@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,9 +13,11 @@ struct river_voice_preproc_ops {
     river_status_t (*process)(river_voice_preproc_t *preproc,
                               const uint8_t *input,
                               size_t input_bytes,
+                              const uint8_t *reference,
+                              size_t reference_bytes,
                               uint8_t *output,
                               size_t output_capacity,
-    size_t *output_bytes);
+                              size_t *output_bytes);
     void (*close)(river_voice_preproc_t *preproc);
     void (*dump_profile)(void);
 };
@@ -23,6 +26,8 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc);
 river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *preproc,
                                                    const uint8_t *input,
                                                    size_t input_bytes,
+                                                   const uint8_t *reference,
+                                                   size_t reference_bytes,
                                                    uint8_t *output,
                                                    size_t output_capacity,
                                                    size_t *output_bytes);
@@ -52,16 +57,23 @@ river_status_t river_voice_preproc_open(river_voice_preproc_t *preproc)
     preproc->frame_ms = profile->frame_ms;
     preproc->input_channels = profile->capture_channels;
     preproc->output_channels = 1U;
+    preproc->reference_channels = 1U;
     preproc->input_frame_bytes = ((profile->sample_rate * profile->frame_ms) / 1000U) *
                                  preproc->input_channels * sizeof(int16_t);
     preproc->output_frame_bytes = ((profile->sample_rate * profile->frame_ms) / 1000U) *
                                   preproc->output_channels * sizeof(int16_t);
+    preproc->reference_frame_bytes = ((profile->sample_rate * profile->frame_ms) / 1000U) *
+                                     preproc->reference_channels * sizeof(int16_t);
+    preproc->feed_frame_bytes = preproc->input_frame_bytes;
+    preproc->reference_enabled = false;
     return preproc->ops->open(preproc);
 }
 
 river_status_t river_voice_preproc_process(river_voice_preproc_t *preproc,
                                            const uint8_t *input,
                                            size_t input_bytes,
+                                           const uint8_t *reference,
+                                           size_t reference_bytes,
                                            uint8_t *output,
                                            size_t output_capacity,
                                            size_t *output_bytes)
@@ -70,7 +82,14 @@ river_status_t river_voice_preproc_process(river_voice_preproc_t *preproc,
         return RIVER_ERR_ARG;
     }
 
-    return preproc->ops->process(preproc, input, input_bytes, output, output_capacity, output_bytes);
+    return preproc->ops->process(preproc,
+                                 input,
+                                 input_bytes,
+                                 reference,
+                                 reference_bytes,
+                                 output,
+                                 output_capacity,
+                                 output_bytes);
 }
 
 void river_voice_preproc_close(river_voice_preproc_t *preproc)
@@ -93,9 +112,29 @@ size_t river_voice_preproc_output_frame_bytes(const river_voice_preproc_t *prepr
     return preproc == 0 ? 0U : preproc->output_frame_bytes;
 }
 
+size_t river_voice_preproc_reference_frame_bytes(const river_voice_preproc_t *preproc)
+{
+    return preproc == 0 ? 0U : preproc->reference_frame_bytes;
+}
+
+size_t river_voice_preproc_feed_frame_bytes(const river_voice_preproc_t *preproc)
+{
+    return preproc == 0 ? 0U : preproc->feed_frame_bytes;
+}
+
 uint32_t river_voice_preproc_output_channels(const river_voice_preproc_t *preproc)
 {
     return preproc == 0 ? 0U : preproc->output_channels;
+}
+
+uint32_t river_voice_preproc_reference_channels(const river_voice_preproc_t *preproc)
+{
+    return preproc == 0 ? 0U : preproc->reference_channels;
+}
+
+bool river_voice_preproc_reference_enabled(const river_voice_preproc_t *preproc)
+{
+    return preproc != 0 && preproc->reference_enabled;
 }
 
 const char *river_voice_preproc_backend_name(void)

@@ -109,6 +109,8 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
 river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *preproc,
                                                    const uint8_t *input,
                                                    size_t input_bytes,
+                                                   const uint8_t *reference,
+                                                   size_t reference_bytes,
                                                    uint8_t *output,
                                                    size_t output_capacity,
                                                    size_t *output_bytes)
@@ -120,6 +122,8 @@ river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *prepro
         return RIVER_ERR_ARG;
     }
 
+    (void)reference;
+    (void)reference_bytes;
     context = (river_voice_preproc_aivoice_context_t *)preproc->backend_ctx;
     if (context == 0 || context->handle == 0) {
         return RIVER_ERR_UNSUPPORTED;
@@ -177,5 +181,5 @@ void river_voice_preproc_aivoice_dump_profile(void)
            (unsigned long)profile->sample_rate,
            (unsigned long)profile->frame_ms,
            (unsigned long)profile->capture_channels);
-    printf("[river][voice] preproc afe: aec=off ns=on(mid) agc=on(fixed=9dB) ssl=off ref=0\n");
+    printf("[river][voice] preproc afe: aec=off ns=on(mid) agc=on(fixed=9dB) ssl=off ref=staged(1ch)\n");
 }

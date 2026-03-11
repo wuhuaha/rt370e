@@ -375,6 +375,46 @@ Interpretation:
 - idle hiss is still large even after this step:
   - stop tuning replay gain and move next to `AEC/reference-path`
 
+## Step 3.2
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][voice] playback ref: deferred backend=playback_ring source=post-delay mono speaker feed
+[river] local_playback_ref=playback_ring
+[river][voice] audio echo ref: backend=playback_ring source=post-delay mono history=1536ms aec=off
+```
+
+Expected diagnostics:
+```text
+[river][voice][diag] ... ref_read_ok=... ref_read_miss=... ref_write_ok=... ref_write_fail=... ...
+```
+
+Manual check:
+- Focus on serial diagnostics in this step; audible behavior should stay close to Step `3.1.1`.
+- After boot, let the board run for a few seconds.
+- Confirm:
+  - `ref_write_ok` keeps increasing
+  - `ref_write_fail` stays `0`
+  - `ref_read_ok` becomes stable after startup
+  - `ref_read_miss` should mostly be limited to startup or reset moments
+
+Interpretation:
+- `ref_write_ok` stable and `ref_write_fail=0`:
+  - the speaker-reference path is alive and ready for the `AEC` step
+- `ref_write_fail` increases:
+  - stop before enabling `AEC`; the reference ring path is not stable enough yet
+- audible quality changes sharply in this step:
+  - that is unexpected; inspect the new reference counters first before touching `AEC`
+
 ## Step 2.6.1
 Build and flash:
 ```bash

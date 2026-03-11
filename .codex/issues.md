@@ -61,6 +61,10 @@
 - User feedback for the current phase is clear:
   - detector-style gating is not wanted right now
   - next noise reduction steps should prioritize AFE/AEC policy over reintroducing early VAD gating
+- The new playback-reference path is still software-staged only:
+  - source is the mono frame queued for speaker playback inside the application
+  - it is not a hardware loopback or codec-side echo reference
+  - alignment still needs to be validated when `AEC` is enabled
 
 ## Mitigation
 - Keep all online provider logic behind `river_cloud_adapter_*`.
@@ -125,3 +129,7 @@
   - reduce AFE fixed AGC first
   - let replay-side post-AGC mute only very low-level frames
   - move to playback-reference-based `AEC` before revisiting SDK `VAD`
+- For the new playback-reference round:
+  - keep the reference path behind `river_voice_ref.*`
+  - keep `AEC` disabled until reference counters and timing look stable
+  - enable `AEC` through `river_voice_preproc`, not by letting playback code call SDK `aivoice` directly

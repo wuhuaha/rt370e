@@ -67,7 +67,12 @@ Build a maintainable `RTL8730E` voice home-control application that starts with 
   - AFE `NS` aggressiveness is raised from `low` to `mid`
   - replay-side post-AGC is tightened from `target12000/maxx4/floor96` to `target9000/maxx2/floor192`
   - frames below the replay floor are muted directly instead of being replayed as idle hiss
+- Step 3.2 completed: playback-reference plumbing is now staged for future `AEC` without changing the current `AFE-only` runtime policy:
+  - added an independent `river_voice_ref` ring buffer for speaker-reference PCM
+  - the active echo task now publishes the actual delayed mono playback frame into that reference ring
+  - `river_voice_preproc` is widened to accept optional reference audio on the same stable interface that future `AEC` will use
+  - `AEC` remains disabled in this step, so the current backend still behaves as `AFE-only`
 - Next recommended step:
-  - run board validation on the lower-noise `AFE-only` replay path first
-  - if idle noise becomes acceptable, add playback-reference capture and enable `AEC` through the same preproc boundary
+  - validate that the playback-reference path is alive and stable in diagnostics
+  - then enable `AEC` through the existing `preproc(mic, ref)` boundary
   - revisit `VAD` only after the `AEC/reference` path is stable; do not reintroduce detector-style gating before that
