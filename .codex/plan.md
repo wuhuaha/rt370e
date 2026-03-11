@@ -173,7 +173,15 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - on-device tensor `dims/name` metadata turned out to be unusable for this model even though tensor structs and types are valid
   - detector binding now validates fixed I/O order plus tensor buffer readiness instead of requiring runtime shape metadata
   - full `RTL8730E` image rebuild after this fix passed locally
+- Step 4.12 completed: detector bring-up now works around missing top-level tensor buffers in the SDK runtime:
+  - board logs showed all four `Silero` I/O tensors with:
+    - valid pointers
+    - valid `float32` type
+    - correct `bytes`
+    - but `data=NULL`
+  - detector runtime now preserves eval tensors and patches fallback buffers into both eval and persistent tensor views when the SDK leaves those buffers unset
+  - full local image rebuild after this workaround passed
 - Next recommended step:
   - flash the newly rebuilt image and confirm the detector now reaches `silero_vad runtime ready`
   - if it does, collect silence / near-field / far-field `vad_prob_q15` diagnostics
-  - if it still fails, use the new `data/bytes` tensor dump to decide whether arena size or tensor allocation order is the next blocker
+  - if it still fails, inspect whether invoke-time tensor contents or arena pressure, not binding, is the next blocker

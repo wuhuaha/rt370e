@@ -952,3 +952,34 @@ Interpretation:
   - detector should now be able to bind without tensor shape metadata
 - `data == NULL` for one or more tensors:
   - next suspect is allocation / arena pressure rather than tensor ordering
+
+## Step 4.12
+Rebuild the latest fallback-buffer image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected current result:
+- boot should report:
+  - `detector backend: silero_vad runtime=tflite_micro`
+- boot should now advance past:
+  - `silero_vad tensor binding failed`
+- next expected milestone is:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+
+Interpretation:
+- if `silero_vad runtime ready` appears:
+  - the remaining `RTL8730E` SDK `TFLite Micro` blocker was missing top-level I/O buffers, now patched in firmware
+- if binding still fails:
+  - collect the next `silero_vad` log block
+  - the problem is no longer tensor order or missing metadata, and is more likely in arena layout or invoke-time buffer ownership

@@ -517,3 +517,24 @@
 - Current expected next board behavior:
   - detector should advance past `silero_vad tensor binding failed`
   - next useful milestone log is `silero_vad runtime ready`
+
+## Step 4.12
+- Collected the next board-side `Silero` failure from the updated build:
+  - tensor structs are present
+  - tensor `bytes` are non-zero and match the expected payload sizes
+  - but top-level `TfLiteTensor.data` is still `NULL` for all model I/O on this SDK/runtime snapshot
+- Root-caused the remaining bring-up blocker:
+  - the current `RTL8730E` `TFLite Micro` runtime can expose valid I/O tensor handles while leaving their top-level `data` pointers unset
+  - this means detector binding cannot rely on `interpreter->input()/output()` alone even after `AllocateTensors()`
+- Updated `river_voice_detector_silero.cc` to add an SDK-compatibility fallback:
+  - construct the interpreter with `preserve_all_tensors=true`
+  - fetch the corresponding `TfLiteEvalTensor` handles for the pinned I/O order
+  - patch missing I/O buffers with detector-owned fallback storage:
+    - audio input -> `audio_input_buffer`
+    - state input -> `recurrent_state`
+    - probability output -> `probability_output_buffer`
+    - state output -> `next_state`
+  - mirror eval-tensor buffers back into the persistent `TfLiteTensor` views when the SDK leaves them empty
+- Revalidated after the fallback-buffer change:
+  - `CCACHE_DISABLE=1 cmake --build /root/ameba-river/build_RTL8730E/build --parallel --target river_voice_target_img2_ap` passed
+  - full `RTL8730E` rebuild also passed locally

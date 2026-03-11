@@ -268,3 +268,7 @@
   - board logs showed valid tensor structs and valid `float32` types
   - but `dims/name` were unusable for the embedded `Silero` model
   - runtime binding should therefore prefer pinned I/O order plus buffer readiness over metadata-dependent matching
+- The same SDK runtime should also not be assumed to populate top-level `TfLiteTensor.data` for model I/O:
+  - board logs showed all `Silero` I/O tensors with correct `bytes` but `data=NULL`
+  - current detector therefore patches fallback buffers into both eval tensors and persistent tensor views during open
+  - if the SDK `tflite_micro` snapshot changes later, this workaround should be revisited before simplifying detector buffer ownership

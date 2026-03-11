@@ -381,3 +381,35 @@ It must be updated during every migration step so the port can be rebuilt later 
 - Next board-side validation target:
   - confirm boot advances past `silero_vad tensor binding failed`
   - expect `silero_vad runtime ready` if the buffer-based binding is sufficient
+
+## SDK Tensor Buffer Compatibility
+- Next board-side log after the metadata-independent binding change still failed, but exposed the key runtime detail:
+  - all four top-level `TfLiteTensor *` handles exist
+  - all four report the expected `bytes` ranges:
+    - state input `1024`
+    - audio input `2304`
+    - probability output `4`
+    - state output `1024`
+  - but every top-level tensor still reports `data=NULL`
+- Interpretation:
+  - this `RTL8730E` SDK snapshot of `TFLite Micro` cannot be assumed to populate persistent `TfLiteTensor.data` for embedded-model I/O even after `AllocateTensors()`
+  - detector open must therefore tolerate valid tensor handles with missing top-level data pointers
+- Device-side action on `2026-03-11`:
+  - construct the interpreter with `preserve_all_tensors=true`
+  - fetch the corresponding `TfLiteEvalTensor` handles using the pinned I/O order
+  - patch fallback buffers into missing tensor storage:
+    - audio input -> local `audio_input_buffer`
+    - state input -> local `recurrent_state`
+    - probability output -> local `probability_output_buffer`
+    - state output -> local `next_state`
+  - mirror those buffers back into the persistent `TfLiteTensor` views when the SDK leaves their `data` pointers empty
+- Local validation after the workaround:
+  ```bash
+  cd /root/ameba-river
+  source env.sh
+  CCACHE_DISABLE=1 ameba.py build -p
+  ```
+  - result: passed
+- Next board-side validation target:
+  - confirm boot now reaches `silero_vad runtime ready`
+  - only if it still fails, move on to arena-pressure or invoke-time debugging
