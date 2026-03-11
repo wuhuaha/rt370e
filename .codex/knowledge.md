@@ -55,6 +55,27 @@
   - then use `J3.1` and `J4.1`
 - Wrong `12V` audio power wiring can damage the PC or USB adapter.
 
+## RGB Indicator Assumption
+- The current board-side RGB status implementation assumes the onboard RGB LED is driven through the AmebaSmart `LEDC` path as a single `WS2812`-style pixel.
+- Current software baseline:
+  - `LEDC`
+  - pin `PA_9`
+  - `GRB` payload order
+- Basis for this assumption:
+  - SDK example `component/example/peripheral/raw/LEDC/raw_ledc_ws2812`
+  - for `CONFIG_AMEBASMART`, the SDK example pin is `LEDC_PIN _PA_9`
+- Current project usage:
+  - `boot` -> amber
+  - `VAD silence` -> blue
+  - `VAD speech` -> green
+  - `error` -> red
+- Important limitation:
+  - this is currently an SDK-based board assumption, not yet a schematic-confirmed fact for the user's exact `EV730EA2 RO1` population
+  - if the LED does not respond, first suspects are:
+    - RGB data pin is not actually `PA_9`
+    - onboard LED is not `WS2812`-compatible
+    - the RGB device is behind a different power or enable path
+
 ## SDK Voice Baseline
 - SDK `aivoice` AFE explicitly supports these microphone geometries:
   - `AFE_1MIC`

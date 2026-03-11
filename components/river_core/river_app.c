@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "river/river_app.h"
+#include "river/river_board_rgb.h"
 #include "river/river_cloud.h"
 #include "river/river_online_control.h"
 #include "river/river_voice.h"
@@ -22,17 +23,30 @@ river_status_t river_app_boot(void)
     printf("[river] ameba-river boot\n");
     printf("[river] target=RTL8730E\n");
 
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_BOOT);
+#endif
+
     river_voice_frontend_set_handler(river_app_on_voice_event);
 
     if (river_voice_frontend_init() != RIVER_OK) {
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
     if (river_cloud_adapter_init() != RIVER_OK) {
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
     if (river_online_control_init() != RIVER_OK) {
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -45,6 +59,9 @@ river_status_t river_app_boot(void)
     printf("[river][voice] boot audio echo autostart enabled\n");
     if (river_voice_echo_start() != RIVER_OK) {
         printf("[river][voice] boot audio echo autostart failed\n");
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
     }
 #endif
 

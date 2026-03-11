@@ -20,6 +20,10 @@ config RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     bool "Enable audio echo diagnostics by default"
     default n
 
+config RIVER_BOARD_RGB_VAD_INDICATOR_EN
+    bool "Enable RGB VAD status indicator"
+    default y
+
 choice RIVER_VOICE_PREPROC_BACKEND
     prompt "Local voice pre-processing backend"
     default RIVER_VOICE_PREPROC_AIVOICE_AFE

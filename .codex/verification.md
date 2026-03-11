@@ -1064,3 +1064,41 @@ Interpretation:
 - if open still fails:
   - collect the next `silero_vad` block
   - the next suspect shifts to invoke-time behavior or arena pressure rather than top-level tensor metadata
+
+## Step 4.16
+Rebuild the RGB-indicator image:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot log:
+- the existing `Silero VAD` runtime should still reach:
+  - `silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite ...`
+- a new board-side log should appear once:
+  - `rgb indicator ready: ws2812 ledc cpu pin=PA_9 silence=blue speech=green error=red`
+
+Expected LED behavior:
+- just after boot:
+  - amber during bring-up
+- once the voice loop is running but no speech is detected:
+  - blue
+- while speech is detected:
+  - green
+- if detector open or runtime start fails:
+  - red
+
+Interpretation:
+- if serial logs are healthy but the RGB LED never changes:
+  - current `PA_9 + WS2812` assumption is likely wrong for this exact board population
+- if blue / green switching follows speech roughly in step with `vad=silence/speech`:
+  - board-side visual VAD indication is confirmed and ready for later wake-word / ASR state extension

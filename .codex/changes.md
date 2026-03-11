@@ -634,3 +634,27 @@
     - `Silero VAD` reaches `runtime ready`
     - on-device detector decisions are produced
     - the project is ready to move from runtime bring-up into policy tuning
+
+## Step 4.16
+- Added a board RGB indicator module:
+  - `include/river/river_board_rgb.h`
+  - `components/river_voice/river_board_rgb.c`
+- Reused the SDK `LEDC` / `WS2812` board assumption for `AmebaSmart`:
+  - pin `PA_9`
+  - single-pixel `GRB`
+  - CPU-mode LEDC transfer to avoid introducing new DMA/cache complexity into the VAD bring-up step
+- Current indicator mapping:
+  - `boot` -> amber
+  - `VAD silence` -> blue
+  - `VAD speech` -> green
+  - `error` -> red
+- Added project config:
+  - `CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN`
+- Enabled the RGB VAD indicator in `prj.conf`.
+- Wired state changes into the current voice runtime:
+  - app boot sets `boot`
+  - echo task sets `silence` once running
+  - detector decision toggles `silence` / `speech`
+  - detector/open/autostart failures set `error`
+  - echo stop sets `off`
+- Recorded the board assumption and risk boundary in `.codex/knowledge.md` so later schematic confirmation or pin remap can be traced cleanly.
