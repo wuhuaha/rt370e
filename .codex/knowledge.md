@@ -129,3 +129,83 @@
   - DMIC
   - earphone microphone path
 - Whether the project will rely on external IPEX antennas or switch to onboard PCB antennas.
+
+## External Reference Projects
+
+### 1. Realtek `ambd_arduino` `micro_speech`
+- Repository:
+  - `https://github.com/ambiot/ambd_arduino`
+- Why it matters:
+  - this is still a Realtek-maintained Ameba-family code path
+  - even though it is packaged as `Arduino`, it reflects Realtek's own `TFLite Micro` and audio integration choices
+- Highest-value takeaways for `ameba-river`:
+  - how Realtek wires `TFLite Micro` interpreter setup into an Ameba project
+  - how microphone data is buffered and fed into the inference loop
+  - how an Ameba-targeted `TensorArena` is budgeted in practice
+- How to use it in this project:
+  - treat it as an Ameba-specific bring-up reference, not as drop-in code
+  - compare its microphone buffering and inference cadence with:
+    - `river_voice_capture`
+    - `river_voice_detector_silero`
+- Cautions:
+  - it is not a direct `RTL8730E RTOS external-project` template
+  - board support, SDK wrappers, and class structure will differ from current `ameba-river`
+  - use it for sequencing and resource-allocation ideas, not for blind copy/paste
+
+### 2. Google `tflite-micro` `micro_speech`
+- Repository:
+  - `https://github.com/tensorflow/tflite-micro/tree/main/tensorflow/lite/micro/examples/micro_speech`
+- Why it matters:
+  - this is the cleanest upstream reference for:
+    - `TFLite Micro` interpreter lifecycle
+    - audio-frame ingestion
+    - rolling feature / window update logic
+- Highest-value takeaways for `ameba-river`:
+  - keep hardware capture and model runtime clearly separated
+  - use stable sliding-window logic instead of ad hoc frame stitching
+  - maintain a deterministic infer loop that only consumes fully formed model windows
+- Direct relevance to current `Silero VAD` work:
+  - the project's `256-sample` feed and `512 + 64` rolling input assembly are conceptually similar to `micro_speech`'s staged feature-window updates
+  - this upstream example is a good architecture reference for:
+    - future `VAD`
+    - later `KWS`
+    - self-developed `TFLite` models
+- Cautions:
+  - `micro_speech` is a tiny KWS example, not a production audio front-end
+  - it is useful mainly for pipeline shape and buffering discipline, not for direct acoustic quality decisions
+
+### 3. ARM `ML-embedded-evaluation-kit`
+- Repository:
+  - `https://github.com/ARM-software/ML-embedded-evaluation-kit`
+- Why it matters:
+  - it is a strong reference for embedded ML system architecture and optimization on ARM cores
+  - it is especially useful for:
+    - modular audio front-end design
+    - clean separation of preprocessing, feature extraction, model execution, and post-processing
+    - performance-oriented deployment thinking
+- Expected value for `ameba-river`:
+  - medium to high as an architecture and optimization reference
+  - lower as a direct code-reuse source for the current `RTL8730E CA32 + Realtek SDK + AIVoice + TFLM` stack
+- How to use it in this project:
+  - use it to review:
+    - KWS / ASR pipeline decomposition
+    - performance instrumentation
+    - optimized model-runner structure
+  - do not assume its implementation can be transplanted directly into the current Realtek build without adaptation
+- Cautions:
+  - `CMSIS-NN` and ARM-optimized paths are highly valuable, but they are not automatically a drop-in win on the current project stack
+  - for `RTL8730E`, first priority remains:
+    - getting the real board runtime stable
+    - then measuring latency / memory / arena usage
+    - only then deciding whether deeper ARM-specific optimization is needed
+
+## External Reference Priority
+- `Highest priority`:
+  - Realtek `ambd_arduino micro_speech`
+  - Google `tflite-micro micro_speech`
+- `Conditional priority`:
+  - ARM `ML-embedded-evaluation-kit`
+- Working rule for future implementation:
+  - prefer Realtek examples for Ameba-specific driver and bring-up behavior
+  - prefer upstream `tflite-micro` examples for model-runtime architecture
+  - use ARM ML kit mainly when optimization or later `KWS/ASR` pipeline refinement becomes the bottleneck

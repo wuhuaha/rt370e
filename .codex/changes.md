@@ -578,3 +578,13 @@
   - keep hard open-time rejection only for persistent tensors that the detector actually uses directly
 - Revalidated after the change:
   - targeted `river_voice_target_img2_ap` rebuild passed locally
+
+## Knowledge Update
+- Added an external-reference section to `.codex/knowledge.md` covering three project families relevant to future voice work:
+  - Realtek `ambd_arduino` `micro_speech`
+  - Google `tflite-micro` `micro_speech`
+  - ARM `ML-embedded-evaluation-kit`
+- Recorded not just the links but the intended usage boundary for each:
+  - which one is best for Ameba-specific audio / TFLM integration
+  - which one is best for upstream pipeline architecture
+  - which one is best kept as an optimization reference instead of direct reusable code
