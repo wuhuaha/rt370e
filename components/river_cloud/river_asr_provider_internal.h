@@ -31,5 +31,7 @@ extern const river_cloud_asr_provider_ops_t g_river_cloud_iflytek_rtasr_ops;
 
 const river_cloud_asr_provider_ops_t *river_cloud_provider_lookup(const char *name);
 const river_cloud_asr_provider_ops_t *river_cloud_provider_default(void);
+uint32_t river_cloud_now_utc_seconds(void);
+bool river_cloud_utc_ready(void);
 
 #endif

@@ -16,7 +16,6 @@ set(private_definitions)
 set(private_compile_options)
 
 ameba_list_append(private_sources
-    river_board_rgb.c
     river_voice_board.c
     river_voice_capture.c
     river_voice_detector.c

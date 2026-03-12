@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
 #include "cJSON.h"
 #include "lwip_netconf.h"
 #include "mbedtls/base64.h"
@@ -161,7 +160,10 @@ static river_status_t river_iflytek_build_url(const river_cloud_asr_audio_desc_t
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    time(&now);
+    now = (time_t)river_cloud_now_utc_seconds();
+    if (now <= 0) {
+        return RIVER_ERR_BUSY;
+    }
     snprintf(utc_text, sizeof(utc_text), "%lu", (unsigned long)now);
     snprintf(uuid_text,
              sizeof(uuid_text),

@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include "river/river_app.h"
-#include "river/river_board_rgb.h"
 #include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_online_control.h"
@@ -87,39 +86,23 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("ameba-river boot");
     RIVER_LOGI("target=RTL8730E");
 
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_BOOT);
-#endif
-
     river_voice_frontend_set_handler(river_app_on_voice_event);
 
     if (river_wifi_station_init() != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
     if (river_cloud_adapter_init() != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
     river_cloud_adapter_set_result_handler(river_app_on_cloud_asr_result, NULL);
 
     if (river_voice_frontend_init() != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
     if (river_online_control_init() != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -137,9 +120,6 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("boot vad probe autostart enabled");
     if (river_voice_vad_probe_start() != RIVER_OK) {
         RIVER_LOGE("boot vad probe autostart failed");
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
     }
 #endif
 
@@ -147,9 +127,6 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("boot audio echo autostart enabled");
     if (river_voice_echo_start() != RIVER_OK) {
         RIVER_LOGE("boot audio echo autostart failed");
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
     }
 #endif
 

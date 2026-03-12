@@ -10,7 +10,6 @@
 #include "audio/audio_control.h"
 #include "audio/audio_service.h"
 
-#include "river/river_board_rgb.h"
 #include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_voice.h"
@@ -105,6 +104,7 @@ typedef struct {
     bool diag_vad_state_initialized;
     bool diag_vad_is_speech;
     bool diag_vad_prev_is_speech;
+    bool diag_vad_last_logged_is_speech;
     bool diag_sdk_vad_is_speech;
 } river_voice_vad_probe_context_t;
 
@@ -307,7 +307,7 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
     if (!g_river_voice_vad_probe.diag_vad_state_initialized) {
         should_log = true;
         g_river_voice_vad_probe.diag_vad_state_initialized = true;
-    } else if (g_river_voice_vad_probe.diag_vad_prev_is_speech != detector_is_speech) {
+    } else if (g_river_voice_vad_probe.diag_vad_last_logged_is_speech != detector_is_speech) {
         should_log = true;
     }
 
@@ -336,6 +336,7 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_ok,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_busy,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_fail);
+    g_river_voice_vad_probe.diag_vad_last_logged_is_speech = detector_is_speech;
 }
 
 static void river_voice_vad_probe_close_audio(void)
@@ -517,10 +518,6 @@ static void river_voice_vad_probe_task(void *param)
 
     (void)param;
 
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_VAD_SILENCE);
-#endif
-
     while (!g_river_voice_vad_probe.stop_requested) {
         bytes_read = (size_t)river_voice_capture_read(&g_river_voice_vad_probe.capture,
                                                       g_river_voice_vad_probe.capture_buffer,
@@ -574,9 +571,6 @@ static void river_voice_vad_probe_task(void *param)
                                          g_river_voice_vad_probe.enhanced_chunk_bytes,
                                          &detector_result) != RIVER_OK) {
             g_river_voice_vad_probe.diag_det_fail++;
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-            river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
             river_voice_vad_probe_log_diagnostics_if_needed();
             continue;
         }
@@ -601,11 +595,6 @@ static void river_voice_vad_probe_task(void *param)
                 g_river_voice_vad_probe.diag_vad_speech_end++;
             }
             g_river_voice_vad_probe.diag_vad_prev_is_speech = detector_result.is_speech;
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-            river_board_rgb_set_state(detector_result.is_speech
-                                      ? RIVER_BOARD_RGB_STATE_VAD_SPEECH
-                                      : RIVER_BOARD_RGB_STATE_VAD_SILENCE);
-#endif
             if (g_river_voice_vad_probe.segment_buffer_enabled &&
                 river_voice_segment_buffer_push(&g_river_voice_vad_probe.segment_buffer,
                                                 g_river_voice_vad_probe.enhanced_buffer,
@@ -700,9 +689,6 @@ static void river_voice_vad_probe_task(void *param)
 
     river_voice_vad_probe_close_audio();
     river_voice_vad_probe_release_buffers();
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_OFF);
-#endif
     g_river_voice_vad_probe.stop_requested = false;
     g_river_voice_vad_probe.running = false;
     g_river_voice_vad_probe.task = 0;
@@ -724,9 +710,6 @@ river_status_t river_voice_vad_probe_start(void)
 
     status = river_voice_vad_probe_open_audio();
     if (status != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         river_voice_vad_probe_close_audio();
         river_voice_vad_probe_release_buffers();
         return status;
@@ -741,9 +724,6 @@ river_status_t river_voice_vad_probe_start(void)
                          RIVER_VOICE_VAD_PROBE_TASK_PRIORITY) != RTK_SUCCESS) {
         RIVER_LOGE("create vad probe task failed");
         g_river_voice_vad_probe.running = false;
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         river_voice_vad_probe_close_audio();
         river_voice_vad_probe_release_buffers();
         return RIVER_ERR_NO_MEMORY;

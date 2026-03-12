@@ -10,7 +10,6 @@
 #include "audio/audio_service.h"
 #include "audio/audio_track.h"
 
-#include "river/river_board_rgb.h"
 #include "river/river_log.h"
 #include "river/river_voice.h"
 #include "river/river_voice_board.h"
@@ -618,10 +617,6 @@ static void river_voice_echo_task(void *param)
 
     (void)param;
 
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_VAD_SILENCE);
-#endif
-
     while (!g_river_voice_echo.stop_requested) {
         int32_t bytes_read;
         size_t enhanced_bytes;
@@ -691,9 +686,6 @@ static void river_voice_echo_task(void *param)
                                          g_river_voice_echo.enhanced_chunk_bytes,
                                          &detector_result) != RIVER_OK) {
             g_river_voice_echo.diag_det_fail++;
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-            river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
             river_voice_echo_log_diagnostics_if_needed();
             RIVER_LOGE("detector process failed");
             continue;
@@ -707,11 +699,6 @@ static void river_voice_echo_task(void *param)
             if (detector_result.is_speech) {
                 g_river_voice_echo.diag_vad_speech++;
             }
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-            river_board_rgb_set_state(detector_result.is_speech
-                                      ? RIVER_BOARD_RGB_STATE_VAD_SPEECH
-                                      : RIVER_BOARD_RGB_STATE_VAD_SILENCE);
-#endif
         }
 
         if (g_river_voice_echo.vad_reference_enabled) {
@@ -775,9 +762,6 @@ static void river_voice_echo_task(void *param)
 
     river_voice_echo_close_audio();
     river_voice_echo_release_buffers();
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-    river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_OFF);
-#endif
     g_river_voice_echo.stop_requested = false;
     g_river_voice_echo.running = false;
     g_river_voice_echo.task = 0;
@@ -799,9 +783,6 @@ river_status_t river_voice_echo_start(void)
 
     status = river_voice_echo_open_audio();
     if (status != RIVER_OK) {
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         river_voice_echo_close_audio();
         river_voice_echo_release_buffers();
         return status;
@@ -816,9 +797,6 @@ river_status_t river_voice_echo_start(void)
                          RIVER_VOICE_ECHO_TASK_PRIORITY) != RTK_SUCCESS) {
         RIVER_LOGE("create echo task failed");
         g_river_voice_echo.running = false;
-#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
-        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
-#endif
         river_voice_echo_close_audio();
         river_voice_echo_release_buffers();
         return RIVER_ERR_NO_MEMORY;

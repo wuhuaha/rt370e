@@ -22,9 +22,11 @@
     - **RSSI 门限**：在扫描阶段直接过滤掉低于 `-80dB` 的 AP，避免无效的策略切换。
 
 ## 陷阱 3：云端鉴权的时间依赖 (SNTP Bottleneck)
-- **现象**：Wi-Fi 已连，但 ASR 云端返回 `403` 或 `Signature Mismatch`。
-- **原因**：iFlytek 等 API 签名依赖系统时间（UTC），联网后 SNTP 同步通常有延迟。
-- **对策**：将 `SNTP_Ready` 状态作为 ASR 链路开启的硬性闸门。
+- **现象**：Wi-Fi 已连，但 ASR 无法启动，日志报错：`status=-4 wifi=connected time_ready=no`。
+- **原因**：iFlytek 等 API 签名（HMAC）严重依赖系统 UTC 时间。即便 Wi-Fi 连上，如果 SNTP 没同步，鉴权必败。
+- **对策**：
+    1.  将 `SNTP_Ready` 状态作为 ASR 链路开启的硬性闸门（已在 `river_cloud_adapter` 实现）。
+    2.  在获取 IP 后立即**强制触发**一次 SNTP 同步，缩短从“联网”到“可用”的空白期。
 
 ## 陷阱 4：Wi-Fi 已拿到 IP，但应用层反复“重复认领成功”
 - **现象**：串口里持续打印 `connected ssid=... ip=... success=N`，计数不断上涨，但实际上并没有重新连接。

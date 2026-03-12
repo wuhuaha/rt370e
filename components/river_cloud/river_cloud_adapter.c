@@ -20,6 +20,7 @@
 #define RIVER_CLOUD_DEFAULT_SNTP_SERVER      "pool.ntp.org"
 #define RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS  (60U * 60U * 1000U)
 #define RIVER_CLOUD_TIME_READY_EPOCH_MIN     1700000000UL
+#define RIVER_CLOUD_BUILD_TZ_OFFSET_SECONDS  (8L * 60L * 60L)
 
 typedef struct {
     bool initialized;
@@ -50,14 +51,91 @@ typedef struct {
     uint32_t final_results;
     uint32_t error_results;
     bool time_ready_announced;
+    bool time_seeded_from_build;
     int stream_open_defer_status;
     bool stream_open_defer_wifi_connected;
     bool stream_open_defer_time_ready;
+    uint32_t seeded_utc_epoch;
+    uint64_t seeded_utc_rtos_ms;
     char last_text[192];
     char last_error[128];
 } river_cloud_context_t;
 
 static river_cloud_context_t g_river_cloud;
+
+static bool river_cloud_is_leap_year(int year)
+{
+    return ((year % 4) == 0 && (year % 100) != 0) || ((year % 400) == 0);
+}
+
+static int river_cloud_month_from_abbrev(const char *month)
+{
+    static const char *const k_months[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    int index;
+
+    if (month == NULL) {
+        return -1;
+    }
+
+    for (index = 0; index < 12; ++index) {
+        if (strncmp(month, k_months[index], 3U) == 0) {
+            return index + 1;
+        }
+    }
+
+    return -1;
+}
+
+static uint32_t river_cloud_days_before_month(int year, int month)
+{
+    static const uint16_t k_days_before_month[] = {
+        0U,   31U,  59U,  90U,  120U, 151U,
+        181U, 212U, 243U, 273U, 304U, 334U
+    };
+    uint32_t days;
+
+    if (month <= 0) {
+        return 0U;
+    }
+
+    days = k_days_before_month[month - 1];
+    if (month > 2 && river_cloud_is_leap_year(year)) {
+        days++;
+    }
+    return days;
+}
+
+static time_t river_cloud_epoch_from_utc_components(int year,
+                                                    int month,
+                                                    int day,
+                                                    int hour,
+                                                    int minute,
+                                                    int second)
+{
+    uint32_t days;
+    int current_year;
+
+    if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+        second < 0 || second > 59) {
+        return (time_t)0;
+    }
+
+    days = 0U;
+    for (current_year = 1970; current_year < year; ++current_year) {
+        days += river_cloud_is_leap_year(current_year) ? 366U : 365U;
+    }
+    days += river_cloud_days_before_month(year, month);
+    days += (uint32_t)(day - 1);
+
+    return (time_t)((days * 24U * 60U * 60U) +
+                    ((uint32_t)hour * 60U * 60U) +
+                    ((uint32_t)minute * 60U) +
+                    (uint32_t)second);
+}
 
 static uint32_t river_cloud_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms)
 {
@@ -68,12 +146,41 @@ static uint32_t river_cloud_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms
     return (duration_ms + frame_ms - 1U) / frame_ms;
 }
 
-static bool river_cloud_time_ready(void)
+uint32_t river_cloud_now_utc_seconds(void)
 {
+    uint32_t sec = 0U;
+    uint32_t usec = 0U;
     time_t now;
 
+    sntp_get_system_time(&sec, &usec);
+    if (sec >= RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
+        return sec;
+    }
+
     time(&now);
-    return now >= (time_t)RIVER_CLOUD_TIME_READY_EPOCH_MIN;
+    if (now >= (time_t)RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
+        return (uint32_t)now;
+    }
+
+    if (g_river_cloud.time_seeded_from_build) {
+        uint64_t elapsed_ms;
+
+        elapsed_ms = (uint64_t)rtos_time_get_current_system_time_ms() -
+                     g_river_cloud.seeded_utc_rtos_ms;
+        return g_river_cloud.seeded_utc_epoch + (uint32_t)(elapsed_ms / 1000ULL);
+    }
+
+    return 0U;
+}
+
+bool river_cloud_utc_ready(void)
+{
+    return river_cloud_now_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
+}
+
+static bool river_cloud_time_ready(void)
+{
+    return river_cloud_utc_ready();
 }
 
 static void river_cloud_start_sntp_if_needed(void)
@@ -91,6 +198,63 @@ static void river_cloud_start_sntp_if_needed(void)
                (unsigned int)RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
 }
 
+static void river_cloud_seed_time_from_build_if_needed(void)
+{
+    char month_text[4];
+    int month;
+    int day;
+    int year;
+    int hour;
+    int minute;
+    int second;
+    time_t build_local_epoch;
+    uint32_t seeded_utc_epoch;
+
+    if (river_cloud_time_ready()) {
+        return;
+    }
+
+    if (sscanf(__DATE__, "%3s %d %d", month_text, &day, &year) != 3) {
+        return;
+    }
+    month_text[3] = '\0';
+    if (sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second) != 3) {
+        return;
+    }
+
+    month = river_cloud_month_from_abbrev(month_text);
+    if (month < 1) {
+        return;
+    }
+
+    build_local_epoch = river_cloud_epoch_from_utc_components(year,
+                                                              month,
+                                                              day,
+                                                              hour,
+                                                              minute,
+                                                              second);
+    if (build_local_epoch == (time_t)0) {
+        return;
+    }
+
+    seeded_utc_epoch = (uint32_t)(build_local_epoch - RIVER_CLOUD_BUILD_TZ_OFFSET_SECONDS);
+    if (seeded_utc_epoch < RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
+        return;
+    }
+
+    g_river_cloud.time_seeded_from_build = true;
+    g_river_cloud.seeded_utc_epoch = seeded_utc_epoch;
+    g_river_cloud.seeded_utc_rtos_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    sntp_set_system_time(seeded_utc_epoch, 0U);
+    if (river_cloud_time_ready()) {
+        RIVER_LOGI("seed system utc from build time: utc=%lu build_local=%s %s tz_offset_sec=%ld",
+                   (unsigned long)river_cloud_now_utc_seconds(),
+                   __DATE__,
+                   __TIME__,
+                   (long)RIVER_CLOUD_BUILD_TZ_OFFSET_SECONDS);
+    }
+}
+
 static void river_cloud_log_time_ready_once(void)
 {
     if (g_river_cloud.time_ready_announced) {
@@ -102,7 +266,7 @@ static void river_cloud_log_time_ready_once(void)
     }
 
     g_river_cloud.time_ready_announced = true;
-    RIVER_LOGI("sntp ready: utc=%ld", (long)time(NULL));
+    RIVER_LOGI("sntp ready: utc=%lu", (unsigned long)river_cloud_now_utc_seconds());
 }
 
 static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
@@ -213,6 +377,7 @@ static river_status_t river_cloud_stream_open_and_flush(void)
     }
 
     river_cloud_start_sntp_if_needed();
+    river_cloud_seed_time_from_build_if_needed();
     if (!river_cloud_time_ready()) {
         snprintf(g_river_cloud.last_error,
                  sizeof(g_river_cloud.last_error),
@@ -293,6 +458,7 @@ river_status_t river_cloud_adapter_init(void)
     }
 
     river_cloud_start_sntp_if_needed();
+    river_cloud_seed_time_from_build_if_needed();
     RIVER_LOGI("online asr provider init: %s stream=%s batch=%s",
                river_cloud_asr_provider_name(),
                river_cloud_asr_streaming_supported() ? "yes" : "no",
