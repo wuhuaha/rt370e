@@ -864,3 +864,13 @@
   - `enabled`
   - or `disabled`
 - This preserves the architecture for future non-streaming ASR while removing a large, currently unnecessary heap allocation from the live `iflytek_rtasr` path.
+
+## Step 4.25
+- Hardened STA Wi-Fi bring-up against repeated auth / 4-way / busy failures observed while connecting to `Keeu`.
+- Updated [river_wifi_station.c](/root/ameba-river/components/river_cloud/river_wifi_station.c) to use a multi-strategy connect policy:
+  - try the most compatible path first: `SSID + password` only
+  - if scan data is available, retry with scan-bound `BSSID + channel + security`
+  - if the scanned AP reports `WPA2/WPA3 mixed`, also try a final `WPA2 AES` compatibility fallback
+- The scan candidate selector now prefers `2.4G` APs over `5G` when the SSID is duplicated across bands, which is better aligned with embedded voice bring-up and home-router compatibility.
+- Added explicit disconnect-and-idle waiting between retries so the driver has time to leave transitional join states before the next attempt.
+- Failure logs now show the strategy name, decoded error reason, and current join state to make router-compatibility issues easier to identify on the next board run.

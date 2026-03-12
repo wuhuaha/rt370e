@@ -1444,3 +1444,30 @@ Expected runtime behavior with `iflytek_rtasr`:
     - `vad probe segment buffer skipped: free_heap=... required~... headroom=... provider=... batch=yes`
 - the low-level allocator failure should disappear:
   - `Malloc failed. Core:[CA32], Task:[NoTsk], [free heap size: ...] [xWantedSize:256064]`
+
+## Step 4.25
+Build the Wi-Fi connect fallback update:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime behavior:
+- `river_wifi_station` should first log a basic connect attempt:
+  - `connect strategy=basic ssid=Keeu ...`
+- If that fails, and scan data is available, it should retry with a scan-bound attempt:
+  - `connect strategy=scan_exact ...`
+- If the target AP is `WPA2/WPA3 mixed`, a final compatibility fallback may appear:
+  - `connect strategy=scan_wpa2_fallback ...`
+- Failures should now include both the strategy and decoded join status:
+  - `connect strategy=... failed err=...(<name>) join=<status>`
+- Between attempts, the app should no longer hammer the driver immediately after a failed join; it now disconnects and waits for the join state to settle first.
