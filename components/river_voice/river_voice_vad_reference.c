@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "os_wrapper.h"
+#include "os_wrapper_memory.h"
 
 #include "aivoice_interface.h"
 
@@ -13,6 +14,13 @@
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.vadref"
+
+#ifndef CONFIG_RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB
+#define CONFIG_RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB 0
+#endif
+
+#define RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_BYTES \
+    ((uint32_t)CONFIG_RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB * 1024U)
 
 typedef struct {
     const struct rtk_aivoice_iface *iface;
@@ -68,6 +76,7 @@ river_status_t river_voice_vad_reference_open(void)
     struct afe_config afe_param;
     struct vad_config vad_param;
     struct aivoice_sdk_config common_param;
+    uint32_t free_heap;
 
     if (g_river_voice_vad_reference.opened) {
         return RIVER_OK;
@@ -75,6 +84,13 @@ river_status_t river_voice_vad_reference_open(void)
 
     memset(&g_river_voice_vad_reference, 0, sizeof(g_river_voice_vad_reference));
     profile = river_voice_board_array_profile();
+    free_heap = rtos_mem_get_free_heap_size();
+    if (free_heap < RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_BYTES) {
+        RIVER_LOGW("sdk_vad reference skipped: free_heap=%luB min_required=%luB create_scratch~256064B",
+                   (unsigned long)free_heap,
+                   (unsigned long)RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_BYTES);
+        return RIVER_ERR_NO_MEMORY;
+    }
 
     memset(&config, 0, sizeof(config));
     afe_param = (struct afe_config)AFE_CONFIG_ASR_DEFAULT_1MIC();
@@ -98,8 +114,9 @@ river_status_t river_voice_vad_reference_open(void)
     g_river_voice_vad_reference.iface = &aivoice_iface_vad_v1;
     g_river_voice_vad_reference.handle = g_river_voice_vad_reference.iface->create(&config);
     if (g_river_voice_vad_reference.handle == 0) {
-        RIVER_LOGW("sdk_vad reference create failed");
-        return RIVER_ERR_UNSUPPORTED;
+        RIVER_LOGW("sdk_vad reference create failed: free_heap_before=%luB",
+                   (unsigned long)free_heap);
+        return RIVER_ERR_NO_MEMORY;
     }
 
     rtk_aivoice_register_callback(g_river_voice_vad_reference.handle,
@@ -176,7 +193,8 @@ const char *river_voice_vad_reference_name(void)
 void river_voice_vad_reference_dump_profile(void)
 {
 #ifdef CONFIG_RIVER_AIVOICE_VAD_REFERENCE_EN
-    RIVER_LOGI("detector reference: aivoice_vad_v1 diagnostic-only sensitivity=mid left_margin=300ms right_margin=160ms min_speech=200ms feed=256 samples");
+    RIVER_LOGI("detector reference: aivoice_vad_v1 diagnostic-only sensitivity=mid left_margin=300ms right_margin=160ms min_speech=200ms feed=256 samples min_free_heap=%luKB",
+               (unsigned long)CONFIG_RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB);
 #else
     RIVER_LOGI("detector reference: disabled");
 #endif

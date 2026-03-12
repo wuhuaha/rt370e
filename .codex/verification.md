@@ -1384,3 +1384,35 @@ Expected VAD behavior at default `INFO`:
 Expected VAD behavior at `DEBUG`:
 - periodic probe lines should still be available for deep tuning
 - segment-ready diagnostics and tensor-inventory style details should also remain available
+
+## Step 4.23
+Build the heap-guarded SDK VAD reference update:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime behavior when online ASR + Silero are active and heap is tight:
+- `Silero VAD` still reaches:
+  - `silero_vad runtime ready: ...`
+- the optional SDK comparison path may now log either:
+  - normal profile information, if heap is sufficient
+  - or:
+    - `sdk_vad reference skipped: free_heap=... min_required=... create_scratch~256064B`
+    - `sdk_vad reference auto-disabled; keep silero-only decision logging`
+- the previous vendor-side crash-style line should disappear:
+  - `Malloc failed. Core:[CA32], Task:[NoTsk], [free heap size: ...] [xWantedSize:256064]`
+
+Expected behavior after the fix:
+- pure VAD probe continues running
+- online ASR bridge still opens
+- SDK VAD reference becomes opportunistic instead of mandatory

@@ -432,7 +432,7 @@ static river_status_t river_voice_vad_probe_open_audio(void)
     g_river_voice_vad_probe.vad_reference_enabled =
         (river_voice_vad_reference_open() == RIVER_OK);
     if (!g_river_voice_vad_probe.vad_reference_enabled) {
-        RIVER_LOGW("sdk_vad reference unavailable; keep silero-only decision logging");
+        RIVER_LOGW("sdk_vad reference auto-disabled; keep silero-only decision logging");
     }
 
     if (river_voice_vad_probe_prepare_buffers() != RIVER_OK) {

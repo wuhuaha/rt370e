@@ -85,6 +85,12 @@ config RIVER_AIVOICE_VAD_REFERENCE_EN
     default y
     depends on AIVOICE_EN_MENU
 
+config RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB
+    int "Minimum free heap required before enabling SDK AIVoice VAD reference"
+    range 0 2048
+    default 320
+    depends on RIVER_AIVOICE_VAD_REFERENCE_EN
+
 config RIVER_SILERO_VAD_TENSOR_ARENA_KB
     int "Silero VAD tensor arena size in KB"
     range 64 1024

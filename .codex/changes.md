@@ -833,3 +833,17 @@
   - alternate transports
   These sinks are not implemented yet, but the boundary is now explicit.
 - Refactored key voice/cloud modules to use the shared logger so background runtime output is more readable and easier to filter during bring-up.
+
+## Step 4.23
+- Hardened the diagnostic SDK VAD side path against heap exhaustion during online-ASR bring-up:
+  - added `CONFIG_RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB`
+  - defaulted it to `320KB`
+- `river_voice_vad_reference_open()` now checks current free heap before creating `aivoice_iface_vad_v1`.
+- If free heap is below the configured floor, the SDK VAD reference is skipped with a clear warning instead of triggering a low-level `Malloc failed` path inside the vendor library.
+- Updated upper-layer logs so the behavior is explicit:
+  - `sdk_vad reference auto-disabled; keep silero-only decision logging`
+- This keeps:
+  - `Silero VAD`
+  - pure VAD probe
+  - cloud ASR bridge
+  available even when the optional SDK comparison path is too expensive for the current heap budget.
