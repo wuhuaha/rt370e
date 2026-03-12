@@ -1,13 +1,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "basic_types.h"
 #include "os_wrapper.h"
 
+#include "river/river_log.h"
 #include "river/river_voice_ref.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.ref"
 
 #define RIVER_VOICE_REF_DEFAULT_HISTORY_MS  1536U
 
@@ -200,15 +203,15 @@ const char *river_voice_ref_backend_name(void)
 void river_voice_ref_dump_profile(void)
 {
     if (!g_river_voice_ref.opened) {
-        printf("[river][voice] playback ref: deferred backend=%s source=post-delay mono speaker feed\n",
-               river_voice_ref_backend_name());
+        RIVER_LOGI("playback ref: deferred backend=%s source=post-delay mono speaker feed",
+                   river_voice_ref_backend_name());
         return;
     }
 
-    printf("[river][voice] playback ref: %s %lu Hz %lums %luch history=%lums source=post-delay mono speaker feed\n",
-           river_voice_ref_backend_name(),
-           (unsigned long)g_river_voice_ref.sample_rate,
-           (unsigned long)g_river_voice_ref.frame_ms,
-           (unsigned long)g_river_voice_ref.channels,
-           (unsigned long)g_river_voice_ref.history_ms);
+    RIVER_LOGI("playback ref: %s %lu Hz %lums %luch history=%lums source=post-delay mono speaker feed",
+               river_voice_ref_backend_name(),
+               (unsigned long)g_river_voice_ref.sample_rate,
+               (unsigned long)g_river_voice_ref.frame_ms,
+               (unsigned long)g_river_voice_ref.channels,
+               (unsigned long)g_river_voice_ref.history_ms);
 }

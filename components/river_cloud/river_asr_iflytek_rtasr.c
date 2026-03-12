@@ -15,7 +15,11 @@
 #include "websocket/wsclient_api.h"
 
 #include "river/river_asr_iflytek_credentials.h"
+#include "river/river_log.h"
 #include "river_asr_provider_internal.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.cloud.iflytek"
 
 #define RIVER_IFLYTEK_RTASR_URL_MAX            1024U
 #define RIVER_IFLYTEK_RTASR_TEXT_MAX           256U
@@ -531,11 +535,11 @@ static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc
     g_river_iflytek_rtasr.last_sid[0] = '\0';
     g_river_iflytek_rtasr.last_text[0] = '\0';
     g_river_iflytek_rtasr.last_error[0] = '\0';
-    printf("[river][cloud][iflytek] stream open: %luHz/%luch/%lubit seq=%lu\n",
-           (unsigned long)audio->sample_rate,
-           (unsigned long)audio->channels,
-           (unsigned long)audio->bits_per_sample,
-           (unsigned long)g_river_iflytek_rtasr.sequence);
+    RIVER_LOGI("stream open: %luHz/%luch/%lubit seq=%lu",
+               (unsigned long)audio->sample_rate,
+               (unsigned long)audio->channels,
+               (unsigned long)audio->bits_per_sample,
+               (unsigned long)g_river_iflytek_rtasr.sequence);
     return RIVER_OK;
 }
 
@@ -608,20 +612,20 @@ static river_status_t river_iflytek_batch_submit(const uint8_t *pcm,
 
 static void river_iflytek_dump_status(void)
 {
-    printf("[river][cloud][iflytek] stream=%s seq=%lu opened=%lu closed=%lu partial=%lu final=%lu error=%lu recv=%lu audio_bytes=%lu frames=%lu sid=%s last_text=%s last_err=%s\n",
-           river_iflytek_stream_active() ? "open" : "closed",
-           (unsigned long)g_river_iflytek_rtasr.sequence,
-           (unsigned long)g_river_iflytek_rtasr.sessions_opened,
-           (unsigned long)g_river_iflytek_rtasr.sessions_closed,
-           (unsigned long)g_river_iflytek_rtasr.partial_results,
-           (unsigned long)g_river_iflytek_rtasr.final_results,
-           (unsigned long)g_river_iflytek_rtasr.error_results,
-           (unsigned long)g_river_iflytek_rtasr.receive_messages,
-           (unsigned long)g_river_iflytek_rtasr.sent_audio_bytes,
-           (unsigned long)g_river_iflytek_rtasr.sent_frames,
-           g_river_iflytek_rtasr.last_sid[0] != '\0' ? g_river_iflytek_rtasr.last_sid : "-",
-           g_river_iflytek_rtasr.last_text[0] != '\0' ? g_river_iflytek_rtasr.last_text : "-",
-           g_river_iflytek_rtasr.last_error[0] != '\0' ? g_river_iflytek_rtasr.last_error : "-");
+    RIVER_LOGI("stream=%s seq=%lu opened=%lu closed=%lu partial=%lu final=%lu error=%lu recv=%lu audio_bytes=%lu frames=%lu sid=%s last_text=%s last_err=%s",
+               river_iflytek_stream_active() ? "open" : "closed",
+               (unsigned long)g_river_iflytek_rtasr.sequence,
+               (unsigned long)g_river_iflytek_rtasr.sessions_opened,
+               (unsigned long)g_river_iflytek_rtasr.sessions_closed,
+               (unsigned long)g_river_iflytek_rtasr.partial_results,
+               (unsigned long)g_river_iflytek_rtasr.final_results,
+               (unsigned long)g_river_iflytek_rtasr.error_results,
+               (unsigned long)g_river_iflytek_rtasr.receive_messages,
+               (unsigned long)g_river_iflytek_rtasr.sent_audio_bytes,
+               (unsigned long)g_river_iflytek_rtasr.sent_frames,
+               g_river_iflytek_rtasr.last_sid[0] != '\0' ? g_river_iflytek_rtasr.last_sid : "-",
+               g_river_iflytek_rtasr.last_text[0] != '\0' ? g_river_iflytek_rtasr.last_text : "-",
+               g_river_iflytek_rtasr.last_error[0] != '\0' ? g_river_iflytek_rtasr.last_error : "-");
 }
 
 const river_cloud_asr_provider_ops_t g_river_cloud_iflytek_rtasr_ops = {

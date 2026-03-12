@@ -145,3 +145,30 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 - current credential policy:
   - Wi-Fi and iFlytek bring-up credentials are intentionally stored in project-local headers for the first integration round
   - this is temporary and must later be replaced by secure storage or provisioning
+
+## Runtime Logging Architecture
+
+- `river_common/river_log` is now the shared runtime logging boundary for project-owned modules.
+- Current sink policy:
+  - primary sink:
+    - serial console
+  - secondary sink:
+    - reserved through a callback interface
+    - future file / upload / alternate transport backends can be attached without rewriting callers
+- Current level policy:
+  - default level:
+    - `INFO`
+  - state changes and durable service lifecycle:
+    - `INFO`
+  - recoverable anomalies:
+    - `WARN`
+  - hard failures:
+    - `ERROR`
+  - high-rate diagnostics, tensor inventory, VAD probe windows, and segment-buffer churn:
+    - `DEBUG`
+- Why this boundary matters:
+  - the project should not keep spreading raw `printf` formatting rules through voice/cloud/application modules
+  - future file logging or remote trace upload should be a sink change, not a whole-project refactor
+- Current VAD logging rule:
+  - `vad_probe` emits `INFO` only when the detector state changes between `speech` and `silence`
+  - high-rate per-window VAD statistics remain available at `DEBUG`

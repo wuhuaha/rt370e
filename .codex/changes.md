@@ -807,3 +807,29 @@
   - no playback reference
   - no `AEC` in the validation path
 - Raised diagnostic cadence from roughly `1s` windows to about `240ms` windows in the probe runtime so short utterances are easier to catch in serial logs.
+
+## Step 4.22
+- Added a shared project-owned logging abstraction:
+  - `include/river/river_log.h`
+  - `components/river_common/river_log.c`
+  - `components/river_common/CMakeLists.txt`
+- Logging policy is now layered instead of direct `printf` in product modules:
+  - `ERROR`
+  - `WARN`
+  - `INFO`
+  - `DEBUG`
+- The default runtime level is now `INFO` through:
+  - `Kconfig`
+  - `CONFIG_RIVER_LOG_LEVEL_INFO=y` in `prj.conf`
+- Log lines now carry a monotonic millisecond timestamp and stable tag:
+  - format:
+    - `[%010lu][<level>][<tag>] ...`
+- `vad_probe` logging policy is now split into:
+  - `INFO` only when VAD state changes
+  - `DEBUG` for high-rate probe and segment diagnostics
+- The new logger keeps a secondary sink abstraction for future:
+  - file persistence
+  - upload / relay
+  - alternate transports
+  These sinks are not implemented yet, but the boundary is now explicit.
+- Refactored key voice/cloud modules to use the shared logger so background runtime output is more readable and easier to filter during bring-up.

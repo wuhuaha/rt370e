@@ -10,8 +10,12 @@
 #include "os_wrapper.h"
 
 #include "river/river_cloud.h"
+#include "river/river_log.h"
 #include "river/river_wifi_station.h"
 #include "river_asr_provider_internal.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.cloud"
 
 #define RIVER_CLOUD_DEFAULT_SNTP_SERVER      "pool.ntp.org"
 #define RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS  (60U * 60U * 1000U)
@@ -78,9 +82,9 @@ static void river_cloud_start_sntp_if_needed(void)
     sntp_set_update_interval(RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
     sntp_init();
     g_river_cloud.sntp_started = true;
-    printf("[river][cloud] sntp init: server=%s interval_ms=%u\n",
-           RIVER_CLOUD_DEFAULT_SNTP_SERVER,
-           (unsigned int)RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
+    RIVER_LOGI("sntp init: server=%s interval_ms=%u",
+               RIVER_CLOUD_DEFAULT_SNTP_SERVER,
+               (unsigned int)RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
 }
 
 static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
@@ -231,19 +235,19 @@ river_status_t river_cloud_adapter_init(void)
     memset(&g_river_cloud, 0, sizeof(g_river_cloud));
     g_river_cloud.provider = river_cloud_provider_default();
     if (g_river_cloud.provider == NULL) {
-        printf("[river][cloud] no online asr provider registered\n");
+        RIVER_LOGE("no online asr provider registered");
         return RIVER_ERR_UNSUPPORTED;
     }
     if (g_river_cloud.provider->init(river_cloud_notify_result, &g_river_cloud) != RIVER_OK) {
-        printf("[river][cloud] asr provider init failed\n");
+        RIVER_LOGE("asr provider init failed");
         return RIVER_ERR_UNSUPPORTED;
     }
 
     river_cloud_start_sntp_if_needed();
-    printf("[river][cloud] online asr provider init: %s stream=%s batch=%s\n",
-           river_cloud_asr_provider_name(),
-           river_cloud_asr_streaming_supported() ? "yes" : "no",
-           river_cloud_asr_batch_supported() ? "yes" : "no");
+    RIVER_LOGI("online asr provider init: %s stream=%s batch=%s",
+               river_cloud_asr_provider_name(),
+               river_cloud_asr_streaming_supported() ? "yes" : "no",
+               river_cloud_asr_batch_supported() ? "yes" : "no");
     g_river_cloud.initialized = true;
     return RIVER_OK;
 }
@@ -262,7 +266,7 @@ river_status_t river_cloud_adapter_submit_text(const char *text)
         return RIVER_ERR_ARG;
     }
 
-    printf("[river][cloud] text stub=%s\n", text);
+    RIVER_LOGI("text stub=%s", text);
     return RIVER_OK;
 }
 
@@ -317,14 +321,14 @@ river_status_t river_cloud_asr_audio_open(const river_cloud_asr_audio_desc_t *au
     }
 
     g_river_cloud.audio_bridge_open = true;
-    printf("[river][cloud] asr bridge open: provider=%s %luHz/%luch/%lubit frame=%lums pre=%ums post=%ums\n",
-           river_cloud_asr_provider_name(),
-           (unsigned long)audio->sample_rate,
-           (unsigned long)audio->channels,
-           (unsigned long)audio->bits_per_sample,
-           (unsigned long)audio->frame_ms,
-           (unsigned int)pre_roll_ms,
-           (unsigned int)post_roll_ms);
+    RIVER_LOGI("asr bridge open: provider=%s %luHz/%luch/%lubit frame=%lums pre=%ums post=%ums",
+               river_cloud_asr_provider_name(),
+               (unsigned long)audio->sample_rate,
+               (unsigned long)audio->channels,
+               (unsigned long)audio->bits_per_sample,
+               (unsigned long)audio->frame_ms,
+               (unsigned int)pre_roll_ms,
+               (unsigned int)post_roll_ms);
     return RIVER_OK;
 }
 
@@ -376,11 +380,11 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
         status = river_cloud_stream_open_and_flush();
         if (status != RIVER_OK) {
             g_river_cloud.stream_open_fail++;
-            printf("[river][cloud] asr stream open deferred: provider=%s status=%d wifi=%s time_ready=%s\n",
-                   river_cloud_asr_provider_name(),
-                   status,
-                   river_wifi_station_status_name(),
-                   river_cloud_time_ready() ? "yes" : "no");
+            RIVER_LOGD("asr stream open deferred: provider=%s status=%d wifi=%s time_ready=%s",
+                       river_cloud_asr_provider_name(),
+                       status,
+                       river_wifi_station_status_name(),
+                       river_cloud_time_ready() ? "yes" : "no");
             return status;
         }
 
@@ -441,27 +445,27 @@ river_status_t river_cloud_asr_batch_submit_segment(const uint8_t *pcm,
 
 void river_cloud_adapter_dump_status(void)
 {
-    printf("[river][cloud] asr provider=%s stream=%s batch=%s wifi=%s bridge=%s time_ready=%s partial=%lu final=%lu err=%lu open_ok=%lu open_fail=%lu feed_ok=%lu feed_fail=%lu close_ok=%lu close_fail=%lu batch_ok=%lu batch_unsupported=%lu batch_fail=%lu last_text=%s last_err=%s\n",
-           river_cloud_asr_provider_name(),
-           river_cloud_asr_streaming_supported() ? "yes" : "no",
-           river_cloud_asr_batch_supported() ? "yes" : "no",
-           river_wifi_station_status_name(),
-           g_river_cloud.audio_bridge_open ? "open" : "closed",
-           river_cloud_time_ready() ? "yes" : "no",
-           (unsigned long)g_river_cloud.partial_results,
-           (unsigned long)g_river_cloud.final_results,
-           (unsigned long)g_river_cloud.error_results,
-           (unsigned long)g_river_cloud.stream_open_ok,
-           (unsigned long)g_river_cloud.stream_open_fail,
-           (unsigned long)g_river_cloud.stream_feed_ok,
-           (unsigned long)g_river_cloud.stream_feed_fail,
-           (unsigned long)g_river_cloud.stream_close_ok,
-           (unsigned long)g_river_cloud.stream_close_fail,
-           (unsigned long)g_river_cloud.batch_submit_ok,
-           (unsigned long)g_river_cloud.batch_submit_unsupported,
-           (unsigned long)g_river_cloud.batch_submit_fail,
-           g_river_cloud.last_text[0] != '\0' ? g_river_cloud.last_text : "-",
-           g_river_cloud.last_error[0] != '\0' ? g_river_cloud.last_error : "-");
+    RIVER_LOGI("asr provider=%s stream=%s batch=%s wifi=%s bridge=%s time_ready=%s partial=%lu final=%lu err=%lu open_ok=%lu open_fail=%lu feed_ok=%lu feed_fail=%lu close_ok=%lu close_fail=%lu batch_ok=%lu batch_unsupported=%lu batch_fail=%lu last_text=%s last_err=%s",
+               river_cloud_asr_provider_name(),
+               river_cloud_asr_streaming_supported() ? "yes" : "no",
+               river_cloud_asr_batch_supported() ? "yes" : "no",
+               river_wifi_station_status_name(),
+               g_river_cloud.audio_bridge_open ? "open" : "closed",
+               river_cloud_time_ready() ? "yes" : "no",
+               (unsigned long)g_river_cloud.partial_results,
+               (unsigned long)g_river_cloud.final_results,
+               (unsigned long)g_river_cloud.error_results,
+               (unsigned long)g_river_cloud.stream_open_ok,
+               (unsigned long)g_river_cloud.stream_open_fail,
+               (unsigned long)g_river_cloud.stream_feed_ok,
+               (unsigned long)g_river_cloud.stream_feed_fail,
+               (unsigned long)g_river_cloud.stream_close_ok,
+               (unsigned long)g_river_cloud.stream_close_fail,
+               (unsigned long)g_river_cloud.batch_submit_ok,
+               (unsigned long)g_river_cloud.batch_submit_unsupported,
+               (unsigned long)g_river_cloud.batch_submit_fail,
+               g_river_cloud.last_text[0] != '\0' ? g_river_cloud.last_text : "-",
+               g_river_cloud.last_error[0] != '\0' ? g_river_cloud.last_error : "-");
     if (g_river_cloud.provider != NULL) {
         g_river_cloud.provider->dump_status();
     }

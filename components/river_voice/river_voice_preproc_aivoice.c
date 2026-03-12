@@ -1,15 +1,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "os_wrapper.h"
 
 #include "aivoice_interface.h"
 
+#include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_preproc.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.preproc"
 
 typedef struct {
     const struct rtk_aivoice_iface *iface;
@@ -146,7 +149,7 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
     context->handle = context->iface->create(&config);
     if (context->handle == 0) {
         rtos_mem_free(context);
-        printf("[river][voice] aivoice AFE create failed\n");
+        RIVER_LOGE("aivoice AFE create failed");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -165,7 +168,7 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
         if (context->feed_buffer == 0) {
             context->iface->destroy(context->handle);
             rtos_mem_free(context);
-            printf("[river][voice] aivoice AFE feed buffer alloc failed\n");
+            RIVER_LOGE("aivoice AFE feed buffer alloc failed");
             return RIVER_ERR_NO_MEMORY;
         }
     }
@@ -263,15 +266,15 @@ void river_voice_preproc_aivoice_dump_profile(void)
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    printf("[river][voice] preproc backend: aivoice_afe %s %lu Hz %lums in=%luch out=1ch profile=%s\n",
-           profile->aivoice_geometry_name,
-           (unsigned long)profile->sample_rate,
-           (unsigned long)profile->frame_ms,
-           (unsigned long)profile->capture_channels,
-           river_voice_preproc_profile_name());
+    RIVER_LOGI("preproc backend: aivoice_afe %s %lu Hz %lums in=%luch out=1ch profile=%s",
+               profile->aivoice_geometry_name,
+               (unsigned long)profile->sample_rate,
+               (unsigned long)profile->frame_ms,
+               (unsigned long)profile->capture_channels,
+               river_voice_preproc_profile_name());
 #ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
-    printf("[river][voice] preproc afe: mode=asr aec=on ns=off agc=on(fixed=10dB) ssl=on ref=playback_ring(1ch)\n");
+    RIVER_LOGI("preproc afe: mode=asr aec=on ns=off agc=on(fixed=10dB) ssl=on ref=playback_ring(1ch)");
 #else
-    printf("[river][voice] preproc afe: mode=asr aec=off ns=off agc=on(fixed=10dB) ssl=on ref=staged-off\n");
+    RIVER_LOGI("preproc afe: mode=asr aec=off ns=off agc=on(fixed=10dB) ssl=on ref=staged-off");
 #endif
 }

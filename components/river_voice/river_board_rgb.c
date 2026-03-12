@@ -1,7 +1,9 @@
 #include <stdbool.h>
-#include <stdio.h>
-
+#include "river/river_log.h"
 #include "river/river_board_rgb.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.board"
 
 typedef struct {
     bool init_attempted;
@@ -17,7 +19,7 @@ river_status_t river_board_rgb_init(void)
     return RIVER_ERR_UNSUPPORTED;
 #else
     if (!g_river_board_rgb.warning_printed) {
-        printf("[river][board] rgb indicator deferred: EV8730EA2 USER LED is passive RGB, not WS2812; confirm R25/R27/R31 population and LEDR/LEDG/LEDB GPIO mapping before runtime control\n");
+        RIVER_LOGI("rgb indicator deferred: EV8730EA2 USER LED is passive RGB, not WS2812; confirm R25/R27/R31 population and LEDR/LEDG/LEDB GPIO mapping before runtime control");
         g_river_board_rgb.warning_printed = true;
     }
     g_river_board_rgb.init_attempted = true;

@@ -12,6 +12,24 @@ config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
 
+choice RIVER_LOG_DEFAULT_LEVEL
+    prompt "Default river log level"
+    default RIVER_LOG_LEVEL_INFO
+
+config RIVER_LOG_LEVEL_ERROR
+    bool "ERROR"
+
+config RIVER_LOG_LEVEL_WARN
+    bool "WARN"
+
+config RIVER_LOG_LEVEL_INFO
+    bool "INFO"
+
+config RIVER_LOG_LEVEL_DEBUG
+    bool "DEBUG"
+
+endchoice
+
 config RIVER_AUDIO_ECHO_AUTOSTART
     bool "Autostart board audio echo at boot"
     default n

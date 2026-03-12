@@ -1,8 +1,11 @@
-#include <stdio.h>
 #include <string.h>
 
 #include "river/river_cloud.h"
+#include "river/river_log.h"
 #include "river/river_online_control.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.control"
 
 typedef struct {
     const char *name;
@@ -41,7 +44,7 @@ river_status_t river_online_control_init(void)
         g_river_devices[index].is_on = 0;
     }
 
-    printf("[river][control] online control service init\n");
+    RIVER_LOGI("online control service init");
     return RIVER_OK;
 }
 
@@ -72,7 +75,7 @@ river_status_t river_online_control_set_device(const char *device_name, const ch
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    printf("[river][control] %s => %s\n", device->name, device->is_on ? "on" : "off");
+    RIVER_LOGI("%s => %s", device->name, device->is_on ? "on" : "off");
     return RIVER_OK;
 }
 
@@ -80,10 +83,10 @@ void river_online_control_dump_status(void)
 {
     unsigned int index;
 
-    printf("[river][control] devices:\n");
+    RIVER_LOGI("devices:");
     for (index = 0; index < (sizeof(g_river_devices) / sizeof(g_river_devices[0])); ++index) {
-        printf("[river][control]   %s=%s\n",
-               g_river_devices[index].name,
-               g_river_devices[index].is_on ? "on" : "off");
+        RIVER_LOGI("  %s=%s",
+                   g_river_devices[index].name,
+                   g_river_devices[index].is_on ? "on" : "off");
     }
 }

@@ -1,15 +1,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "os_wrapper.h"
 
 #include "aivoice_interface.h"
 
+#include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_vad_reference.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.vadref"
 
 typedef struct {
     const struct rtk_aivoice_iface *iface;
@@ -95,7 +98,7 @@ river_status_t river_voice_vad_reference_open(void)
     g_river_voice_vad_reference.iface = &aivoice_iface_vad_v1;
     g_river_voice_vad_reference.handle = g_river_voice_vad_reference.iface->create(&config);
     if (g_river_voice_vad_reference.handle == 0) {
-        printf("[river][voice] sdk_vad reference create failed\n");
+        RIVER_LOGW("sdk_vad reference create failed");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -173,8 +176,8 @@ const char *river_voice_vad_reference_name(void)
 void river_voice_vad_reference_dump_profile(void)
 {
 #ifdef CONFIG_RIVER_AIVOICE_VAD_REFERENCE_EN
-    printf("[river][voice] detector reference: aivoice_vad_v1 diagnostic-only sensitivity=mid left_margin=300ms right_margin=160ms min_speech=200ms feed=256 samples\n");
+    RIVER_LOGI("detector reference: aivoice_vad_v1 diagnostic-only sensitivity=mid left_margin=300ms right_margin=160ms min_speech=200ms feed=256 samples");
 #else
-    printf("[river][voice] detector reference: disabled\n");
+    RIVER_LOGI("detector reference: disabled");
 #endif
 }

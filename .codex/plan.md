@@ -244,3 +244,14 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
     - stream open trigger timing
     - segment-buffer policy independently from streaming policy
   - after first end-to-end cloud verification, route final ASR text into the next online control intent layer
+- Step 5.1 completed: runtime logging is now consolidated behind a project-owned abstraction:
+  - added a shared logger with:
+    - timestamped serial output
+    - level filtering
+    - future secondary sink support
+  - set the default level to `INFO`
+  - moved high-rate VAD probe diagnostics to `DEBUG`
+  - kept VAD state-transition messages at `INFO`
+- Next recommended step:
+  - if field logs still feel too noisy, add a small runtime log-level control path through the existing monitor command set
+  - keep the current sink abstraction serial-only until file or remote trace requirements are concrete

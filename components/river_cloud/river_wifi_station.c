@@ -6,8 +6,12 @@
 #include "os_wrapper.h"
 #include "wifi_api.h"
 
+#include "river/river_log.h"
 #include "river/river_wifi_credentials.h"
 #include "river/river_wifi_station.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.wifi"
 
 #define RIVER_WIFI_STA_TASK_STACK    (1024U * 4U)
 #define RIVER_WIFI_STA_TASK_PRIORITY 3U
@@ -59,9 +63,9 @@ static void river_wifi_station_task(void *param)
         g_river_wifi_station.connecting = true;
         g_river_wifi_station.connect_attempts++;
 
-        printf("[river][wifi] connect ssid=%s attempt=%lu\n",
-               RIVER_WIFI_STA_SSID,
-               (unsigned long)g_river_wifi_station.connect_attempts);
+        RIVER_LOGI("connect ssid=%s attempt=%lu",
+                   RIVER_WIFI_STA_SSID,
+                   (unsigned long)g_river_wifi_station.connect_attempts);
 
         result = wifi_connect(&connect_param, 1);
         if (result == RTK_SUCCESS) {
@@ -71,13 +75,13 @@ static void river_wifi_station_task(void *param)
                 g_river_wifi_station.connecting = false;
                 g_river_wifi_station.connect_successes++;
                 g_river_wifi_station.last_error = 0;
-                printf("[river][wifi] connected ssid=%s ip=%u.%u.%u.%u success=%lu\n",
-                       RIVER_WIFI_STA_SSID,
-                       (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[0],
-                       (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[1],
-                       (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
-                       (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
-                       (unsigned long)g_river_wifi_station.connect_successes);
+                RIVER_LOGI("connected ssid=%s ip=%u.%u.%u.%u success=%lu",
+                           RIVER_WIFI_STA_SSID,
+                           (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[0],
+                           (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[1],
+                           (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
+                           (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
+                           (unsigned long)g_river_wifi_station.connect_successes);
                 rtos_time_delay_ms(1000);
                 continue;
             }
@@ -90,11 +94,11 @@ static void river_wifi_station_task(void *param)
 
         g_river_wifi_station.connecting = false;
         g_river_wifi_station.connect_failures++;
-        printf("[river][wifi] connect failed ssid=%s err=%d failures=%lu retry_ms=%u\n",
-               RIVER_WIFI_STA_SSID,
-               g_river_wifi_station.last_error,
-               (unsigned long)g_river_wifi_station.connect_failures,
-               (unsigned int)RIVER_WIFI_STA_RETRY_MS);
+        RIVER_LOGW("connect failed ssid=%s err=%d failures=%lu retry_ms=%u",
+                   RIVER_WIFI_STA_SSID,
+                   g_river_wifi_station.last_error,
+                   (unsigned long)g_river_wifi_station.connect_failures,
+                   (unsigned int)RIVER_WIFI_STA_RETRY_MS);
         rtos_time_delay_ms(RIVER_WIFI_STA_RETRY_MS);
     }
 }
@@ -112,14 +116,14 @@ river_status_t river_wifi_station_init(void)
                          NULL,
                          RIVER_WIFI_STA_TASK_STACK,
                          RIVER_WIFI_STA_TASK_PRIORITY) != RTK_SUCCESS) {
-        printf("[river][wifi] autoconnect task create failed\n");
+        RIVER_LOGE("autoconnect task create failed");
         return RIVER_ERR_IO;
     }
 
     g_river_wifi_station.initialized = true;
-    printf("[river][wifi] autoconnect init: ssid=%s retry_ms=%u\n",
-           RIVER_WIFI_STA_SSID,
-           (unsigned int)RIVER_WIFI_STA_RETRY_MS);
+    RIVER_LOGI("autoconnect init: ssid=%s retry_ms=%u",
+               RIVER_WIFI_STA_SSID,
+               (unsigned int)RIVER_WIFI_STA_RETRY_MS);
     return RIVER_OK;
 }
 
@@ -149,11 +153,11 @@ const char *river_wifi_station_status_name(void)
 
 void river_wifi_station_dump_status(void)
 {
-    printf("[river][wifi] status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d\n",
-           river_wifi_station_status_name(),
-           river_wifi_station_ssid(),
-           (unsigned long)g_river_wifi_station.connect_attempts,
-           (unsigned long)g_river_wifi_station.connect_successes,
-           (unsigned long)g_river_wifi_station.connect_failures,
-           g_river_wifi_station.last_error);
+    RIVER_LOGI("status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d",
+               river_wifi_station_status_name(),
+               river_wifi_station_ssid(),
+               (unsigned long)g_river_wifi_station.connect_attempts,
+               (unsigned long)g_river_wifi_station.connect_successes,
+               (unsigned long)g_river_wifi_station.connect_failures,
+               g_river_wifi_station.last_error);
 }

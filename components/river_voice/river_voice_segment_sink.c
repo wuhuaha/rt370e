@@ -1,8 +1,11 @@
-#include <stdio.h>
 #include <string.h>
 
 #include "river/river_cloud.h"
+#include "river/river_log.h"
 #include "river/river_voice_segment_sink.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.segment"
 
 typedef struct {
     uint32_t submitted_segments;
@@ -51,14 +54,14 @@ const char *river_voice_segment_sink_name(void)
 
 void river_voice_segment_sink_dump_profile(void)
 {
-    printf("[river][voice] segment sink: %s provider=%s stream=%s batch=%s total_bytes=%lu last_bytes=%lu segments=%lu unsupported=%lu fail=%lu\n",
-           river_voice_segment_sink_name(),
-           river_cloud_asr_provider_name(),
-           river_cloud_asr_streaming_supported() ? "yes" : "no",
-           river_cloud_asr_batch_supported() ? "yes" : "no",
-           (unsigned long)g_river_voice_segment_sink_bridge.submitted_bytes,
-           (unsigned long)g_river_voice_segment_sink_bridge.last_segment_bytes,
-           (unsigned long)g_river_voice_segment_sink_bridge.submitted_segments,
-           (unsigned long)g_river_voice_segment_sink_bridge.unsupported_segments,
-           (unsigned long)g_river_voice_segment_sink_bridge.submit_failures);
+    RIVER_LOGI("segment sink: %s provider=%s stream=%s batch=%s total_bytes=%lu last_bytes=%lu segments=%lu unsupported=%lu fail=%lu",
+               river_voice_segment_sink_name(),
+               river_cloud_asr_provider_name(),
+               river_cloud_asr_streaming_supported() ? "yes" : "no",
+               river_cloud_asr_batch_supported() ? "yes" : "no",
+               (unsigned long)g_river_voice_segment_sink_bridge.submitted_bytes,
+               (unsigned long)g_river_voice_segment_sink_bridge.last_segment_bytes,
+               (unsigned long)g_river_voice_segment_sink_bridge.submitted_segments,
+               (unsigned long)g_river_voice_segment_sink_bridge.unsupported_segments,
+               (unsigned long)g_river_voice_segment_sink_bridge.submit_failures);
 }

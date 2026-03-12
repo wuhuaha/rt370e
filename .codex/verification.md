@@ -1348,3 +1348,39 @@ Interpretation:
   - previous instability was mainly caused by the `AEC + playback` validation path
 - if `Silero` remains much less stable than SDK VAD on the same probe stream:
   - continue tuning `Silero` thresholds / smoothing / stream-state handling
+
+## Step 4.22
+Build the logging-layer update:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime behavior:
+- boot and service lifecycle logs remain visible at `INFO`
+- high-rate VAD probe lines are suppressed at the default log level
+- VAD state changes still print because they are now emitted at `INFO`
+- every project-owned log line should now include:
+  - a millisecond timestamp
+  - a level marker
+  - a stable module tag
+
+Expected VAD behavior at default `INFO`:
+- logs should not spam every `~96ms`
+- only transitions such as:
+  - `vad state=speech ...`
+  - `vad state=silence ...`
+  should remain visible
+
+Expected VAD behavior at `DEBUG`:
+- periodic probe lines should still be available for deep tuning
+- segment-ready diagnostics and tensor-inventory style details should also remain available

@@ -16,6 +16,7 @@
 
 extern "C" {
 #include "os_wrapper.h"
+#include "river/river_log.h"
 #include "river/river_voice_detector.h"
 }
 
@@ -57,6 +58,9 @@ extern "C" {
 #define RIVER_SILERO_VAD_OP_COUNT 16U
 #define RIVER_SILERO_VAD_ARENA_BYTES \
     ((uint32_t)CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB * 1024U)
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.detector"
 
 typedef tflite::MicroMutableOpResolver<RIVER_SILERO_VAD_OP_COUNT>
     river_silero_vad_op_resolver_t;
@@ -141,22 +145,22 @@ static void river_silero_vad_dump_tensor(const char *prefix,
         }
     }
 
-    printf("[river][voice] silero_vad %s[%lu]: ptr=%p type=%d dims=%d [%d,%d,%d] name=%s\n",
-           prefix,
-           (unsigned long)index,
-           (const void *)tensor,
-           tensor != NULL ? tensor->type : -1,
-           dims_size,
-           dim0,
-           dim1,
-           dim2,
-           (tensor != NULL && tensor->name != NULL) ? tensor->name : "(null)");
-    if (tensor != NULL) {
-        printf("[river][voice] silero_vad %s[%lu] data=%p bytes=%lu\n",
+    RIVER_LOGD("silero_vad %s[%lu]: ptr=%p type=%d dims=%d [%d,%d,%d] name=%s",
                prefix,
                (unsigned long)index,
-               (const void *)tensor->data.data,
-               (unsigned long)tensor->bytes);
+               (const void *)tensor,
+               tensor != NULL ? tensor->type : -1,
+               dims_size,
+               dim0,
+               dim1,
+               dim2,
+               (tensor != NULL && tensor->name != NULL) ? tensor->name : "(null)");
+    if (tensor != NULL) {
+        RIVER_LOGD("silero_vad %s[%lu] data=%p bytes=%lu",
+                   prefix,
+                   (unsigned long)index,
+                   (const void *)tensor->data.data,
+                   (unsigned long)tensor->bytes);
     }
 }
 
@@ -168,9 +172,9 @@ static void river_silero_vad_dump_interpreter_io(tflite::MicroInterpreter *inter
         return;
     }
 
-    printf("[river][voice] silero_vad interpreter io: inputs=%lu outputs=%lu\n",
-           (unsigned long)interpreter->inputs_size(),
-           (unsigned long)interpreter->outputs_size());
+    RIVER_LOGD("silero_vad interpreter io: inputs=%lu outputs=%lu",
+               (unsigned long)interpreter->inputs_size(),
+               (unsigned long)interpreter->outputs_size());
 
     for (index = 0; index < interpreter->inputs_size(); ++index) {
         river_silero_vad_dump_tensor("input", index, interpreter->input(index));
@@ -348,7 +352,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
     }
     if (detector->sample_rate != RIVER_SILERO_VAD_SAMPLE_RATE_HZ ||
         detector->input_frame_bytes != (RIVER_SILERO_VAD_FEED_SAMPLES * sizeof(int16_t))) {
-        printf("[river][voice] silero_vad expects 16kHz mono 256-sample frames\n");
+        RIVER_LOGE("silero_vad expects 16kHz mono 256-sample frames");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -373,7 +377,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
     if (context->model == NULL || context->model->version() != TFLITE_SCHEMA_VERSION) {
         river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
-        printf("[river][voice] silero_vad model schema mismatch\n");
+        RIVER_LOGE("silero_vad model schema mismatch");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -385,7 +389,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         context->op_resolver.~river_silero_vad_op_resolver_t();
         river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
-        printf("[river][voice] silero_vad op registration failed\n");
+        RIVER_LOGE("silero_vad op registration failed");
         return status;
     }
 
@@ -402,7 +406,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         context->op_resolver.~river_silero_vad_op_resolver_t();
         river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
-        printf("[river][voice] silero_vad AllocateTensors failed\n");
+        RIVER_LOGE("silero_vad AllocateTensors failed");
         return RIVER_ERR_NO_MEMORY;
     }
 
@@ -468,12 +472,11 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         !river_silero_vad_eval_tensor_buffer_ready(
             context->state_output_eval_tensor,
             RIVER_SILERO_VAD_STATE_FLOATS * sizeof(float))) {
-        printf("[river][voice] silero_vad eval tensor state degraded:"
-               " audio_in=%p state_in=%p prob_out=%p state_out=%p\n",
-               (void *)context->audio_input_eval_tensor,
-               (void *)context->state_input_eval_tensor,
-               (void *)context->prob_output_eval_tensor,
-               (void *)context->state_output_eval_tensor);
+        RIVER_LOGD("silero_vad eval tensor state degraded: audio_in=%p state_in=%p prob_out=%p state_out=%p",
+                   (void *)context->audio_input_eval_tensor,
+                   (void *)context->state_input_eval_tensor,
+                   (void *)context->prob_output_eval_tensor,
+                   (void *)context->state_output_eval_tensor);
     }
 
     if (context->audio_input_tensor == NULL ||
@@ -497,7 +500,7 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
         context->op_resolver.~river_silero_vad_op_resolver_t();
         river_silero_vad_free_tensor_arena(context);
         rtos_mem_free(context);
-        printf("[river][voice] silero_vad tensor binding failed\n");
+        RIVER_LOGE("silero_vad tensor binding failed");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -508,13 +511,13 @@ extern "C" river_status_t river_voice_detector_silero_open(river_voice_detector_
     detector->backend_ctx = context;
     detector->staged_only = false;
 
-    printf("[river][voice] silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=%luKB used=%luB enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u\n",
-           (unsigned long)(context->arena_size_bytes / 1024U),
-           (unsigned long)context->arena_used_bytes,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT);
+    RIVER_LOGI("silero_vad runtime ready: model=silero_vad_16k_b1_fp32.tflite arena=%luKB used=%luB enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u",
+               (unsigned long)(context->arena_size_bytes / 1024U),
+               (unsigned long)context->arena_used_bytes,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT);
     return RIVER_OK;
 }
 
@@ -659,11 +662,11 @@ extern "C" void river_voice_detector_silero_close(river_voice_detector_t *detect
 
 extern "C" void river_voice_detector_silero_dump_profile(void)
 {
-    printf("[river][voice] detector backend: silero_vad runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_b1_fp32.tflite enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u arena=%uKB\n",
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT,
-           (unsigned int)CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB);
-    printf("[river][voice] detector policy: direct official-model migration is complete; compression stays deferred until on-device flash/heap/latency data requires it\n");
+    RIVER_LOGI("detector backend: silero_vad runtime=tflite_micro feed=256 samples window=512 samples context=64 samples model_input=576 samples model=silero_vad_16k_b1_fp32.tflite enter_q15=%u exit_q15=%u hangover=%u ema_shift=%u arena=%uKB",
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_SPEECH_THRESHOLD_Q15,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_SILENCE_THRESHOLD_Q15,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_EMA_SHIFT,
+               (unsigned int)CONFIG_RIVER_SILERO_VAD_TENSOR_ARENA_KB);
+    RIVER_LOGI("detector policy: direct official-model migration is complete; compression stays deferred until on-device flash/heap/latency data requires it");
 }

@@ -1,12 +1,15 @@
 #include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "audio/audio_control.h"
 #include "audio/audio_record.h"
 
+#include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.capture"
 
 river_status_t river_voice_capture_open(river_voice_capture_t *capture)
 {
@@ -40,7 +43,7 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
 
     capture->record = AudioRecord_Create();
     if (capture->record == 0) {
-        printf("[river][voice] create AudioRecord failed\n");
+        RIVER_LOGE("create AudioRecord failed");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -50,7 +53,7 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     record_config.device = DEVICE_IN_MIC;
     record_config.buffer_bytes = (uint32_t)capture->frame_bytes;
     if (AudioRecord_Init((struct AudioRecord *)capture->record, &record_config, AUDIO_INPUT_FLAG_NONE) != 0) {
-        printf("[river][voice] AudioRecord_Init failed\n");
+        RIVER_LOGE("AudioRecord_Init failed");
         river_voice_capture_close(capture);
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -58,7 +61,7 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     AudioRecord_SetParameters((struct AudioRecord *)capture->record, "cap_mode=no_afe_pure_data");
 
     if (AudioRecord_Start((struct AudioRecord *)capture->record) != 0) {
-        printf("[river][voice] AudioRecord_Start failed\n");
+        RIVER_LOGE("AudioRecord_Start failed");
         river_voice_capture_close(capture);
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -97,10 +100,10 @@ void river_voice_capture_dump_profile(void)
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    printf("[river][voice] capture profile: %lu Hz, %lums, %luch, %s+%s\n",
-           (unsigned long)profile->sample_rate,
-           (unsigned long)profile->frame_ms,
-           (unsigned long)profile->capture_channels,
-           river_voice_board_mic_name(profile->primary_mic),
-           river_voice_board_mic_name(profile->secondary_mic));
+    RIVER_LOGI("capture profile: %lu Hz, %lums, %luch, %s+%s",
+               (unsigned long)profile->sample_rate,
+               (unsigned long)profile->frame_ms,
+               (unsigned long)profile->capture_channels,
+               river_voice_board_mic_name(profile->primary_mic),
+               river_voice_board_mic_name(profile->secondary_mic));
 }

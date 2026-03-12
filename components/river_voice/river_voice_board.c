@@ -1,9 +1,12 @@
 #include <stdbool.h>
-#include <stdio.h>
 
 #include "audio/audio_control.h"
 
+#include "river/river_log.h"
 #include "river/river_voice_board.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.voice.board"
 
 static const river_voice_board_array_profile_t g_river_voice_board_array_profile = {
     .board_name = "EV8730EA2/EV730EA2",
@@ -92,16 +95,16 @@ void river_voice_board_dump_array_profile(void)
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    printf("[river][voice] board array: %s %s primary=%s secondary=%s spacing=%lumm\n",
-           profile->board_name,
-           profile->geometry_name,
-           river_voice_board_mic_name(profile->primary_mic),
-           river_voice_board_mic_name(profile->secondary_mic),
-           (unsigned long)profile->mic_spacing_mm);
+    RIVER_LOGI("board array: %s %s primary=%s secondary=%s spacing=%lumm",
+               profile->board_name,
+               profile->geometry_name,
+               river_voice_board_mic_name(profile->primary_mic),
+               river_voice_board_mic_name(profile->secondary_mic),
+               (unsigned long)profile->mic_spacing_mm);
     if (profile->aux_mic_reserved) {
-        printf("[river][voice] board array aux: %s reserved for future AFE/beamforming raw tap\n",
-               river_voice_board_mic_name(profile->aux_mic));
+        RIVER_LOGI("board array aux: %s reserved for future AFE/beamforming raw tap",
+                   river_voice_board_mic_name(profile->aux_mic));
     }
-    printf("[river][voice] aivoice-ready geometry: %s\n",
-           profile->aivoice_geometry_name);
+    RIVER_LOGI("aivoice-ready geometry: %s",
+               profile->aivoice_geometry_name);
 }
