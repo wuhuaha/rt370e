@@ -218,3 +218,29 @@ Build a maintainable `RTL8730E` `ASR-first` voice home-control application that 
   - keep validating the pure `vad_probe` path with short Chinese utterances and room-noise samples
   - if `Silero` still drops too many short utterances, keep tuning decision policy before touching the model
   - next feature step should connect `segment_buffer ready` data to the future online ASR uplink boundary
+- Step 5.0 completed: the online-ASR uplink boundary is now connected to a real provider framework:
+  - added `river_wifi_station` for STA auto-connect bring-up with project-local credentials
+  - added `river_cloud_adapter` as the unified cloud-ASR bridge between local audio and provider backends
+  - added a provider registry so future vendors can be added without rewriting the adapter
+  - added the first real provider:
+    - `iflytek_rtasr`
+    - streaming WebSocket uplink implemented
+    - partial/final/error/session callbacks routed back into `river_core`
+  - the voice path now fans out in two online-ready directions:
+    - streaming:
+      - `detector -> cloud_adapter stream bridge -> iflytek_rtasr`
+    - non-streaming / segmented:
+      - `detector -> segment_buffer -> segment_sink -> cloud batch bridge`
+  - current batch path is architecture-ready but still provider-limited:
+    - interface is stable
+    - `iflytek_rtasr` batch submit remains unsupported for now
+- Next recommended step:
+  - flash the current build and verify:
+    - Wi-Fi auto-connect
+    - RTASR session open
+    - partial/final result callbacks
+  - if RTASR opens but recognition is unstable, tune:
+    - VAD post-roll
+    - stream open trigger timing
+    - segment-buffer policy independently from streaming policy
+  - after first end-to-end cloud verification, route final ASR text into the next online control intent layer

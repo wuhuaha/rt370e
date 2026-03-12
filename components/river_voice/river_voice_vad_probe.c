@@ -11,6 +11,7 @@
 #include "audio/audio_service.h"
 
 #include "river/river_board_rgb.h"
+#include "river/river_cloud.h"
 #include "river/river_voice.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
@@ -78,7 +79,11 @@ typedef struct {
     uint32_t diag_vad_speech;
     uint32_t diag_vad_speech_start;
     uint32_t diag_vad_speech_end;
+    uint32_t diag_segment_unsupported;
     uint32_t diag_segment_fail;
+    uint32_t diag_cloud_stream_ok;
+    uint32_t diag_cloud_stream_busy;
+    uint32_t diag_cloud_stream_fail;
     uint32_t diag_chunks_until_log;
     uint16_t diag_capture_peak_ch0;
     uint16_t diag_capture_peak_ch1;
@@ -187,7 +192,11 @@ static void river_voice_vad_probe_reset_diag_counters(void)
     g_river_voice_vad_probe.diag_vad_speech = 0U;
     g_river_voice_vad_probe.diag_vad_speech_start = 0U;
     g_river_voice_vad_probe.diag_vad_speech_end = 0U;
+    g_river_voice_vad_probe.diag_segment_unsupported = 0U;
     g_river_voice_vad_probe.diag_segment_fail = 0U;
+    g_river_voice_vad_probe.diag_cloud_stream_ok = 0U;
+    g_river_voice_vad_probe.diag_cloud_stream_busy = 0U;
+    g_river_voice_vad_probe.diag_cloud_stream_fail = 0U;
     g_river_voice_vad_probe.diag_capture_peak_ch0 = 0U;
     g_river_voice_vad_probe.diag_capture_peak_ch1 = 0U;
     g_river_voice_vad_probe.diag_enhanced_peak = 0U;
@@ -220,7 +229,7 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
     river_voice_segment_buffer_get_status(&g_river_voice_vad_probe.segment_buffer,
                                           &segment_status);
 
-    printf("[river][voice][probe] cap_peak=[%u,%u] afe_peak=%u vad_raw_q15=%u vad_prob_q15=%u vad=%s vad_decisions=%lu vad_speech=%lu vad_start=%lu vad_end=%lu sdk_vad=%s sdk_events=%lu sdk_start=%lu sdk_end=%lu sdk_offset_ms=%lu seg=%s seg_pre_ms=%lu seg_post_left_ms=%lu seg_active_ms=%lu seg_ready_ms=%lu seg_done=%lu seg_drop=%lu read_ok=%lu proc_ok=%lu det_ok=%lu seg_fail=%lu read_fail=%lu proc_fail=%lu det_fail=%lu partial_read=%lu partial_proc=%lu\n",
+    printf("[river][voice][probe] cap_peak=[%u,%u] afe_peak=%u vad_raw_q15=%u vad_prob_q15=%u vad=%s vad_decisions=%lu vad_speech=%lu vad_start=%lu vad_end=%lu sdk_vad=%s sdk_events=%lu sdk_start=%lu sdk_end=%lu sdk_offset_ms=%lu seg=%s seg_pre_ms=%lu seg_post_left_ms=%lu seg_active_ms=%lu seg_ready_ms=%lu seg_done=%lu seg_drop=%lu cloud_stream_ok=%lu cloud_stream_busy=%lu cloud_stream_fail=%lu read_ok=%lu proc_ok=%lu det_ok=%lu seg_unsupported=%lu seg_fail=%lu read_fail=%lu proc_fail=%lu det_fail=%lu partial_read=%lu partial_proc=%lu\n",
            (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch0,
            (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch1,
            (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
@@ -245,9 +254,13 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
            (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.ready_frames),
            (unsigned long)segment_status.segments_completed,
            (unsigned long)segment_status.segments_dropped,
+           (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_ok,
+           (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_busy,
+           (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_fail,
            (unsigned long)g_river_voice_vad_probe.diag_read_ok,
            (unsigned long)g_river_voice_vad_probe.diag_proc_ok,
            (unsigned long)g_river_voice_vad_probe.diag_det_ok,
+           (unsigned long)g_river_voice_vad_probe.diag_segment_unsupported,
            (unsigned long)g_river_voice_vad_probe.diag_segment_fail,
            (unsigned long)g_river_voice_vad_probe.diag_read_fail,
            (unsigned long)g_river_voice_vad_probe.diag_proc_fail,
@@ -261,6 +274,7 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
 static void river_voice_vad_probe_close_audio(void)
 {
     river_voice_vad_reference_close();
+    river_cloud_asr_audio_close();
     river_voice_detector_close(&g_river_voice_vad_probe.detector);
     river_voice_preproc_close(&g_river_voice_vad_probe.preproc);
     river_voice_capture_close(&g_river_voice_vad_probe.capture);
@@ -320,6 +334,8 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
 
 static river_status_t river_voice_vad_probe_open_audio(void)
 {
+    river_cloud_asr_audio_desc_t audio_desc;
+
     AudioService_Init();
     AudioControl_SetCaptureVolume(river_voice_board_array_profile()->capture_channels,
                                   RIVER_VOICE_VAD_PROBE_CAPTURE_VOLUME);
@@ -351,6 +367,19 @@ static river_status_t river_voice_vad_probe_open_audio(void)
         printf("[river][voice] vad probe detector/preproc frame mismatch: detector=%luB preproc=%luB\n",
                (unsigned long)river_voice_detector_input_frame_bytes(&g_river_voice_vad_probe.detector),
                (unsigned long)river_voice_preproc_output_frame_bytes(&g_river_voice_vad_probe.preproc));
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    memset(&audio_desc, 0, sizeof(audio_desc));
+    audio_desc.sample_rate = g_river_voice_vad_probe.capture.sample_rate;
+    audio_desc.channels = 1U;
+    audio_desc.bits_per_sample = 16U;
+    audio_desc.frame_ms = g_river_voice_vad_probe.capture.frame_ms;
+    audio_desc.encoding = "pcm_s16le";
+    if (river_cloud_asr_audio_open(&audio_desc,
+                                   RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
+                                   RIVER_VOICE_VAD_PROBE_POST_ROLL_MS) != RIVER_OK) {
+        printf("[river][voice] vad probe cloud asr bridge open failed\n");
         return RIVER_ERR_UNSUPPORTED;
     }
 
@@ -453,6 +482,8 @@ static void river_voice_vad_probe_task(void *param)
         }
         g_river_voice_vad_probe.diag_det_ok++;
         if (detector_result.decision_valid) {
+            river_status_t cloud_status;
+
             g_river_voice_vad_probe.diag_vad_probability_raw_q15 =
                 detector_result.speech_probability_raw_q15;
             g_river_voice_vad_probe.diag_vad_probability_q15 =
@@ -482,6 +513,7 @@ static void river_voice_vad_probe_task(void *param)
             } else if (river_voice_segment_buffer_ready_bytes(&g_river_voice_vad_probe.segment_buffer) > 0U) {
                 river_voice_segment_buffer_status_t segment_status;
                 river_voice_segment_desc_t segment_desc;
+                river_status_t segment_sink_status;
                 size_t segment_bytes;
 
                 river_voice_segment_buffer_get_status(&g_river_voice_vad_probe.segment_buffer,
@@ -497,10 +529,13 @@ static void river_voice_vad_probe_task(void *param)
                     river_voice_vad_probe_frames_to_ms(segment_status.ready_frames);
                 segment_desc.completed_segments = segment_status.segments_completed;
                 segment_desc.dropped_segments = segment_status.segments_dropped;
-                if (river_voice_segment_sink_submit(
-                        river_voice_segment_buffer_ready_data(&g_river_voice_vad_probe.segment_buffer),
-                        segment_bytes,
-                        &segment_desc) != RIVER_OK) {
+                segment_sink_status = river_voice_segment_sink_submit(
+                    river_voice_segment_buffer_ready_data(&g_river_voice_vad_probe.segment_buffer),
+                    segment_bytes,
+                    &segment_desc);
+                if (segment_sink_status == RIVER_ERR_UNSUPPORTED) {
+                    g_river_voice_vad_probe.diag_segment_unsupported++;
+                } else if (segment_sink_status != RIVER_OK) {
                     g_river_voice_vad_probe.diag_segment_fail++;
                 }
                 printf("[river][voice][segment] ready: bytes=%lu ms=%lu pre=%ums post=%ums completed=%lu dropped=%lu\n",
@@ -511,6 +546,19 @@ static void river_voice_vad_probe_task(void *param)
                        (unsigned long)segment_status.segments_completed,
                        (unsigned long)segment_status.segments_dropped);
                 river_voice_segment_buffer_release_ready(&g_river_voice_vad_probe.segment_buffer);
+            }
+
+            cloud_status = river_cloud_asr_stream_push_frame(
+                g_river_voice_vad_probe.enhanced_buffer,
+                g_river_voice_vad_probe.enhanced_chunk_bytes,
+                detector_result.is_speech);
+            if (cloud_status == RIVER_OK) {
+                g_river_voice_vad_probe.diag_cloud_stream_ok++;
+            } else if (cloud_status == RIVER_ERR_BUSY ||
+                       cloud_status == RIVER_ERR_UNSUPPORTED) {
+                g_river_voice_vad_probe.diag_cloud_stream_busy++;
+            } else {
+                g_river_voice_vad_probe.diag_cloud_stream_fail++;
             }
         }
 

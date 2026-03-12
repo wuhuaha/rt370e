@@ -338,6 +338,71 @@ Interpretation:
   - treat this as a flash-layout compatibility issue, not a wrapper bug
   - compare the downloaded image size and any boot-stage fault log before enlarging the profile further
 
+## Step 5.0
+Build and flash:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Boot-time expectation:
+```text
+[river][wifi] autoconnect init: ssid=Keeu retry_ms=5000
+[river][cloud] sntp init: server=pool.ntp.org interval_ms=3600000
+[river][cloud] online asr provider init: iflytek_rtasr stream=yes batch=no
+[river][voice] detector backend: silero_vad ...
+[river][voice] vad probe started
+[river] local_segment_sink=cloud_asr_batch_bridge
+[river][cloud] asr provider=iflytek_rtasr stream=yes batch=no ...
+```
+
+Expected runtime path:
+- streaming path:
+  - `vad_probe -> river_cloud_asr_stream_push_frame() -> iflytek_rtasr`
+- non-streaming path:
+  - `segment_buffer ready -> river_voice_segment_sink_submit() -> river_cloud_asr_batch_submit_segment()`
+
+Expected Wi-Fi behavior:
+```text
+[river][wifi] connect ssid=Keeu attempt=1
+[river][wifi] connected ssid=Keeu ip=...
+```
+
+Expected cloud behavior when UTC and Wi-Fi are ready and speech arrives:
+```text
+[river][cloud] asr bridge open: provider=iflytek_rtasr 16000Hz/1ch/16bit frame=16ms pre=384ms post=768ms
+[river][cloud][iflytek] stream open: 16000Hz/1ch/16bit seq=1
+[river][asr][iflytek_rtasr] session started sid=...
+[river][asr][iflytek_rtasr] partial sid=... text=...
+[river][asr][iflytek_rtasr] final sid=... text=...
+[river][asr][iflytek_rtasr] session closed sid=...
+```
+
+Probe diagnostics should now also expose cloud-side counters:
+```text
+[river][voice][probe] ... cloud_stream_ok=... cloud_stream_busy=... cloud_stream_fail=... seg_unsupported=... seg_fail=...
+```
+
+Interpretation:
+- `cloud_stream_busy` increases while Wi-Fi is not connected:
+  - local VAD path is working, but network is not yet ready
+- `cloud_stream_busy` increases while Wi-Fi is connected but UTC is not ready:
+  - SNTP has not completed yet, so signed RTASR URL generation is intentionally deferred
+- `cloud_stream_fail` increases:
+  - provider open/send/poll path needs inspection
+- `seg_unsupported` increases:
+  - expected for the current iFlytek provider, because only streaming is implemented
+- no `[river][asr][iflytek_rtasr] ...` lines appear even though `cloud_stream_ok` rises:
+  - inspect WebSocket callback / server response parsing first
+
+Current validation gap:
+- local build is complete and board image is generated
+- end-to-end live-service verification still requires the target board to reach the public iFlytek service
+- this repository-side environment does not verify external network traffic by itself
+
 ## Step 4.9
 Build and flash after the `Silero` runtime construction fix:
 ```bash

@@ -291,8 +291,66 @@
   - reproduction and audit procedure
     - `text=2355576`
     - `data=38868`
-    - `bss=87680`
+  - `bss=87680`
   - packaged app image `km0_km4_ca32_app.bin`: about `2.8 MB`
+
+## Step 5.0
+- Replaced the old cloud-ASR stub with a real provider framework under `components/river_cloud`.
+- Added `river_wifi_station.*`:
+  - STA auto-connect task
+  - project-local temporary credentials in `include/river/river_wifi_credentials.h`
+  - retry and status logging for field bring-up
+- Expanded `include/river/river_cloud.h` from a text-stub surface into a provider-neutral ASR contract:
+  - audio-open / audio-close
+  - streaming frame push
+  - batch segment submit
+  - partial/final/error/session result callback
+- Added `river_cloud_adapter.c`:
+  - project-owned bridge between local VAD output and cloud providers
+  - provider-neutral result fan-out back into `river_core`
+  - streaming pre-roll / post-roll handling so provider code does not own local VAD policy
+  - SNTP/UTC readiness gating for signed cloud requests
+- Added provider-internal registry and ops boundary:
+  - `river_asr_provider_internal.h`
+  - `river_asr_provider_registry.c`
+  - provider choice is no longer hardcoded in the adapter body
+- Added the first real provider implementation:
+  - `river_asr_iflytek_rtasr.c`
+  - target service:
+    - iFlytek RTASR LLM WebSocket API
+  - implemented pieces:
+    - query-string auth signing with `HMAC-SHA1 + Base64 + URL-encode`
+    - WebSocket session open / binary PCM feed / finish
+    - JSON result parsing through `cJSON`
+    - partial/final/error/session callbacks
+  - temporary credentials are stored in:
+    - `include/river/river_asr_iflytek_credentials.h`
+- Connected the local speech path to cloud ASR:
+  - `vad_probe` now opens the cloud audio bridge
+  - enhanced mono frames are pushed to the streaming bridge on every detector decision
+  - `river_core` now logs:
+    - session started
+    - partial result
+    - final result
+    - error
+    - session closed
+- Kept non-streaming architecture in place for future providers:
+  - `segment_buffer` still produces ready utterance segments
+  - `segment_sink` now bridges those segments into `river_cloud_asr_batch_submit_segment()`
+  - current iFlytek provider still reports `batch unsupported`
+- Added Chinese integration / audit record:
+  - `/.codex/iflytek_rtasr_integration_zh.md`
+
+## Step 5.0.1
+- Tightened the segment/batch accounting so unsupported provider batch upload is no longer misreported as a successful submit.
+- `river_cloud_asr_batch_submit_segment()` now returns `RIVER_ERR_UNSUPPORTED` transparently.
+- `river_voice_segment_sink` now tracks:
+  - submitted segments
+  - unsupported segments
+  - real failures
+- `vad_probe` diagnostics now distinguish:
+  - `seg_unsupported`
+  - `seg_fail`
 
 ## Step 4.8
 - Copied the `RTL8730E NOR` device profile into the project and turned it into a project-owned flash profile flow.

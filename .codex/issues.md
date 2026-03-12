@@ -292,8 +292,37 @@
 - The EV8730EA2 user RGB LED is now explicitly treated as unresolved hardware:
   - runtime log correctly reports `rgb indicator deferred`
   - `R25/R27/R31` population and `LEDR/LEDG/LEDB` GPIO mapping still need hardware confirmation
+- The first online-ASR provider round is only partially complete:
+  - streaming path is implemented for `iflytek_rtasr`
+  - batch / non-streaming provider upload is still unsupported by the current provider
+- Provider abstraction is now in place, but production-grade provider selection is not finalized yet:
+  - there is a provider registry and default lookup
+  - only `iflytek_rtasr` is registered today
+- Current credential handling is intentionally temporary:
+  - Wi-Fi SSID/password live in `include/river/river_wifi_credentials.h`
+  - iFlytek app credentials live in `include/river/river_asr_iflytek_credentials.h`
+  - this is acceptable only for first integration and audit
+- The current repository-side environment does not prove live cloud success:
+  - code builds and the board image is generated
+  - but actual RTASR session establishment and transcript quality still depend on target-side external connectivity
+- Current online-ASR runtime still depends on SNTP / UTC readiness:
+  - if UTC is not ready, signed RTASR URL generation is deferred on purpose
+  - this may look like a cloud failure if Wi-Fi is up but time sync has not completed yet
+- Current VAD + cloud joint validation can still over-segment speech:
+  - `Silero` is intentionally recall-oriented
+  - streaming may therefore open more often than the final product will want
+  - this is acceptable for the current "do not miss speech" stage
+- Current segmented batch handoff is architecture-only:
+  - `segment_buffer -> segment_sink -> cloud_batch_bridge` is the stable path for future non-streaming ASR
+  - but today it should be interpreted as "ready for a provider" rather than "already uploading"
 
 ## Latest Mitigation Additions
 - Keep the current VAD policy recall-oriented until online-ASR segment loss is no longer the dominant risk, then tighten thresholds using probe logs and real utterance captures.
 - Keep `segment_buffer -> segment_sink` as the only allowed handoff path into future online ASR code so `vad_probe` remains a validation path, not business-logic glue.
 - Do not re-enable RGB runtime driving until the passive RGB hardware path is confirmed on the actual board revision.
+- Treat `cloud_stream_busy` and `cloud_stream_fail` separately during field bring-up:
+  - `busy` is usually Wi-Fi or UTC readiness
+  - `fail` is usually provider or transport logic
+- Do not treat `seg_unsupported` as a failure:
+  - it only means the current provider has no batch implementation yet
+- Keep provider-specific protocol code inside `components/river_cloud`, not in `river_voice` or `river_core`.

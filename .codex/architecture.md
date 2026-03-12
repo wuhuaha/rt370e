@@ -24,7 +24,12 @@ Owns local front-end interfaces. It now contains:
 - future `Silero VAD`, wake word, and self-developed model adapters
 
 ### `components/river_cloud`
-Owns online control transport. Today it is a stub that echoes text and exposes a simulated device-control path. Later it will contain the real HTTP/WebSocket or vendor SDK integration.
+Owns online speech transport and cloud-provider integration. It now contains:
+- `river_wifi_station`: STA auto-connect worker for bring-up credentials
+- `river_cloud_adapter`: provider-neutral audio/text/session bridge
+- `river_asr_provider_registry`: provider lookup and default selection
+- `river_asr_iflytek_rtasr`: first real streaming ASR provider
+- `river_online_control`: current business-side control stub
 
 ### `components/river_diag`
 Owns monitor commands so every phase can be tested without full voice input.
@@ -105,6 +110,8 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 
 - default validation path:
   - `capture -> preproc(asr_mainline) -> detector(silero + sdk_vad_ref) -> segment_buffer -> segment_sink -> diagnostics`
+- active online uplink path:
+  - `capture -> preproc(asr_mainline) -> detector -> cloud_adapter(stream bridge) -> iflytek_rtasr`
 - current intention:
   - keep `echo` only as a board test path
   - keep `vad_probe` as the main speech-segmentation validation path
@@ -118,3 +125,23 @@ This keeps the current SDK-backed step and the future self-developed step aligne
 - why this boundary matters:
   - later replacing `Silero` with a self-developed VAD should not change online ASR upload logic
   - later replacing `aivoice_afe` with a self-developed front-end should not change segment buffering logic
+- current provider abstraction contract:
+  - streaming and batch are both modeled in `river_cloud_asr_provider_ops_t`
+  - providers return results through one callback path:
+    - session started
+    - partial result
+    - final result
+    - error
+    - session closed
+  - the adapter is responsible for:
+    - Wi-Fi readiness gating
+    - SNTP / UTC readiness gating
+    - streaming pre-roll and post-roll handling
+    - batching handoff from `segment_sink`
+- current provider state:
+  - default provider is `iflytek_rtasr`
+  - streaming is implemented
+  - batch interface is reserved but not implemented by the provider yet
+- current credential policy:
+  - Wi-Fi and iFlytek bring-up credentials are intentionally stored in project-local headers for the first integration round
+  - this is temporary and must later be replaced by secure storage or provisioning

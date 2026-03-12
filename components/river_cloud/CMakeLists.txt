@@ -16,8 +16,11 @@ set(private_definitions)
 set(private_compile_options)
 
 ameba_list_append(private_sources
-    river_cloud_adapter_stub.c
+    river_asr_iflytek_rtasr.c
+    river_asr_provider_registry.c
+    river_cloud_adapter.c
     river_online_control.c
+    river_wifi_station.c
 )
 
 ameba_list_append(private_includes

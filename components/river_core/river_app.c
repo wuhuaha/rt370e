@@ -6,6 +6,7 @@
 #include "river/river_online_control.h"
 #include "river/river_voice.h"
 #include "river/river_voice_vad_reference.h"
+#include "river/river_wifi_station.h"
 
 static void river_app_on_voice_event(const river_voice_event_t *event)
 {
@@ -16,6 +17,50 @@ static void river_app_on_voice_event(const river_voice_event_t *event)
     printf("[river][voice] event=%d confidence=%d\n", event->type, event->confidence);
     if (event->text != 0) {
         printf("[river][voice] text=%s\n", event->text);
+    }
+}
+
+static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result,
+                                          void *user_data)
+{
+    (void)user_data;
+
+    if (result == NULL) {
+        return;
+    }
+
+    switch (result->type) {
+    case RIVER_CLOUD_ASR_EVENT_PARTIAL:
+        printf("[river][asr][%s] partial sid=%s text=%s\n",
+               result->provider_name != NULL ? result->provider_name : "-",
+               result->sid != NULL ? result->sid : "-",
+               result->text != NULL ? result->text : "-");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_FINAL:
+        printf("[river][asr][%s] final sid=%s text=%s\n",
+               result->provider_name != NULL ? result->provider_name : "-",
+               result->sid != NULL ? result->sid : "-",
+               result->text != NULL ? result->text : "-");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_ERROR:
+        printf("[river][asr][%s] error code=%d sid=%s msg=%s\n",
+               result->provider_name != NULL ? result->provider_name : "-",
+               result->code,
+               result->sid != NULL ? result->sid : "-",
+               result->message != NULL ? result->message : "-");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
+        printf("[river][asr][%s] session started sid=%s\n",
+               result->provider_name != NULL ? result->provider_name : "-",
+               result->sid != NULL ? result->sid : "-");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
+        printf("[river][asr][%s] session closed sid=%s\n",
+               result->provider_name != NULL ? result->provider_name : "-",
+               result->sid != NULL ? result->sid : "-");
+        break;
+    default:
+        break;
     }
 }
 
@@ -30,7 +75,7 @@ river_status_t river_app_boot(void)
 
     river_voice_frontend_set_handler(river_app_on_voice_event);
 
-    if (river_voice_frontend_init() != RIVER_OK) {
+    if (river_wifi_station_init() != RIVER_OK) {
 #ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
         river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
 #endif
@@ -38,6 +83,15 @@ river_status_t river_app_boot(void)
     }
 
     if (river_cloud_adapter_init() != RIVER_OK) {
+#ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
+        river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
+#endif
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    river_cloud_adapter_set_result_handler(river_app_on_cloud_asr_result, NULL);
+
+    if (river_voice_frontend_init() != RIVER_OK) {
 #ifdef CONFIG_RIVER_BOARD_RGB_VAD_INDICATOR_EN
         river_board_rgb_set_state(RIVER_BOARD_RGB_STATE_ERROR);
 #endif
@@ -106,5 +160,7 @@ void river_app_print_status(void)
 #endif
     river_voice_echo_dump_status();
     river_voice_vad_probe_dump_status();
+    river_wifi_station_dump_status();
+    river_cloud_adapter_dump_status();
     river_online_control_dump_status();
 }

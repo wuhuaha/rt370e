@@ -336,3 +336,40 @@
   - `useful with RTL8730E-specific corrections`
   - `not suitable for direct reuse`
 - Prefer storing actionable conclusions over preserving raw prose.
+
+## iFlytek RTASR LLM Notes
+- Source:
+  - official doc used for the current integration:
+    - `https://www.xfyun.cn/doc/spark/asr_llm/rtasr_llm.html`
+- Current project relevance:
+  - `high`
+  - this is the protocol baseline for the first real online-ASR provider in `ameba-river`
+- Key protocol points extracted for current implementation:
+  - WebSocket endpoint:
+    - host `office-api-ast-dx.iflyaisol.com`
+    - path `/ast/communicate/v1`
+  - authentication:
+    - query-string based
+    - sorted parameters
+    - `HMAC-SHA1`
+    - `Base64`
+    - URL-encoded signature
+  - current audio contract:
+    - `16 kHz`
+    - `mono`
+    - `16-bit`
+    - `pcm_s16le`
+  - result parsing:
+    - transcript text is nested under:
+      - `data.cn.st.rt[].ws[].cw[].w`
+    - final result can be inferred from:
+      - `data.ls == true`
+      - or `data.cn.st.type == 0`
+- Project-specific implications:
+  - provider code should stay inside `components/river_cloud`
+  - signing and session setup should not leak into `river_voice`
+  - local VAD / segment policy must remain provider-neutral
+- Current implementation status in this repository:
+  - streaming provider is implemented
+  - batch/non-streaming provider upload is not yet implemented for iFlytek
+  - result callback path is already provider-neutral, so later vendors can reuse the same app-facing shape
