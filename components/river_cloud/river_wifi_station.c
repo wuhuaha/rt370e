@@ -19,6 +19,7 @@
 #define RIVER_WIFI_STA_TASK_STACK    (1024U * 4U)
 #define RIVER_WIFI_STA_TASK_PRIORITY 3U
 #define RIVER_WIFI_STA_RETRY_MS      5000U
+#define RIVER_WIFI_STA_IDLE_WAIT_MS  3000U
 
 typedef struct {
     bool initialized;
@@ -26,6 +27,7 @@ typedef struct {
     bool connecting;
     bool sdk_autoreconnect_disabled;
     bool sdk_fast_connect_disabled;
+    bool sdk_lps_disabled;
     rtos_task_t task;
     uint32_t connect_attempts;
     uint32_t connect_successes;
@@ -213,9 +215,51 @@ static void river_wifi_station_disable_sdk_fast_connect_once(void)
     RIVER_LOGI("sdk fast connect disabled; river owns initial connect policy");
 }
 
+static void river_wifi_station_disable_lps_once(void)
+{
+    if (g_river_wifi_station.sdk_lps_disabled) {
+        return;
+    }
+
+    if (wifi_set_lps_enable(0) == RTK_SUCCESS) {
+        RIVER_LOGI("sdk lps disabled during bring-up");
+    } else {
+        RIVER_LOGW("sdk lps disable failed");
+    }
+
+    g_river_wifi_station.sdk_lps_disabled = true;
+}
+
 static int river_wifi_station_request_dhcp(void)
 {
     return LwIP_IP_Address_Request(NETIF_WLAN_STA_INDEX);
+}
+
+static bool river_wifi_station_wait_driver_idle(uint32_t timeout_ms, bool allow_join_success)
+{
+    uint32_t waited_ms = 0U;
+    u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+
+    while (waited_ms < timeout_ms) {
+        if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
+            return false;
+        }
+
+        if (allow_join_success && join_status == RTW_JOINSTATUS_SUCCESS) {
+            return true;
+        }
+
+        if ((join_status == RTW_JOINSTATUS_UNKNOWN) ||
+            (join_status == RTW_JOINSTATUS_FAIL) ||
+            (join_status == RTW_JOINSTATUS_DISCONNECT)) {
+            return true;
+        }
+
+        rtos_time_delay_ms(100);
+        waited_ms += 100U;
+    }
+
+    return false;
 }
 
 static bool river_wifi_station_try_complete_join_without_reconnect(void)
@@ -294,7 +338,17 @@ static river_wifi_scan_candidate_t river_wifi_station_scan_target(void)
     scan_param.ssid = (u8 *)RIVER_WIFI_STA_SSID;
     scan_param.max_ap_record_num = 16;
 
+    if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
+        RIVER_LOGW("scan wait-idle timeout for ssid=%s", RIVER_WIFI_STA_SSID);
+    }
+
     scanned_ap_num = wifi_scan_networks(&scan_param, 1);
+    if (scanned_ap_num == -RTK_ERR_BUSY) {
+        RIVER_LOGW("scan busy for ssid=%s; wait idle and retry once", RIVER_WIFI_STA_SSID);
+        if (river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
+            scanned_ap_num = wifi_scan_networks(&scan_param, 1);
+        }
+    }
     if (scanned_ap_num <= 0) {
         RIVER_LOGW("scan failed for ssid=%s ret=%d", RIVER_WIFI_STA_SSID, scanned_ap_num);
         return candidate;
@@ -391,6 +445,24 @@ static void river_wifi_station_fill_connect_param(struct rtw_network_info *conne
     }
 }
 
+static void river_wifi_station_build_strategy_order(const river_wifi_scan_candidate_t *candidate,
+                                                    river_wifi_connect_strategy_t *strategies,
+                                                    size_t *strategy_count)
+{
+    *strategy_count = 0U;
+
+    if ((candidate != NULL) && candidate->valid) {
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_EXACT;
+        if (candidate->result.security == RTW_SECURITY_WPA2_WPA3_MIXED) {
+            strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK;
+        }
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+        return;
+    }
+
+    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+}
+
 static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
 {
     uint32_t waited_ms = 0U;
@@ -420,6 +492,9 @@ static void river_wifi_station_task(void *param)
     struct rtw_network_info connect_param;
     river_wifi_scan_candidate_t candidate;
     river_wifi_connect_strategy_t strategy;
+    river_wifi_connect_strategy_t strategy_order[3];
+    size_t strategy_count = 0U;
+    size_t strategy_index = 0U;
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
     bool joined_in_wait;
     int result;
@@ -437,6 +512,7 @@ static void river_wifi_station_task(void *param)
 
         river_wifi_station_disable_sdk_autoreconnect_once();
         river_wifi_station_disable_sdk_fast_connect_once();
+        river_wifi_station_disable_lps_once();
 
         if (river_wifi_station_is_ready()) {
             g_river_wifi_station.connected = true;
@@ -459,19 +535,16 @@ static void river_wifi_station_task(void *param)
                    (unsigned long)g_river_wifi_station.connect_attempts);
 
         candidate = river_wifi_station_scan_target();
-        strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+        river_wifi_station_build_strategy_order(&candidate, strategy_order, &strategy_count);
         joined_in_wait = false;
         result = RTK_FAIL;
 
-        for (strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
-             strategy <= RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK;
-             strategy++) {
-            if ((strategy != RIVER_WIFI_CONNECT_STRATEGY_BASIC) && !candidate.valid) {
-                break;
-            }
-            if ((strategy == RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK) &&
-                (!candidate.valid || (candidate.result.security != RTW_SECURITY_WPA2_WPA3_MIXED))) {
-                continue;
+        for (strategy_index = 0U; strategy_index < strategy_count; ++strategy_index) {
+            strategy = strategy_order[strategy_index];
+
+            if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
+                RIVER_LOGW("connect wait-idle timeout before strategy=%s",
+                           river_wifi_station_connect_strategy_name(strategy));
             }
 
             river_wifi_station_fill_connect_param(&connect_param, &candidate, strategy);
@@ -570,6 +643,9 @@ river_status_t river_wifi_station_init(void)
     }
 
     memset(&g_river_wifi_station, 0, sizeof(g_river_wifi_station));
+    wifi_fast_connect_enable(0);
+    g_river_wifi_station.sdk_fast_connect_disabled = true;
+    RIVER_LOGI("sdk fast connect pre-disabled before wlan init");
     if (rtos_task_create(&g_river_wifi_station.task,
                          "river_wifi_sta",
                          river_wifi_station_task,

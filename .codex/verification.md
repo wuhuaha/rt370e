@@ -1476,3 +1476,24 @@ Expected runtime behavior:
 - If `wifi_connect()` reports `busy` while the SDK is already progressing a join, the app should now wait and adopt that connection instead of immediately disconnecting it:
   - `connect strategy=... busy; wait existing join flow`
 - If the driver reaches `RTW_JOINSTATUS_SUCCESS` first and only DHCP is pending, the app should request an IPv4 lease and complete the connection instead of restarting the join.
+
+Follow-up Wi-Fi verification after startup-race hardening:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected additional runtime behavior:
+- SDK fast-connect should now be disabled before WLAN init:
+  - `sdk fast connect pre-disabled before wlan init`
+- SDK LPS should now be disabled during bring-up:
+  - `sdk lps disabled during bring-up`
+- The STA task should not immediately launch a fresh scan/connect while the driver is still internally busy:
+  - `scan busy for ssid=Keeu; wait idle and retry once`
+  - or `connect wait-idle timeout before strategy=...`
+- If the SSID is found by scan, the app should prefer the deterministic candidate-bound attempt first:
+  - `connect strategy=scan_exact ssid=Keeu channel=<n> sec=<security> ...`
+- `basic` should remain as a later fallback rather than the default first path once scan metadata exists.

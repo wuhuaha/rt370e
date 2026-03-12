@@ -330,3 +330,25 @@
 - Do not treat `seg_unsupported` as a failure:
   - it only means the current provider has no batch implementation yet
 - Keep provider-specific protocol code inside `components/river_cloud`, not in `river_voice` or `river_core`.
+
+## Active Issue: Wi-Fi Bring-up Instability On `Keeu`
+- Status: open
+- Symptom:
+  - repeated `auth_fail (-4109)` or `busy (-3)` while connecting to `Keeu`
+  - occasional logs showing the SDK background path progressing join state independently of the application task
+- Current findings:
+  - startup-time fast-connect / background join interference has been observed on this SDK
+  - pure `SSID + password` retries are less deterministic than using scanned `BSSID + channel + security`
+  - low-power transitions during association may worsen handshake reliability
+- Current fix in code:
+  - pre-disable SDK fast-connect before WLAN init
+  - disable SDK auto-reconnect
+  - disable LPS during bring-up
+  - wait for driver idle before scan/connect
+  - retry scan once if the driver reports busy
+  - prefer `scan_exact` first when a scan candidate is available
+  - keep `basic` as a fallback rather than the default first path
+- Next verification target:
+  - confirm logs show `sdk fast connect pre-disabled before wlan init`
+  - confirm `connect strategy=scan_exact ...` appears before `basic` when a candidate is found
+  - confirm whether `Keeu` reaches `connected ssid=Keeu ip=...`

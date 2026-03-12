@@ -879,3 +879,17 @@
   - when `wifi_connect()` returns `-RTK_ERR_BUSY`, do not immediately declare failure; instead wait for the in-flight join flow to complete and adopt the connection if it succeeds
   - if the driver reaches `RTW_JOINSTATUS_SUCCESS` before IPv4 is assigned, the app now requests DHCP and completes the join instead of disconnecting and restarting
 - This addresses the observed case where the SDK background path already printed `[$]wifi connected` but the app still treated the attempt as failed and tore it down.
+
+## Step 4.26
+- Selectively adopted the `REVIEW.md` guidance around Wi-Fi lifecycle ownership and startup race avoidance.
+- Additional STA state-machine hardening in [river_wifi_station.c](/root/ameba-river/components/river_cloud/river_wifi_station.c):
+  - disable SDK fast-connect before WLAN init, not only after the STA task starts
+  - disable SDK LPS during bring-up to reduce auth / association instability while debugging connectivity
+  - wait for the join state machine to return to an idle/disconnected state before launching a site survey or a fresh connect attempt
+  - if a scan candidate is available, prefer `scan_exact` first and keep `basic` as a later fallback, instead of always trying the unconstrained path first
+  - retry a busy site-survey once after waiting for driver idle
+- Rationale:
+  - the previous order still allowed driver-level background activity to race with the app's own connect flow
+  - using the scanned `BSSID + channel + security` first is more deterministic for home-router debugging than restarting from the least constrained path each time
+- Added root-level [TIPS.md](/root/ameba-river/TIPS.md) as the first-stop runtime troubleshooting guide for recurring serial-log signatures such as `auth_fail`, `busy`, and provider bring-up issues.
+- Added a dedicated active Wi-Fi issue record in [.codex/issues.md](/root/ameba-river/.codex/issues.md) so transient field failures can be tracked with symptoms, mitigations, and closure criteria.
