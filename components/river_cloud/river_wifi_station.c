@@ -24,9 +24,12 @@
 #define RIVER_WIFI_STA_JOIN_WAIT_MS  12000U
 #define RIVER_WIFI_STA_DHCP_WAIT_MS  12000U
 #define RIVER_WIFI_STA_DHCP_POLL_MS  500U
+#define RIVER_WIFI_STA_DHCP_RETRY_COUNT 2U
+#define RIVER_WIFI_STA_DHCP_RETRY_BACKOFF_MS 1000U
 #define RIVER_WIFI_STA_POWER_SETTLE_MS 500U
 #define RIVER_WIFI_STA_MAX_CREDENTIALS 2U
 #define RIVER_WIFI_STA_PASSWORD_BUFFER_SIZE (RTW_MAX_PSK_LEN + 1U)
+#define RIVER_WIFI_STA_MIN_RSSI_DBM (-80)
 
 extern int (*p_wifi_do_fast_connect)(void);
 extern int (*p_store_fast_connect_info)(unsigned int data1, unsigned int data2);
@@ -45,6 +48,7 @@ typedef struct {
     bool initialized;
     bool connected;
     bool connecting;
+    bool connection_latched;
     bool sdk_autoreconnect_disabled;
     bool sdk_fast_connect_disabled;
     bool sdk_lps_disabled;
@@ -63,6 +67,8 @@ typedef struct {
     bool active_credential_valid;
     u8 active_credential_index;
     char active_ssid[RTW_ESSID_MAX_SIZE + 1U];
+    u32 last_connected_ip;
+    char last_connected_ssid[RTW_ESSID_MAX_SIZE + 1U];
 } river_wifi_station_context_t;
 
 static river_wifi_station_context_t g_river_wifi_station;
@@ -507,11 +513,27 @@ static int river_wifi_station_request_dhcp(void)
 static void river_wifi_station_mark_connected(void)
 {
     const river_wifi_credential_t *credential = river_wifi_station_get_active_credential();
+    u32 current_ip;
+
+    current_ip = *(u32 *)LwIP_GetIP(NETIF_WLAN_STA_INDEX);
+    if (g_river_wifi_station.connection_latched &&
+        (g_river_wifi_station.last_connected_ip == current_ip) &&
+        (strcmp(g_river_wifi_station.last_connected_ssid, river_wifi_station_selected_ssid()) == 0)) {
+        g_river_wifi_station.connected = true;
+        g_river_wifi_station.connecting = false;
+        g_river_wifi_station.last_error = 0;
+        return;
+    }
 
     g_river_wifi_station.connected = true;
     g_river_wifi_station.connecting = false;
+    g_river_wifi_station.connection_latched = true;
     g_river_wifi_station.connect_successes++;
     g_river_wifi_station.last_error = 0;
+    g_river_wifi_station.last_connected_ip = current_ip;
+    river_wifi_station_copy_string(g_river_wifi_station.last_connected_ssid,
+                                   sizeof(g_river_wifi_station.last_connected_ssid),
+                                   river_wifi_station_selected_ssid());
     if (credential != NULL) {
         g_river_wifi_station.next_credential_index = g_river_wifi_station.active_credential_index;
     }
@@ -554,8 +576,7 @@ static bool river_wifi_station_wait_driver_idle(uint32_t timeout_ms, bool allow_
 static bool river_wifi_station_wait_for_ipv4_after_join(uint32_t timeout_ms, const char *source)
 {
     int dhcp_result = DHCP_ADDRESS_ASSIGNED;
-    uint32_t waited_ms = 0U;
-    bool dhcp_requested = false;
+    uint32_t attempt = 0U;
 
     if (!river_wifi_station_joined()) {
         return false;
@@ -570,7 +591,7 @@ static bool river_wifi_station_wait_for_ipv4_after_join(uint32_t timeout_ms, con
                source,
                (unsigned long)timeout_ms);
 
-    while (waited_ms < timeout_ms) {
+    for (attempt = 0U; attempt < RIVER_WIFI_STA_DHCP_RETRY_COUNT; ++attempt) {
         if (!river_wifi_station_joined()) {
             break;
         }
@@ -580,21 +601,34 @@ static bool river_wifi_station_wait_for_ipv4_after_join(uint32_t timeout_ms, con
             return true;
         }
 
-        if (!dhcp_requested) {
-            dhcp_requested = true;
-            dhcp_result = river_wifi_station_request_dhcp();
-            if (dhcp_result == DHCP_ADDRESS_ASSIGNED) {
-                river_wifi_station_mark_connected();
-                return true;
-            }
-
-            RIVER_LOGW("dhcp pending after join source=%s ret=%d; keep link up and poll ip",
-                       source,
-                       dhcp_result);
+        dhcp_result = river_wifi_station_request_dhcp();
+        if (dhcp_result == DHCP_ADDRESS_ASSIGNED) {
+            river_wifi_station_mark_connected();
+            return true;
         }
 
-        rtos_time_delay_ms(RIVER_WIFI_STA_DHCP_POLL_MS);
-        waited_ms += RIVER_WIFI_STA_DHCP_POLL_MS;
+        if (river_wifi_station_has_ipv4()) {
+            river_wifi_station_mark_connected();
+            return true;
+        }
+
+        if (!river_wifi_station_joined()) {
+            break;
+        }
+
+        if ((attempt + 1U) < RIVER_WIFI_STA_DHCP_RETRY_COUNT) {
+            RIVER_LOGW("dhcp pending/timeout after join source=%s ret=%d; retry=%lu/%u",
+                       source,
+                       dhcp_result,
+                       (unsigned long)(attempt + 1U),
+                       (unsigned int)RIVER_WIFI_STA_DHCP_RETRY_COUNT);
+            rtos_time_delay_ms(RIVER_WIFI_STA_DHCP_RETRY_BACKOFF_MS);
+        } else {
+            RIVER_LOGW("dhcp pending after join source=%s ret=%d; retries exhausted=%u",
+                       source,
+                       dhcp_result,
+                       (unsigned int)RIVER_WIFI_STA_DHCP_RETRY_COUNT);
+        }
     }
 
     if (river_wifi_station_has_ipv4()) {
@@ -603,11 +637,11 @@ static bool river_wifi_station_wait_for_ipv4_after_join(uint32_t timeout_ms, con
     }
 
     g_river_wifi_station.last_error = dhcp_result;
-    RIVER_LOGW("dhcp pending/failed after join ssid=%s source=%s ret=%d waited_ms=%lu",
+    RIVER_LOGW("dhcp pending/failed after join ssid=%s source=%s ret=%d retries=%u",
                river_wifi_station_selected_ssid(),
                source,
                dhcp_result,
-               (unsigned long)waited_ms);
+               (unsigned int)RIVER_WIFI_STA_DHCP_RETRY_COUNT);
     return false;
 }
 
@@ -669,6 +703,15 @@ static bool river_wifi_station_scan_candidate_better(const river_wifi_scan_candi
     }
 
     return false;
+}
+
+static bool river_wifi_station_candidate_signal_acceptable(const river_wifi_scan_candidate_t *candidate)
+{
+    if ((candidate == NULL) || (!candidate->valid)) {
+        return true;
+    }
+
+    return candidate->result.signal_strength >= RIVER_WIFI_STA_MIN_RSSI_DBM;
 }
 
 static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candidates, size_t candidate_count)
@@ -763,6 +806,12 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
                        (int)candidate->result.signal_strength,
                        river_wifi_station_security_name(candidate->result.security),
                        (unsigned long)candidate->result.security);
+            if (candidate->result.signal_strength < RIVER_WIFI_STA_MIN_RSSI_DBM) {
+                RIVER_LOGW("scan candidate ssid=%s weak rssi=%d threshold=%d; de-prioritize this round",
+                           credential->ssid,
+                           (int)candidate->result.signal_strength,
+                           (int)RIVER_WIFI_STA_MIN_RSSI_DBM);
+            }
         }
     }
 
@@ -836,6 +885,12 @@ static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
 {
     uint32_t waited_ms = 0U;
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+
+    g_river_wifi_station.connected = false;
+    g_river_wifi_station.connecting = false;
+    g_river_wifi_station.connection_latched = false;
+    g_river_wifi_station.last_connected_ip = 0U;
+    g_river_wifi_station.last_connected_ssid[0] = '\0';
 
     wifi_disconnect();
     rtos_time_delay_ms(300);
@@ -928,6 +983,12 @@ static void river_wifi_station_task(void *param)
             continue;
         }
 
+        if (river_wifi_station_is_ready()) {
+            river_wifi_station_mark_connected();
+            rtos_time_delay_ms(1000);
+            continue;
+        }
+
         if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
             if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "loop-top")) {
                 rtos_time_delay_ms(1000);
@@ -945,16 +1006,9 @@ static void river_wifi_station_task(void *param)
             continue;
         }
 
-        /* If we just became ready (perhaps via background join), skip re-connect */
-        if (river_wifi_station_is_ready()) {
-            g_river_wifi_station.connected = true;
-            g_river_wifi_station.connecting = false;
-            rtos_time_delay_ms(1000);
-            continue;
-        }
-
         g_river_wifi_station.connected = false;
         g_river_wifi_station.connecting = true;
+        g_river_wifi_station.connection_latched = false;
         g_river_wifi_station.connect_attempts++;
 
         RIVER_LOGI("connect attempt=%lu ap_count=%u next_index=%u current=%s",
@@ -993,6 +1047,15 @@ static void river_wifi_station_task(void *param)
             candidate = &candidates[credential_index];
 
             if (!credential->enabled) {
+                continue;
+            }
+
+            if ((candidate != NULL) && candidate->valid &&
+                !river_wifi_station_candidate_signal_acceptable(candidate)) {
+                RIVER_LOGW("skip ssid=%s this round: weak candidate rssi=%d threshold=%d",
+                           credential->ssid,
+                           (int)candidate->result.signal_strength,
+                           (int)RIVER_WIFI_STA_MIN_RSSI_DBM);
                 continue;
             }
 
@@ -1098,6 +1161,9 @@ static void river_wifi_station_task(void *param)
                 continue;
             }
 
+            g_river_wifi_station.next_credential_index = g_river_wifi_station.active_credential_index;
+            RIVER_LOGW("keep retrying current ssid=%s after dhcp failure; do not rotate ap yet",
+                       river_wifi_station_selected_ssid());
             river_wifi_station_disconnect_and_wait_idle(1500U);
         } else {
             g_river_wifi_station.last_error = result;

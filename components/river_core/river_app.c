@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <string.h>
+
 #include "river/river_app.h"
 #include "river/river_board_rgb.h"
 #include "river/river_cloud.h"
@@ -9,6 +12,8 @@
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.app"
+
+static char g_river_app_last_partial[192];
 
 static void river_app_on_voice_event(const river_voice_event_t *event)
 {
@@ -33,18 +38,27 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
 
     switch (result->type) {
     case RIVER_CLOUD_ASR_EVENT_PARTIAL:
-        RIVER_LOGD("asr provider=%s partial sid=%s text=%s",
-                   result->provider_name != NULL ? result->provider_name : "-",
-                   result->sid != NULL ? result->sid : "-",
-                   result->text != NULL ? result->text : "-");
+        if ((result->text != NULL) && (result->text[0] != '\0') &&
+            (strcmp(g_river_app_last_partial, result->text) != 0)) {
+            snprintf(g_river_app_last_partial,
+                     sizeof(g_river_app_last_partial),
+                     "%s",
+                     result->text);
+            RIVER_LOGI("asr provider=%s partial sid=%s text=%s",
+                       result->provider_name != NULL ? result->provider_name : "-",
+                       result->sid != NULL ? result->sid : "-",
+                       result->text);
+        }
         break;
     case RIVER_CLOUD_ASR_EVENT_FINAL:
+        g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s final sid=%s text=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-",
                    result->text != NULL ? result->text : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_ERROR:
+        g_river_app_last_partial[0] = '\0';
         RIVER_LOGE("asr provider=%s error code=%d sid=%s msg=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->code,
@@ -52,11 +66,13 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
                    result->message != NULL ? result->message : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
+        g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
+        g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");

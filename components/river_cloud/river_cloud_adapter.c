@@ -49,6 +49,10 @@ typedef struct {
     uint32_t partial_results;
     uint32_t final_results;
     uint32_t error_results;
+    bool time_ready_announced;
+    int stream_open_defer_status;
+    bool stream_open_defer_wifi_connected;
+    bool stream_open_defer_time_ready;
     char last_text[192];
     char last_error[128];
 } river_cloud_context_t;
@@ -87,6 +91,20 @@ static void river_cloud_start_sntp_if_needed(void)
                (unsigned int)RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
 }
 
+static void river_cloud_log_time_ready_once(void)
+{
+    if (g_river_cloud.time_ready_announced) {
+        return;
+    }
+
+    if (!river_cloud_time_ready()) {
+        return;
+    }
+
+    g_river_cloud.time_ready_announced = true;
+    RIVER_LOGI("sntp ready: utc=%ld", (long)time(NULL));
+}
+
 static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
                                       void *user_data)
 {
@@ -120,6 +138,37 @@ static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
     if (g_river_cloud.result_handler != NULL) {
         g_river_cloud.result_handler(result, g_river_cloud.result_handler_user);
     }
+}
+
+static void river_cloud_log_stream_open_deferred_once(river_status_t status)
+{
+    bool wifi_connected;
+    bool time_ready;
+
+    wifi_connected = river_wifi_station_is_connected();
+    time_ready = river_cloud_time_ready();
+
+    if ((g_river_cloud.stream_open_defer_status == status) &&
+        (g_river_cloud.stream_open_defer_wifi_connected == wifi_connected) &&
+        (g_river_cloud.stream_open_defer_time_ready == time_ready)) {
+        return;
+    }
+
+    g_river_cloud.stream_open_defer_status = status;
+    g_river_cloud.stream_open_defer_wifi_connected = wifi_connected;
+    g_river_cloud.stream_open_defer_time_ready = time_ready;
+    RIVER_LOGI("asr stream deferred: provider=%s status=%d wifi=%s time_ready=%s",
+               river_cloud_asr_provider_name(),
+               status,
+               river_wifi_station_status_name(),
+               time_ready ? "yes" : "no");
+}
+
+static void river_cloud_reset_stream_open_deferred_state(void)
+{
+    g_river_cloud.stream_open_defer_status = 0;
+    g_river_cloud.stream_open_defer_wifi_connected = false;
+    g_river_cloud.stream_open_defer_time_ready = false;
 }
 
 static void river_cloud_pre_roll_reset(void)
@@ -371,6 +420,8 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
         g_river_cloud.provider->stream_poll(0U);
     }
 
+    river_cloud_log_time_ready_once();
+
     if (!g_river_cloud.stream_active) {
         river_cloud_pre_roll_store(pcm);
         if (!is_speech) {
@@ -380,17 +431,17 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
         status = river_cloud_stream_open_and_flush();
         if (status != RIVER_OK) {
             g_river_cloud.stream_open_fail++;
-            RIVER_LOGD("asr stream open deferred: provider=%s status=%d wifi=%s time_ready=%s",
-                       river_cloud_asr_provider_name(),
-                       status,
-                       river_wifi_station_status_name(),
-                       river_cloud_time_ready() ? "yes" : "no");
+            river_cloud_log_stream_open_deferred_once(status);
             return status;
         }
 
+        river_cloud_reset_stream_open_deferred_state();
         g_river_cloud.stream_active = true;
         g_river_cloud.stream_open_ok++;
         g_river_cloud.silence_frames = 0U;
+        RIVER_LOGI("asr stream active: provider=%s pre_roll_frames=%lu",
+                   river_cloud_asr_provider_name(),
+                   (unsigned long)g_river_cloud.pre_roll_count_frames);
         return RIVER_OK;
     }
 

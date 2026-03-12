@@ -14,6 +14,7 @@
 #include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_voice.h"
+#include "river/river_wifi_station.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
 #include "river/river_voice_detector.h"
@@ -304,7 +305,7 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
     }
 
     if (!g_river_voice_vad_probe.diag_vad_state_initialized) {
-        should_log = detector_is_speech;
+        should_log = true;
         g_river_voice_vad_probe.diag_vad_state_initialized = true;
     } else if (g_river_voice_vad_probe.diag_vad_prev_is_speech != detector_is_speech) {
         should_log = true;
@@ -659,8 +660,20 @@ static void river_voice_vad_probe_task(void *param)
             } else if (cloud_status == RIVER_ERR_BUSY ||
                        cloud_status == RIVER_ERR_UNSUPPORTED) {
                 g_river_voice_vad_probe.diag_cloud_stream_busy++;
+                if (detector_result.is_speech && !previous_vad_state) {
+                    RIVER_LOGI("speech detected but cloud stream not active yet: provider=%s status=%d wifi=%s",
+                               river_cloud_asr_provider_name(),
+                               cloud_status,
+                               river_wifi_station_status_name());
+                }
             } else {
                 g_river_voice_vad_probe.diag_cloud_stream_fail++;
+                if (detector_result.is_speech && !previous_vad_state) {
+                    RIVER_LOGW("speech detected but cloud stream push failed: provider=%s status=%d wifi=%s",
+                               river_cloud_asr_provider_name(),
+                               cloud_status,
+                               river_wifi_station_status_name());
+                }
             }
         }
 

@@ -1,0 +1,46 @@
+# RTL8730E 嵌入式联网“填坑”指南
+
+本文件记录了在 `ameba-river` 项目开发中遇到的典型硬件/SDK 级陷阱及对应的解决方案，为后续开发提供参考。
+
+---
+
+## 陷阱 1：Wi-Fi 驱动背景竞态 (Race Condition)
+- **现象**：启动时频繁出现 `RTK_ERR_BUSY (-3)`，且应用层无法控制连接过程。
+- **原因**：SDK 默认开启了 `Fast-connect`，在应用层任务启动前，驱动已根据 Flash 残留信息开始连接。
+- **对策**：
+    1.  在 `wlan_init` 之前显式调用 `wifi_fast_connect_enable(0)`。
+    2.  如果仍有干扰，启动时调用 `erase_wifi_config()`。
+    3.  采用“主动接管策略”：检查 `wifi_get_join_status`，若已连接则直接跳入 DHCP 流程。
+
+## 陷阱 2：L2 成功但 L3 DHCP 失败 (The DHCP Wall)
+- **现象**：日志显示 `[$]wifi connected`，但随后 `[$]wifi got ip timeout` 导致断连。
+- **原因**：
+    - **省电模式干扰**：`LPS/IPS` 开启时，驱动可能漏掉 DHCP 的广播 ACK 包。
+    - **RSSI 信号太弱**：信号低于 `-75dB` 时，即使 L2 关联成功，L3 握手包也极易丢失。
+- **对策**：
+    - **物理锁定**：在连接和 DHCP 全过程中，强制锁定驱动工作在 `Active` 模式。
+    - **RSSI 门限**：在扫描阶段直接过滤掉低于 `-80dB` 的 AP，避免无效的策略切换。
+
+## 陷阱 3：云端鉴权的时间依赖 (SNTP Bottleneck)
+- **现象**：Wi-Fi 已连，但 ASR 云端返回 `403` 或 `Signature Mismatch`。
+- **原因**：iFlytek 等 API 签名依赖系统时间（UTC），联网后 SNTP 同步通常有延迟。
+- **对策**：将 `SNTP_Ready` 状态作为 ASR 链路开启的硬性闸门。
+
+## 陷阱 4：Wi-Fi 已拿到 IP，但应用层反复“重复认领成功”
+- **现象**：串口里持续打印 `connected ssid=... ip=... success=N`，计数不断上涨，但实际上并没有重新连接。
+- **原因**：应用侧状态机在 `join + ip ready` 后每轮都重复调用“成功收口”逻辑，没有把这次连接当成单次事件锁住。
+- **对策**：
+  - 在应用层增加 `connection_latched` 之类的单次成功闸门。
+  - 只有在 `disconnect`、显式重连或 IP 变化后，才允许再次打印连接成功。
+
+## 陷阱 5：VAD 和在线 ASR 没日志，不代表链路没跑
+- **现象**：开发者明明说话了，但串口里看不到 `vad` 或 `asr` 日志。
+- **原因**：
+  - 当前默认策略是“只在 VAD 状态变化时打印 `INFO`”，不是高频刷屏。
+  - 在线 ASR 还受 `Wi-Fi connected + SNTP ready + stream active` 三重门槛控制。
+- **对策**：
+  - 至少打印一次 `vad initial state`，避免误判为 VAD 没工作。
+  - 在 `speech` 触发但云端流未激活时，打印明确原因，例如 `wifi=disconnected`、`time_ready=no`、`stream deferred`。
+  - 不要仅凭“没有识别结果”就判断模型或移植失败，先看前置门槛日志。
+
+---
