@@ -1471,3 +1471,8 @@ Expected runtime behavior:
 - Failures should now include both the strategy and decoded join status:
   - `connect strategy=... failed err=...(<name>) join=<status>`
 - Between attempts, the app should no longer hammer the driver immediately after a failed join; it now disconnects and waits for the join state to settle first.
+- SDK fast-connect should also be disabled during bring-up:
+  - `sdk fast connect disabled; river owns initial connect policy`
+- If `wifi_connect()` reports `busy` while the SDK is already progressing a join, the app should now wait and adopt that connection instead of immediately disconnecting it:
+  - `connect strategy=... busy; wait existing join flow`
+- If the driver reaches `RTW_JOINSTATUS_SUCCESS` first and only DHCP is pending, the app should request an IPv4 lease and complete the connection instead of restarting the join.

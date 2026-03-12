@@ -7,6 +7,7 @@
 #include "os_wrapper_memory.h"
 #include "wifi_api.h"
 #include "wifi_api_ext.h"
+#include "wifi_fast_connect.h"
 
 #include "river/river_log.h"
 #include "river/river_wifi_credentials.h"
@@ -24,6 +25,7 @@ typedef struct {
     bool connected;
     bool connecting;
     bool sdk_autoreconnect_disabled;
+    bool sdk_fast_connect_disabled;
     rtos_task_t task;
     uint32_t connect_attempts;
     uint32_t connect_successes;
@@ -159,6 +161,17 @@ static bool river_wifi_station_has_ipv4(void)
     return (*(u32 *)LwIP_GetIP(NETIF_WLAN_STA_INDEX) != IP_ADDR_INVALID);
 }
 
+static bool river_wifi_station_joined(void)
+{
+    u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+
+    if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
+        return false;
+    }
+
+    return join_status == RTW_JOINSTATUS_SUCCESS;
+}
+
 static bool river_wifi_station_is_ready(void)
 {
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
@@ -187,6 +200,84 @@ static void river_wifi_station_disable_sdk_autoreconnect_once(void)
     }
 
     g_river_wifi_station.sdk_autoreconnect_disabled = true;
+}
+
+static void river_wifi_station_disable_sdk_fast_connect_once(void)
+{
+    if (g_river_wifi_station.sdk_fast_connect_disabled) {
+        return;
+    }
+
+    wifi_fast_connect_enable(0);
+    g_river_wifi_station.sdk_fast_connect_disabled = true;
+    RIVER_LOGI("sdk fast connect disabled; river owns initial connect policy");
+}
+
+static int river_wifi_station_request_dhcp(void)
+{
+    return LwIP_IP_Address_Request(NETIF_WLAN_STA_INDEX);
+}
+
+static bool river_wifi_station_try_complete_join_without_reconnect(void)
+{
+    int dhcp_result;
+
+    if (!river_wifi_station_joined()) {
+        return false;
+    }
+
+    if (river_wifi_station_has_ipv4()) {
+        g_river_wifi_station.connected = true;
+        g_river_wifi_station.connecting = false;
+        return true;
+    }
+
+    dhcp_result = river_wifi_station_request_dhcp();
+    if (dhcp_result == DHCP_ADDRESS_ASSIGNED) {
+        g_river_wifi_station.connected = true;
+        g_river_wifi_station.connecting = false;
+        g_river_wifi_station.connect_successes++;
+        g_river_wifi_station.last_error = 0;
+        RIVER_LOGI("connected ssid=%s ip=%u.%u.%u.%u success=%lu",
+                   RIVER_WIFI_STA_SSID,
+                   (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[0],
+                   (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[1],
+                   (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
+                   (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
+                   (unsigned long)g_river_wifi_station.connect_successes);
+        return true;
+    }
+
+    g_river_wifi_station.last_error = dhcp_result;
+    RIVER_LOGW("dhcp pending/failed after join ssid=%s ret=%d", RIVER_WIFI_STA_SSID, dhcp_result);
+    return false;
+}
+
+static bool river_wifi_station_wait_for_join_result(uint32_t timeout_ms)
+{
+    uint32_t waited_ms = 0U;
+    u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+
+    while (waited_ms < timeout_ms) {
+        if (river_wifi_station_try_complete_join_without_reconnect()) {
+            return true;
+        }
+
+        if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
+            return false;
+        }
+
+        if ((join_status == RTW_JOINSTATUS_FAIL) ||
+            (join_status == RTW_JOINSTATUS_DISCONNECT) ||
+            (join_status == RTW_JOINSTATUS_UNKNOWN)) {
+            return false;
+        }
+
+        rtos_time_delay_ms(200);
+        waited_ms += 200U;
+    }
+
+    return river_wifi_station_try_complete_join_without_reconnect();
 }
 
 static river_wifi_scan_candidate_t river_wifi_station_scan_target(void)
@@ -330,6 +421,7 @@ static void river_wifi_station_task(void *param)
     river_wifi_scan_candidate_t candidate;
     river_wifi_connect_strategy_t strategy;
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+    bool joined_in_wait;
     int result;
 
     (void)param;
@@ -338,15 +430,22 @@ static void river_wifi_station_task(void *param)
         if (!wifi_is_running(STA_WLAN_INDEX)) {
             wifi_on(RTW_MODE_STA);
             g_river_wifi_station.sdk_autoreconnect_disabled = false;
+            g_river_wifi_station.sdk_fast_connect_disabled = false;
             rtos_time_delay_ms(1000);
             continue;
         }
 
         river_wifi_station_disable_sdk_autoreconnect_once();
+        river_wifi_station_disable_sdk_fast_connect_once();
 
         if (river_wifi_station_is_ready()) {
             g_river_wifi_station.connected = true;
             g_river_wifi_station.connecting = false;
+            rtos_time_delay_ms(1000);
+            continue;
+        }
+
+        if (river_wifi_station_try_complete_join_without_reconnect()) {
             rtos_time_delay_ms(1000);
             continue;
         }
@@ -361,6 +460,7 @@ static void river_wifi_station_task(void *param)
 
         candidate = river_wifi_station_scan_target();
         strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+        joined_in_wait = false;
         result = RTK_FAIL;
 
         for (strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
@@ -392,6 +492,16 @@ static void river_wifi_station_task(void *param)
                 break;
             }
 
+            if (result == -RTK_ERR_BUSY) {
+                RIVER_LOGW("connect strategy=%s busy; wait existing join flow",
+                           river_wifi_station_connect_strategy_name(strategy));
+                if (river_wifi_station_wait_for_join_result(12000U)) {
+                    result = RTK_SUCCESS;
+                    joined_in_wait = true;
+                    break;
+                }
+            }
+
             g_river_wifi_station.last_error = result;
             if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
                 join_status = RTW_JOINSTATUS_UNKNOWN;
@@ -405,7 +515,14 @@ static void river_wifi_station_task(void *param)
         }
 
         if (result == RTK_SUCCESS) {
-            result = LwIP_IP_Address_Request(NETIF_WLAN_STA_INDEX);
+            if (joined_in_wait && river_wifi_station_is_ready()) {
+                g_river_wifi_station.connected = true;
+                g_river_wifi_station.connecting = false;
+                rtos_time_delay_ms(1000);
+                continue;
+            }
+
+            result = river_wifi_station_request_dhcp();
             if (result == DHCP_ADDRESS_ASSIGNED) {
                 g_river_wifi_station.connected = true;
                 g_river_wifi_station.connecting = false;

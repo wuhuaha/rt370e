@@ -874,3 +874,8 @@
 - The scan candidate selector now prefers `2.4G` APs over `5G` when the SSID is duplicated across bands, which is better aligned with embedded voice bring-up and home-router compatibility.
 - Added explicit disconnect-and-idle waiting between retries so the driver has time to leave transitional join states before the next attempt.
 - Failure logs now show the strategy name, decoded error reason, and current join state to make router-compatibility issues easier to identify on the next board run.
+- Follow-up hardening:
+  - explicitly disable SDK fast-connect in addition to SDK auto-reconnect
+  - when `wifi_connect()` returns `-RTK_ERR_BUSY`, do not immediately declare failure; instead wait for the in-flight join flow to complete and adopt the connection if it succeeds
+  - if the driver reaches `RTW_JOINSTATUS_SUCCESS` before IPv4 is assigned, the app now requests DHCP and completes the join instead of disconnecting and restarting
+- This addresses the observed case where the SDK background path already printed `[$]wifi connected` but the app still treated the attempt as failed and tore it down.
