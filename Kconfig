@@ -141,6 +141,11 @@ config RIVER_VAD_PROBE_MAX_SEGMENT_MS
     range 500 30000
     default 8000
 
+config RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB
+    int "Pure VAD probe batch segment minimum free heap headroom in KB"
+    range 0 2048
+    default 64
+
 config RIVER_OFFLINE_ASR_RESERVED
     bool "Reserve offline ASR integration points"
     default y

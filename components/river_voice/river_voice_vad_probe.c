@@ -5,6 +5,7 @@
 
 #include "basic_types.h"
 #include "os_wrapper.h"
+#include "os_wrapper_memory.h"
 
 #include "audio/audio_control.h"
 #include "audio/audio_service.h"
@@ -40,10 +41,16 @@
 #define CONFIG_RIVER_VAD_PROBE_MAX_SEGMENT_MS 8000
 #endif
 
+#ifndef CONFIG_RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB
+#define CONFIG_RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB 64
+#endif
+
 #define RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS CONFIG_RIVER_VAD_PROBE_DIAG_WINDOW_MS
 #define RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS    CONFIG_RIVER_VAD_PROBE_PRE_ROLL_MS
 #define RIVER_VOICE_VAD_PROBE_POST_ROLL_MS   CONFIG_RIVER_VAD_PROBE_POST_ROLL_MS
 #define RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS CONFIG_RIVER_VAD_PROBE_MAX_SEGMENT_MS
+#define RIVER_VOICE_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_BYTES \
+    ((uint32_t)CONFIG_RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB * 1024U)
 
 #define RIVER_VOICE_VAD_PROBE_TASK_STACK         (1024U * 8U)
 #define RIVER_VOICE_VAD_PROBE_TASK_PRIORITY      4U
@@ -57,6 +64,7 @@ typedef struct {
     bool stop_requested;
     bool diag_enabled;
     bool vad_reference_enabled;
+    bool segment_buffer_enabled;
     rtos_task_t task;
     river_voice_capture_t capture;
     river_voice_preproc_t preproc;
@@ -105,6 +113,14 @@ static bool g_river_voice_vad_probe_diag_enabled;
 static uint32_t river_voice_vad_probe_frames_to_ms(uint32_t frames)
 {
     return frames * river_voice_board_array_profile()->frame_ms;
+}
+
+static uint32_t river_voice_vad_probe_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms)
+{
+    if (frame_ms == 0U) {
+        return 0U;
+    }
+    return (duration_ms + frame_ms - 1U) / frame_ms;
 }
 
 static uint16_t river_voice_vad_probe_abs16(int32_t value)
@@ -251,7 +267,9 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
                (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_speech_start,
                (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_speech_end,
                (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_last_offset_ms,
-               segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle"),
+               g_river_voice_vad_probe.segment_buffer_enabled ?
+                   (segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle")) :
+                   "disabled",
                (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.prebuffered_frames),
                (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.post_roll_frames_left),
                (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.active_frames),
@@ -309,7 +327,9 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
                    (g_river_voice_vad_probe.diag_sdk_vad_is_speech ? "speech" : "silence") :
                    "disabled",
                (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_events,
-               segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle"),
+               g_river_voice_vad_probe.segment_buffer_enabled ?
+                   (segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle")) :
+                   "disabled",
                (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.prebuffered_frames),
                (unsigned long)river_voice_vad_probe_frames_to_ms(segment_status.post_roll_frames_left),
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_ok,
@@ -346,11 +366,14 @@ static void river_voice_vad_probe_release_buffers(void)
 static river_status_t river_voice_vad_probe_prepare_buffers(void)
 {
     river_voice_segment_buffer_config_t segment_config;
+    uint32_t required_segment_bytes;
+    uint32_t free_heap;
 
     g_river_voice_vad_probe.capture_chunk_bytes = g_river_voice_vad_probe.capture.frame_bytes;
     g_river_voice_vad_probe.enhanced_chunk_bytes =
         river_voice_preproc_output_frame_bytes(&g_river_voice_vad_probe.preproc);
     g_river_voice_vad_probe.diag_enabled = g_river_voice_vad_probe_diag_enabled;
+    g_river_voice_vad_probe.segment_buffer_enabled = false;
 
     g_river_voice_vad_probe.capture_buffer =
         (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_vad_probe.capture_chunk_bytes);
@@ -369,11 +392,37 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
     segment_config.pre_roll_ms = RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS;
     segment_config.post_roll_ms = RIVER_VOICE_VAD_PROBE_POST_ROLL_MS;
     segment_config.max_segment_ms = RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS;
+
+    if (!river_cloud_asr_batch_supported()) {
+        RIVER_LOGI("vad probe segment buffer disabled: provider=%s batch=no stream-only bridge active",
+                   river_cloud_asr_provider_name());
+        return RIVER_OK;
+    }
+
+    required_segment_bytes =
+        river_voice_vad_probe_ms_to_frames(segment_config.pre_roll_ms, segment_config.frame_ms) *
+            (uint32_t)segment_config.frame_bytes +
+        river_voice_vad_probe_ms_to_frames(segment_config.max_segment_ms, segment_config.frame_ms) *
+            (uint32_t)segment_config.frame_bytes;
+    free_heap = rtos_mem_get_free_heap_size();
+    if (free_heap < (required_segment_bytes + RIVER_VOICE_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_BYTES)) {
+        RIVER_LOGW("vad probe segment buffer skipped: free_heap=%luB required~%luB headroom=%luB provider=%s batch=yes",
+                   (unsigned long)free_heap,
+                   (unsigned long)required_segment_bytes,
+                   (unsigned long)RIVER_VOICE_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_BYTES,
+                   river_cloud_asr_provider_name());
+        return RIVER_OK;
+    }
+
     if (river_voice_segment_buffer_open(&g_river_voice_vad_probe.segment_buffer,
                                         &segment_config) != RIVER_OK) {
-        river_voice_vad_probe_release_buffers();
-        return RIVER_ERR_NO_MEMORY;
+        RIVER_LOGW("vad probe segment buffer open failed: free_heap=%luB required~%luB provider=%s; continue stream-only",
+                   (unsigned long)free_heap,
+                   (unsigned long)required_segment_bytes,
+                   river_cloud_asr_provider_name());
+        return RIVER_OK;
     }
+    g_river_voice_vad_probe.segment_buffer_enabled = true;
 
     return RIVER_OK;
 }
@@ -448,10 +497,14 @@ static river_status_t river_voice_vad_probe_open_audio(void)
                (unsigned int)RIVER_VOICE_VAD_PROBE_CAPTURE_VOLUME,
                river_voice_board_mic_gain_name(RIVER_VOICE_VAD_PROBE_PRIMARY_MIC_GAIN),
                river_voice_board_mic_gain_name(RIVER_VOICE_VAD_PROBE_SECONDARY_MIC_GAIN));
-    RIVER_LOGI("vad probe segment buffer: pre=%ums post=%ums max=%ums",
-               (unsigned int)RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
-               (unsigned int)RIVER_VOICE_VAD_PROBE_POST_ROLL_MS,
-               (unsigned int)RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS);
+    if (g_river_voice_vad_probe.segment_buffer_enabled) {
+        RIVER_LOGI("vad probe segment buffer: enabled pre=%ums post=%ums max=%ums",
+                   (unsigned int)RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
+                   (unsigned int)RIVER_VOICE_VAD_PROBE_POST_ROLL_MS,
+                   (unsigned int)RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS);
+    } else {
+        RIVER_LOGI("vad probe segment buffer: disabled; streaming path remains active");
+    }
     return RIVER_OK;
 }
 
@@ -552,12 +605,14 @@ static void river_voice_vad_probe_task(void *param)
                                       ? RIVER_BOARD_RGB_STATE_VAD_SPEECH
                                       : RIVER_BOARD_RGB_STATE_VAD_SILENCE);
 #endif
-            if (river_voice_segment_buffer_push(&g_river_voice_vad_probe.segment_buffer,
+            if (g_river_voice_vad_probe.segment_buffer_enabled &&
+                river_voice_segment_buffer_push(&g_river_voice_vad_probe.segment_buffer,
                                                 g_river_voice_vad_probe.enhanced_buffer,
                                                 g_river_voice_vad_probe.enhanced_chunk_bytes,
                                                 detector_result.is_speech) != RIVER_OK) {
                 g_river_voice_vad_probe.diag_segment_fail++;
-            } else if (river_voice_segment_buffer_ready_bytes(&g_river_voice_vad_probe.segment_buffer) > 0U) {
+            } else if (g_river_voice_vad_probe.segment_buffer_enabled &&
+                       river_voice_segment_buffer_ready_bytes(&g_river_voice_vad_probe.segment_buffer) > 0U) {
                 river_voice_segment_buffer_status_t segment_status;
                 river_voice_segment_desc_t segment_desc;
                 river_status_t segment_sink_status;
@@ -733,7 +788,7 @@ void river_voice_vad_probe_dump_status(void)
     RIVER_LOGI("audio_vad_probe=%s", river_voice_vad_probe_status_name());
     RIVER_LOGI("audio_vad_probe_diag=%s", river_voice_vad_probe_diag_enabled() ? "on" : "off");
     if (river_voice_vad_probe_is_running()) {
-        RIVER_LOGI("audio_vad_probe_profile=cap:%luHz/%luch(%s+%s) preproc:%s detector:%s diag_window~%ums segment:[pre=%ums post=%ums max=%ums]",
+        RIVER_LOGI("audio_vad_probe_profile=cap:%luHz/%luch(%s+%s) preproc:%s detector:%s diag_window~%ums segment:%s[pre=%ums post=%ums max=%ums]",
                    (unsigned long)g_river_voice_vad_probe.capture.sample_rate,
                    (unsigned long)g_river_voice_vad_probe.capture.channels,
                    river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
@@ -741,6 +796,7 @@ void river_voice_vad_probe_dump_status(void)
                    river_voice_preproc_backend_name(),
                    river_voice_detector_backend_name(),
                    (unsigned int)RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS,
+                   g_river_voice_vad_probe.segment_buffer_enabled ? "enabled" : "disabled",
                    (unsigned int)RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
                    (unsigned int)RIVER_VOICE_VAD_PROBE_POST_ROLL_MS,
                    (unsigned int)RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS);

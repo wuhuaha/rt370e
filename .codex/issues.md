@@ -315,6 +315,10 @@
 - Current segmented batch handoff is architecture-only:
   - `segment_buffer -> segment_sink -> cloud_batch_bridge` is the stable path for future non-streaming ASR
   - but today it should be interpreted as "ready for a provider" rather than "already uploading"
+- Current `iflytek_rtasr` runtime should not enable the VAD probe batch segment buffer:
+  - the provider reports `stream=yes batch=no`
+  - allocating the `8s` segment buffer in this mode wastes roughly `256KB`
+  - if this buffer is opened unconditionally, the system can still hit allocator warnings even after the SDK VAD reference has been heap-guarded
 
 ## Latest Mitigation Additions
 - Keep the current VAD policy recall-oriented until online-ASR segment loss is no longer the dominant risk, then tighten thresholds using probe logs and real utterance captures.

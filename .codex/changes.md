@@ -847,3 +847,20 @@
   - pure VAD probe
   - cloud ASR bridge
   available even when the optional SDK comparison path is too expensive for the current heap budget.
+
+## Step 4.24
+- Hardened `vad_probe` against a second large heap consumer in the batch-segment path.
+- Root cause:
+  - `river_voice_vad_probe_prepare_buffers()` always opened `segment_buffer`
+  - the current `iflytek_rtasr` provider is `stream=yes batch=no`
+  - so the `8s` segment buffer was being allocated even though the provider could not consume it
+  - this matched the runtime `Malloc failed ... xWantedSize:256064`
+- Updated behavior:
+  - if the active cloud provider does not support batch ASR, `vad_probe` now disables `segment_buffer` and keeps only the streaming bridge active
+  - if a future provider does support batch, `vad_probe` now also checks free heap headroom before opening the batch segment buffer
+  - if heap headroom is insufficient, batch buffering is skipped with a clear warning and the system continues in stream-only mode
+- Added `CONFIG_RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB` with default `64KB`
+- Runtime status / diagnostics now expose whether the segment path is:
+  - `enabled`
+  - or `disabled`
+- This preserves the architecture for future non-streaming ASR while removing a large, currently unnecessary heap allocation from the live `iflytek_rtasr` path.

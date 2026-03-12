@@ -1416,3 +1416,31 @@ Expected behavior after the fix:
 - pure VAD probe continues running
 - online ASR bridge still opens
 - SDK VAD reference becomes opportunistic instead of mandatory
+
+## Step 4.24
+Build the batch-segment heap hardening update:
+```bash
+cd /root/ameba-river
+source env.sh
+CCACHE_DISABLE=1 ameba.py build -p
+```
+
+Flash and monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0
+ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime behavior with `iflytek_rtasr`:
+- `Silero VAD` still reaches:
+  - `silero_vad runtime ready: ...`
+- the cloud ASR audio bridge still opens:
+  - `asr bridge open: provider=iflytek_rtasr ...`
+- `vad_probe` now reports the batch segment path as disabled instead of attempting a large allocation:
+  - `vad probe segment buffer disabled: provider=iflytek_rtasr batch=no stream-only bridge active`
+  - or, for a future batch-capable provider with low heap:
+    - `vad probe segment buffer skipped: free_heap=... required~... headroom=... provider=... batch=yes`
+- the low-level allocator failure should disappear:
+  - `Malloc failed. Core:[CA32], Task:[NoTsk], [free heap size: ...] [xWantedSize:256064]`
