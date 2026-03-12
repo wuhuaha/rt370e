@@ -24,11 +24,22 @@
 #define RIVER_WIFI_STA_JOIN_WAIT_MS  12000U
 #define RIVER_WIFI_STA_DHCP_WAIT_MS  12000U
 #define RIVER_WIFI_STA_DHCP_POLL_MS  500U
+#define RIVER_WIFI_STA_POWER_SETTLE_MS 500U
+#define RIVER_WIFI_STA_MAX_CREDENTIALS 2U
+#define RIVER_WIFI_STA_PASSWORD_BUFFER_SIZE (RTW_MAX_PSK_LEN + 1U)
 
 extern int (*p_wifi_do_fast_connect)(void);
 extern int (*p_store_fast_connect_info)(unsigned int data1, unsigned int data2);
 extern int wifi_set_ips_internal(u8 enable);
 extern struct wifi_user_conf wifi_user_config;
+
+typedef struct {
+    bool enabled;
+    char ssid[RTW_ESSID_MAX_SIZE + 1U];
+    char password[RIVER_WIFI_STA_PASSWORD_BUFFER_SIZE];
+    u8 ssid_len;
+    u8 password_len;
+} river_wifi_credential_t;
 
 typedef struct {
     bool initialized;
@@ -46,6 +57,12 @@ typedef struct {
     uint32_t connect_successes;
     uint32_t connect_failures;
     int last_error;
+    river_wifi_credential_t credentials[RIVER_WIFI_STA_MAX_CREDENTIALS];
+    u8 credential_count;
+    u8 next_credential_index;
+    bool active_credential_valid;
+    u8 active_credential_index;
+    char active_ssid[RTW_ESSID_MAX_SIZE + 1U];
 } river_wifi_station_context_t;
 
 static river_wifi_station_context_t g_river_wifi_station;
@@ -56,9 +73,14 @@ typedef struct {
 } river_wifi_scan_candidate_t;
 
 typedef enum {
-    RIVER_WIFI_CONNECT_STRATEGY_BASIC = 0,
-    RIVER_WIFI_CONNECT_STRATEGY_SCAN_EXACT,
-    RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK,
+    RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO = 0,
+    RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED,
+    RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED,
+    RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES,
+    RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO,
+    RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED,
+    RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED,
+    RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES,
 } river_wifi_connect_strategy_t;
 
 static const char *river_wifi_station_join_status_name(u8 status)
@@ -160,15 +182,167 @@ static const char *river_wifi_station_security_name(u32 security)
 static const char *river_wifi_station_connect_strategy_name(river_wifi_connect_strategy_t strategy)
 {
     switch (strategy) {
-    case RIVER_WIFI_CONNECT_STRATEGY_BASIC:
-        return "basic";
-    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_EXACT:
-        return "scan_exact";
-    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK:
-        return "scan_wpa2_fallback";
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO:
+        return "scan_auto";
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED:
+        return "scan_wpa2_mixed";
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED:
+        return "scan_wpa_wpa2_mixed";
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES:
+        return "scan_wpa2_aes";
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO:
+        return "basic_auto";
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED:
+        return "basic_wpa2_mixed";
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED:
+        return "basic_wpa_wpa2_mixed";
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES:
+        return "basic_wpa2_aes";
     default:
         return "unknown";
     }
+}
+
+static void river_wifi_station_copy_string(char *dst, size_t dst_size, const char *src)
+{
+    if ((dst == NULL) || (dst_size == 0U)) {
+        return;
+    }
+
+    if (src == NULL) {
+        dst[0] = '\0';
+        return;
+    }
+
+    strncpy(dst, src, dst_size - 1U);
+    dst[dst_size - 1U] = '\0';
+}
+
+static void river_wifi_station_add_credential(u8 *count, const char *ssid, const char *password)
+{
+    river_wifi_credential_t *credential;
+    size_t ssid_len;
+    size_t password_len;
+
+    if ((count == NULL) || (*count >= RIVER_WIFI_STA_MAX_CREDENTIALS) || (ssid == NULL) || (ssid[0] == '\0')) {
+        return;
+    }
+
+    credential = &g_river_wifi_station.credentials[*count];
+    memset(credential, 0, sizeof(*credential));
+
+    ssid_len = strnlen(ssid, RTW_ESSID_MAX_SIZE);
+    password_len = strnlen(password ? password : "", RTW_MAX_PSK_LEN);
+    if ((ssid_len == 0U) || (ssid_len > RTW_ESSID_MAX_SIZE)) {
+        return;
+    }
+
+    river_wifi_station_copy_string(credential->ssid, sizeof(credential->ssid), ssid);
+    river_wifi_station_copy_string(credential->password, sizeof(credential->password), password ? password : "");
+    credential->ssid_len = (u8)ssid_len;
+    credential->password_len = (u8)password_len;
+    credential->enabled = true;
+    (*count)++;
+}
+
+static void river_wifi_station_load_credentials(void)
+{
+    g_river_wifi_station.credential_count = 0U;
+    memset(g_river_wifi_station.credentials, 0, sizeof(g_river_wifi_station.credentials));
+
+    river_wifi_station_add_credential(&g_river_wifi_station.credential_count,
+                                      RIVER_WIFI_STA_PRIMARY_SSID,
+                                      RIVER_WIFI_STA_PRIMARY_PASSWORD);
+    river_wifi_station_add_credential(&g_river_wifi_station.credential_count,
+                                      RIVER_WIFI_STA_SECONDARY_SSID,
+                                      RIVER_WIFI_STA_SECONDARY_PASSWORD);
+}
+
+static const river_wifi_credential_t *river_wifi_station_get_active_credential(void)
+{
+    if (g_river_wifi_station.active_credential_valid &&
+        (g_river_wifi_station.active_credential_index < g_river_wifi_station.credential_count)) {
+        return &g_river_wifi_station.credentials[g_river_wifi_station.active_credential_index];
+    }
+
+    if (g_river_wifi_station.credential_count > 0U) {
+        return &g_river_wifi_station.credentials[0];
+    }
+
+    return NULL;
+}
+
+static const char *river_wifi_station_selected_ssid(void)
+{
+    const river_wifi_credential_t *credential = river_wifi_station_get_active_credential();
+
+    if ((credential != NULL) && (credential->ssid[0] != '\0')) {
+        return credential->ssid;
+    }
+
+    return "-";
+}
+
+static void river_wifi_station_select_credential(u8 credential_index)
+{
+    if (credential_index >= g_river_wifi_station.credential_count) {
+        return;
+    }
+
+    g_river_wifi_station.active_credential_valid = true;
+    g_river_wifi_station.active_credential_index = credential_index;
+    river_wifi_station_copy_string(g_river_wifi_station.active_ssid,
+                                   sizeof(g_river_wifi_station.active_ssid),
+                                   g_river_wifi_station.credentials[credential_index].ssid);
+}
+
+static bool river_wifi_station_strategy_uses_candidate(river_wifi_connect_strategy_t strategy)
+{
+    switch (strategy) {
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO:
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED:
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED:
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static u32 river_wifi_station_strategy_security_type(const river_wifi_credential_t *credential,
+                                                     river_wifi_connect_strategy_t strategy)
+{
+    if ((credential == NULL) || (credential->password_len == 0U)) {
+        return RTW_SECURITY_OPEN;
+    }
+
+    switch (strategy) {
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED:
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED:
+        return RTW_SECURITY_WPA2_MIXED_PSK;
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED:
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED:
+        return RTW_SECURITY_WPA_WPA2_MIXED_PSK;
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES:
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES:
+        return RTW_SECURITY_WPA2_AES_PSK;
+    case RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO:
+    case RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO:
+    default:
+        return 0U;
+    }
+}
+
+static const char *river_wifi_station_strategy_security_name(const river_wifi_credential_t *credential,
+                                                             river_wifi_connect_strategy_t strategy)
+{
+    u32 security_type = river_wifi_station_strategy_security_type(credential, strategy);
+
+    if ((credential != NULL) && (credential->password_len > 0U) && (security_type == 0U)) {
+        return "auto";
+    }
+
+    return river_wifi_station_security_name(security_type);
 }
 
 static bool river_wifi_station_has_ipv4(void)
@@ -332,12 +506,17 @@ static int river_wifi_station_request_dhcp(void)
 
 static void river_wifi_station_mark_connected(void)
 {
+    const river_wifi_credential_t *credential = river_wifi_station_get_active_credential();
+
     g_river_wifi_station.connected = true;
     g_river_wifi_station.connecting = false;
     g_river_wifi_station.connect_successes++;
     g_river_wifi_station.last_error = 0;
+    if (credential != NULL) {
+        g_river_wifi_station.next_credential_index = g_river_wifi_station.active_credential_index;
+    }
     RIVER_LOGI("connected ssid=%s ip=%u.%u.%u.%u success=%lu",
-               RIVER_WIFI_STA_SSID,
+               river_wifi_station_selected_ssid(),
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[0],
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[1],
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
@@ -425,7 +604,7 @@ static bool river_wifi_station_wait_for_ipv4_after_join(uint32_t timeout_ms, con
 
     g_river_wifi_station.last_error = dhcp_result;
     RIVER_LOGW("dhcp pending/failed after join ssid=%s source=%s ret=%d waited_ms=%lu",
-               RIVER_WIFI_STA_SSID,
+               river_wifi_station_selected_ssid(),
                source,
                dhcp_result,
                (unsigned long)waited_ms);
@@ -473,113 +652,148 @@ static bool river_wifi_station_wait_for_join_result(uint32_t timeout_ms)
     return river_wifi_station_try_complete_join_without_reconnect();
 }
 
-static river_wifi_scan_candidate_t river_wifi_station_scan_target(void)
+static bool river_wifi_station_scan_candidate_better(const river_wifi_scan_candidate_t *current,
+                                                     const struct rtw_scan_result *incoming)
 {
-    river_wifi_scan_candidate_t candidate;
+    if ((current == NULL) || (!current->valid)) {
+        return true;
+    }
+
+    if ((current->result.band != RTW_BAND_ON_24G) && (incoming->band == RTW_BAND_ON_24G)) {
+        return true;
+    }
+
+    if ((current->result.band == incoming->band) &&
+        (incoming->signal_strength > current->result.signal_strength)) {
+        return true;
+    }
+
+    return false;
+}
+
+static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candidates, size_t candidate_count)
+{
     struct rtw_scan_param scan_param;
     struct rtw_scan_result *records = NULL;
     int scanned_ap_num;
     u32 ap_num;
     u32 i;
+    size_t credential_index;
+    bool any_candidate = false;
 
-    memset(&candidate, 0, sizeof(candidate));
+    memset(candidates, 0, candidate_count * sizeof(*candidates));
     memset(&scan_param, 0, sizeof(scan_param));
-    scan_param.ssid = (u8 *)RIVER_WIFI_STA_SSID;
-    scan_param.max_ap_record_num = 16;
+    scan_param.ssid = NULL;
+    scan_param.max_ap_record_num = 24;
 
     if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
-        RIVER_LOGW("scan wait-idle timeout for ssid=%s; skip active scan this round", RIVER_WIFI_STA_SSID);
-        return candidate;
+        RIVER_LOGW("scan wait-idle timeout for configured ap list; skip active scan this round");
+        return;
     }
 
     scanned_ap_num = wifi_scan_networks(&scan_param, 1);
     if (scanned_ap_num == -RTK_ERR_BUSY) {
-        RIVER_LOGW("scan busy for ssid=%s; wait idle and retry once", RIVER_WIFI_STA_SSID);
+        RIVER_LOGW("scan busy for configured ap list; wait idle and retry once");
         if (river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
             scanned_ap_num = wifi_scan_networks(&scan_param, 1);
         }
     }
     if (scanned_ap_num <= 0) {
-        RIVER_LOGW("scan failed for ssid=%s ret=%d", RIVER_WIFI_STA_SSID, scanned_ap_num);
-        return candidate;
+        RIVER_LOGW("scan failed for configured ap list ret=%d", scanned_ap_num);
+        return;
     }
 
     ap_num = (u32)scanned_ap_num;
     records = (struct rtw_scan_result *)rtos_mem_zmalloc(ap_num * sizeof(struct rtw_scan_result));
     if (records == NULL) {
         RIVER_LOGW("scan result alloc failed ap_num=%lu", (unsigned long)ap_num);
-        return candidate;
+        return;
     }
 
     if (wifi_get_scan_records(&ap_num, records) != RTK_SUCCESS) {
         RIVER_LOGW("scan record fetch failed");
         rtos_mem_free(records);
-        return candidate;
+        return;
     }
 
     for (i = 0; i < ap_num; ++i) {
         struct rtw_scan_result *record = &records[i];
-        size_t target_len = strlen(RIVER_WIFI_STA_SSID);
 
-        if ((record->ssid.len != target_len) ||
-            (memcmp(record->ssid.val, RIVER_WIFI_STA_SSID, target_len) != 0)) {
-            continue;
-        }
+        for (credential_index = 0; credential_index < candidate_count; ++credential_index) {
+            const river_wifi_credential_t *credential = &g_river_wifi_station.credentials[credential_index];
 
-        if ((!candidate.valid) ||
-            ((candidate.result.band != RTW_BAND_ON_24G) && (record->band == RTW_BAND_ON_24G)) ||
-            ((candidate.result.band == record->band) &&
-             (record->signal_strength > candidate.result.signal_strength))) {
-            candidate.valid = true;
-            memcpy(&candidate.result, record, sizeof(candidate.result));
+            if (!credential->enabled) {
+                continue;
+            }
+
+            if ((record->ssid.len != credential->ssid_len) ||
+                (memcmp(record->ssid.val, credential->ssid, credential->ssid_len) != 0)) {
+                continue;
+            }
+
+            if (river_wifi_station_scan_candidate_better(&candidates[credential_index], record)) {
+                candidates[credential_index].valid = true;
+                memcpy(&candidates[credential_index].result, record, sizeof(candidates[credential_index].result));
+            }
         }
     }
 
     rtos_mem_free(records);
 
-    if (candidate.valid) {
-        RIVER_LOGI("scan candidate ssid=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%lu band=%s rssi=%d sec=%s(0x%lx)",
-                   RIVER_WIFI_STA_SSID,
-                   candidate.result.bssid.octet[0],
-                   candidate.result.bssid.octet[1],
-                   candidate.result.bssid.octet[2],
-                   candidate.result.bssid.octet[3],
-                   candidate.result.bssid.octet[4],
-                   candidate.result.bssid.octet[5],
-                   (unsigned long)candidate.result.channel,
-                   candidate.result.band == RTW_BAND_ON_5G ? "5g" : "2.4g",
-                   (int)candidate.result.signal_strength,
-                   river_wifi_station_security_name(candidate.result.security),
-                   (unsigned long)candidate.result.security);
-    } else {
-        RIVER_LOGW("scan candidate not found for ssid=%s", RIVER_WIFI_STA_SSID);
+    for (credential_index = 0; credential_index < candidate_count; ++credential_index) {
+        const river_wifi_credential_t *credential = &g_river_wifi_station.credentials[credential_index];
+        const river_wifi_scan_candidate_t *candidate = &candidates[credential_index];
+
+        if (!credential->enabled) {
+            continue;
+        }
+
+        if (candidate->valid) {
+            any_candidate = true;
+            RIVER_LOGI("scan candidate ssid=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%lu band=%s rssi=%d sec=%s(0x%lx)",
+                       credential->ssid,
+                       candidate->result.bssid.octet[0],
+                       candidate->result.bssid.octet[1],
+                       candidate->result.bssid.octet[2],
+                       candidate->result.bssid.octet[3],
+                       candidate->result.bssid.octet[4],
+                       candidate->result.bssid.octet[5],
+                       (unsigned long)candidate->result.channel,
+                       candidate->result.band == RTW_BAND_ON_5G ? "5g" : "2.4g",
+                       (int)candidate->result.signal_strength,
+                       river_wifi_station_security_name(candidate->result.security),
+                       (unsigned long)candidate->result.security);
+        }
     }
 
-    return candidate;
+    if (!any_candidate) {
+        RIVER_LOGW("scan candidate not found for configured ap list");
+    }
 }
 
-static void river_wifi_station_fill_connect_param_basic(struct rtw_network_info *connect_param)
+static void river_wifi_station_fill_connect_param_basic(struct rtw_network_info *connect_param,
+                                                        const river_wifi_credential_t *credential,
+                                                        river_wifi_connect_strategy_t strategy)
 {
     memset(connect_param, 0, sizeof(*connect_param));
     memcpy(connect_param->ssid.val,
-           RIVER_WIFI_STA_SSID,
-           strlen(RIVER_WIFI_STA_SSID));
-    connect_param->ssid.len = strlen(RIVER_WIFI_STA_SSID);
-    connect_param->password = (unsigned char *)RIVER_WIFI_STA_PASSWORD;
-    connect_param->password_len = strlen(RIVER_WIFI_STA_PASSWORD);
-    if (connect_param->password_len > 0) {
-        connect_param->security_type = RTW_SECURITY_WPA2_AES_PSK;
-    }
+           credential->ssid,
+           credential->ssid_len);
+    connect_param->ssid.len = credential->ssid_len;
+    connect_param->password = credential->password_len ? (unsigned char *)credential->password : NULL;
+    connect_param->password_len = credential->password_len;
+    connect_param->security_type = river_wifi_station_strategy_security_type(credential, strategy);
 }
 
 static void river_wifi_station_fill_connect_param(struct rtw_network_info *connect_param,
+                                                  const river_wifi_credential_t *credential,
                                                   const river_wifi_scan_candidate_t *candidate,
                                                   river_wifi_connect_strategy_t strategy)
 {
-    river_wifi_station_fill_connect_param_basic(connect_param);
+    river_wifi_station_fill_connect_param_basic(connect_param, credential, strategy);
 
     if ((candidate == NULL) || (!candidate->valid) ||
-        (strategy == RIVER_WIFI_CONNECT_STRATEGY_BASIC)) {
+        !river_wifi_station_strategy_uses_candidate(strategy)) {
         return;
     }
 
@@ -587,33 +801,35 @@ static void river_wifi_station_fill_connect_param(struct rtw_network_info *conne
            candidate->result.bssid.octet,
            sizeof(connect_param->bssid.octet));
     connect_param->channel = (u8)candidate->result.channel;
-    connect_param->security_type = candidate->result.security;
     connect_param->pscan_option = RTW_PSCAN_FAST_SURVEY;
-
-    if (strategy == RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK) {
-        connect_param->security_type = RTW_SECURITY_WPA2_AES_PSK;
-        RIVER_LOGI("scan candidate sec=%s; force fallback connect sec=%s for compatibility",
-                   river_wifi_station_security_name(candidate->result.security),
-                   river_wifi_station_security_name(connect_param->security_type));
-    }
 }
 
-static void river_wifi_station_build_strategy_order(const river_wifi_scan_candidate_t *candidate,
+static void river_wifi_station_build_strategy_order(const river_wifi_credential_t *credential,
+                                                    const river_wifi_scan_candidate_t *candidate,
                                                     river_wifi_connect_strategy_t *strategies,
                                                     size_t *strategy_count)
 {
     *strategy_count = 0U;
 
-    if ((candidate != NULL) && candidate->valid) {
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_EXACT;
-        if (candidate->result.security == RTW_SECURITY_WPA2_WPA3_MIXED) {
-            strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_FALLBACK;
+    if (credential->password_len == 0U) {
+        if ((candidate != NULL) && candidate->valid) {
+            strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO;
         }
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO;
         return;
     }
 
-    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC;
+    if ((candidate != NULL) && candidate->valid) {
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO;
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED;
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED;
+        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES;
+    }
+
+    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO;
+    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED;
+    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED;
+    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES;
 }
 
 static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
@@ -667,11 +883,13 @@ static bool river_wifi_station_adopt_existing_join_flow(uint32_t timeout_ms, con
 static void river_wifi_station_task(void *param)
 {
     struct rtw_network_info connect_param;
-    river_wifi_scan_candidate_t candidate;
+    river_wifi_scan_candidate_t candidates[RIVER_WIFI_STA_MAX_CREDENTIALS];
     river_wifi_connect_strategy_t strategy;
-    river_wifi_connect_strategy_t strategy_order[3];
+    river_wifi_connect_strategy_t strategy_order[7];
     size_t strategy_count = 0U;
     size_t strategy_index = 0U;
+    size_t credential_offset = 0U;
+    size_t credential_index = 0U;
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
     bool joined_in_wait;
     int result;
@@ -706,7 +924,7 @@ static void river_wifi_station_task(void *param)
             RIVER_LOGI("reset startup sta state before first app-owned connect");
             river_wifi_station_disconnect_and_wait_idle(3000U);
             g_river_wifi_station.startup_sta_state_cleared = true;
-            rtos_time_delay_ms(300U);
+            rtos_time_delay_ms(RIVER_WIFI_STA_POWER_SETTLE_MS);
             continue;
         }
 
@@ -739,11 +957,12 @@ static void river_wifi_station_task(void *param)
         g_river_wifi_station.connecting = true;
         g_river_wifi_station.connect_attempts++;
 
-        RIVER_LOGI("connect ssid=%s attempt=%lu",
-                   RIVER_WIFI_STA_SSID,
-                   (unsigned long)g_river_wifi_station.connect_attempts);
-
-        candidate = river_wifi_station_scan_target();
+        RIVER_LOGI("connect attempt=%lu ap_count=%u next_index=%u current=%s",
+                   (unsigned long)g_river_wifi_station.connect_attempts,
+                   (unsigned int)g_river_wifi_station.credential_count,
+                   (unsigned int)g_river_wifi_station.next_credential_index,
+                   river_wifi_station_selected_ssid());
+        river_wifi_station_scan_targets(candidates, g_river_wifi_station.credential_count);
         if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
             if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "post-scan")) {
                 rtos_time_delay_ms(1000);
@@ -761,89 +980,109 @@ static void river_wifi_station_task(void *param)
             continue;
         }
 
-        river_wifi_station_build_strategy_order(&candidate, strategy_order, &strategy_count);
         joined_in_wait = false;
         result = RTK_FAIL;
 
-        for (strategy_index = 0U; strategy_index < strategy_count; ++strategy_index) {
-            strategy = strategy_order[strategy_index];
+        for (credential_offset = 0U; credential_offset < g_river_wifi_station.credential_count; ++credential_offset) {
+            const river_wifi_credential_t *credential;
+            const river_wifi_scan_candidate_t *candidate;
 
-            /* If some other join flow appeared, adopt it instead of competing. */
-            if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
-                if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "post-scan")) {
-                    result = RTK_SUCCESS;
-                    joined_in_wait = true;
+            credential_index = (g_river_wifi_station.next_credential_index + credential_offset) %
+                               g_river_wifi_station.credential_count;
+            credential = &g_river_wifi_station.credentials[credential_index];
+            candidate = &candidates[credential_index];
+
+            if (!credential->enabled) {
+                continue;
+            }
+
+            river_wifi_station_build_strategy_order(credential, candidate, strategy_order, &strategy_count);
+            river_wifi_station_select_credential((u8)credential_index);
+
+            for (strategy_index = 0U; strategy_index < strategy_count; ++strategy_index) {
+                strategy = strategy_order[strategy_index];
+
+                if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
+                    if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "post-scan")) {
+                        result = RTK_SUCCESS;
+                        joined_in_wait = true;
+                        break;
+                    }
+
+                    result = -RTK_ERR_TIMEOUT;
+                    RIVER_LOGW("join flow appeared before strategy=%s but did not stabilize; stop retrying this round",
+                               river_wifi_station_connect_strategy_name(strategy));
                     break;
                 }
 
-                result = -RTK_ERR_TIMEOUT;
-                RIVER_LOGW("join flow appeared before strategy=%s but did not stabilize; stop retrying this round",
-                           river_wifi_station_connect_strategy_name(strategy));
-                break;
-            }
+                if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, true)) {
+                    RIVER_LOGW("connect wait-idle timeout before strategy=%s",
+                               river_wifi_station_connect_strategy_name(strategy));
+                }
 
-            if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, true)) {
-                RIVER_LOGW("connect wait-idle timeout before strategy=%s",
-                           river_wifi_station_connect_strategy_name(strategy));
-            }
+                if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
+                    if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "pre-connect")) {
+                        result = RTK_SUCCESS;
+                        joined_in_wait = true;
+                        break;
+                    }
 
-            /* Final check: did some other join flow start while we were waiting? */
-            if (river_wifi_station_join_in_progress() || river_wifi_station_joined()) {
-                if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "pre-connect")) {
-                    result = RTK_SUCCESS;
-                    joined_in_wait = true;
+                    result = -RTK_ERR_TIMEOUT;
+                    RIVER_LOGW("join flow appeared during pre-connect wait for strategy=%s; stop retrying this round",
+                               river_wifi_station_connect_strategy_name(strategy));
                     break;
                 }
 
-                result = -RTK_ERR_TIMEOUT;
-                RIVER_LOGW("join flow appeared during pre-connect wait for strategy=%s; stop retrying this round",
-                           river_wifi_station_connect_strategy_name(strategy));
-                break;
+                river_wifi_station_fill_connect_param(&connect_param, credential, candidate, strategy);
+                RIVER_LOGI("connect strategy=%s ssid=%s channel=%u sec=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x",
+                           river_wifi_station_connect_strategy_name(strategy),
+                           credential->ssid,
+                           (unsigned int)connect_param.channel,
+                           river_wifi_station_strategy_security_name(credential, strategy),
+                           connect_param.bssid.octet[0],
+                           connect_param.bssid.octet[1],
+                           connect_param.bssid.octet[2],
+                           connect_param.bssid.octet[3],
+                           connect_param.bssid.octet[4],
+                           connect_param.bssid.octet[5]);
+
+                result = wifi_connect(&connect_param, 1);
+                if (result == RTK_SUCCESS) {
+                    g_river_wifi_station.next_credential_index = (u8)credential_index;
+                    break;
+                }
+
+                if (result == -RTK_ERR_BUSY) {
+                    RIVER_LOGW("connect strategy=%s busy; wait existing join flow",
+                               river_wifi_station_connect_strategy_name(strategy));
+                    if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "busy")) {
+                        result = RTK_SUCCESS;
+                        joined_in_wait = true;
+                        break;
+                    }
+
+                    result = -RTK_ERR_TIMEOUT;
+                    RIVER_LOGW("busy join flow did not stabilize for strategy=%s; stop retrying this round",
+                               river_wifi_station_connect_strategy_name(strategy));
+                    break;
+                }
+
+                g_river_wifi_station.last_error = result;
+                if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
+                    join_status = RTW_JOINSTATUS_UNKNOWN;
+                }
+                RIVER_LOGW("connect strategy=%s ssid=%s failed err=%d(%s) join=%s",
+                           river_wifi_station_connect_strategy_name(strategy),
+                           credential->ssid,
+                           result,
+                           river_wifi_station_error_name(result),
+                           river_wifi_station_join_status_name(join_status));
+                river_wifi_station_disconnect_and_wait_idle(1500U);
             }
 
-            river_wifi_station_fill_connect_param(&connect_param, &candidate, strategy);
-            RIVER_LOGI("connect strategy=%s ssid=%s channel=%u sec=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x",
-                       river_wifi_station_connect_strategy_name(strategy),
-                       RIVER_WIFI_STA_SSID,
-                       (unsigned int)connect_param.channel,
-                       river_wifi_station_security_name(connect_param.security_type),
-                       connect_param.bssid.octet[0],
-                       connect_param.bssid.octet[1],
-                       connect_param.bssid.octet[2],
-                       connect_param.bssid.octet[3],
-                       connect_param.bssid.octet[4],
-                       connect_param.bssid.octet[5]);
-
-            result = wifi_connect(&connect_param, 1);
             if (result == RTK_SUCCESS) {
                 break;
             }
-
-            if (result == -RTK_ERR_BUSY) {
-                RIVER_LOGW("connect strategy=%s busy; wait existing join flow",
-                           river_wifi_station_connect_strategy_name(strategy));
-                if (river_wifi_station_adopt_existing_join_flow(RIVER_WIFI_STA_JOIN_WAIT_MS, "busy")) {
-                    result = RTK_SUCCESS;
-                    joined_in_wait = true;
-                    break;
-                }
-
-                result = -RTK_ERR_TIMEOUT;
-                RIVER_LOGW("busy join flow did not stabilize for strategy=%s; stop retrying this round",
-                           river_wifi_station_connect_strategy_name(strategy));
-                break;
-            }
-
-            g_river_wifi_station.last_error = result;
-            if (wifi_get_join_status(&join_status) != RTK_SUCCESS) {
-                join_status = RTW_JOINSTATUS_UNKNOWN;
-            }
-            RIVER_LOGW("connect strategy=%s failed err=%d(%s) join=%s",
-                       river_wifi_station_connect_strategy_name(strategy),
-                       result,
-                       river_wifi_station_error_name(result),
-                       river_wifi_station_join_status_name(join_status));
-            river_wifi_station_disconnect_and_wait_idle(1500U);
         }
 
         if (result == RTK_SUCCESS) {
@@ -870,8 +1109,12 @@ static void river_wifi_station_task(void *param)
 
         g_river_wifi_station.connecting = false;
         g_river_wifi_station.connect_failures++;
+        if (g_river_wifi_station.credential_count > 0U) {
+            g_river_wifi_station.next_credential_index =
+                (u8)((credential_index + 1U) % g_river_wifi_station.credential_count);
+        }
         RIVER_LOGW("connect failed ssid=%s err=%d(%s) join=%s failures=%lu retry_ms=%u",
-                   RIVER_WIFI_STA_SSID,
+                   river_wifi_station_selected_ssid(),
                    g_river_wifi_station.last_error,
                    river_wifi_station_error_name(g_river_wifi_station.last_error),
                    river_wifi_station_join_status_name(join_status),
@@ -889,6 +1132,12 @@ river_status_t river_wifi_station_init(void)
     }
 
     memset(&g_river_wifi_station, 0, sizeof(g_river_wifi_station));
+    river_wifi_station_load_credentials();
+    if (g_river_wifi_station.credential_count == 0U) {
+        RIVER_LOGE("autoconnect init failed: no configured wifi credentials");
+        return RIVER_ERR_ARG;
+    }
+    river_wifi_station_select_credential(0U);
     river_wifi_station_force_sdk_fast_connect_off();
     river_wifi_station_patch_user_config_once();
     river_wifi_station_clear_sdk_fast_connect_profile_early();
@@ -905,8 +1154,9 @@ river_status_t river_wifi_station_init(void)
     }
 
     g_river_wifi_station.initialized = true;
-    RIVER_LOGI("autoconnect init: ssid=%s retry_ms=%u",
-               RIVER_WIFI_STA_SSID,
+    RIVER_LOGI("autoconnect init: ap_count=%u primary=%s retry_ms=%u",
+               (unsigned int)g_river_wifi_station.credential_count,
+               river_wifi_station_selected_ssid(),
                (unsigned int)RIVER_WIFI_STA_RETRY_MS);
     return RIVER_OK;
 }
@@ -918,7 +1168,7 @@ bool river_wifi_station_is_connected(void)
 
 const char *river_wifi_station_ssid(void)
 {
-    return RIVER_WIFI_STA_SSID;
+    return river_wifi_station_selected_ssid();
 }
 
 const char *river_wifi_station_status_name(void)
