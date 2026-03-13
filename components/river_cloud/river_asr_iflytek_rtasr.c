@@ -7,8 +7,11 @@
 #include <time.h>
 #include "cJSON.h"
 #include "lwip_netconf.h"
+#include "lwip/netdb.h"
+#include "wifi_api.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/md.h"
+#include "mbedtls/md5.h"
 #include "os_wrapper.h"
 #include "websocket/libwsclient.h"
 #include "websocket/wsclient_api.h"
@@ -26,9 +29,9 @@
 #define RIVER_IFLYTEK_RTASR_SIGNATURE_RAW_MAX  20U
 #define RIVER_IFLYTEK_RTASR_SIGNATURE_B64_MAX  64U
 #define RIVER_IFLYTEK_RTASR_QUERY_MAX          768U
-#define RIVER_IFLYTEK_RTASR_TX_MAX             2048U
-#define RIVER_IFLYTEK_RTASR_RX_MAX             4096U
-#define RIVER_IFLYTEK_RTASR_QUEUE_MAX          6U
+#define RIVER_IFLYTEK_RTASR_TX_MAX             512U
+#define RIVER_IFLYTEK_RTASR_RX_MAX             1024U
+#define RIVER_IFLYTEK_RTASR_QUEUE_MAX          3U
 
 typedef struct {
     bool initialized;
@@ -86,32 +89,24 @@ static size_t river_iflytek_url_encode(const char *src, char *dst, size_t dst_si
     return written;
 }
 
-static bool river_iflytek_append_encoded_param(char *dst,
-                                               size_t dst_size,
-                                               const char *key,
-                                               const char *value)
+static river_status_t river_iflytek_sign_llm(const char *appid,
+                                             const char *ts,
+                                             char *signature_b64,
+                                             size_t signature_b64_size)
 {
-    char key_encoded[96];
-    char value_encoded[192];
-    int written;
-
-    river_iflytek_url_encode(key, key_encoded, sizeof(key_encoded));
-    river_iflytek_url_encode(value, value_encoded, sizeof(value_encoded));
-    written = snprintf(dst + strlen(dst),
-                       dst_size - strlen(dst),
-                       "%s=%s&",
-                       key_encoded,
-                       value_encoded);
-    return written > 0;
-}
-
-static river_status_t river_iflytek_sign_query(const char *query_without_signature,
-                                               char *signature_b64,
-                                               size_t signature_b64_size)
-{
-    const mbedtls_md_info_t *md_info;
+    unsigned char md5_output[16];
     unsigned char hmac_output[RIVER_IFLYTEK_RTASR_SIGNATURE_RAW_MAX];
+    char base_string[128];
+    const mbedtls_md_info_t *md_info;
     size_t signature_len;
+
+    snprintf(base_string, sizeof(base_string), "%s%s", appid, ts);
+    mbedtls_md5((const unsigned char *)base_string, strlen(base_string), md5_output);
+
+    char md5_hex[33];
+    for (int i = 0; i < 16; i++) {
+        sprintf(md5_hex + (i * 2), "%02x", md5_output[i]);
+    }
 
     md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
     if (md_info == NULL) {
@@ -119,10 +114,10 @@ static river_status_t river_iflytek_sign_query(const char *query_without_signatu
     }
 
     if (mbedtls_md_hmac(md_info,
-                        (const unsigned char *)RIVER_IFLYTEK_RTASR_ACCESS_SECRET,
-                        strlen(RIVER_IFLYTEK_RTASR_ACCESS_SECRET),
-                        (const unsigned char *)query_without_signature,
-                        strlen(query_without_signature),
+                        (const unsigned char *)RIVER_IFLYTEK_RTASR_API_KEY,
+                        strlen(RIVER_IFLYTEK_RTASR_API_KEY),
+                        (const unsigned char *)md5_hex,
+                        strlen(md5_hex),
                         hmac_output) != 0) {
         return RIVER_ERR_IO;
     }
@@ -139,71 +134,30 @@ static river_status_t river_iflytek_sign_query(const char *query_without_signatu
     return RIVER_OK;
 }
 
-static river_status_t river_iflytek_build_url(const river_cloud_asr_audio_desc_t *audio,
-                                              char *url,
-                                              size_t url_size)
+static river_status_t river_iflytek_build_query(char *query, size_t query_size)
 {
-    char utc_text[24];
-    char uuid_text[48];
-    char query[RIVER_IFLYTEK_RTASR_QUERY_MAX];
+    char ts_text[24];
     char signature_b64[RIVER_IFLYTEK_RTASR_SIGNATURE_B64_MAX];
     char signature_encoded[128];
     time_t now;
-    int written;
 
-    if (audio == NULL || url == NULL || url_size == 0U) {
-        return RIVER_ERR_ARG;
-    }
-    if (audio->sample_rate != 16000U || audio->channels != 1U ||
-        audio->bits_per_sample != 16U || audio->encoding == NULL ||
-        strcmp(audio->encoding, RIVER_IFLYTEK_RTASR_AUDIO_ENC) != 0) {
-        return RIVER_ERR_UNSUPPORTED;
-    }
-
-    now = (time_t)river_cloud_now_utc_seconds();
-    if (now <= 0) {
+    now = time(NULL);
+    if (now < 1700000000) {
         return RIVER_ERR_BUSY;
     }
-    snprintf(utc_text, sizeof(utc_text), "%lu", (unsigned long)now);
-    snprintf(uuid_text,
-             sizeof(uuid_text),
-             "%08lx-%08lx-%04lx",
-             (unsigned long)now,
-             (unsigned long)g_river_iflytek_rtasr.sequence,
-             (unsigned long)(g_river_iflytek_rtasr.sent_frames & 0xFFFFU));
+    snprintf(ts_text, sizeof(ts_text), "%lu", (unsigned long)now);
 
-    query[0] = '\0';
-    river_iflytek_append_encoded_param(query, sizeof(query), "accessKeyId",
-                                       RIVER_IFLYTEK_RTASR_ACCESS_KEY_ID);
-    river_iflytek_append_encoded_param(query, sizeof(query), "appId",
-                                       RIVER_IFLYTEK_RTASR_APP_ID);
-    river_iflytek_append_encoded_param(query, sizeof(query), "audio_encode",
-                                       RIVER_IFLYTEK_RTASR_AUDIO_ENC);
-    river_iflytek_append_encoded_param(query, sizeof(query), "lang",
-                                       RIVER_IFLYTEK_RTASR_LANG);
-    river_iflytek_append_encoded_param(query, sizeof(query), "samplerate",
-                                       RIVER_IFLYTEK_RTASR_SAMPLERATE);
-    river_iflytek_append_encoded_param(query, sizeof(query), "utc", utc_text);
-    river_iflytek_append_encoded_param(query, sizeof(query), "uuid", uuid_text);
-    if (strlen(query) > 0U && query[strlen(query) - 1U] == '&') {
-        query[strlen(query) - 1U] = '\0';
-    }
-
-    if (river_iflytek_sign_query(query, signature_b64, sizeof(signature_b64)) != RIVER_OK) {
+    if (river_iflytek_sign_llm(RIVER_IFLYTEK_RTASR_APP_ID,
+                                ts_text,
+                                signature_b64,
+                                sizeof(signature_b64)) != RIVER_OK) {
         return RIVER_ERR_IO;
     }
 
     river_iflytek_url_encode(signature_b64, signature_encoded, sizeof(signature_encoded));
-    written = snprintf(url,
-                       url_size,
-                       "wss://%s%s?%s&signature=%s",
-                       RIVER_IFLYTEK_RTASR_HOST,
-                       RIVER_IFLYTEK_RTASR_PATH,
-                       query,
-                       signature_encoded);
-    if (written <= 0 || (size_t)written >= url_size) {
-        return RIVER_ERR_NO_MEMORY;
-    }
+    
+    snprintf(query, query_size, "appid=%s&ts=%s&signa=%s",
+             RIVER_IFLYTEK_RTASR_APP_ID, ts_text, signature_encoded);
 
     return RIVER_OK;
 }
@@ -495,7 +449,9 @@ static void river_iflytek_deinit(void)
 
 static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc_t *audio)
 {
-    char url[RIVER_IFLYTEK_RTASR_URL_MAX];
+    char query[RIVER_IFLYTEK_RTASR_QUERY_MAX];
+    char full_url[RIVER_IFLYTEK_RTASR_URL_MAX];
+    struct hostent *server_host;
 
     if (audio == NULL) {
         return RIVER_ERR_ARG;
@@ -504,13 +460,36 @@ static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc
         return RIVER_ERR_BUSY;
     }
 
+    server_host = gethostbyname(RIVER_IFLYTEK_RTASR_HOST);
+    if (server_host == NULL) {
+        RIVER_LOGW("DNS resolution failed for %s", RIVER_IFLYTEK_RTASR_HOST);
+        return RIVER_ERR_IO;
+    }
+    RIVER_LOGI("DNS resolved %s to %u.%u.%u.%u",
+               RIVER_IFLYTEK_RTASR_HOST,
+               (unsigned char)server_host->h_addr_list[0][0],
+               (unsigned char)server_host->h_addr_list[0][1],
+               (unsigned char)server_host->h_addr_list[0][2],
+               (unsigned char)server_host->h_addr_list[0][3]);
+
     river_iflytek_close_context(false);
-    if (river_iflytek_build_url(audio, url, sizeof(url)) != RIVER_OK) {
+
+    /* Settle time for network stack */
+    rtos_time_delay_ms(500);
+
+    if (river_iflytek_build_query(query, sizeof(query)) != RIVER_OK) {
         return RIVER_ERR_IO;
     }
 
+    /* 
+     * Rebuild a simple ws:// URL.
+     * We'll use ws_connect_url but ensure it's formatted as ws://host:80/path?query
+     */
+    snprintf(full_url, sizeof(full_url), "ws://%s:80%s?%s", 
+             RIVER_IFLYTEK_RTASR_HOST, RIVER_IFLYTEK_RTASR_PATH, query);
+
     g_river_iflytek_rtasr.wsclient =
-        create_wsclient(url, 0, NULL, NULL,
+        create_wsclient(full_url, 0, NULL, NULL,
                         RIVER_IFLYTEK_RTASR_TX_MAX,
                         RIVER_IFLYTEK_RTASR_RX_MAX,
                         RIVER_IFLYTEK_RTASR_QUEUE_MAX);
@@ -518,12 +497,13 @@ static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc
         return RIVER_ERR_NO_MEMORY;
     }
 
-    ws_setsockopt_timeout(2000U, 2000U, 4000U);
+    ws_setsockopt_timeout(10000U, 10000U, 15000U);
+
+    RIVER_LOGI("initiating ws connection via %s", full_url);
     if (ws_connect_url(g_river_iflytek_rtasr.wsclient) < 0) {
         river_iflytek_close_context(false);
         snprintf(g_river_iflytek_rtasr.last_error,
                  sizeof(g_river_iflytek_rtasr.last_error),
-                 "%s",
                  "ws connect failed");
         return RIVER_ERR_IO;
     }
@@ -537,11 +517,7 @@ static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc
     g_river_iflytek_rtasr.last_sid[0] = '\0';
     g_river_iflytek_rtasr.last_text[0] = '\0';
     g_river_iflytek_rtasr.last_error[0] = '\0';
-    RIVER_LOGI("stream open: %luHz/%luch/%lubit seq=%lu",
-               (unsigned long)audio->sample_rate,
-               (unsigned long)audio->channels,
-               (unsigned long)audio->bits_per_sample,
-               (unsigned long)g_river_iflytek_rtasr.sequence);
+    RIVER_LOGI("stream open success: seq=%lu", (unsigned long)g_river_iflytek_rtasr.sequence);
     return RIVER_OK;
 }
 

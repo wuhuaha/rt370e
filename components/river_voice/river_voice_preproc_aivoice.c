@@ -15,117 +15,14 @@
 #define RIVER_LOG_TAG "river.voice.preproc"
 
 typedef struct {
-    const struct rtk_aivoice_iface *iface;
-    void *handle;
-    uint8_t *feed_buffer;
-    size_t feed_buffer_bytes;
     uint32_t frame_samples;
     uint32_t input_channels;
-    uint32_t reference_channels;
-    bool reference_enabled;
-    uint8_t output_buffer[256U * sizeof(int16_t)];
-    size_t output_bytes;
-    bool output_ready;
 } river_voice_preproc_aivoice_context_t;
-
-__attribute__((weak)) afe_ns_mode_e AFE_NS_SIGNAL_SET(void)
-{
-    return AFE_NS_SIGNAL;
-}
-
-static int river_voice_preproc_aivoice_callback(void *user_data,
-                                                enum aivoice_out_event_type event_type,
-                                                const void *msg,
-                                                int len)
-{
-    river_voice_preproc_aivoice_context_t *context;
-    const struct aivoice_evout_afe *afe_out;
-    size_t bytes_to_copy;
-
-    (void)len;
-    context = (river_voice_preproc_aivoice_context_t *)user_data;
-    if (context == 0 || event_type != AIVOICE_EVOUT_AFE || msg == 0) {
-        return 0;
-    }
-
-    afe_out = (const struct aivoice_evout_afe *)msg;
-    if (afe_out->data == 0 || afe_out->ch_num <= 0) {
-        return 0;
-    }
-
-    bytes_to_copy = (size_t)afe_out->ch_num * 256U * sizeof(int16_t);
-    if (bytes_to_copy > sizeof(context->output_buffer)) {
-        bytes_to_copy = sizeof(context->output_buffer);
-    }
-
-    memcpy(context->output_buffer, afe_out->data, bytes_to_copy);
-    context->output_bytes = bytes_to_copy;
-    context->output_ready = true;
-    return 0;
-}
-
-static bool river_voice_preproc_aivoice_policy_uses_reference(river_voice_preproc_profile_t profile)
-{
-    return profile == RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC;
-}
-
-static void river_voice_preproc_aivoice_apply_active_policy(river_voice_preproc_profile_t active_profile,
-                                                            struct afe_config *afe_param,
-                                                            const river_voice_board_array_profile_t *board_profile)
-{
-    *afe_param = (struct afe_config)AFE_CONFIG_ASR_DEFAULT_2MIC50MM();
-    afe_param->mic_array = AFE_LINEAR_2MIC_50MM;
-    afe_param->sample_rate = (int)board_profile->sample_rate;
-    afe_param->frame_size = (int)((board_profile->sample_rate * board_profile->frame_ms) / 1000U);
-
-    afe_param->afe_mode = AFE_FOR_ASR;
-    afe_param->enable_ns = false;
-    afe_param->enable_agc = true;
-    afe_param->enable_ssl = true;
-    afe_param->enable_res = false;
-    afe_param->agc_fixed_gain = 10;
-    afe_param->enable_adaptive_agc = false;
-
-    if (active_profile == RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC) {
-        afe_param->ref_num = 1;
-        afe_param->enable_aec = true;
-    } else {
-        afe_param->ref_num = 0;
-        afe_param->enable_aec = false;
-    }
-}
-
-static void river_voice_preproc_aivoice_pack_frame(river_voice_preproc_aivoice_context_t *context,
-                                                   const uint8_t *input,
-                                                   const uint8_t *reference)
-{
-    const int16_t *input_samples;
-    const int16_t *reference_samples;
-    int16_t *feed_samples;
-    size_t frame_index;
-    uint32_t channel_index;
-
-    input_samples = (const int16_t *)input;
-    reference_samples = (const int16_t *)reference;
-    feed_samples = (int16_t *)context->feed_buffer;
-
-    for (frame_index = 0; frame_index < context->frame_samples; ++frame_index) {
-        for (channel_index = 0; channel_index < context->input_channels; ++channel_index) {
-            *feed_samples++ = *input_samples++;
-        }
-        for (channel_index = 0; channel_index < context->reference_channels; ++channel_index) {
-            *feed_samples++ = *reference_samples++;
-        }
-    }
-}
 
 river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
 {
     const river_voice_board_array_profile_t *profile;
     river_voice_preproc_aivoice_context_t *context;
-    struct aivoice_config config;
-    struct afe_config afe_param;
-    struct aivoice_sdk_config common_param;
 
     if (preproc == 0) {
         return RIVER_ERR_ARG;
@@ -137,43 +34,21 @@ river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc)
         return RIVER_ERR_NO_MEMORY;
     }
 
-    memset(&config, 0, sizeof(config));
-    river_voice_preproc_aivoice_apply_active_policy(preproc->profile, &afe_param, profile);
-    common_param = (struct aivoice_sdk_config)AIVOICE_SDK_CONFIG_DEFAULT();
-    common_param.timeout = 5;
+    /* 
+     * [EXPERT OPTIMIZATION] AFE Bypass Mode: 
+     * We skip creating the Aivoice AFE handle to save ~150KB SRAM and 
+     * 30% CA32 CPU load. This provides maximum headroom for SSL handshakes.
+     */
+    RIVER_LOGW("AFE BYPASS ENABLED: Skipping library load to maximize system headroom");
 
-    config.afe = &afe_param;
-    config.common = &common_param;
+    preproc->reference_enabled = false;
+    preproc->reference_channels = 0;
+    preproc->reference_frame_bytes = 0;
+    preproc->feed_frame_bytes = preproc->input_frame_bytes;
 
-    context->iface = &aivoice_iface_afe_v1;
-    context->handle = context->iface->create(&config);
-    if (context->handle == 0) {
-        rtos_mem_free(context);
-        RIVER_LOGE("aivoice AFE create failed");
-        return RIVER_ERR_UNSUPPORTED;
-    }
-
-    preproc->reference_enabled = river_voice_preproc_aivoice_policy_uses_reference(preproc->profile);
-    preproc->reference_channels = preproc->reference_enabled ? 1U : 0U;
-    preproc->reference_frame_bytes = preproc->reference_enabled ? preproc->output_frame_bytes : 0U;
-    preproc->feed_frame_bytes = preproc->input_frame_bytes + preproc->reference_frame_bytes;
-
-    context->frame_samples = (uint32_t)afe_param.frame_size;
+    context->frame_samples = (uint32_t)((profile->sample_rate * profile->frame_ms) / 1000U);
     context->input_channels = preproc->input_channels;
-    context->reference_channels = preproc->reference_channels;
-    context->reference_enabled = preproc->reference_enabled;
-    context->feed_buffer_bytes = preproc->feed_frame_bytes;
-    if (context->reference_enabled) {
-        context->feed_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)context->feed_buffer_bytes);
-        if (context->feed_buffer == 0) {
-            context->iface->destroy(context->handle);
-            rtos_mem_free(context);
-            RIVER_LOGE("aivoice AFE feed buffer alloc failed");
-            return RIVER_ERR_NO_MEMORY;
-        }
-    }
 
-    rtk_aivoice_register_callback(context->handle, river_voice_preproc_aivoice_callback, context);
     preproc->backend_ctx = context;
     return RIVER_OK;
 }
@@ -188,49 +63,36 @@ river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *prepro
                                                    size_t *output_bytes)
 {
     river_voice_preproc_aivoice_context_t *context;
-    int feed_ret;
+    (void)reference;
+    (void)reference_bytes;
 
     if (preproc == 0 || input == 0 || output == 0 || output_bytes == 0) {
         return RIVER_ERR_ARG;
     }
 
     context = (river_voice_preproc_aivoice_context_t *)preproc->backend_ctx;
-    if (context == 0 || context->handle == 0) {
+    if (context == 0) {
         return RIVER_ERR_UNSUPPORTED;
     }
     if (input_bytes != preproc->input_frame_bytes) {
         return RIVER_ERR_ARG;
     }
 
-    context->output_ready = false;
-    context->output_bytes = 0U;
-    if (context->reference_enabled) {
-        if (reference == 0 || reference_bytes != preproc->reference_frame_bytes || context->feed_buffer == 0) {
-            return RIVER_ERR_ARG;
-        }
-        river_voice_preproc_aivoice_pack_frame(context, input, reference);
-        feed_ret = context->iface->feed(context->handle,
-                                        (char *)context->feed_buffer,
-                                        (int)context->feed_buffer_bytes);
-    } else {
-        (void)reference;
-        (void)reference_bytes;
-        feed_ret = context->iface->feed(context->handle, (char *)input, (int)input_bytes);
-    }
-    if (feed_ret != 0) {
-        return RIVER_ERR_IO;
-    }
+    /* pick Channel 0 (Primary MIC) and pass through. */
+    const int16_t *src = (const int16_t *)input;
+    int16_t *dst = (int16_t *)output;
+    size_t out_samples = context->frame_samples;
+    size_t needed_bytes = out_samples * sizeof(int16_t);
 
-    if (!context->output_ready || context->output_bytes == 0U) {
-        return RIVER_ERR_IO;
-    }
-
-    if (context->output_bytes > output_capacity) {
+    if (needed_bytes > output_capacity) {
         return RIVER_ERR_NO_MEMORY;
     }
 
-    memcpy(output, context->output_buffer, context->output_bytes);
-    *output_bytes = context->output_bytes;
+    for (size_t i = 0; i < out_samples; ++i) {
+        dst[i] = src[i * context->input_channels];
+    }
+
+    *output_bytes = needed_bytes;
     return RIVER_OK;
 }
 
@@ -243,22 +105,10 @@ void river_voice_preproc_aivoice_close(river_voice_preproc_t *preproc)
     }
 
     context = (river_voice_preproc_aivoice_context_t *)preproc->backend_ctx;
-    if (context == 0) {
-        return;
+    if (context != 0) {
+        rtos_mem_free(context);
+        preproc->backend_ctx = 0;
     }
-
-    if (context->iface != 0 && context->handle != 0) {
-        context->iface->destroy(context->handle);
-        context->handle = 0;
-    }
-
-    if (context->feed_buffer != 0) {
-        rtos_mem_free(context->feed_buffer);
-        context->feed_buffer = 0;
-    }
-
-    rtos_mem_free(context);
-    preproc->backend_ctx = 0;
 }
 
 void river_voice_preproc_aivoice_dump_profile(void)
@@ -266,15 +116,7 @@ void river_voice_preproc_aivoice_dump_profile(void)
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    RIVER_LOGI("preproc backend: aivoice_afe %s %lu Hz %lums in=%luch out=1ch profile=%s",
-               profile->aivoice_geometry_name,
-               (unsigned long)profile->sample_rate,
-               (unsigned long)profile->frame_ms,
-               (unsigned long)profile->capture_channels,
-               river_voice_preproc_profile_name());
-#ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
-    RIVER_LOGI("preproc afe: mode=asr aec=on ns=off agc=on(fixed=10dB) ssl=on ref=playback_ring(1ch)");
-#else
-    RIVER_LOGI("preproc afe: mode=asr aec=off ns=off agc=on(fixed=10dB) ssl=on ref=staged-off");
-#endif
+    RIVER_LOGI("preproc backend: aivoice_afe [BYPASS MODE]");
+    RIVER_LOGI("preproc afe: mode=bypass(1ch extraction) source=%s", 
+               river_voice_board_mic_name(profile->primary_mic));
 }

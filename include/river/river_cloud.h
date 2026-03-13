@@ -42,6 +42,7 @@ river_status_t river_cloud_adapter_init(void);
 river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_handler_t handler,
                                                       void *user_data);
 river_status_t river_cloud_adapter_submit_text(const char *text);
+bool river_cloud_utc_ready(void);
 const char *river_cloud_asr_provider_name(void);
 bool river_cloud_asr_streaming_supported(void);
 bool river_cloud_asr_batch_supported(void);

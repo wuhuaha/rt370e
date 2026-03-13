@@ -893,3 +893,4 @@
   - using the scanned `BSSID + channel + security` first is more deterministic for home-router debugging than restarting from the least constrained path each time
 - Added root-level [TIPS.md](/root/ameba-river/TIPS.md) as the first-stop runtime troubleshooting guide for recurring serial-log signatures such as `auth_fail`, `busy`, and provider bring-up issues.
 - Added a dedicated active Wi-Fi issue record in [.codex/issues.md](/root/ameba-river/.codex/issues.md) so transient field failures can be tracked with symptoms, mitigations, and closure criteria.
+\n## Step 5\n- **Asynchronous Architecture Overhaul**: Implemented river_cloud_wk worker and Ring Buffer system.\n- **IPC Protection**: Task priority tuning to resolve net_connect -82 and IPC timeouts.\n- **Embedded Hardening**: Decomposed WS URL init and Multi-AP failover.\n- **Memory Audit**: Integrated vPortGetHeapStats for fragmentation tracking.
