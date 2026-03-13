@@ -11,7 +11,6 @@
 static const river_voice_board_array_profile_t g_river_voice_board_array_profile = {
     .board_name = "EV8730EA2/EV730EA2",
     .geometry_name = "linear-2mic-50mm",
-    .aivoice_geometry_name = "AFE_LINEAR_2MIC_50MM",
     .mic_spacing_mm = 50U,
     .sample_rate = 16000U,
     .frame_ms = 16U,
@@ -102,9 +101,7 @@ void river_voice_board_dump_array_profile(void)
                river_voice_board_mic_name(profile->secondary_mic),
                (unsigned long)profile->mic_spacing_mm);
     if (profile->aux_mic_reserved) {
-        RIVER_LOGI("board array aux: %s reserved for future AFE/beamforming raw tap",
+        RIVER_LOGI("board array aux: %s reserved for future beamforming/raw tap experiments",
                    river_voice_board_mic_name(profile->aux_mic));
     }
-    RIVER_LOGI("aivoice-ready geometry: %s",
-               profile->aivoice_geometry_name);
 }

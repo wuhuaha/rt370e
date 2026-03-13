@@ -7,7 +7,6 @@
 typedef struct {
     const char *board_name;
     const char *geometry_name;
-    const char *aivoice_geometry_name;
     uint32_t mic_spacing_mm;
     uint32_t sample_rate;
     uint32_t frame_ms;

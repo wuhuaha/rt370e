@@ -6,7 +6,6 @@
 #include "river/river_voice_preproc.h"
 #include "river/river_voice_ref.h"
 #include "river/river_voice_segment_sink.h"
-#include "river/river_voice_vad_reference.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.frontend"
@@ -20,11 +19,10 @@ river_status_t river_voice_frontend_init(void)
     river_voice_capture_dump_profile();
     river_voice_preproc_dump_profile();
     river_voice_detector_dump_profile();
-    river_voice_vad_reference_dump_profile();
     river_voice_ref_dump_profile();
     river_voice_segment_sink_dump_profile();
-    RIVER_LOGI("current board path follows SDK speechmind/aivoice baseline: AMIC1 + AMIC3 dual mic");
-    RIVER_LOGI("pure vad validation path: capture -> aivoice_afe -> silero + sdk_vad_ref -> segment buffer -> serial diagnostics");
+    RIVER_LOGI("current board path uses AMIC1 + AMIC3 dual mic with software fixed delay-and-sum beamforming");
+    RIVER_LOGI("pure vad validation path: capture -> fixed_dsb -> silero -> stream/buffer bridge -> runtime logs");
     RIVER_LOGI("board audio echo test: river audio start | river audio stop | river audio status");
     return RIVER_OK;
 }

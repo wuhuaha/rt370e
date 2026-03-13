@@ -6,7 +6,6 @@
 #include "river/river_log.h"
 #include "river/river_online_control.h"
 #include "river/river_voice.h"
-#include "river/river_voice_vad_reference.h"
 #include "river/river_wifi_station.h"
 
 #undef RIVER_LOG_TAG
@@ -140,7 +139,6 @@ void river_app_print_status(void)
     RIVER_LOGI("local_preproc=%s", river_voice_preproc_backend_name());
     RIVER_LOGI("local_preproc_profile=%s", river_voice_preproc_profile_name());
     RIVER_LOGI("local_detector=%s", river_voice_detector_backend_name());
-    RIVER_LOGI("local_detector_reference=%s", river_voice_vad_reference_name());
     RIVER_LOGI("local_playback_ref=%s", river_voice_ref_backend_name());
     RIVER_LOGI("local_segment_sink=%s", river_voice_segment_sink_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED

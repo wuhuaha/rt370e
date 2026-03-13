@@ -20,7 +20,6 @@
 #include "river/river_voice_preproc.h"
 #include "river/river_voice_segment_buffer.h"
 #include "river/river_voice_segment_sink.h"
-#include "river/river_voice_vad_reference.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.probe"
@@ -63,7 +62,6 @@ typedef struct {
     bool running;
     bool stop_requested;
     bool diag_enabled;
-    bool vad_reference_enabled;
     bool segment_buffer_enabled;
     rtos_task_t task;
     river_voice_capture_t capture;
@@ -77,10 +75,6 @@ typedef struct {
     uint32_t diag_read_ok;
     uint32_t diag_proc_ok;
     uint32_t diag_det_ok;
-    uint32_t diag_sdk_vad_events;
-    uint32_t diag_sdk_vad_speech_start;
-    uint32_t diag_sdk_vad_speech_end;
-    uint32_t diag_sdk_vad_last_offset_ms;
     uint32_t diag_read_fail;
     uint32_t diag_proc_fail;
     uint32_t diag_det_fail;
@@ -105,7 +99,6 @@ typedef struct {
     bool diag_vad_is_speech;
     bool diag_vad_prev_is_speech;
     bool diag_vad_last_logged_is_speech;
-    bool diag_sdk_vad_is_speech;
 } river_voice_vad_probe_context_t;
 
 static river_voice_vad_probe_context_t g_river_voice_vad_probe;
@@ -200,10 +193,6 @@ static void river_voice_vad_probe_reset_diag_counters(void)
     g_river_voice_vad_probe.diag_read_ok = 0U;
     g_river_voice_vad_probe.diag_proc_ok = 0U;
     g_river_voice_vad_probe.diag_det_ok = 0U;
-    g_river_voice_vad_probe.diag_sdk_vad_events = 0U;
-    g_river_voice_vad_probe.diag_sdk_vad_speech_start = 0U;
-    g_river_voice_vad_probe.diag_sdk_vad_speech_end = 0U;
-    g_river_voice_vad_probe.diag_sdk_vad_last_offset_ms = 0U;
     g_river_voice_vad_probe.diag_read_fail = 0U;
     g_river_voice_vad_probe.diag_proc_fail = 0U;
     g_river_voice_vad_probe.diag_det_fail = 0U;
@@ -224,7 +213,6 @@ static void river_voice_vad_probe_reset_diag_counters(void)
     g_river_voice_vad_probe.diag_vad_probability_raw_q15 = 0U;
     g_river_voice_vad_probe.diag_vad_probability_q15 = 0U;
     g_river_voice_vad_probe.diag_vad_is_speech = false;
-    g_river_voice_vad_probe.diag_sdk_vad_is_speech = false;
     g_river_voice_vad_probe.diag_chunks_until_log =
         (RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS + (frame_ms / 2U)) / frame_ms;
     if (g_river_voice_vad_probe.diag_chunks_until_log == 0U) {
@@ -261,13 +249,11 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
                (unsigned long)g_river_voice_vad_probe.diag_vad_speech,
                (unsigned long)g_river_voice_vad_probe.diag_vad_speech_start,
                (unsigned long)g_river_voice_vad_probe.diag_vad_speech_end,
-               g_river_voice_vad_probe.vad_reference_enabled ?
-                   (g_river_voice_vad_probe.diag_sdk_vad_is_speech ? "speech" : "silence") :
-                   "disabled",
-               (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_events,
-               (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_speech_start,
-               (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_speech_end,
-               (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_last_offset_ms,
+               "disabled",
+               0UL,
+               0UL,
+               0UL,
+               0UL,
                g_river_voice_vad_probe.segment_buffer_enabled ?
                    (segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle")) :
                    "disabled",
@@ -324,10 +310,8 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
                (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch0,
                (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch1,
                (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
-               g_river_voice_vad_probe.vad_reference_enabled ?
-                   (g_river_voice_vad_probe.diag_sdk_vad_is_speech ? "speech" : "silence") :
-                   "disabled",
-               (unsigned long)g_river_voice_vad_probe.diag_sdk_vad_events,
+               "disabled",
+               0UL,
                g_river_voice_vad_probe.segment_buffer_enabled ?
                    (segment_status.active ? "active" : (segment_status.ready ? "ready" : "idle")) :
                    "disabled",
@@ -341,7 +325,6 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
 
 static void river_voice_vad_probe_close_audio(void)
 {
-    river_voice_vad_reference_close();
     river_cloud_asr_audio_close();
     river_voice_detector_close(&g_river_voice_vad_probe.detector);
     river_voice_preproc_close(&g_river_voice_vad_probe.preproc);
@@ -480,17 +463,11 @@ static river_status_t river_voice_vad_probe_open_audio(void)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    g_river_voice_vad_probe.vad_reference_enabled =
-        (river_voice_vad_reference_open() == RIVER_OK);
-    if (!g_river_voice_vad_probe.vad_reference_enabled) {
-        RIVER_LOGW("sdk_vad reference auto-disabled; keep silero-only decision logging");
-    }
-
     if (river_voice_vad_probe_prepare_buffers() != RIVER_OK) {
         return RIVER_ERR_NO_MEMORY;
     }
 
-    RIVER_LOGI("vad probe config: %lu Hz capture dual-mic -> ASR-AFE 1ch -> detector-only, %s+%s, diag_window~%ums",
+    RIVER_LOGI("vad probe config: %lu Hz capture dual-mic -> fixed_dsb 1ch -> detector-only, %s+%s, diag_window~%ums",
                (unsigned long)g_river_voice_vad_probe.capture.sample_rate,
                river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
                river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic),
@@ -664,21 +641,6 @@ static void river_voice_vad_probe_task(void *param)
                                river_wifi_station_status_name());
                 }
             }
-        }
-
-        if (g_river_voice_vad_probe.vad_reference_enabled) {
-            river_voice_vad_reference_status_t sdk_vad_status;
-
-            if (river_voice_vad_reference_process(g_river_voice_vad_probe.enhanced_buffer,
-                                                 g_river_voice_vad_probe.enhanced_chunk_bytes) != RIVER_OK) {
-                RIVER_LOGW("sdk_vad reference feed failed");
-            }
-            river_voice_vad_reference_get_status(&sdk_vad_status);
-            g_river_voice_vad_probe.diag_sdk_vad_is_speech = sdk_vad_status.is_speech;
-            g_river_voice_vad_probe.diag_sdk_vad_events = sdk_vad_status.total_events;
-            g_river_voice_vad_probe.diag_sdk_vad_speech_start = sdk_vad_status.total_speech_start;
-            g_river_voice_vad_probe.diag_sdk_vad_speech_end = sdk_vad_status.total_speech_end;
-            g_river_voice_vad_probe.diag_sdk_vad_last_offset_ms = sdk_vad_status.last_offset_ms;
         }
 
         river_voice_vad_probe_log_state_change_if_needed(detector_result.decision_valid,

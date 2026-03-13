@@ -5,7 +5,7 @@
 当前项目已经具备以下基础能力：
 - `Wi-Fi` 自动连接与重试
 - `Silero VAD` 板端运行
-- `AIVoice` 前处理接口边界
+- `fixed_dsb` 前处理接口边界
 - 在线 ASR provider 框架
 - 科大讯飞 provider 初步接入
 
@@ -30,8 +30,8 @@
   - 讯飞新旧接口混用
   - WebSocket host/path/query 处理不一致
 - `preproc` 语义被污染：
-  - 日志显示 `aivoice_afe [BYPASS MODE]`
-  - 运行语义与模块命名不一致，容易误导后续开发者
+  - 历史上曾出现 `aivoice_afe [BYPASS MODE]`
+  - 当前已切为软件 `fixed_dsb`，后续应继续避免“模块名和真实运行算法不一致”
 - `voice -> cloud` 直推路径耦合仍偏重：
   - 语音检测与云流激活耦合过多
   - 缺少独立的“session gate”
@@ -44,13 +44,13 @@
 ## 合理点
 - 引入异步 ASR 管线和双环形缓冲，方向是对的
 - 增强 Wi-Fi 生命周期控制，方向也是对的
-- 为了系统余量暂时引入 `AFE BYPASS MODE`，有调试价值
+- 为了系统余量曾暂时引入 `AFE BYPASS MODE`，在 bring-up 阶段有调试价值
 
 ## 不合理点
 - 修改了用户拥有的 review/tips/issues 文件，不符合当前仓库协作规则
 - 讯飞 provider 仍沿用旧 RTASR 接口模型，与当前官方文档不匹配
 - WebSocket 使用方式不符合 Realtek SDK 客户端约束
-- `aivoice_afe` 名称和 `bypass` 运行模式混在一起，增加理解成本
+- 历史上的 `aivoice_afe`/`bypass` 语义混杂增加了理解成本，现已收敛到 `fixed_dsb`
 
 ## 调整原则
 - 不推翻同事的异步管线思路
@@ -95,9 +95,9 @@
 - 在 `speech -> stream_open -> feed -> finish` 之间加独立会话状态机
 - 避免 VAD 状态和云连接状态直接耦合
 
-### Phase C：恢复真正的前处理 profile
-- 把 `AFE BYPASS MODE` 明确收成单独 profile
-- 不再挂在 `aivoice_afe` 名下伪装
+### Phase C：继续收敛真正的前处理 profile
+- 当前主前处理已切到软件 `fixed_dsb`
+- 后续如需恢复更复杂前处理，应以独立 profile 引入，而不是复用误导性名称
 
 ### Phase D：为多平台 ASR 做 provider 抽象收敛
 - 统一握手、错误码、partial/final、关闭语义
@@ -107,4 +107,3 @@
 - 本地 VAD/KWS 负责开门
 - 云端 ASR 负责最终识别
 - 未来可加离线 fallback
-

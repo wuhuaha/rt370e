@@ -258,6 +258,56 @@
 - The provider should also surface non-ASR result frames such as `res_type=frc`, plus empty final results (`ls=true` but no text), instead of silently treating them as "no event".
 
 ### Ameba SDK WebSocket Caveats
+
+## Fixed Delay-And-Sum Beamforming Notes
+
+### Project Decision
+- SDK-provided beamforming is not used in the current ASR mainline.
+- Current software beamforming strategy is fixed delay-and-sum beamforming (`DSB`) implemented inside the local pre-processing stage.
+- Primary goal:
+  - maximize ASR accuracy for a smart-home control panel user speaking toward the front of the device
+- Current physical/software assumptions:
+  - array topology: linear 2-mic
+  - microphones: `AMIC1 + AMIC3`
+  - nominal spacing: `50mm`
+  - target scene: broadside/front-facing speech toward the screen
+  - default steering: broadside
+  - current secondary delay: `0` samples
+
+### Why DSB Was Chosen
+- It is robust, simple, and predictable on constrained embedded platforms.
+- For broadside speech and a symmetric 2-mic line array, the best fixed-delay starting point is often `0-sample delay + sum + scale`.
+- This is more ASR-friendly than many more aggressive spatial algorithms because it tends to preserve speech timbre and avoid unstable adaptation artifacts.
+- It is cheap enough to run continuously on the current platform without pulling large extra SRAM or CPU from the online-ASR path.
+
+### Current Implementation Notes
+- Runtime backend name:
+  - `fixed_dsb`
+- Current implementation file:
+  - `components/river_voice/river_voice_preproc_aivoice.c`
+- Integration boundary:
+  - `capture (2ch PCM16) -> fixed_dsb (1ch PCM16) -> silero_vad -> online ASR`
+- The current implementation is intentionally fixed-point and lightweight:
+  - take primary sample
+  - take secondary sample
+  - optionally apply a fixed integer-sample delay to the secondary path
+  - sum both channels
+  - divide by 2 with saturation
+
+### Practical Engineering Notes
+- The user-provided theory note describing CMSIS-DSP acceleration is directionally useful, but the current production path runs on the `CA32` application side, not a Cortex-M-only DSP micro-kernel path.
+- The current project does not need a large external beamforming library for DSB.
+- If future tuning shows off-axis users are common, the next tuning knob should be:
+  - `secondary delay in integer samples`
+- If future tuning shows room echo dominates interaction, DSB should stay as the spatial front-end, and AEC should be added only when a real playback reference is available.
+
+### References Worth Keeping
+- `Optimum Array Processing: Part IV of Detection, Estimation, and Modulation Theory` by Harry L. Van Trees
+- `pyroomacoustics` for offline array/room simulation before firmware tuning
+- User-provided DSB implementation note summarizing:
+  - DSB simplicity
+  - 40mm-60mm mic spacing guidance
+  - broadside fixed-sum suitability for low-cost smart-home voice terminals
 - Ameba SDK `wsclient` has a bounded internal send queue.
 - If audio frames are pushed too aggressively, the SDK emits:
   - `ws_sendData: ERROR: Not get usable buffer, Please enlarge max_queue_size!`
@@ -469,3 +519,39 @@
   - streaming provider is implemented
   - batch/non-streaming provider upload is not yet implemented for iFlytek
   - result callback path is already provider-neutral, so later vendors can reuse the same app-facing shape
+
+## Fixed Delay-And-Sum Beamforming Notes
+- Decision:
+  - remove SDK BF/AEC from the current ASR mainline
+  - use software `fixed delay-and-sum beamforming` as the only spatial front-end
+- Why this fits the current product stage:
+  - goal is ASR accuracy first, not maximum acoustic sophistication
+  - current device is a smart-home control panel with the user usually facing the screen
+  - the existing array is a `2-mic linear array` with `50 mm` spacing
+- Current engineering assumptions:
+  - microphones: `AMIC1 + AMIC3`
+  - sample rate: `16 kHz`
+  - frame size: `16 ms`
+  - target direction: front-facing `broadside`
+  - current fixed delay: `0 sample`
+- Algorithm shape kept in code:
+  - read two channels
+  - optionally delay the secondary mic by a small integer-sample offset
+  - sum the aligned channels
+  - divide by `2`
+  - saturate to `PCM16`
+- Why DSB is preferred here:
+  - lower distortion risk than black-box beamformers for ASR-oriented bring-up
+  - predictable resource cost on `RTL8730E`
+  - easy to A/B against `single-mic` or future `AEC` paths
+- Practical acoustic guidance worth keeping:
+  - `40 mm - 60 mm` spacing is a good target range for low-cost smart-home panels
+  - DSB is especially strong when the talker is mostly in front of the device
+  - broadside zero-delay DSB is the simplest robust starting point before any directional tuning
+- Important future rule:
+  - do not enable AEC on the ASR path unless there is a real and trustworthy playback reference
+  - fake or zero-filled references can damage ASR input instead of helping it
+- Useful external references for future tuning:
+  - Harry L. Van Trees, `Optimum Array Processing`
+  - `pyroomacoustics` for offline room/array simulation
+  - ARM `CMSIS-DSP` style optimized vector-add/scaling patterns as implementation inspiration, even if the current target is not a Cortex-M-only pipeline

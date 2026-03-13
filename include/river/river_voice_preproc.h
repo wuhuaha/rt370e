@@ -10,8 +10,7 @@
 typedef struct river_voice_preproc_ops river_voice_preproc_ops_t;
 
 typedef enum {
-    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0,
-    RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC = 1
+    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0
 } river_voice_preproc_profile_t;
 
 typedef struct river_voice_preproc {

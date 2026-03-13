@@ -48,22 +48,24 @@ config RIVER_VAD_PROBE_DIAG_DEFAULT_ON
 
 choice RIVER_VOICE_PREPROC_BACKEND
     prompt "Local voice pre-processing backend"
-    default RIVER_VOICE_PREPROC_AIVOICE_AFE
+    default RIVER_VOICE_PREPROC_FIXED_DSB
 
-config RIVER_VOICE_PREPROC_AIVOICE_AFE
-    bool "AIVoice AFE"
+config RIVER_VOICE_PREPROC_FIXED_DSB
+    bool "Fixed delay-and-sum beamformer"
 
 endchoice
 
+config RIVER_VOICE_DSB_SECONDARY_DELAY_SAMPLES
+    int "Fixed DSB secondary-mic delay in samples"
+    range 0 8
+    default 0
+
 choice RIVER_VOICE_PREPROC_PROFILE
     prompt "Local voice pre-processing profile"
-    default RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
+    default RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE
 
 config RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE
     bool "ASR mainline"
-
-config RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC
-    bool "ASR + AEC barge-in"
 
 endchoice
 
@@ -75,17 +77,6 @@ config RIVER_VOICE_DETECTOR_SILERO_VAD
     bool "Silero VAD"
 
 endchoice
-
-config RIVER_AIVOICE_VAD_REFERENCE_EN
-    bool "Enable SDK AIVoice VAD reference logs"
-    default y
-    depends on AIVOICE_EN_MENU
-
-config RIVER_AIVOICE_VAD_REFERENCE_MIN_FREE_HEAP_KB
-    int "Minimum free heap required before enabling SDK AIVoice VAD reference"
-    range 0 2048
-    default 320
-    depends on RIVER_AIVOICE_VAD_REFERENCE_EN
 
 config RIVER_SILERO_VAD_TENSOR_ARENA_KB
     int "Silero VAD tensor arena size in KB"

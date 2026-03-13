@@ -22,33 +22,29 @@ struct river_voice_preproc_ops {
     void (*dump_profile)(void);
 };
 
-river_status_t river_voice_preproc_aivoice_open(river_voice_preproc_t *preproc);
-river_status_t river_voice_preproc_aivoice_process(river_voice_preproc_t *preproc,
-                                                   const uint8_t *input,
-                                                   size_t input_bytes,
-                                                   const uint8_t *reference,
-                                                   size_t reference_bytes,
-                                                   uint8_t *output,
-                                                   size_t output_capacity,
-                                                   size_t *output_bytes);
-void river_voice_preproc_aivoice_close(river_voice_preproc_t *preproc);
-void river_voice_preproc_aivoice_dump_profile(void);
+river_status_t river_voice_preproc_fixed_dsb_open(river_voice_preproc_t *preproc);
+river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *preproc,
+                                                     const uint8_t *input,
+                                                     size_t input_bytes,
+                                                     const uint8_t *reference,
+                                                     size_t reference_bytes,
+                                                     uint8_t *output,
+                                                     size_t output_capacity,
+                                                     size_t *output_bytes);
+void river_voice_preproc_fixed_dsb_close(river_voice_preproc_t *preproc);
+void river_voice_preproc_fixed_dsb_dump_profile(void);
 
 static const river_voice_preproc_ops_t g_river_voice_preproc_ops = {
-    .name = "aivoice_afe",
-    .open = river_voice_preproc_aivoice_open,
-    .process = river_voice_preproc_aivoice_process,
-    .close = river_voice_preproc_aivoice_close,
-    .dump_profile = river_voice_preproc_aivoice_dump_profile
+    .name = "fixed_dsb",
+    .open = river_voice_preproc_fixed_dsb_open,
+    .process = river_voice_preproc_fixed_dsb_process,
+    .close = river_voice_preproc_fixed_dsb_close,
+    .dump_profile = river_voice_preproc_fixed_dsb_dump_profile
 };
 
 static river_voice_preproc_profile_t river_voice_preproc_default_profile(void)
 {
-#ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE
     return RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE;
-#else
-    return RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC;
-#endif
 }
 
 static const char *river_voice_preproc_profile_name_internal(river_voice_preproc_profile_t profile)
@@ -56,8 +52,6 @@ static const char *river_voice_preproc_profile_name_internal(river_voice_preproc
     switch (profile) {
     case RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE:
         return "asr_mainline";
-    case RIVER_VOICE_PREPROC_PROFILE_ASR_BARGE_IN_AEC:
-        return "asr_barge_in_aec";
     default:
         return "unknown";
     }
