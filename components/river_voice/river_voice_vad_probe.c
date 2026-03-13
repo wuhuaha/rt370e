@@ -52,7 +52,7 @@
 #define RIVER_VOICE_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_BYTES \
     ((uint32_t)CONFIG_RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB * 1024U)
 
-#define RIVER_VOICE_VAD_PROBE_TASK_STACK         (1024U * 8U)
+#define RIVER_VOICE_VAD_PROBE_TASK_STACK         (1024U * 12U)
 #define RIVER_VOICE_VAD_PROBE_TASK_PRIORITY      4U
 #define RIVER_VOICE_VAD_PROBE_CAPTURE_VOLUME     0x24U
 #define RIVER_VOICE_VAD_PROBE_CAPTURE_HPF_FC     0U
@@ -650,7 +650,7 @@ static void river_voice_vad_probe_task(void *param)
                        cloud_status == RIVER_ERR_UNSUPPORTED) {
                 g_river_voice_vad_probe.diag_cloud_stream_busy++;
                 if (detector_result.is_speech && !previous_vad_state) {
-                    RIVER_LOGI("speech detected but cloud stream not active yet: provider=%s status=%d wifi=%s",
+                    RIVER_LOGI("speech detected but cloud stream backpressured/deferred: provider=%s status=%d wifi=%s",
                                river_cloud_asr_provider_name(),
                                cloud_status,
                                river_wifi_station_status_name());

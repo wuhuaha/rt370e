@@ -1,12 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "basic_types.h"
-#include "os_wrapper.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
-
 #include "river/river_app.h"
 #include "river/river_cloud.h"
 #include "river/river_log.h"
@@ -87,53 +81,8 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
     }
 }
 
-static void river_app_boot_monitor_task(void *param)
-{
-    (void)param;
-
-    RIVER_LOGI("boot monitor active: waiting for network and time sync...");
-
-    while (1) {
-        if (river_wifi_station_is_connected()) {
-            break;
-        }
-        rtos_time_delay_ms(500);
-    }
-
-    /* Wait one more second for network stack/background SDK logic to settle */
-    rtos_time_delay_ms(1000);
-
-    RIVER_LOGI("network and time ready; initiating deferred voice startup");
-
-    if (river_voice_frontend_init() != RIVER_OK) {
-        RIVER_LOGE("deferred voice frontend init failed");
-        rtos_task_delete(NULL);
-        return;
-    }
-
-#ifdef CONFIG_RIVER_VAD_PROBE_AUTOSTART
-    RIVER_LOGI("starting deferred vad probe...");
-    if (river_voice_vad_probe_start() != RIVER_OK) {
-        RIVER_LOGE("deferred vad probe start failed");
-    }
-#endif
-
-#ifdef CONFIG_RIVER_AUDIO_ECHO_AUTOSTART
-    RIVER_LOGI("starting deferred audio echo...");
-    if (river_voice_echo_start() != RIVER_OK) {
-        RIVER_LOGE("deferred audio echo start failed");
-    }
-#endif
-
-    river_app_print_status();
-    RIVER_LOGI("deferred boot sequence complete");
-    rtos_task_delete(NULL);
-}
-
 river_status_t river_app_boot(void)
 {
-    rtos_task_t boot_task;
-
     RIVER_LOGI("ameba-river boot");
     RIVER_LOGI("target=RTL8730E");
 
@@ -149,45 +98,44 @@ river_status_t river_app_boot(void)
 
     river_cloud_adapter_set_result_handler(river_app_on_cloud_asr_result, NULL);
 
+    if (river_voice_frontend_init() != RIVER_OK) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
     if (river_online_control_init() != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
     }
 
 #ifdef CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     river_voice_echo_set_diag_enabled(true);
+    RIVER_LOGI("boot audio echo diagnostics enabled");
 #endif
 
 #ifdef CONFIG_RIVER_VAD_PROBE_DIAG_DEFAULT_ON
     river_voice_vad_probe_set_diag_enabled(true);
+    RIVER_LOGI("boot vad probe diagnostics enabled");
 #endif
 
-    /* Create background monitor to handle deferred voice startup */
-    if (rtos_task_create(&boot_task, "river_boot_mon", river_app_boot_monitor_task, 
-                         NULL, 1024 * 8, 2) != RTK_SUCCESS) {
-        RIVER_LOGE("failed to create boot monitor task");
-        return RIVER_ERR_IO;
+#ifdef CONFIG_RIVER_VAD_PROBE_AUTOSTART
+    RIVER_LOGI("boot vad probe autostart enabled");
+    if (river_voice_vad_probe_start() != RIVER_OK) {
+        RIVER_LOGE("boot vad probe autostart failed");
     }
+#endif
 
+#ifdef CONFIG_RIVER_AUDIO_ECHO_AUTOSTART
+    RIVER_LOGI("boot audio echo autostart enabled");
+    if (river_voice_echo_start() != RIVER_OK) {
+        RIVER_LOGE("boot audio echo autostart failed");
+    }
+#endif
+
+    river_app_print_status();
     return RIVER_OK;
 }
 
 void river_app_print_status(void)
 {
-    HeapStats_t stats;
-    int frag_ratio = 0;
-
-    vPortGetHeapStats(&stats);
-    if (stats.xAvailableHeapSpaceInBytes > 0) {
-        frag_ratio = (int)((1.0f - ((float)stats.xSizeOfLargestFreeBlockInBytes / (float)stats.xAvailableHeapSpaceInBytes)) * 100.0f);
-    }
-
-    RIVER_LOGI("system heap audit:");
-    RIVER_LOGI("  total_free: %lu B", (unsigned long)stats.xAvailableHeapSpaceInBytes);
-    RIVER_LOGI("  largest_block: %lu B", (unsigned long)stats.xSizeOfLargestFreeBlockInBytes);
-    RIVER_LOGI("  min_ever_free: %lu B", (unsigned long)stats.xMinimumEverFreeBytesRemaining);
-    RIVER_LOGI("  free_blocks: %lu", (unsigned long)stats.xNumberOfFreeBlocks);
-    RIVER_LOGI("  fragmentation: %d%%", frag_ratio);
-
     RIVER_LOGI("local_frontend=%s", river_voice_frontend_mode_name());
     RIVER_LOGI("local_preproc=%s", river_voice_preproc_backend_name());
     RIVER_LOGI("local_preproc_profile=%s", river_voice_preproc_profile_name());

@@ -214,10 +214,106 @@
     - optimized model-runner structure
   - do not assume its implementation can be transplanted directly into the current Realtek build without adaptation
 - Cautions:
-  - `CMSIS-NN` and ARM-optimized paths are highly valuable, but they are not automatically a drop-in win on the current project stack
-  - for `RTL8730E`, first priority remains:
+- `CMSIS-NN` and ARM-optimized paths are highly valuable, but they are not automatically a drop-in win on the current project stack
+- for `RTL8730E`, first priority remains:
     - getting the real board runtime stable
     - then measuring latency / memory / arena usage
+
+## Online ASR Notes
+
+### iFlytek RTASR LLM Protocol
+- The currently integrated online ASR endpoint is:
+  - host: `office-api-ast-dx.iflyaisol.com`
+  - path: `/ast/communicate/v1`
+- Current query parameters in use:
+  - `accessKeyId`
+  - `appId`
+  - `audio_encode=pcm_s16le`
+  - `lang=autodialect`
+  - `samplerate=16000`
+  - `utc`
+  - `uuid`
+  - `signature`
+- Signature convention currently used by the project:
+  - URL-encode each key/value
+  - sort by key
+  - build `k=v&...`
+  - HMAC-SHA1 with `APISecret`
+  - Base64 result
+  - URL-encode and append as `signature`
+
+### iFlytek Response Parsing Caveats
+- Do not assume every server text frame contains `code` and `desc`.
+- In the current RTASR LLM flow, successful recognition frames may arrive without a numeric `code` field.
+- `started` / `result` style control and result frames should be treated as success even when `code` is absent.
+- The session-start frame is currently observed as:
+  - `msg_type=action`
+  - `data.action=started`
+  - `data.sessionId=...`
+- This means `started` is nested under `data.action`, not necessarily exposed as a top-level `action`.
+- A parser that defaults `missing code -> -1` will produce false provider errors such as:
+  - `asr provider=iflytek_rtasr error code=-1 sid= msg=`
+- On Ameba SDK `wsclient`, fragmented server JSON may be surfaced to the callback with final opcode `CONTINUATION` rather than `TEXT_FRAME`.
+- If the callback only accepts `TEXT_FRAME`, valid `started` / `partial` / `final` frames can be dropped silently.
+- The provider should also surface non-ASR result frames such as `res_type=frc`, plus empty final results (`ls=true` but no text), instead of silently treating them as "no event".
+
+### Ameba SDK WebSocket Caveats
+- Ameba SDK `wsclient` has a bounded internal send queue.
+- If audio frames are pushed too aggressively, the SDK emits:
+  - `ws_sendData: ERROR: Not get usable buffer, Please enlarge max_queue_size!`
+- Practical implications for this project:
+  - do not send every 16ms capture frame directly
+  - stage audio locally
+  - aggregate to larger chunks
+  - pace sending at a stable interval
+- When a VAD transition opens the cloud stream, the current triggering speech frame must also be sent immediately after `stream_open()`.
+- If only pre-roll silence is flushed and the triggering speech frame is omitted, the provider may close the session before any recognisable speech reaches the server.
+  - treat temporary send backlog as `busy`, not immediately as fatal IO
+- Even after Wi-Fi and WebSocket are healthy, missing queue pacing alone is enough to produce:
+  - VAD works
+  - stream opens
+  - but no ASR result returns
+
+## iFlytek RTASR LLM Integration Notes
+- The current official "实时语音转写大模型" document is not the same protocol as the older `rtasr.xfyun.cn` service.
+- Current official request target:
+  - `wss://office-api-ast-dx.iflyaisol.com/ast/communicate/v1?{query}`
+- Current handshake parameters should include:
+  - `appId`
+  - `accessKeyId`
+  - `uuid`
+  - `utc`
+  - `audio_encode`
+  - `lang`
+  - `samplerate`
+  - `signature`
+- Current signature rule:
+  - exclude `signature`
+  - sort all params by key ascending
+  - URL-encode key and value separately
+  - join as `k=v&...`
+  - sign that `baseString` with `HmacSHA1(accessKeySecret)`
+  - Base64-encode the HMAC output
+- Current audio recommendation from the official doc:
+  - `16kHz`
+  - `16bit`
+  - `mono`
+  - `pcm`
+  - recommended pacing: `40ms -> 1280 bytes`
+- Current service-side end frame:
+  - `{"end": true, "sessionId": "..."}`
+- Important SDK integration pitfall on Ameba:
+  - Realtek `create_wsclient()` does not accept a full `ws://host/path?query` string as the `url` argument
+  - `url` must be only `ws://host` or `wss://host`
+  - `path` and query should be passed separately
+  - otherwise the SDK tries to resolve `host/path?...` as a hostname and `getaddrinfo` fails
+- Current iFlytek error code notes most relevant to this project:
+  - `35014`: UTC/time drift too large
+  - `35030`: signature expired or repeated; repeated `uuid` under same time can trigger it
+  - `100002`: signature error
+  - `100012`: UTC deviation too large
+  - `100016`: `accessKeyId` error
+  - `100020`: `appId` and `accessKeyId` mismatch
 
 ## TFLite Micro Initialization Notes
 - A useful standing principle for this project:
