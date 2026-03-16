@@ -555,3 +555,37 @@
   - Harry L. Van Trees, `Optimum Array Processing`
   - `pyroomacoustics` for offline room/array simulation
   - ARM `CMSIS-DSP` style optimized vector-add/scaling patterns as implementation inspiration, even if the current target is not a Cortex-M-only pipeline
+
+## WebRTC AECM Experimental Integration Notes
+- Current repository status:
+  - `WebRTC AECM` assets may be preserved in-tree for later experiments
+  - they should not be treated as the active mainline front-end unless explicitly re-integrated
+- Mainline reminder:
+  - current stable ASR path is still:
+    - `capture -> fixed_dsb -> silero_vad -> online ASR`
+- Key constraint:
+  - current mainline frame size is `16 ms / 256 samples @ 16 kHz`
+  - `WebRTC AECM` processes `10 ms / 160 samples @ 16 kHz`
+- Important implication:
+  - a naive `256-sample input -> internal 160-sample AEC blocks -> try pop 256 samples` adapter can break frame alignment
+  - this is risky for:
+    - `Silero VAD`
+    - ASR segment boundaries
+    - per-frame diagnostics
+- Recommended integration rule:
+  - keep `AECM` as a separate experimental profile or explicit feature gate
+  - do not wire it directly into the default `vad_probe` / `asr_mainline` path
+  - solve strict frame alignment first
+  - only then evaluate acoustic benefit
+- Recommended runtime gating rule:
+  - enable AEC only when playback reference is truly present and stable
+  - use hysteresis / stable windows
+  - do not toggle AEC on/off by a single-frame peak threshold
+  - avoid resetting AEC state every time one quiet reference frame appears
+- Architectural rule:
+  - `vad_probe` should stay focused on validating:
+    - capture
+    - preproc
+    - VAD
+    - ASR uplink
+  - it should not become the permanent dumping ground for experimental AEC control logic
