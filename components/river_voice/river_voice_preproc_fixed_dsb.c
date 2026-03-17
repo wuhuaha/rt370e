@@ -8,6 +8,8 @@
 #include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_preproc.h"
+#include "river/river_voice_profile.h"
+#include "river/river_voice_runtime_policy.h"
 
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
 #include "river_voice_webrtc_aecm_adapter.h"
@@ -23,15 +25,30 @@ typedef struct {
     int16_t secondary_history[8];
     uint32_t history_count;
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
+    struct {
+        int16_t *buffer;
+        uint32_t capacity;
+        uint32_t head;
+        uint32_t tail;
+        uint32_t count;
+    } dsb_aligned_fifo;
     bool experiment_enabled;
+    bool aligned_stream_primed;
     river_voice_webrtc_aecm_adapter_t aecm;
     river_voice_webrtc_aecm_adapter_stats_t aecm_stats;
     river_voice_webrtc_aecm_ref_state_t last_ref_state;
+    river_voice_aec_gate_reason_t last_gate_reason;
+    bool aec_gate_system_armed;
     int16_t *aecm_mic0;
     int16_t *aecm_mic1;
     uint32_t aec_frames_total;
     uint32_t aec_frames_used;
     uint32_t aec_frames_fallback;
+    uint32_t aec_gate_transitions;
+    uint32_t aec_gate_disabled;
+    uint32_t aec_gate_block_playback;
+    uint32_t aec_gate_block_interaction;
+    uint32_t aec_gate_block_reference_path;
     uint32_t aec_ref_missing;
     uint32_t aec_ref_idle;
     uint32_t aec_push_fail;
@@ -51,6 +68,139 @@ static int16_t river_voice_preproc_clamp_q15(int32_t value)
         return -32768;
     }
     return (int16_t)value;
+}
+
+static bool river_voice_preproc_sample_fifo_init(
+    river_voice_preproc_fixed_dsb_context_t *context,
+    uint32_t capacity_samples)
+{
+    context->dsb_aligned_fifo.buffer =
+        (int16_t *)rtos_mem_zmalloc((uint32_t)(capacity_samples * sizeof(int16_t)));
+    if (context->dsb_aligned_fifo.buffer == 0) {
+        return false;
+    }
+    context->dsb_aligned_fifo.capacity = capacity_samples;
+    context->dsb_aligned_fifo.head = 0U;
+    context->dsb_aligned_fifo.tail = 0U;
+    context->dsb_aligned_fifo.count = 0U;
+    return true;
+}
+
+static void river_voice_preproc_sample_fifo_reset(
+    river_voice_preproc_fixed_dsb_context_t *context)
+{
+    context->dsb_aligned_fifo.head = 0U;
+    context->dsb_aligned_fifo.tail = 0U;
+    context->dsb_aligned_fifo.count = 0U;
+}
+
+static bool river_voice_preproc_sample_fifo_push(
+    river_voice_preproc_fixed_dsb_context_t *context,
+    const int16_t *samples,
+    uint32_t count)
+{
+    if (context->dsb_aligned_fifo.buffer == 0 ||
+        context->dsb_aligned_fifo.count + count > context->dsb_aligned_fifo.capacity) {
+        return false;
+    }
+
+    for (uint32_t i = 0; i < count; ++i) {
+        context->dsb_aligned_fifo.buffer[context->dsb_aligned_fifo.tail] = samples[i];
+        context->dsb_aligned_fifo.tail =
+            (context->dsb_aligned_fifo.tail + 1U) % context->dsb_aligned_fifo.capacity;
+    }
+    context->dsb_aligned_fifo.count += count;
+    return true;
+}
+
+static bool river_voice_preproc_sample_fifo_pop(
+    river_voice_preproc_fixed_dsb_context_t *context,
+    int16_t *samples,
+    uint32_t count)
+{
+    if (context->dsb_aligned_fifo.buffer == 0 ||
+        context->dsb_aligned_fifo.count < count) {
+        return false;
+    }
+
+    for (uint32_t i = 0; i < count; ++i) {
+        samples[i] = context->dsb_aligned_fifo.buffer[context->dsb_aligned_fifo.head];
+        context->dsb_aligned_fifo.head =
+            (context->dsb_aligned_fifo.head + 1U) % context->dsb_aligned_fifo.capacity;
+    }
+    context->dsb_aligned_fifo.count -= count;
+    return true;
+}
+
+static void river_voice_preproc_reset_experiment_path(
+    river_voice_preproc_fixed_dsb_context_t *context)
+{
+    river_voice_webrtc_aecm_adapter_reset(&context->aecm);
+    river_voice_preproc_sample_fifo_reset(context);
+    context->aligned_stream_primed = false;
+    context->last_ref_state = RIVER_VOICE_AECM_REF_STATE_MISSING;
+    context->aec_gate_system_armed = false;
+}
+
+static river_voice_reference_activity_t river_voice_preproc_ref_activity_from_adapter(
+    river_voice_webrtc_aecm_ref_state_t state)
+{
+    switch (state) {
+    case RIVER_VOICE_AECM_REF_STATE_ACTIVE:
+        return RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE;
+    case RIVER_VOICE_AECM_REF_STATE_IDLE:
+        return RIVER_VOICE_REFERENCE_ACTIVITY_IDLE;
+    case RIVER_VOICE_AECM_REF_STATE_MISSING:
+    default:
+        return RIVER_VOICE_REFERENCE_ACTIVITY_MISSING;
+    }
+}
+
+static void river_voice_preproc_note_gate_reason(
+    river_voice_preproc_fixed_dsb_context_t *context,
+    const river_voice_aec_gate_eval_t *gate_eval,
+    river_voice_reference_activity_t ref_activity)
+{
+    if (context == 0 || gate_eval == 0) {
+        return;
+    }
+
+    switch (gate_eval->reason) {
+    case RIVER_VOICE_AEC_GATE_DISABLED:
+        context->aec_gate_disabled++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK:
+        context->aec_gate_block_playback++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_INTERACTION:
+        context->aec_gate_block_interaction++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_REFERENCE_PATH:
+        context->aec_gate_block_reference_path++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_REF_IDLE:
+        context->aec_ref_idle++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_REF_MISSING:
+        context->aec_ref_missing++;
+        break;
+    case RIVER_VOICE_AEC_GATE_ACTIVE:
+        break;
+    default:
+        break;
+    }
+
+    if (gate_eval->reason != context->last_gate_reason) {
+        context->aec_gate_transitions++;
+        RIVER_LOGI("webrtc_aecm gate=%s playback=%s interaction=%s ref_path=%s ref_activity=%s native_ref=%u",
+                   river_voice_runtime_aec_gate_reason_name(gate_eval->reason),
+                   river_playback_service_state_name(gate_eval->playback_state),
+                   river_interaction_state_name(gate_eval->interaction_state),
+                   river_reference_service_state_name(gate_eval->reference_state),
+                   river_voice_runtime_reference_activity_name(ref_activity),
+                   gate_eval->uses_native_capture_ref ? 1U : 0U);
+        context->last_gate_reason = gate_eval->reason;
+    }
 }
 
 river_status_t river_voice_preproc_fixed_dsb_open(river_voice_preproc_t *preproc)
@@ -86,9 +236,15 @@ river_status_t river_voice_preproc_fixed_dsb_open(river_voice_preproc_t *preproc
     context->experiment_enabled =
         preproc->profile == RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM;
     context->last_ref_state = RIVER_VOICE_AECM_REF_STATE_MISSING;
+    context->last_gate_reason = RIVER_VOICE_AEC_GATE_DISABLED;
+    context->aec_gate_system_armed = false;
     if (context->experiment_enabled) {
         river_voice_webrtc_aecm_ref_policy_t ref_policy;
 
+        if (!river_voice_preproc_sample_fifo_init(context, context->frame_samples * 4U)) {
+            river_voice_preproc_fixed_dsb_close(preproc);
+            return RIVER_ERR_NO_MEMORY;
+        }
         context->aecm_mic0 =
             (int16_t *)rtos_mem_zmalloc((uint32_t)(context->frame_samples * sizeof(int16_t)));
         context->aecm_mic1 =
@@ -189,8 +345,34 @@ river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *prep
     if (context->experiment_enabled) {
         bool pushed = false;
         river_voice_webrtc_aecm_ref_state_t ref_state;
+        river_voice_reference_activity_t ref_activity;
+        river_voice_aec_gate_eval_t gate_eval;
 
         context->aec_frames_total++;
+
+        river_voice_runtime_aec_gate_eval_base(preproc->profile, &gate_eval);
+        if (!gate_eval.system_ready) {
+            river_voice_preproc_note_gate_reason(context,
+                                                 &gate_eval,
+                                                 RIVER_VOICE_REFERENCE_ACTIVITY_MISSING);
+            if (context->aec_gate_system_armed) {
+                river_voice_preproc_reset_experiment_path(context);
+            }
+            *output_bytes = needed_bytes;
+            return RIVER_OK;
+        }
+        if (!context->aec_gate_system_armed) {
+            river_voice_preproc_reset_experiment_path(context);
+            context->aec_gate_system_armed = true;
+        }
+
+        if (!river_voice_preproc_sample_fifo_push(context, dst, (uint32_t)out_samples)) {
+            context->aec_push_fail++;
+            river_voice_preproc_reset_experiment_path(context);
+            memset(dst, 0, needed_bytes);
+            *output_bytes = needed_bytes;
+            return RIVER_OK;
+        }
 
         pushed = river_voice_webrtc_aecm_adapter_push_frame(&context->aecm,
                                                             src,
@@ -198,14 +380,17 @@ river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *prep
                                                             (int)context->input_channels);
         if (!pushed) {
             context->aec_push_fail++;
-            river_voice_webrtc_aecm_adapter_reset(&context->aecm);
-            context->last_ref_state = RIVER_VOICE_AECM_REF_STATE_MISSING;
+            river_voice_preproc_reset_experiment_path(context);
             context->aec_frames_fallback++;
+            memset(dst, 0, needed_bytes);
             *output_bytes = needed_bytes;
             return RIVER_OK;
         }
 
         ref_state = river_voice_webrtc_aecm_adapter_ref_state(&context->aecm);
+        ref_activity = river_voice_preproc_ref_activity_from_adapter(ref_state);
+        river_voice_runtime_aec_gate_apply_reference(&gate_eval, ref_activity);
+        river_voice_preproc_note_gate_reason(context, &gate_eval, ref_activity);
         if (ref_state != context->last_ref_state) {
             river_voice_webrtc_aecm_adapter_get_stats(&context->aecm, &context->aecm_stats);
             RIVER_LOGI("webrtc_aecm ref_state=%s peak=%u ratio_q15=%u pushed=%lu popped=%lu blocks=%lu resets=%lu",
@@ -219,20 +404,22 @@ river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *prep
             context->last_ref_state = ref_state;
         }
 
-        if (ref_state != RIVER_VOICE_AECM_REF_STATE_ACTIVE) {
-            if (ref_state == RIVER_VOICE_AECM_REF_STATE_IDLE) {
-                context->aec_ref_idle++;
-            } else {
-                context->aec_ref_missing++;
+        if (!context->aligned_stream_primed) {
+            if (!river_voice_webrtc_aecm_adapter_output_ready(&context->aecm)) {
+                memset(dst, 0, needed_bytes);
+                *output_bytes = needed_bytes;
+                return RIVER_OK;
             }
-            while (river_voice_webrtc_aecm_adapter_output_ready(&context->aecm)) {
-                if (!river_voice_webrtc_aecm_adapter_pop_frame(&context->aecm,
-                                                               context->aecm_mic0,
-                                                               context->aecm_mic1)) {
-                    break;
-                }
-            }
-            context->aec_frames_fallback++;
+            context->aligned_stream_primed = true;
+            RIVER_LOGI("webrtc_aecm aligned stream primed: frame=%lu samples block=%d",
+                       (unsigned long)out_samples,
+                       context->aecm.process_block_samples);
+        }
+
+        if (!river_voice_preproc_sample_fifo_pop(context, dst, (uint32_t)out_samples)) {
+            context->aec_pop_fail++;
+            river_voice_preproc_reset_experiment_path(context);
+            memset(dst, 0, needed_bytes);
             *output_bytes = needed_bytes;
             return RIVER_OK;
         }
@@ -242,6 +429,13 @@ river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *prep
                                                        context->aecm_mic0,
                                                        context->aecm_mic1)) {
             context->aec_pop_fail++;
+            river_voice_preproc_reset_experiment_path(context);
+            memset(dst, 0, needed_bytes);
+            *output_bytes = needed_bytes;
+            return RIVER_OK;
+        }
+
+        if (!gate_eval.active) {
             context->aec_frames_fallback++;
             *output_bytes = needed_bytes;
             return RIVER_OK;
@@ -271,15 +465,23 @@ void river_voice_preproc_fixed_dsb_close(river_voice_preproc_t *preproc)
     if (context != 0) {
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
         if (context->experiment_enabled) {
-            RIVER_LOGI("webrtc_aecm summary: used=%lu fallback=%lu ref_missing=%lu ref_idle=%lu push_fail=%lu pop_fail=%lu total=%lu",
+            RIVER_LOGI("webrtc_aecm summary: used=%lu fallback=%lu disabled=%lu block_playback=%lu block_interaction=%lu block_ref_path=%lu ref_missing=%lu ref_idle=%lu gate_transitions=%lu push_fail=%lu pop_fail=%lu total=%lu",
                        (unsigned long)context->aec_frames_used,
                        (unsigned long)context->aec_frames_fallback,
+                       (unsigned long)context->aec_gate_disabled,
+                       (unsigned long)context->aec_gate_block_playback,
+                       (unsigned long)context->aec_gate_block_interaction,
+                       (unsigned long)context->aec_gate_block_reference_path,
                        (unsigned long)context->aec_ref_missing,
                        (unsigned long)context->aec_ref_idle,
+                       (unsigned long)context->aec_gate_transitions,
                        (unsigned long)context->aec_push_fail,
                        (unsigned long)context->aec_pop_fail,
                        (unsigned long)context->aec_frames_total);
             river_voice_webrtc_aecm_adapter_deinit(&context->aecm);
+        }
+        if (context->dsb_aligned_fifo.buffer != 0) {
+            rtos_mem_free(context->dsb_aligned_fifo.buffer);
         }
         if (context->aecm_mic1 != 0) {
             rtos_mem_free(context->aecm_mic1);
@@ -308,10 +510,13 @@ void river_voice_preproc_fixed_dsb_dump_runtime_stats(const river_voice_preproc_
     }
 
     river_voice_webrtc_aecm_adapter_get_stats(&context->aecm, &context->aecm_stats);
-    RIVER_LOGI("preproc aecm stats: ref_state=%s ratio_q15=%u peak=%u pushed=%lu popped=%lu blocks=%lu in_fail=%lu proc_fail=%lu underrun=%lu resets=%lu used=%lu fallback=%lu",
+    RIVER_LOGI("preproc aecm stats: gate=%s ref_state=%s ratio_q15=%u peak=%u zero_streak=%u aligned=%u pushed=%lu popped=%lu blocks=%lu in_fail=%lu proc_fail=%lu underrun=%lu resets=%lu used=%lu fallback=%lu gate_transitions=%lu",
+               river_voice_runtime_aec_gate_reason_name(context->last_gate_reason),
                river_voice_webrtc_aecm_adapter_ref_state_name(context->aecm_stats.ref_state),
                (unsigned int)context->aecm_stats.ref_active_ratio_q15,
                (unsigned int)context->aecm_stats.last_ref_peak,
+               (unsigned int)context->aecm_stats.ref_zero_streak,
+               context->aligned_stream_primed ? 1U : 0U,
                (unsigned long)context->aecm_stats.frames_pushed,
                (unsigned long)context->aecm_stats.frames_popped,
                (unsigned long)context->aecm_stats.blocks_processed,
@@ -320,7 +525,8 @@ void river_voice_preproc_fixed_dsb_dump_runtime_stats(const river_voice_preproc_
                (unsigned long)context->aecm_stats.output_underruns,
                (unsigned long)context->aecm_stats.resets,
                (unsigned long)context->aec_frames_used,
-               (unsigned long)context->aec_frames_fallback);
+               (unsigned long)context->aec_frames_fallback,
+               (unsigned long)context->aec_gate_transitions);
 #else
     (void)preproc;
 #endif
@@ -329,21 +535,24 @@ void river_voice_preproc_fixed_dsb_dump_runtime_stats(const river_voice_preproc_
 void river_voice_preproc_fixed_dsb_dump_profile(void)
 {
     const river_voice_board_array_profile_t *profile;
+    river_voice_preproc_profile_t active_profile;
     const char *profile_name;
 
     profile = river_voice_board_array_profile();
-    profile_name = river_voice_preproc_profile_name();
-    if (strcmp(profile_name, "fixed_dsb_webrtc_aecm") == 0) {
+    active_profile = river_voice_profile_active_preproc();
+    profile_name = river_voice_profile_name(active_profile);
+    if (active_profile == RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM) {
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
         RIVER_LOGI("preproc backend: fixed_dsb + webrtc_aecm [experimental native-3ch-ref]");
-        RIVER_LOGI("preproc dsb+aec: profile=%s mode=fixed_delay_and_sum_then_aec primary=%s secondary=%s spacing=%lumm delay_samples=%u ref=native_capture_ch3 echo_mode=%u aec_delay_ms=%u",
+        RIVER_LOGI("preproc dsb+aec: profile=%s mode=dual_mic_aec_then_dsb_mix primary=%s secondary=%s spacing=%lumm delay_samples=%u ref=native_capture_ch3 echo_mode=%u aec_delay_ms=%u stream_delay=%lums gate=playback_state+interaction_state+ref_activity",
                    profile_name,
                    river_voice_board_mic_name(profile->primary_mic),
                    river_voice_board_mic_name(profile->secondary_mic),
                    (unsigned long)profile->mic_spacing_mm,
                    (unsigned int)CONFIG_RIVER_VOICE_DSB_SECONDARY_DELAY_SAMPLES,
                    (unsigned int)CONFIG_RIVER_WEBRTC_AECM_ECHO_MODE,
-                   (unsigned int)CONFIG_RIVER_WEBRTC_AECM_DELAY_MS);
+                   (unsigned int)CONFIG_RIVER_WEBRTC_AECM_DELAY_MS,
+                   (unsigned long)profile->frame_ms);
         RIVER_LOGI("preproc aec gate: enter_peak=%u exit_peak=%u stable=%u hangover=%u window=%u",
                    (unsigned int)CONFIG_RIVER_WEBRTC_AECM_REF_ENTER_PEAK,
                    (unsigned int)CONFIG_RIVER_WEBRTC_AECM_REF_EXIT_PEAK,

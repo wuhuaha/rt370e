@@ -12,6 +12,7 @@
 
 #include "river/river_cloud.h"
 #include "river/river_log.h"
+#include "river/river_reference_service.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
 #include "river/river_wifi_station.h"
@@ -19,7 +20,7 @@
 #include "river/river_voice_capture.h"
 #include "river/river_voice_detector.h"
 #include "river/river_voice_preproc.h"
-#include "river/river_voice_ref.h"
+#include "river/river_voice_profile.h"
 #include "river/river_voice_segment_buffer.h"
 #include "river/river_voice_segment_sink.h"
 
@@ -339,9 +340,6 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
 
 static void river_voice_vad_probe_close_audio(void)
 {
-    if (river_voice_ref_is_open()) {
-        river_voice_ref_close();
-    }
     river_cloud_asr_audio_close();
     river_voice_detector_close(&g_river_voice_vad_probe.detector);
     river_voice_preproc_close(&g_river_voice_vad_probe.preproc);
@@ -447,6 +445,7 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
 static river_status_t river_voice_vad_probe_open_audio(void)
 {
     river_cloud_asr_audio_desc_t audio_desc;
+    const river_voice_profile_config_t *voice_profile;
     bool use_reference;
 
     AudioService_Init();
@@ -467,15 +466,8 @@ static river_status_t river_voice_vad_probe_open_audio(void)
         RIVER_LOGE("vad probe preproc open failed");
         return RIVER_ERR_UNSUPPORTED;
     }
+    voice_profile = river_voice_profile_active();
     use_reference = river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc);
-    if (use_reference &&
-        river_voice_ref_open(g_river_voice_vad_probe.capture.sample_rate,
-                             g_river_voice_vad_probe.capture.frame_ms,
-                             1U,
-                             1500U) != RIVER_OK) {
-        RIVER_LOGE("vad probe playback ref open failed");
-        return RIVER_ERR_UNSUPPORTED;
-    }
     if (river_voice_detector_open(&g_river_voice_vad_probe.detector) != RIVER_OK) {
         RIVER_LOGE("vad probe detector open failed");
         return RIVER_ERR_UNSUPPORTED;
@@ -507,15 +499,12 @@ static river_status_t river_voice_vad_probe_open_audio(void)
 
     RIVER_LOGI("vad probe config: %lu Hz capture %s -> %s 1ch -> detector-only, %s+%s, diag_window~%ums",
                (unsigned long)g_river_voice_vad_probe.capture.sample_rate,
-               g_river_voice_vad_probe.capture.channels > 2U ? "2mic+ref(native ch3)" : "dual-mic",
-               g_river_voice_vad_probe.preproc.profile ==
-                       RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM
-                   ? "fixed_dsb+webrtc_aecm(exp/native_ref)"
-                   : "fixed_dsb",
+               voice_profile->uses_native_capture_ref ? "2mic+ref(native ch3)" : "dual-mic",
+               voice_profile->experimental ? "fixed_dsb+webrtc_aecm(exp/native_ref)" : "fixed_dsb",
                river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
                river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic),
                (unsigned int)RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS);
-    if (g_river_voice_vad_probe.preproc.profile == RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM) {
+    if (voice_profile->uses_native_capture_ref) {
         RIVER_LOGI("vad probe aec ref: source=native_capture_ch3 frame=%luB external_ref=%s",
                    (unsigned long)(g_river_voice_vad_probe.capture.frame_samples * sizeof(int16_t)),
                    use_reference ? "enabled" : "disabled");
@@ -569,8 +558,8 @@ static void river_voice_vad_probe_task(void *param)
 
         if (use_reference && g_river_voice_vad_probe.reference_buffer != 0) {
             memset(g_river_voice_vad_probe.reference_buffer, 0, g_river_voice_vad_probe.reference_chunk_bytes);
-            if (river_voice_ref_read(g_river_voice_vad_probe.reference_buffer,
-                                     g_river_voice_vad_probe.reference_chunk_bytes) == RIVER_OK) {
+            if (river_reference_service_read(g_river_voice_vad_probe.reference_buffer,
+                                             g_river_voice_vad_probe.reference_chunk_bytes) == RIVER_OK) {
                 g_river_voice_vad_probe.diag_ref_read_ok++;
             } else {
                 g_river_voice_vad_probe.diag_ref_read_miss++;

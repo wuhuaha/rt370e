@@ -3,16 +3,60 @@
 
 #include "river/river_app.h"
 #include "river/river_cloud.h"
+#include "river/river_interaction_state.h"
 #include "river/river_log.h"
 #include "river/river_online_control.h"
+#include "river/river_playback_service.h"
+#include "river/river_reference_service.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
+#include "river/river_voice_profile.h"
 #include "river/river_wifi_station.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.app"
 
 static char g_river_app_last_partial[192];
+static bool g_river_app_asr_session_active;
+
+static bool river_app_playback_state_active(river_playback_state_t state)
+{
+    return state == RIVER_PLAYBACK_PREPARING ||
+           state == RIVER_PLAYBACK_RUNNING ||
+           state == RIVER_PLAYBACK_DRAINING ||
+           state == RIVER_PLAYBACK_STOPPING;
+}
+
+static void river_app_sync_interaction_state(const char *reason)
+{
+    if (river_app_playback_state_active(river_playback_service_state())) {
+        river_interaction_state_set(g_river_app_asr_session_active ?
+                                        RIVER_INTERACTION_BARGE_IN_LISTENING :
+                                        RIVER_INTERACTION_SPEAKING,
+                                    reason);
+        return;
+    }
+
+    river_interaction_state_set(g_river_app_asr_session_active ?
+                                    RIVER_INTERACTION_ASR_STREAMING :
+                                    RIVER_INTERACTION_WAKE_MONITORING,
+                                reason);
+}
+
+static void river_app_on_playback_state(river_playback_state_t state,
+                                        const river_playback_stream_config_t *config,
+                                        void *user_data)
+{
+    (void)config;
+    (void)user_data;
+
+    if (state == RIVER_PLAYBACK_ERROR) {
+        river_interaction_state_set(RIVER_INTERACTION_ERROR_RECOVERING, "playback_error");
+        return;
+    }
+
+    river_app_sync_interaction_state("playback_state");
+}
 
 static void river_app_on_voice_event(const river_voice_event_t *event)
 {
@@ -57,24 +101,30 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
                    result->text != NULL ? result->text : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_ERROR:
+        g_river_app_asr_session_active = false;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGE("asr provider=%s error code=%d sid=%s msg=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->code,
                    result->sid != NULL ? result->sid : "-",
                    result->message != NULL ? result->message : "-");
+        river_interaction_state_set(RIVER_INTERACTION_ERROR_RECOVERING, "asr_error");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
+        g_river_app_asr_session_active = true;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
+        river_app_sync_interaction_state("asr_session_started");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
+        g_river_app_asr_session_active = false;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
+        river_app_sync_interaction_state("asr_session_closed");
         break;
     default:
         break;
@@ -87,6 +137,14 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("target=RTL8730E");
 
     river_runtime_stats_init();
+    if (river_interaction_state_init() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (river_playback_service_init() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    river_interaction_state_set(RIVER_INTERACTION_BOOTING, "boot_begin");
+    river_playback_service_register_listener(river_app_on_playback_state, NULL);
 
     river_voice_frontend_set_handler(river_app_on_voice_event);
 
@@ -132,6 +190,7 @@ river_status_t river_app_boot(void)
     }
 #endif
 
+    river_app_sync_interaction_state("boot_ready");
     river_app_print_status();
     river_runtime_stats_snapshot("boot_ready");
     return RIVER_OK;
@@ -140,16 +199,18 @@ river_status_t river_app_boot(void)
 void river_app_print_status(void)
 {
     const char *profile_name;
+    const river_voice_profile_config_t *profile;
 
+    profile = river_voice_profile_active();
     profile_name = river_voice_preproc_profile_name();
     RIVER_LOGI("local_frontend=%s", river_voice_frontend_mode_name());
     RIVER_LOGI("local_preproc=%s", river_voice_preproc_backend_name());
     RIVER_LOGI("local_preproc_profile=%s", profile_name);
     RIVER_LOGI("local_detector=%s", river_voice_detector_backend_name());
-    if (strcmp(profile_name, "fixed_dsb_webrtc_aecm") == 0) {
+    if (profile->uses_native_capture_ref) {
         RIVER_LOGI("local_aec_ref=native_capture_ch3");
     } else {
-        RIVER_LOGI("local_playback_ref=%s", river_voice_ref_backend_name());
+        RIVER_LOGI("local_playback_ref=%s", river_reference_service_backend_name());
     }
     RIVER_LOGI("local_segment_sink=%s", river_voice_segment_sink_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED
@@ -162,6 +223,9 @@ void river_app_print_status(void)
 #else
     RIVER_LOGI("online_control=disabled");
 #endif
+    river_interaction_state_dump_status();
+    river_playback_service_dump_status();
+    river_reference_service_dump_status();
     river_voice_echo_dump_status();
     river_voice_vad_probe_dump_status();
     river_wifi_station_dump_status();

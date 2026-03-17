@@ -43,6 +43,7 @@ typedef struct river_voice_webrtc_aecm_adapter {
 	int frame_samples;
 	int process_block_samples;
 	int16_t ms_in_sndcard_buf;
+	int16_t echo_mode;
 	uint32_t frames_pushed;
 	uint32_t frames_popped;
 	uint32_t blocks_processed;
@@ -60,6 +61,7 @@ typedef struct river_voice_webrtc_aecm_adapter {
 	uint16_t last_ref_peak;
 	uint16_t ref_above_enter_streak;
 	uint16_t ref_below_exit_streak;
+	uint16_t ref_zero_streak;
 	uint16_t ref_window_count;
 	uint16_t ref_window_active_count;
 	uint16_t ref_window_index;
@@ -91,6 +93,7 @@ typedef struct river_voice_webrtc_aecm_adapter_stats {
 	uint16_t ref_active_ratio_q15;
 	uint16_t ref_above_enter_streak;
 	uint16_t ref_below_exit_streak;
+	uint16_t ref_zero_streak;
 	uint32_t ref_frames_seen;
 	uint32_t ref_state_entered_active;
 	uint32_t ref_state_exited_active;

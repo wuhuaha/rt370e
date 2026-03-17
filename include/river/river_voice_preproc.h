@@ -6,13 +6,9 @@
 #include <stdint.h>
 
 #include "river/river_types.h"
+#include "river/river_voice_profile.h"
 
 typedef struct river_voice_preproc_ops river_voice_preproc_ops_t;
-
-typedef enum {
-    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0,
-    RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM = 1
-} river_voice_preproc_profile_t;
 
 typedef struct river_voice_preproc {
     const river_voice_preproc_ops_t *ops;

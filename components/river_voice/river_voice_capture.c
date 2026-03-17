@@ -9,6 +9,7 @@
 #include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
+#include "river/river_voice_profile.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.capture"
@@ -17,14 +18,6 @@
 #define RIVER_VOICE_CAPTURE_THREAD_STACK   (1024U * 2U)
 /* Priority 6: Above all other voice/app tasks to ensure IPC responsiveness */
 #define RIVER_VOICE_CAPTURE_THREAD_PRIO    6U
-
-#ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM
-#define RIVER_VOICE_CAPTURE_EXPERIMENT_CHANNELS 3U
-#define RIVER_VOICE_CAPTURE_REF_CHANNEL_PARAM   "ref_channel=2;cap_mode=no_afe_pure_data"
-#else
-#define RIVER_VOICE_CAPTURE_EXPERIMENT_CHANNELS 2U
-#define RIVER_VOICE_CAPTURE_REF_CHANNEL_PARAM   "cap_mode=no_afe_pure_data"
-#endif
 
 typedef struct {
     uint8_t *data;
@@ -122,6 +115,7 @@ static void river_voice_capture_thread(void *param)
 river_status_t river_voice_capture_open(river_voice_capture_t *capture)
 {
     const river_voice_board_array_profile_t *profile;
+    const river_voice_profile_config_t *voice_profile;
     AudioRecordConfig record_config;
 
     if (capture == 0) {
@@ -130,9 +124,10 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
 
     memset(capture, 0, sizeof(*capture));
     profile = river_voice_board_array_profile();
+    voice_profile = river_voice_profile_active();
 
     capture->sample_rate = profile->sample_rate;
-    capture->channels = RIVER_VOICE_CAPTURE_EXPERIMENT_CHANNELS;
+    capture->channels = voice_profile->capture_channels;
     capture->frame_ms = profile->frame_ms;
     capture->frame_samples = (profile->sample_rate * profile->frame_ms) / 1000U;
     capture->frame_bytes = capture->frame_samples * capture->channels * sizeof(int16_t);
@@ -162,7 +157,7 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     }
 
     AudioRecord_SetParameters((struct AudioRecord *)capture->record,
-                              RIVER_VOICE_CAPTURE_REF_CHANNEL_PARAM);
+                              voice_profile->capture_audio_record_params);
 
     if (AudioRecord_Start((struct AudioRecord *)capture->record) != 0) {
         river_voice_capture_close(capture);
@@ -217,13 +212,15 @@ void river_voice_capture_close(river_voice_capture_t *capture)
 void river_voice_capture_dump_profile(void)
 {
     const river_voice_board_array_profile_t *profile;
+    const river_voice_profile_config_t *voice_profile;
 
     profile = river_voice_board_array_profile();
+    voice_profile = river_voice_profile_active();
     RIVER_LOGI("capture profile: %lu Hz, %lums, %luch, %s+%s%s",
                (unsigned long)profile->sample_rate,
                (unsigned long)profile->frame_ms,
-               (unsigned long)RIVER_VOICE_CAPTURE_EXPERIMENT_CHANNELS,
+               (unsigned long)voice_profile->capture_channels,
                river_voice_board_mic_name(profile->primary_mic),
                river_voice_board_mic_name(profile->secondary_mic),
-               (RIVER_VOICE_CAPTURE_EXPERIMENT_CHANNELS > 2U) ? "+REF(native ch3)" : "");
+               voice_profile->uses_native_capture_ref ? "+REF(native ch3)" : "");
 }

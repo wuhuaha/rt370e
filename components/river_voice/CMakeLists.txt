@@ -22,10 +22,14 @@ ameba_list_append(private_sources
     river_voice_detector_silero.cc
     river_voice_frontend.c
     river_voice_echo.c
+    river_playback_service.c
+    river_reference_service.c
     river_voice_segment_buffer.c
     river_voice_segment_sink.c
     river_voice_vad_probe.c
     river_voice_preproc.c
+    river_voice_profile.c
+    river_voice_runtime_policy.c
     river_voice_preproc_fixed_dsb.c
     river_voice_webrtc_aecm_adapter.c
     river_voice_ref.c

@@ -6,6 +6,7 @@
 
 #include "river/river_voice_board.h"
 #include "river/river_voice_preproc.h"
+#include "river/river_voice_profile.h"
 
 struct river_voice_preproc_ops {
     const char *name;
@@ -45,27 +46,6 @@ static const river_voice_preproc_ops_t g_river_voice_preproc_ops = {
     .dump_runtime_stats = river_voice_preproc_fixed_dsb_dump_runtime_stats
 };
 
-static river_voice_preproc_profile_t river_voice_preproc_default_profile(void)
-{
-#ifdef CONFIG_RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM
-    return RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM;
-#else
-    return RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE;
-#endif
-}
-
-static const char *river_voice_preproc_profile_name_internal(river_voice_preproc_profile_t profile)
-{
-    switch (profile) {
-    case RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE:
-        return "asr_mainline";
-    case RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM:
-        return "fixed_dsb_webrtc_aecm";
-    default:
-        return "unknown";
-    }
-}
-
 river_status_t river_voice_preproc_open(river_voice_preproc_t *preproc)
 {
     const river_voice_board_array_profile_t *profile;
@@ -78,15 +58,13 @@ river_status_t river_voice_preproc_open(river_voice_preproc_t *preproc)
 
     memset(preproc, 0, sizeof(*preproc));
     profile = river_voice_board_array_profile();
-    active_profile = river_voice_preproc_default_profile();
+    active_profile = river_voice_profile_active_preproc();
     frame_samples = (profile->sample_rate * profile->frame_ms) / 1000U;
     preproc->ops = &g_river_voice_preproc_ops;
     preproc->sample_rate = profile->sample_rate;
     preproc->frame_ms = profile->frame_ms;
     preproc->profile = active_profile;
-    preproc->input_channels =
-        active_profile == RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM ? 3U
-                                                                            : profile->capture_channels;
+    preproc->input_channels = river_voice_profile_capture_channels(active_profile);
     preproc->output_channels = 1U;
     preproc->reference_channels = 0U;
     preproc->input_frame_bytes = frame_samples * preproc->input_channels * sizeof(int16_t);
@@ -172,7 +150,7 @@ const char *river_voice_preproc_backend_name(void)
 
 const char *river_voice_preproc_profile_name(void)
 {
-    return river_voice_preproc_profile_name_internal(river_voice_preproc_default_profile());
+    return river_voice_profile_name(river_voice_profile_active_preproc());
 }
 
 void river_voice_preproc_dump_profile(void)

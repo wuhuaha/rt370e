@@ -26,7 +26,6 @@ const char *river_voice_frontend_mode_name(void);
 const char *river_voice_preproc_backend_name(void);
 const char *river_voice_preproc_profile_name(void);
 const char *river_voice_detector_backend_name(void);
-const char *river_voice_ref_backend_name(void);
 const char *river_voice_segment_sink_name(void);
 river_status_t river_voice_echo_start(void);
 river_status_t river_voice_echo_stop(void);

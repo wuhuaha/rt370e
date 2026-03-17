@@ -112,6 +112,7 @@ static void river_voice_webrtc_aecm_ref_activity_reset(river_voice_webrtc_aecm_a
 	adapter->last_ref_peak = 0U;
 	adapter->ref_above_enter_streak = 0U;
 	adapter->ref_below_exit_streak = 0U;
+	adapter->ref_zero_streak = 0U;
 	adapter->ref_window_count = 0U;
 	adapter->ref_window_active_count = 0U;
 	adapter->ref_window_index = 0U;
@@ -149,6 +150,14 @@ static void river_voice_webrtc_aecm_update_ref_state(river_voice_webrtc_aecm_ada
 	active_sample = (uint8_t)(ref_peak >= adapter->ref_policy.exit_peak ? 1U : 0U);
 	river_voice_webrtc_aecm_ref_window_push(adapter, active_sample);
 
+	if (ref_peak == 0U) {
+		if (adapter->ref_zero_streak < 0xFFFFU) {
+			adapter->ref_zero_streak++;
+		}
+	} else {
+		adapter->ref_zero_streak = 0U;
+	}
+
 	if (above_enter) {
 		if (adapter->ref_above_enter_streak < 0xFFFFU) {
 			adapter->ref_above_enter_streak++;
@@ -161,11 +170,18 @@ static void river_voice_webrtc_aecm_update_ref_state(river_voice_webrtc_aecm_ada
 		if (adapter->ref_below_exit_streak < 0xFFFFU) {
 			adapter->ref_below_exit_streak++;
 		}
-	} else {
+		} else {
+			adapter->ref_below_exit_streak = 0U;
+		}
+
+	if (adapter->ref_zero_streak >= adapter->ref_policy.hangover_frames) {
+		adapter->ref_state = RIVER_VOICE_AECM_REF_STATE_MISSING;
+		adapter->ref_above_enter_streak = 0U;
 		adapter->ref_below_exit_streak = 0U;
+		return;
 	}
 
-	if (adapter->ref_state == RIVER_VOICE_AECM_REF_STATE_MISSING) {
+	if (adapter->ref_state == RIVER_VOICE_AECM_REF_STATE_MISSING && ref_peak > 0U) {
 		adapter->ref_state = RIVER_VOICE_AECM_REF_STATE_IDLE;
 	}
 
@@ -183,6 +199,27 @@ static void river_voice_webrtc_aecm_update_ref_state(river_voice_webrtc_aecm_ada
 		adapter->ref_state_exited_active++;
 		adapter->ref_above_enter_streak = 0U;
 	}
+}
+
+static bool river_voice_webrtc_aecm_reinit_instances(river_voice_webrtc_aecm_adapter_t *adapter)
+{
+	for (int idx = 0; idx < RIVER_VOICE_AECM_CHANNELS; ++idx) {
+		AecmConfig config;
+
+		if (!adapter->aec_instance[idx]) {
+			return false;
+		}
+		if (WebRtcAecm_Init(adapter->aec_instance[idx], adapter->sample_rate) != 0) {
+			return false;
+		}
+		config.cngMode = AecmTrue;
+		config.echoMode = adapter->echo_mode;
+		if (WebRtcAecm_set_config(adapter->aec_instance[idx], config) != 0) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 static void river_voice_webrtc_aecm_adapter_update_max_fifo(river_voice_webrtc_aecm_adapter_t *adapter)
@@ -276,6 +313,7 @@ bool river_voice_webrtc_aecm_adapter_init(river_voice_webrtc_aecm_adapter_t *ada
 	adapter->frame_samples = frame_samples;
 	adapter->process_block_samples = sample_rate / 100;
 	adapter->ms_in_sndcard_buf = ms_in_sndcard_buf;
+	adapter->echo_mode = echo_mode;
 	river_voice_webrtc_aecm_ref_policy_defaults(&adapter->ref_policy);
 	river_voice_webrtc_aecm_ref_policy_normalize(&adapter->ref_policy);
 	river_voice_webrtc_aecm_ref_activity_reset(adapter);
@@ -295,9 +333,9 @@ bool river_voice_webrtc_aecm_adapter_init(river_voice_webrtc_aecm_adapter_t *ada
 			break;
 		}
 
-		AecmConfig config;
-		config.cngMode = AecmTrue;
-		config.echoMode = echo_mode;
+			AecmConfig config;
+			config.cngMode = AecmTrue;
+			config.echoMode = echo_mode;
 		if (WebRtcAecm_set_config(adapter->aec_instance[idx], config) != 0) {
 			break;
 		}
@@ -425,6 +463,7 @@ void river_voice_webrtc_aecm_adapter_reset(river_voice_webrtc_aecm_adapter_t *ad
 	river_voice_aecm_sample_fifo_init(&adapter->mic_out[0]);
 	river_voice_aecm_sample_fifo_init(&adapter->mic_out[1]);
 	river_voice_webrtc_aecm_ref_activity_reset(adapter);
+	adapter->ready = river_voice_webrtc_aecm_reinit_instances(adapter);
 	adapter->resets++;
 	river_voice_webrtc_aecm_adapter_update_max_fifo(adapter);
 }
@@ -464,6 +503,7 @@ void river_voice_webrtc_aecm_adapter_get_stats(const river_voice_webrtc_aecm_ada
 	                                               adapter->ref_window_count);
 	stats->ref_above_enter_streak = adapter->ref_above_enter_streak;
 	stats->ref_below_exit_streak = adapter->ref_below_exit_streak;
+	stats->ref_zero_streak = adapter->ref_zero_streak;
 	stats->ref_frames_seen = adapter->ref_frames_seen;
 	stats->ref_state_entered_active = adapter->ref_state_entered_active;
 	stats->ref_state_exited_active = adapter->ref_state_exited_active;

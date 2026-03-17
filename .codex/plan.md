@@ -6,10 +6,19 @@
 - Stable ASR baseline tag: `m3-asr-baseline-fixed-dsb`
 - Stable ASR baseline commit: `e40e017`
 - Preserved WebRTC AECM experiment assets commit: `6546a11`
+- Current WebRTC AEC experiment snapshot commit: `b7684da`
 
 Current stable mainline runtime chain:
 
 - `capture -> fixed_dsb -> silero_vad -> streaming asr`
+
+Current branch-level refactor additions:
+
+- `PlaybackService`
+- `ReferenceService`
+- `InteractionStateManager`
+- `VoiceProfile`
+- `RuntimePolicy`
 
 Current preserved experiment assets:
 
@@ -232,6 +241,12 @@ Exit criteria:
 
 - AEC failure does not break ASR or VAD
 
+Status:
+
+- completed on the current branch
+- native `capture(3ch) = mic0 + mic1 + ref` experiment path is integrated
+- runtime gate now depends on playback state, interaction state, and reference activity
+
 ### Phase 5: Keep `vad_probe` Clean
 
 Goal:
@@ -254,6 +269,11 @@ Deliverable:
 Exit criteria:
 
 - VAD/ASR debugging remains possible even when AEC is disabled
+
+Status:
+
+- partially completed
+- `vad_probe` remains usable as the main validation path, but board-side AEC validation is still pending
 
 ### Phase 6: Add AEC-Focused Observability
 
@@ -375,6 +395,12 @@ Add logs and counters for:
 ### Task F
 
 Run the full acoustic evaluation matrix and compare against the `m3-asr-baseline-fixed-dsb` baseline.
+
+## Current Immediate Focus
+
+1. keep the stable `fixed_dsb` baseline untouched
+2. validate the current gated WebRTC AECM experiment on board
+3. decide whether WebRTC AECM is worth continuing before moving into larger wake/profile/beamforming refactors
 
 ## Risks
 
