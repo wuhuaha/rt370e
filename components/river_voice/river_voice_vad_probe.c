@@ -12,12 +12,14 @@
 
 #include "river/river_cloud.h"
 #include "river/river_log.h"
+#include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
 #include "river/river_wifi_station.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
 #include "river/river_voice_detector.h"
 #include "river/river_voice_preproc.h"
+#include "river/river_voice_ref.h"
 #include "river/river_voice_segment_buffer.h"
 #include "river/river_voice_segment_sink.h"
 
@@ -55,8 +57,8 @@
 #define RIVER_VOICE_VAD_PROBE_TASK_PRIORITY      4U
 #define RIVER_VOICE_VAD_PROBE_CAPTURE_VOLUME     0x24U
 #define RIVER_VOICE_VAD_PROBE_CAPTURE_HPF_FC     0U
-#define RIVER_VOICE_VAD_PROBE_PRIMARY_MIC_GAIN   AUDIO_MICBST_GAIN_15DB
-#define RIVER_VOICE_VAD_PROBE_SECONDARY_MIC_GAIN AUDIO_MICBST_GAIN_15DB
+#define RIVER_VOICE_VAD_PROBE_PRIMARY_MIC_GAIN   AUDIO_MICBST_GAIN_20DB
+#define RIVER_VOICE_VAD_PROBE_SECONDARY_MIC_GAIN AUDIO_MICBST_GAIN_20DB
 
 typedef struct {
     bool running;
@@ -70,8 +72,10 @@ typedef struct {
     river_voice_segment_buffer_t segment_buffer;
     uint8_t *capture_buffer;
     uint8_t *enhanced_buffer;
+    uint8_t *reference_buffer;
     size_t capture_chunk_bytes;
     size_t enhanced_chunk_bytes;
+    size_t reference_chunk_bytes;
     uint32_t diag_read_ok;
     uint32_t diag_proc_ok;
     uint32_t diag_det_ok;
@@ -89,6 +93,8 @@ typedef struct {
     uint32_t diag_cloud_stream_ok;
     uint32_t diag_cloud_stream_busy;
     uint32_t diag_cloud_stream_fail;
+    uint32_t diag_ref_read_ok;
+    uint32_t diag_ref_read_miss;
     uint32_t diag_chunks_until_log;
     uint16_t diag_capture_peak_ch0;
     uint16_t diag_capture_peak_ch1;
@@ -162,12 +168,14 @@ static uint16_t river_voice_vad_probe_update_peak(const uint8_t *buffer,
         return max_peak;
     }
 
-    for (index = 0; (index + 1U) < sample_count; index += 2U) {
+    for (index = 0; index < sample_count; index += channels) {
         uint16_t peak0;
-        uint16_t peak1;
+        uint16_t peak1 = 0U;
 
         peak0 = river_voice_vad_probe_abs16(samples[index]);
-        peak1 = river_voice_vad_probe_abs16(samples[index + 1U]);
+        if ((index + 1U) < sample_count) {
+            peak1 = river_voice_vad_probe_abs16(samples[index + 1U]);
+        }
         if (peak0 > *peak_ch0) {
             *peak_ch0 = peak0;
         }
@@ -207,6 +215,8 @@ static void river_voice_vad_probe_reset_diag_counters(void)
     g_river_voice_vad_probe.diag_cloud_stream_ok = 0U;
     g_river_voice_vad_probe.diag_cloud_stream_busy = 0U;
     g_river_voice_vad_probe.diag_cloud_stream_fail = 0U;
+    g_river_voice_vad_probe.diag_ref_read_ok = 0U;
+    g_river_voice_vad_probe.diag_ref_read_miss = 0U;
     g_river_voice_vad_probe.diag_capture_peak_ch0 = 0U;
     g_river_voice_vad_probe.diag_capture_peak_ch1 = 0U;
     g_river_voice_vad_probe.diag_enhanced_peak = 0U;
@@ -238,7 +248,7 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
     river_voice_segment_buffer_get_status(&g_river_voice_vad_probe.segment_buffer,
                                           &segment_status);
 
-    RIVER_LOGD("cap_peak=[%u,%u] afe_peak=%u vad_raw_q15=%u vad_prob_q15=%u vad=%s vad_decisions=%lu vad_speech=%lu vad_start=%lu vad_end=%lu sdk_vad=%s sdk_events=%lu sdk_start=%lu sdk_end=%lu sdk_offset_ms=%lu seg=%s seg_pre_ms=%lu seg_post_left_ms=%lu seg_active_ms=%lu seg_ready_ms=%lu seg_done=%lu seg_drop=%lu cloud_stream_ok=%lu cloud_stream_busy=%lu cloud_stream_fail=%lu read_ok=%lu proc_ok=%lu det_ok=%lu seg_unsupported=%lu seg_fail=%lu read_fail=%lu proc_fail=%lu det_fail=%lu partial_read=%lu partial_proc=%lu",
+    RIVER_LOGD("cap_peak=[%u,%u] afe_peak=%u vad_raw_q15=%u vad_prob_q15=%u vad=%s vad_decisions=%lu vad_speech=%lu vad_start=%lu vad_end=%lu sdk_vad=%s sdk_events=%lu sdk_start=%lu sdk_end=%lu sdk_offset_ms=%lu seg=%s seg_pre_ms=%lu seg_post_left_ms=%lu seg_active_ms=%lu seg_ready_ms=%lu seg_done=%lu seg_drop=%lu cloud_stream_ok=%lu cloud_stream_busy=%lu cloud_stream_fail=%lu ref_read_ok=%lu ref_read_miss=%lu read_ok=%lu proc_ok=%lu det_ok=%lu seg_unsupported=%lu seg_fail=%lu read_fail=%lu proc_fail=%lu det_fail=%lu partial_read=%lu partial_proc=%lu",
                (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch0,
                (unsigned int)g_river_voice_vad_probe.diag_capture_peak_ch1,
                (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
@@ -266,6 +276,8 @@ static void river_voice_vad_probe_log_diagnostics_if_needed(void)
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_ok,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_busy,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_fail,
+               (unsigned long)g_river_voice_vad_probe.diag_ref_read_ok,
+               (unsigned long)g_river_voice_vad_probe.diag_ref_read_miss,
                (unsigned long)g_river_voice_vad_probe.diag_read_ok,
                (unsigned long)g_river_voice_vad_probe.diag_proc_ok,
                (unsigned long)g_river_voice_vad_probe.diag_det_ok,
@@ -320,11 +332,16 @@ static void river_voice_vad_probe_log_state_change_if_needed(bool detector_decis
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_ok,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_busy,
                (unsigned long)g_river_voice_vad_probe.diag_cloud_stream_fail);
+    river_runtime_stats_snapshot(detector_is_speech ? "vad_speech" : "vad_silence");
+    river_voice_preproc_dump_runtime_stats(&g_river_voice_vad_probe.preproc);
     g_river_voice_vad_probe.diag_vad_last_logged_is_speech = detector_is_speech;
 }
 
 static void river_voice_vad_probe_close_audio(void)
 {
+    if (river_voice_ref_is_open()) {
+        river_voice_ref_close();
+    }
     river_cloud_asr_audio_close();
     river_voice_detector_close(&g_river_voice_vad_probe.detector);
     river_voice_preproc_close(&g_river_voice_vad_probe.preproc);
@@ -338,6 +355,10 @@ static void river_voice_vad_probe_release_buffers(void)
         rtos_mem_free(g_river_voice_vad_probe.enhanced_buffer);
         g_river_voice_vad_probe.enhanced_buffer = 0;
     }
+    if (g_river_voice_vad_probe.reference_buffer != 0) {
+        rtos_mem_free(g_river_voice_vad_probe.reference_buffer);
+        g_river_voice_vad_probe.reference_buffer = 0;
+    }
     if (g_river_voice_vad_probe.capture_buffer != 0) {
         rtos_mem_free(g_river_voice_vad_probe.capture_buffer);
         g_river_voice_vad_probe.capture_buffer = 0;
@@ -345,6 +366,7 @@ static void river_voice_vad_probe_release_buffers(void)
 
     g_river_voice_vad_probe.capture_chunk_bytes = 0U;
     g_river_voice_vad_probe.enhanced_chunk_bytes = 0U;
+    g_river_voice_vad_probe.reference_chunk_bytes = 0U;
     river_voice_vad_probe_reset_diag_counters();
 }
 
@@ -357,6 +379,8 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
     g_river_voice_vad_probe.capture_chunk_bytes = g_river_voice_vad_probe.capture.frame_bytes;
     g_river_voice_vad_probe.enhanced_chunk_bytes =
         river_voice_preproc_output_frame_bytes(&g_river_voice_vad_probe.preproc);
+    g_river_voice_vad_probe.reference_chunk_bytes =
+        river_voice_preproc_reference_frame_bytes(&g_river_voice_vad_probe.preproc);
     g_river_voice_vad_probe.diag_enabled = g_river_voice_vad_probe_diag_enabled;
     g_river_voice_vad_probe.segment_buffer_enabled = false;
 
@@ -364,8 +388,16 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
         (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_vad_probe.capture_chunk_bytes);
     g_river_voice_vad_probe.enhanced_buffer =
         (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_vad_probe.enhanced_chunk_bytes);
+    if (river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc) &&
+        g_river_voice_vad_probe.reference_chunk_bytes > 0U) {
+        g_river_voice_vad_probe.reference_buffer =
+            (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_vad_probe.reference_chunk_bytes);
+    }
     if (g_river_voice_vad_probe.capture_buffer == 0 ||
-        g_river_voice_vad_probe.enhanced_buffer == 0) {
+        g_river_voice_vad_probe.enhanced_buffer == 0 ||
+        (river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc) &&
+         g_river_voice_vad_probe.reference_chunk_bytes > 0U &&
+         g_river_voice_vad_probe.reference_buffer == 0)) {
         river_voice_vad_probe_release_buffers();
         return RIVER_ERR_NO_MEMORY;
     }
@@ -415,6 +447,7 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
 static river_status_t river_voice_vad_probe_open_audio(void)
 {
     river_cloud_asr_audio_desc_t audio_desc;
+    bool use_reference;
 
     AudioService_Init();
     AudioControl_SetCaptureVolume(river_voice_board_array_profile()->capture_channels,
@@ -434,8 +467,13 @@ static river_status_t river_voice_vad_probe_open_audio(void)
         RIVER_LOGE("vad probe preproc open failed");
         return RIVER_ERR_UNSUPPORTED;
     }
-    if (river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc)) {
-        RIVER_LOGE("vad probe requires reference-disabled preproc profile");
+    use_reference = river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc);
+    if (use_reference &&
+        river_voice_ref_open(g_river_voice_vad_probe.capture.sample_rate,
+                             g_river_voice_vad_probe.capture.frame_ms,
+                             1U,
+                             1500U) != RIVER_OK) {
+        RIVER_LOGE("vad probe playback ref open failed");
         return RIVER_ERR_UNSUPPORTED;
     }
     if (river_voice_detector_open(&g_river_voice_vad_probe.detector) != RIVER_OK) {
@@ -467,11 +505,21 @@ static river_status_t river_voice_vad_probe_open_audio(void)
         return RIVER_ERR_NO_MEMORY;
     }
 
-    RIVER_LOGI("vad probe config: %lu Hz capture dual-mic -> fixed_dsb 1ch -> detector-only, %s+%s, diag_window~%ums",
+    RIVER_LOGI("vad probe config: %lu Hz capture %s -> %s 1ch -> detector-only, %s+%s, diag_window~%ums",
                (unsigned long)g_river_voice_vad_probe.capture.sample_rate,
+               g_river_voice_vad_probe.capture.channels > 2U ? "2mic+ref(native ch3)" : "dual-mic",
+               g_river_voice_vad_probe.preproc.profile ==
+                       RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM
+                   ? "fixed_dsb+webrtc_aecm(exp/native_ref)"
+                   : "fixed_dsb",
                river_voice_board_mic_name(river_voice_board_array_profile()->primary_mic),
                river_voice_board_mic_name(river_voice_board_array_profile()->secondary_mic),
                (unsigned int)RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS);
+    if (g_river_voice_vad_probe.preproc.profile == RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM) {
+        RIVER_LOGI("vad probe aec ref: source=native_capture_ch3 frame=%luB external_ref=%s",
+                   (unsigned long)(g_river_voice_vad_probe.capture.frame_samples * sizeof(int16_t)),
+                   use_reference ? "enabled" : "disabled");
+    }
     RIVER_LOGI("vad probe gain: cap=0x%02x micbst=[%s,%s]",
                (unsigned int)RIVER_VOICE_VAD_PROBE_CAPTURE_VOLUME,
                river_voice_board_mic_gain_name(RIVER_VOICE_VAD_PROBE_PRIMARY_MIC_GAIN),
@@ -496,6 +544,8 @@ static void river_voice_vad_probe_task(void *param)
     (void)param;
 
     while (!g_river_voice_vad_probe.stop_requested) {
+        const bool use_reference = river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc);
+
         bytes_read = (size_t)river_voice_capture_read(&g_river_voice_vad_probe.capture,
                                                       g_river_voice_vad_probe.capture_buffer,
                                                       g_river_voice_vad_probe.capture_chunk_bytes);
@@ -517,12 +567,22 @@ static void river_voice_vad_probe_task(void *param)
                                           &g_river_voice_vad_probe.diag_capture_peak_ch0,
                                           &g_river_voice_vad_probe.diag_capture_peak_ch1);
 
+        if (use_reference && g_river_voice_vad_probe.reference_buffer != 0) {
+            memset(g_river_voice_vad_probe.reference_buffer, 0, g_river_voice_vad_probe.reference_chunk_bytes);
+            if (river_voice_ref_read(g_river_voice_vad_probe.reference_buffer,
+                                     g_river_voice_vad_probe.reference_chunk_bytes) == RIVER_OK) {
+                g_river_voice_vad_probe.diag_ref_read_ok++;
+            } else {
+                g_river_voice_vad_probe.diag_ref_read_miss++;
+            }
+        }
+
         enhanced_bytes = 0U;
         if (river_voice_preproc_process(&g_river_voice_vad_probe.preproc,
                                         g_river_voice_vad_probe.capture_buffer,
                                         g_river_voice_vad_probe.capture_chunk_bytes,
-                                        0,
-                                        0U,
+                                        use_reference ? g_river_voice_vad_probe.reference_buffer : 0,
+                                        use_reference ? g_river_voice_vad_probe.reference_chunk_bytes : 0U,
                                         g_river_voice_vad_probe.enhanced_buffer,
                                         g_river_voice_vad_probe.enhanced_chunk_bytes,
                                         &enhanced_bytes) != RIVER_OK) {

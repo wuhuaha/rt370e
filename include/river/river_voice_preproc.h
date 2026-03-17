@@ -10,7 +10,8 @@
 typedef struct river_voice_preproc_ops river_voice_preproc_ops_t;
 
 typedef enum {
-    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0
+    RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE = 0,
+    RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM = 1
 } river_voice_preproc_profile_t;
 
 typedef struct river_voice_preproc {
@@ -49,5 +50,6 @@ bool river_voice_preproc_reference_enabled(const river_voice_preproc_t *preproc)
 const char *river_voice_preproc_backend_name(void);
 const char *river_voice_preproc_profile_name(void);
 void river_voice_preproc_dump_profile(void);
+void river_voice_preproc_dump_runtime_stats(const river_voice_preproc_t *preproc);
 
 #endif

@@ -5,6 +5,7 @@
 #include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_online_control.h"
+#include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
 #include "river/river_wifi_station.h"
 
@@ -85,6 +86,8 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("ameba-river boot");
     RIVER_LOGI("target=RTL8730E");
 
+    river_runtime_stats_init();
+
     river_voice_frontend_set_handler(river_app_on_voice_event);
 
     if (river_wifi_station_init() != RIVER_OK) {
@@ -130,16 +133,24 @@ river_status_t river_app_boot(void)
 #endif
 
     river_app_print_status();
+    river_runtime_stats_snapshot("boot_ready");
     return RIVER_OK;
 }
 
 void river_app_print_status(void)
 {
+    const char *profile_name;
+
+    profile_name = river_voice_preproc_profile_name();
     RIVER_LOGI("local_frontend=%s", river_voice_frontend_mode_name());
     RIVER_LOGI("local_preproc=%s", river_voice_preproc_backend_name());
-    RIVER_LOGI("local_preproc_profile=%s", river_voice_preproc_profile_name());
+    RIVER_LOGI("local_preproc_profile=%s", profile_name);
     RIVER_LOGI("local_detector=%s", river_voice_detector_backend_name());
-    RIVER_LOGI("local_playback_ref=%s", river_voice_ref_backend_name());
+    if (strcmp(profile_name, "fixed_dsb_webrtc_aecm") == 0) {
+        RIVER_LOGI("local_aec_ref=native_capture_ch3");
+    } else {
+        RIVER_LOGI("local_playback_ref=%s", river_voice_ref_backend_name());
+    }
     RIVER_LOGI("local_segment_sink=%s", river_voice_segment_sink_name());
 #ifdef CONFIG_RIVER_OFFLINE_ASR_RESERVED
     RIVER_LOGI("offline_asr=reserved");

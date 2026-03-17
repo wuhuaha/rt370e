@@ -11,6 +11,7 @@
 #include "wifi_fast_connect.h"
 
 #include "river/river_log.h"
+#include "river/river_runtime_stats.h"
 #include "river/river_wifi_credentials.h"
 #include "river/river_wifi_station.h"
 
@@ -544,6 +545,7 @@ static void river_wifi_station_mark_connected(void)
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
                (unsigned long)g_river_wifi_station.connect_successes);
+    river_runtime_stats_snapshot("wifi_connected");
 }
 
 static bool river_wifi_station_wait_driver_idle(uint32_t timeout_ms, bool allow_join_success)

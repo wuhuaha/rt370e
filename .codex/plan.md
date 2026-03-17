@@ -1,257 +1,422 @@
 # Ameba River Plan
 
-## Goal
-Build a maintainable `RTL8730E` `ASR-first` voice home-control application that prioritizes wake-word and ASR quality, while keeping `AEC` and `VAD` replaceable by self-developed models later.
+## Current Context
 
-## Architecture Direction
-1. `river_core`
-   - app orchestration
-   - state and intent routing
-   - future dialogue/session coordinator
-2. `river_voice`
-   - `ASR-first` acoustic front-end
-   - `AEC` as a pluggable barge-in capability
-   - `VAD/KWS` as replaceable model adapters
-3. `river_cloud`
-   - online speech / NLU / home-control transport
-   - backend provider switch point
-4. `river_diag`
-   - monitor commands
-   - test injection and observability
+- Current working branch: `debug/webrtc-aec`
+- Stable ASR baseline tag: `m3-asr-baseline-fixed-dsb`
+- Stable ASR baseline commit: `e40e017`
+- Preserved WebRTC AECM experiment assets commit: `6546a11`
 
-## Step Plan
-1. Bootstrap project, add `.codex` workflow, and create monitor echo + device-control skeleton.
-2. Add a board-level mic-to-speaker audio echo path with fixed delay so the audio hardware chain can be validated independently.
-3. Split the local voice path into `capture -> preproc -> detector -> router`, and land an `AFE-only` backend that is suitable for `RTL8730E`.
-4. Refocus the product to `ASR-first` only and delete voice-side code paths that do not serve wake-word, ASR, or home-control.
-5. Raise `AEC` priority and land it behind a stable `preproc` adapter so SDK `aivoice` can be replaced by a self-developed backend later.
-6. Replace SDK `VAD` with `Silero VAD`, and keep a strict migration / reproduction record under `.codex`.
-7. Add wake-word detection on top of the enhanced mono output instead of on raw array PCM.
-8. Add beamforming / spatial metadata abstraction without coupling app logic to a specific SDK or model vendor.
-9. Replace the cloud stub with a real online control client abstraction and request flow.
-10. Keep `VAD/AEC/KWS` interfaces stable so future self-developed `DSP/TFLite Micro` models can be swapped in without touching app logic.
+Current stable mainline runtime chain:
 
-## Current Step
-- Step 2 completed: command-driven board audio echo bring-up is implemented and builds for `RTL8730E`.
-- Step 2.1 completed: serial diagnostics are available to separate capture-side failure from playback-side failure during board bring-up.
-- Step 2.2 completed: boot-time echo autostart is enabled so board audio can be validated even when monitor command registration is not usable on the target.
-- Step 2.3 completed: `river` project Kconfig symbols now propagate into the compiled sources through `platform_autoconf.h`.
-- Step 2.4 completed: mono `AMIC3` echo narrowed the mic side, but runtime results still did not produce clean speech.
-- Step 2.5 completed: direct `AudioTrack` speaker playback is proven on the user's board.
-- Step 2.6 in progress: reintroduce echo on top of the proven speaker path and continue narrowing microphone routing / raw capture quality.
-- Step 2.6 completed: mono `AMIC3` echo became audible after aligning playback format and gain with the proven speaker path.
-- Step 2.7 completed: the board voice path is now aligned with SDK `speechmind` / `aivoice` dual-mic baseline:
-  - board array metadata is modeled explicitly
-  - current array geometry is `linear-2mic-50mm`
-  - echo capture now uses `AMIC1 + AMIC3`
-  - delayed replay uses a downmixed mono debug path so future beamforming / AFE integration can replace the mix stage cleanly
-- Step 2.8 completed: the raw dual-mic debug path is tuned for farther speech pickup before AFE integration:
-  - `AMIC1 + AMIC3` boost raised from `15dB` to `20dB`
-  - dual-mic mix is no longer plain averaging; it now biases toward the stronger mic each frame
-  - a lightweight per-frame AGC lifts low-level speech before replay
-  - noise gate is lowered so farther speech is less likely to be muted
-- Step 3.0 completed: the local voice path is now refactored for `RTL8730E` AIVoice AFE integration:
-  - added `river_voice_capture` as a reusable raw-array capture layer
-  - added `river_voice_preproc` as a backend-neutral enhancement boundary
-  - added `river_voice_preproc_aivoice` using SDK `aivoice_iface_afe_v1`
-  - aligned the board frame size to `256 samples / 16 ms`, which is the AIVoice-required input cadence
-  - switched the debug echo path from raw dual-mic mix replay to `dual-mic capture -> AFE enhanced mono -> delayed dual-mono replay`
-  - kept `AEC` disabled for now because there is still no dedicated playback reference path
-- Step 3.1 completed: the AFE-only replay path is tuned for clearer debug listening before VAD/AEC integration:
-  - AFE `NS` is enabled in low-aggressive mode
-  - AFE fixed AGC gain is raised to `15 dB`
-  - echo replay now applies a light post-AFE adaptive gain stage
-  - diagnostics now expose `afe_peak` to separate AFE output strength from raw capture and playback gain
-- Step 3.1.1 completed: the experimental detector gate is rolled back and the AFE-only path is retuned for lower idle noise:
-  - the runtime path returns to `capture -> preproc -> replay`
-  - AFE fixed AGC is reduced from `15 dB` to `9 dB`
-  - AFE `NS` aggressiveness is raised from `low` to `mid`
-  - replay-side post-AGC is tightened from `target12000/maxx4/floor96` to `target9000/maxx2/floor192`
-  - frames below the replay floor are muted directly instead of being replayed as idle hiss
-- Step 3.2 completed: playback-reference plumbing is now staged for future `AEC` without changing the current `AFE-only` runtime policy:
-  - added an independent `river_voice_ref` ring buffer for speaker-reference PCM
-  - the active echo task now publishes the actual delayed mono playback frame into that reference ring
-  - `river_voice_preproc` is widened to accept optional reference audio on the same stable interface that future `AEC` will use
-  - `AEC` remains disabled in this step, so the current backend still behaves as `AFE-only`
-- Step 3.3 completed: `AEC` is now enabled through the existing `preproc(mic, ref)` boundary:
-  - `river_voice_preproc_aivoice` now packs `AMIC1 + AMIC3 + playback_ref` into the SDK AIVoice feed frame
-  - the active AFE policy is switched from `ASR`-style enhancement to `COM`-style enhancement with `AEC + NS + adaptive AGC`
-  - the application still only knows `capture -> preproc -> replay`; SDK `AEC` details remain local to the preproc backend
-  - diagnostics from Step `3.2` are kept so the new reference-driven path can be validated before any beamforming or VAD work
-- Step 3.4 completed: the active local front-end strategy is pivoted back to `ASR-first`:
-  - the running AIVoice policy now uses `AFE_FOR_ASR`
-  - the default profile again centers on wake-word / ASR quality instead of communication echo control
-  - runtime `AEC/ref` is no longer part of the main path; playback reference is kept only as staged infrastructure for a later optional barge-in profile
-  - current tuning follows the SDK `ASR 2mic50mm` baseline: `SSL on`, `NS off`, `fixed AGC 10 dB`
-- Step 4.0 planned: reset the roadmap around the user's final product priorities:
-  - `ASR-first` only; remove voice-side code that does not contribute to wake-word / ASR / home-control
-  - move `AEC` ahead of `VAD/KWS` in implementation priority, but keep it behind a replaceable backend boundary
-  - stop using SDK `VAD` and migrate directly to `Silero VAD`
-  - record the full `Silero VAD` migration process in a dedicated reproducibility document:
-    - `/.codex/silero_vad_porting.md`
-- Step 4.1 completed: voice-side cleanup and `ASR + AEC` minimal skeleton are now landed:
-  - removed the old `speaker_test` code path from the build and boot flow
-  - removed SDK `VAD/KWS/ASR` menu resources from the current project config because they are not the target direction
-  - replaced the old ambiguous preproc state with explicit profiles:
-    - `asr_mainline`
-    - `asr_barge_in_aec`
-  - current default profile is now `asr_barge_in_aec`, still based on `AFE_FOR_ASR`
-  - the runtime logs now describe the real product direction instead of reporting `vad` before any detector exists
-- Step 4.2 completed: `Silero VAD` migration staging has started:
-  - added a first-class `river_voice_detector` boundary instead of letting future VAD logic leak into `echo` or `app`
-  - staged `Silero VAD` as the default detector backend
-  - fixed the first runtime choice to `TensorFlow Lite Micro` because `RTL8730E` SDK already ships it and this matches the later self-developed model direction
-  - kept the detector runtime non-invasive for now:
-    - no actual model blob is imported in this step
-    - no runtime gating is added to the audio path in this step
-  - recorded the first migration rule in `/.codex/silero_vad_porting.md`:
-    - migrate the original model first
-    - do not prune or quantize until measured resource pressure appears
-- Step 4.3 completed: official `Silero VAD` upstream is now pinned into the repository:
-  - downloaded official upstream repo and pinned commit `0dd0d85ee86b1f9d178dc26a04e60e90de26a80f`
-  - selected official `silero_vad_16k_op15.onnx` as the first conversion source
-  - vendored that exact artifact into `third_party/silero_vad/upstream/`
-  - recorded the official streaming contract:
-    - `512-sample` logical window
-    - `64-sample` context
-    - recurrent state `2 x batch x 128`
-- Step 4.4 completed: host-side `Silero` conversion bring-up is now reproducible and the first direct path has been de-risked:
-  - created a dedicated host conversion venv under the project instead of mixing conversion tools into the SDK environment
-  - installed and pinned the first `onnx/onnxruntime/onnx2tf/tensorflow` conversion stack
-  - corrected the actual official ONNX input contract:
-    - current chunk `512`
-    - rolling context `64`
-    - real model input tensor `576`
-  - verified that direct `onnx2tf` on the vendored `op15` graph is not yet stable:
-    - base failure: `wa/model/stft/Conv`
-    - after manual graph-specific transpose fixes: `wa/model/decoder/Squeeze`
-- Step 4.5 completed: source-artifact hygiene and reconstruction scaffolding are now in place:
-  - detected that host conversion tooling had mutated the vendored ONNX in place
-  - restored `third_party/silero_vad/upstream/silero_vad_16k_op15.onnx` from the pinned upstream checkout
-  - added a staging tool so future conversion runs always operate on a temporary copy instead of the vendored source
-  - added a reconstruction-oriented tensor extractor that emits:
-    - source tensor metadata
-    - decoder `LSTM` tensors after the ONNX slice/concat layout
-- Step 4.6 completed: the first direct embedded detector artifact now exists and is numerically verified:
-  - rebuilt the pinned official ONNX in `TensorFlow` from extracted weights instead of forcing the old graph through `onnx2tf`
-  - matched ONNX numerically at batch `1`:
-    - output max abs diff `1.56e-08`
-    - state max abs diff `1.67e-06`
-  - exported a batch=`1` `TFLite` artifact:
-    - `third_party/silero_vad/generated/silero_vad_16k_b1_fp32.tflite`
-- Step 4.7 completed: the verified `Silero` artifact now runs inside the device-side detector backend:
-  - `river_voice_detector_silero.cc` now embeds and executes `silero_vad_16k_b1_fp32.tflite` through `TFLite Micro`
-  - the echo task now feeds enhanced mono `16 ms` frames into the detector while preserving detector/replay separation
-  - diagnostics now expose `vad_prob_q15`, `vad=speech|silence`, and detector success/failure counters
-  - first build-time resource baseline is now recorded before any compression decision:
-    - `.tflite` artifact about `1.2 MB`
-  - packaged app image about `2.8 MB`
-  - `target_img2_ap.axf` text about `2.36 MB`
-- Step 4.8 completed: project-owned flash profiles are now in place for the oversized development image:
-  - copied the stock `RTL8730E NOR` profile into the project in decrypted form for traceability
-  - created a development single-slot NOR profile that expands the combined app package range to `0x08600000`
-  - added `tools/river_flash.py` so flashing can use the project profile without patching the SDK
-  - added `tools/generate_rdev.py` so the encrypted `.rdev` stays reproducible from project JSON
-- Step 4.9 completed: first real board-side `Silero` boot crash is now fixed at the detector runtime boundary:
-  - root cause was an unconstructed `tflite::MicroMutableOpResolver` stored inside a zero-initialized C struct
-  - fixed by explicit placement construction / destruction in `river_voice_detector_silero.cc`
-  - also fixed tensor-arena free symmetry for both DRAM-typed and generic heap allocation fallbacks
-- Step 4.10 completed: detector tensor binding is now aligned with the real exported `TFLite` artifact:
-  - confirmed the batch=`1` artifact uses interpreter order:
-    - input 0 = recurrent state
-    - input 1 = audio `[1,576]`
-    - output 0 = probability `[1,1]`
-    - output 1 = next recurrent state
-  - updated device-side binding to follow that order directly and emit a tensor inventory dump on any future mismatch
-- Next recommended step:
-  - flash the new build with the project flash wrapper and confirm `Silero` runtime now reaches `runtime ready`
-  - capture near-field, far-field, and silence diagnostics using the new `vad_*` counters
-  - measure whether `256 KB` tensor arena is sufficient under sustained runtime
-  - only then decide whether compression is necessary
-  - keep `aivoice AEC` inside the `asr_barge_in_aec` preproc profile while detector migration continues
-- Step 4.11 completed: board runtime compatibility is now adjusted to the actual `RTL8730E` SDK `TFLite Micro` behavior:
-  - on-device tensor `dims/name` metadata turned out to be unusable for this model even though tensor structs and types are valid
-  - detector binding now validates fixed I/O order plus tensor buffer readiness instead of requiring runtime shape metadata
-  - full `RTL8730E` image rebuild after this fix passed locally
-- Step 4.12 completed: detector bring-up now works around missing top-level tensor buffers in the SDK runtime:
-  - board logs showed all four `Silero` I/O tensors with:
-    - valid pointers
-    - valid `float32` type
-    - correct `bytes`
-    - but `data=NULL`
-  - detector runtime now preserves eval tensors and patches fallback buffers into both eval and persistent tensor views when the SDK leaves those buffers unset
-  - full local image rebuild after this workaround passed
-- Step 4.13 completed: open-time detector validation is now aligned with what the board runtime actually exposes:
-  - board logs showed the persistent `Silero` tensors already had valid `dims/data/bytes`
-  - remaining failure was therefore in the extra eval-tensor guard, not in model binding itself
-  - detector now keeps strong size checks on persistent I/O tensors and only basic presence/type/data checks on eval tensors
-- Step 4.14 completed: eval tensors are no longer allowed to block detector open on this SDK snapshot:
-  - board logs proved the persistent tensors are now good enough to attempt real runtime bring-up
-  - eval tensors are still collected and patched when available, but only produce a diagnostic warning if degraded
-- Next recommended step:
-  - flash the newly rebuilt image and confirm the detector now reaches `silero_vad runtime ready`
-  - if it does, collect silence / near-field / far-field `vad_prob_q15` diagnostics
-  - if it still fails, inspect whether invoke-time tensor contents or arena pressure, not binding, is the next blocker
-- Step 4.20 completed: default validation is now switched to a pure VAD probe path:
-  - boot autostart runs `vad_probe`, not delayed speaker replay
-  - active preproc profile is changed to `asr_mainline`
-  - `AEC` and playback reference are removed from the default validation path
-  - diagnostics now print at about `240 ms` cadence so short utterances are less likely to be missed
-- Step 4.21 completed: pure VAD validation is now shifted toward online-ASR staging instead of probe-only visibility:
-  - added `river_voice_segment_buffer` as a reusable front/back buffered utterance cache
-  - added `river_voice_segment_sink` as the future online-ASR handoff point, currently backed by a stub implementation
-  - `vad_probe` now keeps:
-    - `384 ms` pre-roll
-    - `768 ms` post-roll
-    - up to `8000 ms` per ready segment
-  - probe diagnostics are now denser and more decision-oriented:
-    - window reduced again to about `96 ms`
-    - logs now expose `vad_start/vad_end`
-    - logs now expose segment prebuffer / post-roll / ready-state counters
-  - `Silero` is tuned more aggressively for recall:
-    - enter threshold `9000`
-    - exit threshold `2500`
-    - hangover `10`
-    - EMA shift `1`
-  - current default validation path is therefore no longer just "does VAD run", but "does VAD produce ASR-usable buffered speech segments"
-- Next recommended step:
-  - keep validating the pure `vad_probe` path with short Chinese utterances and room-noise samples
-  - if `Silero` still drops too many short utterances, keep tuning decision policy before touching the model
-  - next feature step should connect `segment_buffer ready` data to the future online ASR uplink boundary
-- Step 5.0 completed: the online-ASR uplink boundary is now connected to a real provider framework:
-  - added `river_wifi_station` for STA auto-connect bring-up with project-local credentials
-  - added `river_cloud_adapter` as the unified cloud-ASR bridge between local audio and provider backends
-  - added a provider registry so future vendors can be added without rewriting the adapter
-  - added the first real provider:
-    - `iflytek_rtasr`
-    - streaming WebSocket uplink implemented
-    - partial/final/error/session callbacks routed back into `river_core`
-  - the voice path now fans out in two online-ready directions:
-    - streaming:
-      - `detector -> cloud_adapter stream bridge -> iflytek_rtasr`
-    - non-streaming / segmented:
-      - `detector -> segment_buffer -> segment_sink -> cloud batch bridge`
-  - current batch path is architecture-ready but still provider-limited:
-    - interface is stable
-    - `iflytek_rtasr` batch submit remains unsupported for now
-- Next recommended step:
-  - flash the current build and verify:
-    - Wi-Fi auto-connect
-    - RTASR session open
-    - partial/final result callbacks
-  - if RTASR opens but recognition is unstable, tune:
-    - VAD post-roll
-    - stream open trigger timing
-    - segment-buffer policy independently from streaming policy
-  - after first end-to-end cloud verification, route final ASR text into the next online control intent layer
-- Step 5.1 completed: runtime logging is now consolidated behind a project-owned abstraction:
-  - added a shared logger with:
-    - timestamped serial output
-    - level filtering
-    - future secondary sink support
-  - set the default level to `INFO`
-  - moved high-rate VAD probe diagnostics to `DEBUG`
-  - kept VAD state-transition messages at `INFO`
-- Next recommended step:
-  - if field logs still feel too noisy, add a small runtime log-level control path through the existing monitor command set
-  - keep the current sink abstraction serial-only until file or remote trace requirements are concrete
+- `capture -> fixed_dsb -> silero_vad -> streaming asr`
+
+Current preserved experiment assets:
+
+- `components/river_voice/river_voice_webrtc_aecm_adapter.c`
+- `components/river_voice/river_voice_webrtc_aecm_adapter.h`
+- `third_party/webrtc_aecm/`
+- `WEBRTC_AECM_RIVER_接入记录.md`
+
+These assets are intentionally preserved, but they are not part of the current stable runtime chain.
+
+## Product Direction
+
+Build a maintainable `RTL8730E` voice stack that prioritizes:
+
+- ASR accuracy
+- natural dialogue turn-taking
+- replaceable acoustic modules
+- clean separation between stable product path and experimental acoustic profiles
+
+For the current phase, the product path remains:
+
+- `fixed_dsb` as the default ASR front-end
+- `silero_vad` as the current VAD
+- online streaming ASR as the primary recognition backend
+
+`AEC` is treated as an optional barge-in capability, not a default always-on front-end stage.
+
+## AEC Experiment Goal
+
+Land a WebRTC-based `AEC` experiment that can be evaluated professionally without destabilizing the current `fixed_dsb` ASR baseline.
+
+The target behavior is:
+
+- when native `capture ch3 ref` is unavailable or inactive:
+  - stay on the existing stable `fixed_dsb` path
+- when native `capture ch3 ref` is present, aligned, and active:
+  - route audio through `AEC + DSB`
+
+This experiment must be isolated behind an explicit experimental profile or build-time switch. It must not silently change the default ASR path.
+
+## Non-Goals
+
+The following are explicitly out of scope for this branch:
+
+- replacing `Silero VAD`
+- changing the online ASR provider
+- introducing SDK AEC/BF back into the runtime path
+- changing product-layer dialogue logic
+- landing unverified AEC behavior into the default ASR profile
+
+## Constraints
+
+### Hardware / Runtime Constraints
+
+- board microphone array: `AMIC1 + AMIC3`
+- spacing: `50mm`
+- frame cadence in current voice path: `16ms @ 16kHz = 256 samples`
+- WebRTC AECM processing cadence: `10ms @ 16kHz = 160 samples`
+
+### Architectural Constraints
+
+- `river_voice_preproc` remains the only valid insertion boundary for AEC in the current architecture
+- `river_voice_vad_probe` must remain primarily a VAD / ASR validation path, not become a dumping ground for AEC-specific logic
+- `fixed_dsb` mainline must remain intact and independently testable
+
+## Engineering Principles
+
+1. Stable product path first
+   - `fixed_dsb -> silero_vad -> asr` remains the reference chain.
+
+2. AEC as an explicit experiment
+   - no hidden runtime mode changes in the default profile.
+
+3. Strict timing correctness before acoustic tuning
+   - solve `10ms AECM` and `16ms main frame` alignment before evaluating quality.
+
+4. Real reference only
+   - AEC is only meaningful when driven by a real native reference with stable timing.
+
+5. Observability before optimization
+   - add counters and state logs before making subjective tuning decisions.
+
+## Implementation Plan
+
+### Phase 0: Freeze the Reference Baseline
+
+Goal:
+
+- keep the current `fixed_dsb` ASR path as the reference implementation for all A/B comparisons
+
+Tasks:
+
+- confirm the default preproc backend remains `fixed_dsb`
+- confirm the current `Silero VAD` and ASR path continue to work without `AEC`
+- keep existing far-field VAD tuning separate from AEC acceptance criteria
+
+Deliverable:
+
+- a reproducible no-AEC baseline for objective comparison
+
+Exit criteria:
+
+- current default path still produces stable ASR on board
+
+### Phase 1: Define an Explicit Experimental AEC Profile
+
+Goal:
+
+- create a dedicated profile or build switch for WebRTC AECM experiments
+
+Tasks:
+
+- keep `fixed_dsb` as the mainline product backend name
+- define a distinct experimental profile such as:
+  - `fixed_dsb_webrtc_aecm`
+- ensure logs always reflect the real active profile
+
+Deliverable:
+
+- clear separation between product path and experiment path
+
+Exit criteria:
+
+- no ambiguity in runtime logs or configuration about whether AEC is active
+
+### Phase 2: Solve 10ms / 16ms Frame Alignment
+
+Goal:
+
+- guarantee that AECM output is time-aligned with the current main pipeline frame contract
+
+Tasks:
+
+- document the frame contract:
+  - input to main pipeline: `256 samples`
+  - AECM internal step: `160 samples`
+- redesign adapter buffering so that:
+  - input frames can be sliced deterministically into AECM blocks
+  - output frames are reconstructed without mixing stale and current semantic frame boundaries
+- add instrumentation for:
+  - input samples pushed
+  - output samples popped
+  - FIFO depth
+  - underrun
+  - overrun
+  - dropped blocks
+
+Design requirement:
+
+- the adapter must make it explicit whether output corresponds to:
+  - exact-current frame
+  - delayed-but-contiguous frame
+
+Deliverable:
+
+- a hardened AECM adapter with deterministic framing behavior
+
+Exit criteria:
+
+- no frame-boundary ambiguity remains in the experiment chain
+
+### Phase 3: Build a Real Playback Reference Validity Model
+
+Goal:
+
+- prevent AEC from toggling on/off based on single-frame noise
+
+Tasks:
+
+- define reference states:
+  - `ref_missing`
+  - `ref_present_idle`
+  - `ref_present_active`
+- add runtime indicators:
+  - peak
+  - RMS or average energy
+  - active ratio in a sliding window
+- implement hysteresis:
+  - enter threshold
+  - exit threshold
+  - minimum active duration
+  - hangover before disable
+- forbid full AEC reset on every short inactive gap
+
+Deliverable:
+
+- stable AEC gating based on real playback activity, not single-frame spikes
+
+Exit criteria:
+
+- AEC no longer flaps during short TTS pauses or brief playback silence gaps
+
+### Phase 4: Integrate AEC into `river_voice_preproc`
+
+Goal:
+
+- insert AEC only at the preproc boundary, keeping the rest of the chain unchanged
+
+Tasks:
+
+- converge the experimental profile to native `capture(3ch) = mic0 + mic1 + ref`
+- process microphone channels with WebRTC AECM before beamforming
+- keep `fixed_dsb` as the downstream spatial combine step
+- define precise behavior for four cases:
+  - no ref path
+  - ref path exists but inactive
+  - ref active and valid
+  - ref path degraded or adapter failure
+
+Required fallback policy:
+
+- on any AEC experiment failure, fall back to plain `fixed_dsb`
+- never block the ASR chain on AEC failure
+
+Deliverable:
+
+- experimental `AEC + DSB` preproc path with safe fallback
+
+Exit criteria:
+
+- AEC failure does not break ASR or VAD
+
+### Phase 5: Keep `vad_probe` Clean
+
+Goal:
+
+- avoid contaminating the main VAD validation path with AEC-only assumptions
+
+Tasks:
+
+- expose enough reference diagnostics for AEC experiments
+- do not hardwire `vad_probe` into a permanently ref-dependent mode
+- keep `vad_probe` usable for:
+  - raw VAD validation
+  - DSB validation
+  - ASR stream validation
+
+Deliverable:
+
+- `vad_probe` remains a general validation path rather than an AEC-specialized test harness
+
+Exit criteria:
+
+- VAD/ASR debugging remains possible even when AEC is disabled
+
+### Phase 6: Add AEC-Focused Observability
+
+Goal:
+
+- make AEC quality and failure modes visible in runtime logs
+
+Tasks:
+
+- log profile and AEC state transitions
+- log adapter stats:
+  - blocks_in
+  - blocks_out
+  - fifo_depth
+  - underrun
+  - overrun
+  - reset_count
+- log reference stats:
+  - peak
+  - active ratio
+  - entered_active_count
+  - exited_active_count
+- log preproc fallback reason when experiment path is bypassed
+
+Deliverable:
+
+- actionable logs for AEC diagnosis
+
+Exit criteria:
+
+- every AEC bypass or fallback is explainable from logs
+
+### Phase 7: Acoustic Evaluation Matrix
+
+Goal:
+
+- evaluate AEC using controlled scenarios instead of ad-hoc impressions
+
+Scenarios:
+
+1. no playback, near-field speech
+2. no playback, far-field speech
+3. playback active, no user speech
+4. playback active, user barge-in near-field
+5. playback active, user barge-in far-field
+6. playback active with short pause in TTS
+7. playback active with bursty system prompt tones
+
+Metrics:
+
+- VAD trigger rate
+- ASR final accuracy
+- ASR empty-result rate
+- false cut / early endpoint rate
+- subjective barge-in responsiveness
+- heap and CPU deltas versus baseline
+
+Deliverable:
+
+- A/B table:
+  - baseline `fixed_dsb`
+  - experimental `webrtc_aecm + fixed_dsb`
+
+Exit criteria:
+
+- experiment has objective evidence, not just anecdotal preference
+
+### Phase 8: Decision Gate
+
+Goal:
+
+- decide whether WebRTC AECM is good enough to continue, needs redesign, or should be abandoned
+
+Decision outcomes:
+
+1. keep as experiment only
+2. continue tuning for productization
+3. replace with another AEC approach
+
+Promotion criteria:
+
+- no ASR regression in no-playback cases
+- improved or at least acceptable playback-interruption cases
+- stable runtime without frame corruption
+- acceptable resource overhead
+
+## Immediate Work Breakdown
+
+### Task A
+
+Create an explicit experimental profile and keep default `fixed_dsb` untouched.
+
+### Task B
+
+Refactor the existing `webrtc_aecm_adapter` into a deterministic `160 <-> 256` framing module with visible stats.
+
+### Task C
+
+Implement reference-active hysteresis:
+
+- enter threshold
+- exit threshold
+- stable window
+- hangover
+
+### Task D
+
+Integrate the experimental path into `river_voice_preproc` with guaranteed fallback to `fixed_dsb`.
+
+### Task E
+
+Add logs and counters for:
+
+- AEC state
+- adapter health
+- reference health
+- fallback reasons
+
+### Task F
+
+Run the full acoustic evaluation matrix and compare against the `m3-asr-baseline-fixed-dsb` baseline.
+
+## Risks
+
+### Risk 1: Frame Misalignment
+
+If `AECM` output is not strictly aligned, it will damage:
+
+- VAD timing
+- ASR boundary quality
+- perceived responsiveness
+
+This is the highest priority technical risk.
+
+### Risk 2: Reference Flapping
+
+If AEC enable/disable is based on single-frame peak detection, the adaptive state will never stabilize.
+
+### Risk 3: Over-processing
+
+Aggressive AEC in no-playback or weak-ref scenes can degrade ASR more than it helps.
+
+### Risk 4: Validation Contamination
+
+If `vad_probe` becomes AEC-specific, future debugging of VAD / DSB / ASR will become slower and less reliable.
+
+## Success Criteria
+
+This branch is successful only if all of the following hold:
+
+- default mainline `fixed_dsb` path remains intact
+- experimental `AEC` path is explicitly selectable
+- `10ms / 16ms` alignment is deterministic
+- AEC activation uses hysteresis and stable reference logic
+- no-playback ASR is not worse than the baseline
+- playback-interruption scenarios become measurably better or at least technically explainable
+
+## Current Recommendation
+
+Proceed with WebRTC AECM only as an isolated experiment on `debug/webrtc-aec`.
+
+Do not merge any AEC changes into the default runtime chain until:
+
+- frame alignment is proven correct
+- reference gating is stable
+- A/B acoustic results are documented against the `m3-asr-baseline-fixed-dsb` baseline

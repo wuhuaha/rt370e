@@ -17,6 +17,7 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_log.c
+    river_runtime_stats.c
 )
 
 ameba_list_append(private_includes

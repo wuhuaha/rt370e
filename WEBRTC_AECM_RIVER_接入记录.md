@@ -26,6 +26,178 @@
 
 - `capture -> webrtc_aecm_dsb -> silero_vad -> online ASR`
 
+## 分支内阶段进展（debug/webrtc-aec）
+
+### Phase 1 已落地：建立独立实验 profile，默认主链不变
+
+当前已经完成：
+
+- 新增独立实验 profile：
+  - `fixed_dsb_webrtc_aecm`
+- 默认主链仍保持：
+  - `asr_mainline`
+  - `fixed_dsb`
+- 当前即使切到实验 profile，运行时也只会明确打印“实验 profile 已选中”，不会偷偷把未完成的 `AEC` 路径接进默认链路
+
+这样做的目的：
+
+- 先把配置边界和日志边界建立清楚
+- 防止后续 AEC 试验再次污染当前稳定的 `fixed_dsb -> silero_vad -> online ASR` 主链
+
+### Phase 2 已启动：把 AECM adapter 升级为“延迟但连续”的严格对齐模块
+
+当前已完成的整理：
+
+- 保留 `16ms = 256 samples` 主帧输入接口不变
+- 明确 `AECM` 内部处理块仍为：
+  - `10ms = 160 samples`
+- 将 adapter 的输出契约改为：
+  - `delayed-but-contiguous stream`
+  - 只有在累计到至少一个完整主帧输出后，才允许上层取走 `256` 点
+- 增加 adapter 可观测性：
+  - `frames_pushed`
+  - `frames_popped`
+  - `blocks_processed`
+  - `input_push_failures`
+  - `process_failures`
+  - `output_underruns`
+  - `resets`
+  - `samples_pushed`
+  - `samples_popped`
+  - `ref/mic_in/mic_out fifo depth`
+  - `max fifo depth`
+  - `primed_output`
+
+当前阶段的关键判断：
+
+- 这一步还没有把 AEC 正式接回 `river_voice_preproc`
+- 但已经把“原型适配器”升级成了一个更适合后续集成和排障的基础模块
+- 下一步仍然要完成：
+  - 参考激活滞回模型
+  - `preproc` 接入与安全 fallback
+
+### Phase 3 已启动：为 playback reference 建立滞回状态机
+
+当前已补充到 adapter 内部的能力：
+
+- 参考状态枚举：
+  - `missing`
+  - `idle`
+  - `active`
+- 参考策略参数：
+  - `enter_peak`
+  - `exit_peak`
+  - `stable_frames`
+  - `hangover_frames`
+  - `active_window_frames`
+- 参考可观测性：
+  - `last_ref_peak`
+  - `ref_active_ratio_q15`
+  - `ref_above_enter_streak`
+  - `ref_below_exit_streak`
+  - `ref_frames_seen`
+  - `ref_state_entered_active`
+  - `ref_state_exited_active`
+
+当前阶段的定位：
+
+- 先把“参考活跃判断”做成 adapter 内部稳定能力
+- 还没有把它驱动到 `preproc` 的 AEC 开关
+- 下一步才是把这个状态机接到实验 profile 的实际旁路 / AEC 选择逻辑中
+
+### Phase 4 已落地：实验 profile 接回 preproc，但默认主链仍不变
+
+当前已经完成：
+
+- `fixed_dsb_webrtc_aecm` 实验 profile 现在可以真实打开：
+  - `playback ref`
+  - `webrtc_aecm_adapter`
+  - `reference-gated` AEC 旁路切换
+- 默认主链仍保持：
+  - `capture -> fixed_dsb -> silero_vad -> online ASR`
+- `vad_probe` 只在实验 profile 下才会：
+  - 打开 `river_voice_ref`
+  - 读取 mono playback ref
+  - 把参考送入 `preproc`
+
+当前实验 profile 的运行原则：
+
+- 默认输出始终先走 `fixed_dsb`
+- 只有当 `ref_state == active` 且 `adapter` 已经攒够一个完整主帧输出时，才切到 `AECM` 处理结果
+- 当参考不存在、参考不活跃、输出未就绪、`push/pop/process` 任一步失败时，立即回退到 `fixed_dsb`
+- `idle/missing` 状态下会主动 drain 掉 adapter 内部输出，避免旧帧残留污染后续激活段
+
+这一步的意义：
+
+- 实验 profile 终于具备“真实接入”的能力，而不只是日志占位
+- 同时仍然把风险限定在实验链，不影响当前 `fixed_dsb` 主线
+
+### Phase 5 已启动：板端默认打开实验 profile，并补充资源占用统计
+
+当前新增：
+
+- `prj.conf` 已切到：
+  - `fixed_dsb_webrtc_aecm`
+- 新增 `river.stats` 轻量资源快照：
+  - `boot_ready`
+  - `wifi_connected`
+  - `asr_stream_active`
+  - `asr_stream_finish`
+  - `vad_speech`
+  - `vad_silence`
+- 新增 `preproc aecm stats` 运行态日志：
+  - `ref_state`
+  - `ratio_q15`
+  - `peak`
+  - `frames_pushed/popped`
+  - `blocks_processed`
+  - `input_push_failures`
+  - `process_failures`
+  - `output_underruns`
+  - `resets`
+  - `used/fallback`
+
+这一步的目的：
+
+- 把实验 profile 真正打开到板端验证
+- 让每一次 `speech/silence`、流打开/关闭、Wi‑Fi 连通时，都能拿到稳定的资源快照
+- 把 `AECM` 实验状态和系统资源状态分开观测，避免把“算法问题”和“资源问题”混在一起
+
+### Phase 6 已落地：AEC 输入模型收敛为原生 `mic0 + mic1 + ref`
+
+当前实验分支已不再使用：
+
+- `playback_ring ref`
+- 前处理阶段软件拼接 `[mic0, mic1, ref]`
+
+而是直接收敛为：
+
+- `capture(3ch) = mic0 + mic1 + ref`
+
+具体实现约束：
+
+- 仅实验 profile：
+  - `fixed_dsb_webrtc_aecm`
+  - 会把录音 `channel_count` 提升为 `3`
+  - 并通过 `AudioRecord_SetParameters("ref_channel=2;cap_mode=no_afe_pure_data")`
+    将第 3 路标记为 reference
+- 默认主线：
+  - 仍保持 `2ch mic`
+  - 不引入原生 ref
+
+这样调整后的意义：
+
+- 实验链终于与 SDK 官方 `3ch ref` 输入模型一致
+- 去掉了 `playback_ring` 带来的软件时序 tap 偏差
+- 后续 AEC 评估可以集中到：
+  - `10ms/16ms` 对齐
+  - reference-active 滞回
+  - 双讲/打断效果
+
+当前实验链新的输入模型是：
+
+- `capture(2mic+ref native ch3) -> fixed_dsb/webrtc_aecm(exp) -> silero_vad -> online ASR`
+
 ## 这次审查后的结论
 
 方向是对的，但当前实现还**不适合直接合入主线**。主要原因不是代码风格，而是时序和算法接法风险会直接影响 VAD / ASR 结果。

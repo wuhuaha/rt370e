@@ -11,6 +11,7 @@
 
 #include "river/river_cloud.h"
 #include "river/river_log.h"
+#include "river/river_runtime_stats.h"
 #include "river/river_wifi_station.h"
 #include "river_asr_provider_internal.h"
 
@@ -442,6 +443,7 @@ static river_status_t river_cloud_stream_finish_active(void)
     g_river_cloud.silence_frames = 0U;
     g_river_cloud.stream_started_ms = 0U;
     river_cloud_pre_roll_reset();
+    river_runtime_stats_snapshot("asr_stream_finish");
     return status;
 }
 
@@ -632,6 +634,7 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
             RIVER_LOGI("asr stream active: provider=%s pre_roll_frames=%lu",
                        river_cloud_asr_provider_name(),
                        (unsigned long)pre_roll_frames_before_open);
+            river_runtime_stats_snapshot("asr_stream_active");
             return RIVER_OK;
         }
     }

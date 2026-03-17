@@ -27,13 +27,25 @@ ameba_list_append(private_sources
     river_voice_vad_probe.c
     river_voice_preproc.c
     river_voice_preproc_fixed_dsb.c
+    river_voice_webrtc_aecm_adapter.c
     river_voice_ref.c
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/aecm_core.cc
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/aecm_core_c.cc
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/complex_fft.c
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/delay_estimator.cc
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/delay_estimator_wrapper.cc
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/echo_control_mobile.cc
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/real_fft.c
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/ring_buffer.c
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/signal_processing_library.cc
     generated/river_silero_vad_model_data.cc
 )
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
     ${c_CMPT_AUDIO_DIR}/interfaces
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm
+    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm
 )
 
 ameba_add_internal_library(river_voice
