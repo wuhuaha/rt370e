@@ -20,7 +20,9 @@ ameba_list_append(private_sources
     river_asr_provider_registry.c
     river_cloud_adapter.c
     river_online_control.c
+    river_tts_iflytek_ws.c
     river_wifi_station.c
+    river_ws_dispatch.c
 )
 
 ameba_list_append(private_includes

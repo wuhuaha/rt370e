@@ -10,6 +10,9 @@ Stable ASR baseline tag:
 Stable runtime chain:
 - `capture -> fixed_dsb -> silero_vad -> streaming asr`
 
+Current TTS path:
+- `river tts <text> -> iflytek ws tts -> PlaybackService -> speaker`
+
 Current AEC experiment branch:
 - `debug/webrtc-aec`
 
@@ -33,6 +36,9 @@ Generated images:
 ## Key Documents
 
 - `PROJECT_STATUS_ZH.md`
+- `IFLYTEK_TTS_WS_INTEGRATION_ZH.md`
+- `VOICE_FRONTEND_CHAIN_STATUS_ZH.md`
+- `AEC_DEBUG_PLAN_GUIDE_ZH.md`
 - `VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH.md`
 - `WAKE_ASR_AUDIO_PROFILE_DESIGN_ZH.md`
 - `FIXED_DSB_BEAMFORMING_ZH.md`

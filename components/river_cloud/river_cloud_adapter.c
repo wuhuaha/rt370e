@@ -14,6 +14,7 @@
 #include "river/river_runtime_stats.h"
 #include "river/river_wifi_station.h"
 #include "river_asr_provider_internal.h"
+#include "river_tts_internal.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.cloud"
@@ -470,6 +471,11 @@ river_status_t river_cloud_adapter_init(void)
                river_cloud_asr_provider_name(),
                river_cloud_asr_streaming_supported() ? "yes" : "no",
                river_cloud_asr_batch_supported() ? "yes" : "no");
+    if (river_tts_iflytek_init() != RIVER_OK) {
+        RIVER_LOGE("tts provider init failed");
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    RIVER_LOGI("online tts provider init: iflytek_ws speak=yes scheme=ws");
     g_river_cloud.initialized = true;
     return RIVER_OK;
 }
@@ -484,12 +490,26 @@ river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_han
 
 river_status_t river_cloud_adapter_submit_text(const char *text)
 {
+    river_status_t status;
+
     if (text == NULL) {
         return RIVER_ERR_ARG;
     }
+    if (!g_river_cloud.initialized) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!river_wifi_station_is_connected()) {
+        return RIVER_ERR_BUSY;
+    }
+    if (!river_cloud_time_ready()) {
+        return RIVER_ERR_BUSY;
+    }
 
-    RIVER_LOGI("text stub=%s", text);
-    return RIVER_OK;
+    RIVER_LOGI("tts submit text=%s", text);
+    river_runtime_stats_snapshot("tts_submit_start");
+    status = river_tts_iflytek_submit_text(text);
+    river_runtime_stats_snapshot(status == RIVER_OK ? "tts_submit_finish" : "tts_submit_fail");
+    return status;
 }
 
 const char *river_cloud_asr_provider_name(void)
@@ -719,4 +739,5 @@ void river_cloud_adapter_dump_status(void)
     if (g_river_cloud.provider != NULL) {
         g_river_cloud.provider->dump_status();
     }
+    river_tts_iflytek_dump_status();
 }

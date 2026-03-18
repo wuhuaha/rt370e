@@ -20,6 +20,7 @@
 #include "river/river_asr_iflytek_credentials.h"
 #include "river/river_log.h"
 #include "river_asr_provider_internal.h"
+#include "river_ws_dispatch.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.cloud.iflytek"
@@ -702,9 +703,22 @@ static void river_iflytek_ws_message_cb(wsclient_context **wsclient,
     rtos_mem_free(payload);
 }
 
+static void river_iflytek_ws_dispatch_message(wsclient_context **wsclient,
+                                              int data_len,
+                                              enum opcode_type opcode,
+                                              void *user_data)
+{
+    (void)user_data;
+    river_iflytek_ws_message_cb(wsclient, data_len, opcode);
+}
+
 static void river_iflytek_close_context(bool emit_close_event)
 {
     uint32_t wait_loops;
+
+    if (g_river_iflytek_rtasr.wsclient != NULL) {
+        river_ws_dispatch_unregister(g_river_iflytek_rtasr.wsclient);
+    }
 
     if (g_river_iflytek_rtasr.wsclient != NULL &&
         g_river_iflytek_rtasr.wsclient->readyState == WSC_OPEN) {
@@ -846,8 +860,7 @@ static river_status_t river_iflytek_init(river_cloud_asr_provider_result_cb_t ca
     g_river_iflytek_rtasr.callback = callback;
     g_river_iflytek_rtasr.callback_user_data = user_data;
     g_river_iflytek_rtasr.initialized = true;
-    ws_dispatch(river_iflytek_ws_message_cb);
-    return RIVER_OK;
+    return river_ws_dispatch_init();
 }
 
 static void river_iflytek_deinit(void)
@@ -912,6 +925,17 @@ static river_status_t river_iflytek_stream_open(const river_cloud_asr_audio_desc
                         RIVER_IFLYTEK_RTASR_QUEUE_MAX);
     if (g_river_iflytek_rtasr.wsclient == NULL) {
         return RIVER_ERR_NO_MEMORY;
+    }
+
+    if (river_ws_dispatch_register(g_river_iflytek_rtasr.wsclient,
+                                   river_iflytek_ws_dispatch_message,
+                                   NULL,
+                                   NULL) != RIVER_OK) {
+        river_iflytek_close_context(false);
+        snprintf(g_river_iflytek_rtasr.last_error,
+                 sizeof(g_river_iflytek_rtasr.last_error),
+                 "register ws dispatch failed");
+        return RIVER_ERR_BUSY;
     }
 
     ws_setsockopt_timeout(10000U, 10000U, 15000U);

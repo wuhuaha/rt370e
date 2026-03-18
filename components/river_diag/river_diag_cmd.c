@@ -16,6 +16,7 @@ static void river_diag_help(void)
 {
     printf("\triver status\n");
     printf("\triver echo <text>\n");
+    printf("\triver tts <text>\n");
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
     printf("\triver audio probe <start|stop|status>\n");
@@ -71,9 +72,10 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
         return 0;
     }
 
-    if (strcmp((const char *)argv[0], "echo") == 0) {
+    if (strcmp((const char *)argv[0], "echo") == 0 ||
+        strcmp((const char *)argv[0], "tts") == 0) {
         if (argc < 2) {
-            printf("[river][diag] missing echo text\n");
+            printf("[river][diag] missing tts text\n");
             return 0;
         }
 
