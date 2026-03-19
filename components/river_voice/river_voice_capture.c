@@ -6,6 +6,7 @@
 #include "audio/audio_record.h"
 #include "os_wrapper.h"
 
+#include "river/river_audio_frame_ring.h"
 #include "river/river_log.h"
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
@@ -14,101 +15,275 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.capture"
 
-#define RIVER_VOICE_CAPTURE_RING_BUF_MS    800U
-#define RIVER_VOICE_CAPTURE_THREAD_STACK   (1024U * 2U)
+#define RIVER_VOICE_CAPTURE_RING_BUF_MS    1280U
+#define RIVER_VOICE_CAPTURE_THREAD_STACK   (1024U * 4U)
 /* Priority 6: Above all other voice/app tasks to ensure IPC responsiveness */
 #define RIVER_VOICE_CAPTURE_THREAD_PRIO    6U
 
 typedef struct {
-    uint8_t *data;
-    size_t size;
-    size_t write_ptr;
-    size_t read_ptr;
-    size_t count;
-    rtos_sema_t sema;
-    rtos_mutex_t lock;
-} river_ring_buffer_t;
+    bool initialized;
+    size_t frame_bytes;
+    uint32_t frame_capacity;
+    uint32_t dropped_frames;
+    uint32_t read_ok;
+    uint32_t read_wait_timeout;
+    rtos_sema_t ready;
+    river_audio_frame_ring_t ring;
+} river_capture_frame_queue_t;
 
 static struct {
-    river_ring_buffer_t rb;
+    river_capture_frame_queue_t queue;
     rtos_task_t thread;
     bool running;
     river_voice_capture_t *active_capture;
+    uint8_t *buffer_block;
+    size_t buffer_block_bytes;
+    uint8_t *io_buf;
+    uint8_t *frame_buf;
+    uint8_t *discard_buf;
 } g_river_cap_internal;
 
-static void river_ring_buffer_init(river_ring_buffer_t *rb, size_t size)
+static void river_capture_frame_queue_drain_signal(river_capture_frame_queue_t *queue)
 {
-    rb->data = (uint8_t *)rtos_mem_zmalloc((uint32_t)size);
-    rb->size = size;
-    rb->write_ptr = 0;
-    rb->read_ptr = 0;
-    rb->count = 0;
-    rtos_sema_create(&rb->sema, 0, 100);
-    rtos_mutex_create(&rb->lock);
-}
-
-static void river_ring_buffer_write(river_ring_buffer_t *rb, const uint8_t *data, size_t len)
-{
-    rtos_mutex_take(rb->lock, RTOS_MAX_TIMEOUT);
-    if ((rb->count + len) > rb->size) {
-        size_t drop = (rb->count + len) - rb->size;
-        rb->read_ptr = (rb->read_ptr + drop) % rb->size;
-        rb->count -= drop;
+    if (queue == NULL || !queue->initialized) {
+        return;
     }
 
-    size_t first_part = rb->size - rb->write_ptr;
-    if (len <= first_part) {
-        memcpy(rb->data + rb->write_ptr, data, len);
-    } else {
-        memcpy(rb->data + rb->write_ptr, data, first_part);
-        memcpy(rb->data, data + first_part, len - first_part);
-    }
-    rb->write_ptr = (rb->write_ptr + len) % rb->size;
-    rb->count += len;
-    rtos_mutex_give(rb->lock);
-    rtos_sema_give(rb->sema);
-}
-
-static size_t river_ring_buffer_read(river_ring_buffer_t *rb, uint8_t *data, size_t len)
-{
-    while (rb->count < len) {
-        if (!g_river_cap_internal.running) return 0;
-        if (rtos_sema_take(rb->sema, 500) != RTK_SUCCESS) {
-            continue;
+    while (rtos_sema_get_count(queue->ready) > 0U) {
+        if (rtos_sema_take(queue->ready, 0U) != RTK_SUCCESS) {
+            break;
         }
     }
+}
 
-    rtos_mutex_take(rb->lock, RTOS_MAX_TIMEOUT);
-    size_t first_part = rb->size - rb->read_ptr;
-    if (len <= first_part) {
-        memcpy(data, rb->data + rb->read_ptr, len);
-    } else {
-        memcpy(data, rb->data + rb->read_ptr, first_part);
-        memcpy(data + first_part, rb->data, len - first_part);
+static river_status_t river_capture_frame_queue_init(river_capture_frame_queue_t *queue,
+                                                     size_t frame_bytes,
+                                                     uint32_t frame_capacity,
+                                                     void *storage,
+                                                     size_t storage_bytes)
+{
+    river_status_t status;
+
+    if (queue == NULL || frame_bytes == 0U || frame_capacity == 0U) {
+        return RIVER_ERR_ARG;
     }
-    rb->read_ptr = (rb->read_ptr + len) % rb->size;
-    rb->count -= len;
-    rtos_mutex_give(rb->lock);
-    return len;
+
+    if (queue->initialized) {
+        if (queue->frame_bytes != frame_bytes || queue->frame_capacity != frame_capacity) {
+            return RIVER_ERR_BUSY;
+        }
+
+        queue->dropped_frames = 0U;
+        queue->read_ok = 0U;
+        queue->read_wait_timeout = 0U;
+        river_audio_frame_ring_reset(&queue->ring);
+        river_capture_frame_queue_drain_signal(queue);
+        return RIVER_OK;
+    }
+
+    memset(queue, 0, sizeof(*queue));
+    status = river_audio_frame_ring_init_with_storage(&queue->ring,
+                                                      storage,
+                                                      storage_bytes,
+                                                      frame_bytes,
+                                                      frame_capacity);
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    if (rtos_sema_create(&queue->ready, 0U, frame_capacity) != RTK_SUCCESS) {
+        river_audio_frame_ring_deinit(&queue->ring);
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    queue->initialized = true;
+    queue->frame_bytes = frame_bytes;
+    queue->frame_capacity = frame_capacity;
+    return RIVER_OK;
+}
+
+static void river_capture_frame_queue_deinit(river_capture_frame_queue_t *queue)
+{
+    if (queue == NULL || !queue->initialized) {
+        return;
+    }
+
+    river_capture_frame_queue_drain_signal(queue);
+    rtos_sema_delete(queue->ready);
+    river_audio_frame_ring_deinit(&queue->ring);
+    memset(queue, 0, sizeof(*queue));
+}
+
+static void river_capture_release_persistent_buffers(void)
+{
+    if (g_river_cap_internal.buffer_block != NULL) {
+        rtos_mem_free(g_river_cap_internal.buffer_block);
+    }
+    g_river_cap_internal.buffer_block = NULL;
+    g_river_cap_internal.buffer_block_bytes = 0U;
+    g_river_cap_internal.io_buf = NULL;
+    g_river_cap_internal.frame_buf = NULL;
+    g_river_cap_internal.discard_buf = NULL;
+}
+
+static river_status_t river_capture_prepare_persistent_buffers(size_t frame_bytes,
+                                                               uint32_t frame_capacity)
+{
+    uint64_t ring_bytes64;
+    uint64_t total_bytes64;
+    size_t ring_bytes;
+    size_t total_bytes;
+    uint8_t *ring_storage;
+
+    if (frame_bytes == 0U || frame_capacity == 0U) {
+        return RIVER_ERR_ARG;
+    }
+
+    ring_bytes64 = (uint64_t)frame_bytes * (uint64_t)frame_capacity;
+    total_bytes64 = ring_bytes64 + ((uint64_t)frame_bytes * 3ULL);
+    if (ring_bytes64 == 0U || total_bytes64 > UINT32_MAX) {
+        return RIVER_ERR_ARG;
+    }
+
+    ring_bytes = (size_t)ring_bytes64;
+    total_bytes = (size_t)total_bytes64;
+
+    if (g_river_cap_internal.buffer_block != NULL &&
+        (g_river_cap_internal.queue.frame_bytes != frame_bytes ||
+         g_river_cap_internal.queue.frame_capacity != frame_capacity ||
+         g_river_cap_internal.buffer_block_bytes < total_bytes)) {
+        river_capture_frame_queue_deinit(&g_river_cap_internal.queue);
+        river_capture_release_persistent_buffers();
+    }
+
+    if (g_river_cap_internal.buffer_block == NULL) {
+        g_river_cap_internal.buffer_block = (uint8_t *)rtos_mem_zmalloc((uint32_t)total_bytes);
+        if (g_river_cap_internal.buffer_block == NULL) {
+            return RIVER_ERR_NO_MEMORY;
+        }
+        g_river_cap_internal.buffer_block_bytes = total_bytes;
+    }
+
+    memset(g_river_cap_internal.buffer_block, 0, total_bytes);
+    ring_storage = g_river_cap_internal.buffer_block;
+    g_river_cap_internal.io_buf = ring_storage + ring_bytes;
+    g_river_cap_internal.frame_buf = g_river_cap_internal.io_buf + frame_bytes;
+    g_river_cap_internal.discard_buf = g_river_cap_internal.frame_buf + frame_bytes;
+
+    return river_capture_frame_queue_init(&g_river_cap_internal.queue,
+                                          frame_bytes,
+                                          frame_capacity,
+                                          ring_storage,
+                                          ring_bytes);
+}
+
+static void river_capture_frame_queue_write(river_capture_frame_queue_t *queue,
+                                            const uint8_t *frame,
+                                            uint8_t *discard_frame)
+{
+    river_status_t status;
+
+    if (queue == NULL || !queue->initialized || frame == NULL) {
+        return;
+    }
+
+    status = river_audio_frame_ring_write(&queue->ring, frame);
+    if (status == RIVER_OK) {
+        rtos_sema_give(queue->ready);
+        return;
+    }
+
+    if (status != RIVER_ERR_NO_MEMORY || discard_frame == NULL) {
+        return;
+    }
+
+    if (river_audio_frame_ring_read(&queue->ring, discard_frame) != RIVER_OK) {
+        return;
+    }
+
+    queue->dropped_frames++;
+    status = river_audio_frame_ring_write(&queue->ring, frame);
+    if (status != RIVER_OK) {
+        return;
+    }
+
+    if ((queue->dropped_frames & 0x3FU) == 1U) {
+        RIVER_LOGW("capture frame ring overflow: dropped=%lu frames=%lu capacity=%lu",
+                   (unsigned long)queue->dropped_frames,
+                   (unsigned long)river_audio_frame_ring_count(&queue->ring),
+                   (unsigned long)queue->frame_capacity);
+    }
+}
+
+static int32_t river_capture_frame_queue_read(river_capture_frame_queue_t *queue, uint8_t *frame)
+{
+    if (queue == NULL || !queue->initialized || frame == NULL) {
+        return -1;
+    }
+
+    for (;;) {
+        if (!g_river_cap_internal.running) {
+            return 0;
+        }
+        if (rtos_sema_take(queue->ready, 500U) != RTK_SUCCESS) {
+            queue->read_wait_timeout++;
+            continue;
+        }
+        if (river_audio_frame_ring_read(&queue->ring, frame) == RIVER_OK) {
+            queue->read_ok++;
+            return (int32_t)queue->frame_bytes;
+        }
+    }
 }
 
 static void river_voice_capture_thread(void *param)
 {
     river_voice_capture_t *capture = (river_voice_capture_t *)param;
-    uint8_t *tmp_buf = (uint8_t *)rtos_mem_zmalloc((uint32_t)capture->frame_bytes);
+    uint8_t *io_buf = g_river_cap_internal.io_buf;
+    uint8_t *frame_buf = g_river_cap_internal.frame_buf;
+    uint8_t *discard_buf = g_river_cap_internal.discard_buf;
+    size_t pending_bytes = 0U;
 
-    RIVER_LOGI("internal capture thread started (priority=%d)", RIVER_VOICE_CAPTURE_THREAD_PRIO);
+    RIVER_LOGI("internal capture thread started (priority=%d stack=%luB)",
+               RIVER_VOICE_CAPTURE_THREAD_PRIO,
+               (unsigned long)RIVER_VOICE_CAPTURE_THREAD_STACK);
+
+    if (io_buf == NULL || frame_buf == NULL || discard_buf == NULL) {
+        RIVER_LOGE("capture thread buffers unavailable: frame=%luB",
+                   (unsigned long)capture->frame_bytes);
+        g_river_cap_internal.running = false;
+        rtos_task_delete(NULL);
+        return;
+    }
 
     while (g_river_cap_internal.running) {
-        int32_t ret = AudioRecord_Read((struct AudioRecord *)capture->record, tmp_buf, capture->frame_bytes, true);
+        int32_t ret;
+
+        ret = AudioRecord_Read((struct AudioRecord *)capture->record, io_buf, capture->frame_bytes, true);
         if (ret > 0) {
-            river_ring_buffer_write(&g_river_cap_internal.rb, tmp_buf, (size_t)ret);
+            size_t consumed = 0U;
+            size_t available = (size_t)ret;
+
+            while (consumed < available) {
+                size_t chunk = capture->frame_bytes - pending_bytes;
+                if (chunk > (available - consumed)) {
+                    chunk = available - consumed;
+                }
+
+                memcpy(frame_buf + pending_bytes, io_buf + consumed, chunk);
+                pending_bytes += chunk;
+                consumed += chunk;
+
+                if (pending_bytes == capture->frame_bytes) {
+                    river_capture_frame_queue_write(&g_river_cap_internal.queue, frame_buf, discard_buf);
+                    pending_bytes = 0U;
+                }
+            }
         } else {
             rtos_time_delay_ms(5);
         }
     }
 
-    rtos_mem_free(tmp_buf);
     rtos_task_delete(NULL);
 }
 
@@ -164,8 +339,19 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    river_ring_buffer_init(&g_river_cap_internal.rb, 
-                           (capture->frame_bytes * RIVER_VOICE_CAPTURE_RING_BUF_MS) / capture->frame_ms);
+    {
+        uint32_t ring_frames;
+
+        ring_frames = (RIVER_VOICE_CAPTURE_RING_BUF_MS + capture->frame_ms - 1U) / capture->frame_ms;
+        if (ring_frames == 0U) {
+            ring_frames = 1U;
+        }
+        if (river_capture_prepare_persistent_buffers(capture->frame_bytes,
+                                                    ring_frames) != RIVER_OK) {
+            river_voice_capture_close(capture);
+            return RIVER_ERR_NO_MEMORY;
+        }
+    }
     
     g_river_cap_internal.running = true;
     g_river_cap_internal.active_capture = capture;
@@ -182,12 +368,18 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
 
 int32_t river_voice_capture_read(river_voice_capture_t *capture, void *buffer, size_t bytes)
 {
-    (void)capture;
-    if (!g_river_cap_internal.running) {
+    if (capture == 0 || buffer == 0 || !g_river_cap_internal.running) {
         return -1;
     }
 
-    return (int32_t)river_ring_buffer_read(&g_river_cap_internal.rb, (uint8_t *)buffer, bytes);
+    if (bytes != capture->frame_bytes) {
+        RIVER_LOGE("capture read expects fixed frame: req=%luB frame=%luB",
+                   (unsigned long)bytes,
+                   (unsigned long)capture->frame_bytes);
+        return -1;
+    }
+
+    return river_capture_frame_queue_read(&g_river_cap_internal.queue, (uint8_t *)buffer);
 }
 
 void river_voice_capture_close(river_voice_capture_t *capture)
@@ -197,7 +389,11 @@ void river_voice_capture_close(river_voice_capture_t *capture)
     }
 
     g_river_cap_internal.running = false;
+    if (g_river_cap_internal.queue.initialized) {
+        rtos_sema_give(g_river_cap_internal.queue.ready);
+    }
     rtos_time_delay_ms(100);
+    g_river_cap_internal.active_capture = 0;
 
     if (capture->record != 0) {
         if (capture->started) {
@@ -207,6 +403,35 @@ void river_voice_capture_close(river_voice_capture_t *capture)
         AudioRecord_Destroy((struct AudioRecord *)capture->record);
         capture->record = 0;
     }
+}
+
+void river_voice_capture_get_stats(river_voice_capture_stats_t *stats)
+{
+    river_voice_capture_t *capture;
+
+    if (stats == NULL) {
+        return;
+    }
+
+    memset(stats, 0, sizeof(*stats));
+    stats->running = g_river_cap_internal.running;
+    capture = g_river_cap_internal.active_capture;
+    if (capture != NULL) {
+        stats->frame_bytes = capture->frame_bytes;
+        stats->sample_rate = capture->sample_rate;
+        stats->channels = capture->channels;
+        stats->frame_ms = capture->frame_ms;
+    }
+    if (!g_river_cap_internal.queue.initialized) {
+        return;
+    }
+
+    stats->queue_frames = river_audio_frame_ring_count(&g_river_cap_internal.queue.ring);
+    stats->queue_peak_frames = river_audio_frame_ring_peak_count(&g_river_cap_internal.queue.ring);
+    stats->queue_capacity_frames = g_river_cap_internal.queue.frame_capacity;
+    stats->dropped_frames = g_river_cap_internal.queue.dropped_frames;
+    stats->read_ok = g_river_cap_internal.queue.read_ok;
+    stats->read_wait_timeout = g_river_cap_internal.queue.read_wait_timeout;
 }
 
 void river_voice_capture_dump_profile(void)
@@ -223,4 +448,23 @@ void river_voice_capture_dump_profile(void)
                river_voice_board_mic_name(profile->primary_mic),
                river_voice_board_mic_name(profile->secondary_mic),
                voice_profile->uses_native_capture_ref ? "+REF(native ch3)" : "");
+}
+
+void river_voice_capture_dump_status(void)
+{
+    river_voice_capture_stats_t stats;
+
+    river_voice_capture_get_stats(&stats);
+    RIVER_LOGI("capture_service=%s frame=%luB %luHz/%luch/%lums queue=%lu/%lu peak=%lu dropped=%lu reads=%lu wait_to=%lu",
+               stats.running ? "running" : "stopped",
+               (unsigned long)stats.frame_bytes,
+               (unsigned long)stats.sample_rate,
+               (unsigned long)stats.channels,
+               (unsigned long)stats.frame_ms,
+               (unsigned long)stats.queue_frames,
+               (unsigned long)stats.queue_capacity_frames,
+               (unsigned long)stats.queue_peak_frames,
+               (unsigned long)stats.dropped_frames,
+               (unsigned long)stats.read_ok,
+               (unsigned long)stats.read_wait_timeout);
 }

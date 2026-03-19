@@ -268,6 +268,8 @@ const char *river_reference_service_backend_name(void)
 
 void river_reference_service_get_stats(river_reference_service_stats_t *stats)
 {
+    river_voice_ref_stats_t ref_stats;
+
     if (stats == NULL) {
         return;
     }
@@ -285,6 +287,13 @@ void river_reference_service_get_stats(river_reference_service_stats_t *stats)
 
     *stats = g_river_reference_service.stats;
     rtos_mutex_give(g_river_reference_service.lock);
+
+    memset(&ref_stats, 0, sizeof(ref_stats));
+    river_voice_ref_get_stats(&ref_stats);
+    stats->queue_frames = ref_stats.queue_frames;
+    stats->queue_peak_frames = ref_stats.queue_peak_frames;
+    stats->queue_capacity_frames = ref_stats.queue_capacity_frames;
+    stats->dropped_frames = ref_stats.dropped_frames;
 }
 
 void river_reference_service_dump_profile(void)
@@ -314,7 +323,7 @@ void river_reference_service_dump_status(void)
     river_reference_service_stats_t stats;
 
     river_reference_service_get_stats(&stats);
-    RIVER_LOGI("reference_service=%s stream=%s source=%s backend=%s writes=%lu/%lu reads=%lu misses=%lu opens=%lu closes=%lu resets=%lu",
+    RIVER_LOGI("reference_service=%s stream=%s source=%s backend=%s writes=%lu/%lu reads=%lu misses=%lu opens=%lu closes=%lu resets=%lu queue=%lu/%lu peak=%lu dropped=%lu",
                river_reference_service_state_name(stats.state),
                stats.stream_name[0] != '\0' ? stats.stream_name : "-",
                stats.source_name[0] != '\0' ? stats.source_name : "-",
@@ -325,5 +334,9 @@ void river_reference_service_dump_status(void)
                (unsigned long)stats.read_miss,
                (unsigned long)stats.open_count,
                (unsigned long)stats.close_count,
-               (unsigned long)stats.reset_count);
+               (unsigned long)stats.reset_count,
+               (unsigned long)stats.queue_frames,
+               (unsigned long)stats.queue_capacity_frames,
+               (unsigned long)stats.queue_peak_frames,
+               (unsigned long)stats.dropped_frames);
 }

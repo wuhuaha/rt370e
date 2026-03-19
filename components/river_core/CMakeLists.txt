@@ -17,6 +17,7 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_app.c
+    river_interaction_diag.c
     river_interaction_state.c
 )
 

@@ -10,6 +10,7 @@
 #include "wifi_api_ext.h"
 #include "wifi_fast_connect.h"
 
+#include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_wifi_credentials.h"
@@ -31,6 +32,7 @@
 #define RIVER_WIFI_STA_MAX_CREDENTIALS 2U
 #define RIVER_WIFI_STA_PASSWORD_BUFFER_SIZE (RTW_MAX_PSK_LEN + 1U)
 #define RIVER_WIFI_STA_MIN_RSSI_DBM (-80)
+#define RIVER_WIFI_STA_STICKY_RETRY_RSSI_DBM (-85)
 
 extern int (*p_wifi_do_fast_connect)(void);
 extern int (*p_store_fast_connect_info)(unsigned int data1, unsigned int data2);
@@ -546,6 +548,7 @@ static void river_wifi_station_mark_connected(void)
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
                (unsigned long)g_river_wifi_station.connect_successes);
     river_runtime_stats_snapshot("wifi_connected");
+    river_cloud_adapter_notify_network_ready();
 }
 
 static bool river_wifi_station_wait_driver_idle(uint32_t timeout_ms, bool allow_join_success)
@@ -707,13 +710,141 @@ static bool river_wifi_station_scan_candidate_better(const river_wifi_scan_candi
     return false;
 }
 
-static bool river_wifi_station_candidate_signal_acceptable(const river_wifi_scan_candidate_t *candidate)
+static bool river_wifi_station_credential_is_sticky(u8 credential_index)
+{
+    if (credential_index >= g_river_wifi_station.credential_count) {
+        return false;
+    }
+
+    if (g_river_wifi_station.active_credential_valid &&
+        credential_index == g_river_wifi_station.active_credential_index) {
+        return true;
+    }
+
+    if ((g_river_wifi_station.last_connected_ssid[0] != '\0') &&
+        (strcmp(g_river_wifi_station.last_connected_ssid,
+                g_river_wifi_station.credentials[credential_index].ssid) == 0)) {
+        return true;
+    }
+
+    return false;
+}
+
+static int river_wifi_station_candidate_retry_rssi_floor(u8 credential_index)
+{
+    if (river_wifi_station_credential_is_sticky(credential_index)) {
+        return RIVER_WIFI_STA_STICKY_RETRY_RSSI_DBM;
+    }
+
+    return RIVER_WIFI_STA_MIN_RSSI_DBM;
+}
+
+static bool river_wifi_station_candidate_signal_acceptable(u8 credential_index,
+                                                           const river_wifi_scan_candidate_t *candidate)
 {
     if ((candidate == NULL) || (!candidate->valid)) {
         return true;
     }
 
-    return candidate->result.signal_strength >= RIVER_WIFI_STA_MIN_RSSI_DBM;
+    return candidate->result.signal_strength >= river_wifi_station_candidate_retry_rssi_floor(credential_index);
+}
+
+static void river_wifi_station_append_strategy_unique(river_wifi_connect_strategy_t *strategies,
+                                                      size_t *strategy_count,
+                                                      size_t capacity,
+                                                      river_wifi_connect_strategy_t strategy)
+{
+    size_t index;
+
+    if (strategies == NULL || strategy_count == NULL || *strategy_count >= capacity) {
+        return;
+    }
+
+    for (index = 0U; index < *strategy_count; ++index) {
+        if (strategies[index] == strategy) {
+            return;
+        }
+    }
+
+    strategies[(*strategy_count)++] = strategy;
+}
+
+static bool river_wifi_station_security_preferred_scan_strategy(u32 security,
+                                                                river_wifi_connect_strategy_t *strategy)
+{
+    if (strategy == NULL) {
+        return false;
+    }
+
+    switch (security) {
+    case RTW_SECURITY_WPA2_AES_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES;
+        return true;
+    case RTW_SECURITY_WPA2_TKIP_PSK:
+    case RTW_SECURITY_WPA2_MIXED_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED;
+        return true;
+    case RTW_SECURITY_WPA_TKIP_PSK:
+    case RTW_SECURITY_WPA_AES_PSK:
+    case RTW_SECURITY_WPA_MIXED_PSK:
+    case RTW_SECURITY_WPA_WPA2_TKIP_PSK:
+    case RTW_SECURITY_WPA_WPA2_AES_PSK:
+    case RTW_SECURITY_WPA_WPA2_MIXED_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED;
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool river_wifi_station_security_preferred_basic_strategy(u32 security,
+                                                                 river_wifi_connect_strategy_t *strategy)
+{
+    if (strategy == NULL) {
+        return false;
+    }
+
+    switch (security) {
+    case RTW_SECURITY_WPA2_AES_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES;
+        return true;
+    case RTW_SECURITY_WPA2_TKIP_PSK:
+    case RTW_SECURITY_WPA2_MIXED_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED;
+        return true;
+    case RTW_SECURITY_WPA_TKIP_PSK:
+    case RTW_SECURITY_WPA_AES_PSK:
+    case RTW_SECURITY_WPA_MIXED_PSK:
+    case RTW_SECURITY_WPA_WPA2_TKIP_PSK:
+    case RTW_SECURITY_WPA_WPA2_AES_PSK:
+    case RTW_SECURITY_WPA_WPA2_MIXED_PSK:
+        *strategy = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED;
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool river_wifi_station_has_alternate_acceptable_candidate(const river_wifi_scan_candidate_t *candidates,
+                                                                  u8 current_credential_index)
+{
+    u8 index;
+
+    if (candidates == NULL) {
+        return false;
+    }
+
+    for (index = 0U; index < g_river_wifi_station.credential_count; ++index) {
+        if (index == current_credential_index || !g_river_wifi_station.credentials[index].enabled) {
+            continue;
+        }
+
+        if (river_wifi_station_candidate_signal_acceptable(index, &candidates[index])) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candidates, size_t candidate_count)
@@ -860,27 +991,72 @@ static void river_wifi_station_build_strategy_order(const river_wifi_credential_
                                                     river_wifi_connect_strategy_t *strategies,
                                                     size_t *strategy_count)
 {
+    river_wifi_connect_strategy_t preferred_strategy;
+
     *strategy_count = 0U;
 
     if (credential->password_len == 0U) {
         if ((candidate != NULL) && candidate->valid) {
-            strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO;
+            river_wifi_station_append_strategy_unique(strategies,
+                                                      strategy_count,
+                                                      7U,
+                                                      RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO);
         }
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO;
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO);
         return;
     }
 
     if ((candidate != NULL) && candidate->valid) {
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO;
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED;
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED;
-        strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES;
+        if (river_wifi_station_security_preferred_scan_strategy(candidate->result.security, &preferred_strategy)) {
+            river_wifi_station_append_strategy_unique(strategies,
+                                                      strategy_count,
+                                                      7U,
+                                                      preferred_strategy);
+        }
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  RIVER_WIFI_CONNECT_STRATEGY_SCAN_AUTO);
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_AES);
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA2_MIXED);
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  RIVER_WIFI_CONNECT_STRATEGY_SCAN_WPA_WPA2_MIXED);
     }
 
-    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO;
-    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED;
-    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED;
-    strategies[(*strategy_count)++] = RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES;
+    if ((candidate != NULL) && candidate->valid &&
+        river_wifi_station_security_preferred_basic_strategy(candidate->result.security, &preferred_strategy)) {
+        river_wifi_station_append_strategy_unique(strategies,
+                                                  strategy_count,
+                                                  7U,
+                                                  preferred_strategy);
+    }
+    river_wifi_station_append_strategy_unique(strategies,
+                                              strategy_count,
+                                              7U,
+                                              RIVER_WIFI_CONNECT_STRATEGY_BASIC_AUTO);
+    river_wifi_station_append_strategy_unique(strategies,
+                                              strategy_count,
+                                              7U,
+                                              RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_AES);
+    river_wifi_station_append_strategy_unique(strategies,
+                                              strategy_count,
+                                              7U,
+                                              RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA2_MIXED);
+    river_wifi_station_append_strategy_unique(strategies,
+                                              strategy_count,
+                                              7U,
+                                              RIVER_WIFI_CONNECT_STRATEGY_BASIC_WPA_WPA2_MIXED);
 }
 
 static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
@@ -1053,11 +1229,12 @@ static void river_wifi_station_task(void *param)
             }
 
             if ((candidate != NULL) && candidate->valid &&
-                !river_wifi_station_candidate_signal_acceptable(candidate)) {
-                RIVER_LOGW("skip ssid=%s this round: weak candidate rssi=%d threshold=%d",
+                !river_wifi_station_candidate_signal_acceptable((u8)credential_index, candidate)) {
+                RIVER_LOGW("skip ssid=%s this round: weak candidate rssi=%d threshold=%d sticky=%s",
                            credential->ssid,
                            (int)candidate->result.signal_strength,
-                           (int)RIVER_WIFI_STA_MIN_RSSI_DBM);
+                           river_wifi_station_candidate_retry_rssi_floor((u8)credential_index),
+                           river_wifi_station_credential_is_sticky((u8)credential_index) ? "yes" : "no");
                 continue;
             }
 
@@ -1178,8 +1355,14 @@ static void river_wifi_station_task(void *param)
         g_river_wifi_station.connecting = false;
         g_river_wifi_station.connect_failures++;
         if (g_river_wifi_station.credential_count > 0U) {
-            g_river_wifi_station.next_credential_index =
-                (u8)((credential_index + 1U) % g_river_wifi_station.credential_count);
+            if (river_wifi_station_has_alternate_acceptable_candidate(candidates, (u8)credential_index)) {
+                g_river_wifi_station.next_credential_index =
+                    (u8)((credential_index + 1U) % g_river_wifi_station.credential_count);
+            } else {
+                g_river_wifi_station.next_credential_index = (u8)credential_index;
+                RIVER_LOGW("stay on ssid=%s next round: no acceptable alternate candidate",
+                           river_wifi_station_selected_ssid());
+            }
         }
         RIVER_LOGW("connect failed ssid=%s err=%d(%s) join=%s failures=%lu retry_ms=%u",
                    river_wifi_station_selected_ssid(),

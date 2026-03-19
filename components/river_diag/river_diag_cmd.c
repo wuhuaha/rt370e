@@ -6,7 +6,10 @@
 #include "basic_types.h"
 
 #include "river/river_app.h"
+#include "river/river_interaction_diag.h"
 #include "river/river_online_control.h"
+#include "river/river_playback_service.h"
+#include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
 
 #ifdef CONFIG_RIVER_DIAG_CMD_EN
@@ -17,6 +20,11 @@ static void river_diag_help(void)
     printf("\triver status\n");
     printf("\triver echo <text>\n");
     printf("\triver tts <text>\n");
+    printf("\triver interaction <status|intents|tts_test>\n");
+    printf("\triver interaction asr <text>\n");
+    printf("\triver interaction device <light|fan|curtain|socket> <on|off>\n");
+    printf("\triver interaction invoke <intent_name>\n");
+    printf("\triver playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
     printf("\triver audio probe <start|stop|status>\n");
@@ -69,6 +77,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
     if (strcmp((const char *)argv[0], "status") == 0) {
         river_app_print_status();
+        river_runtime_stats_snapshot("diag_status");
         return 0;
     }
 
@@ -92,9 +101,135 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             return 0;
         }
 
-        if (river_online_control_set_device((const char *)argv[1], (const char *)argv[2]) != RIVER_OK) {
+        if (river_interaction_diag_execute_device((const char *)argv[1],
+                                                  (const char *)argv[2],
+                                                  "diag_cli_legacy_device") != RIVER_OK) {
             printf("[river][diag] invalid device command\n");
         }
+        return 0;
+    }
+
+    if (strcmp((const char *)argv[0], "interaction") == 0) {
+        if (argc < 2) {
+            printf("[river][diag] usage: river interaction <status|intents|tts_test|asr|device|invoke>\n");
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "status") == 0) {
+            river_interaction_diag_dump_status();
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "intents") == 0) {
+            river_interaction_diag_dump_intents();
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "tts_test") == 0) {
+            if (river_interaction_diag_submit_tts_test("diag_cli") != RIVER_OK) {
+                printf("[river][diag] interaction tts_test failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "invoke") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river interaction invoke <intent_name>\n");
+                return 0;
+            }
+
+            if (river_interaction_diag_invoke_intent((const char *)argv[2], "diag_cli") != RIVER_OK) {
+                printf("[river][diag] interaction invoke failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "asr") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river interaction asr <text>\n");
+                return 0;
+            }
+
+            river_diag_join_args(argc, argv, 2, echo_text, sizeof(echo_text));
+            if (river_interaction_diag_route_text(echo_text, "diag_cli_asr", "diag_cli") == RIVER_ERR_NOT_FOUND) {
+                printf("[river][diag] no interaction intent matched\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "device") == 0) {
+            if (argc < 4) {
+                printf("[river][diag] usage: river interaction device <name> <on|off|toggle>\n");
+                return 0;
+            }
+
+            if (river_interaction_diag_execute_device((const char *)argv[2],
+                                                      (const char *)argv[3],
+                                                      "diag_cli") != RIVER_OK) {
+                printf("[river][diag] interaction device failed\n");
+            }
+            return 0;
+        }
+
+        printf("[river][diag] usage: river interaction <status|intents|tts_test|asr|device|invoke>\n");
+        return 0;
+    }
+
+    if (strcmp((const char *)argv[0], "playback") == 0) {
+        if (argc < 2) {
+            printf("[river][diag] usage: river playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "status") == 0) {
+            river_playback_service_dump_status();
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "stop") == 0) {
+            if (river_playback_service_stop_stream() != RIVER_OK) {
+                printf("[river][diag] playback stop failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "interrupt") == 0) {
+            if (river_playback_service_interrupt_stream() != RIVER_OK) {
+                printf("[river][diag] playback interrupt failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "flush") == 0) {
+            if (river_playback_service_flush_stream() != RIVER_OK) {
+                printf("[river][diag] playback flush failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "duck") == 0) {
+            float gain;
+
+            if (argc < 3) {
+                printf("[river][diag] usage: river playback duck <gain>\n");
+                return 0;
+            }
+
+            gain = (float)atof((const char *)argv[2]);
+            if (river_playback_service_set_ducking(true, gain) != RIVER_OK) {
+                printf("[river][diag] playback duck failed\n");
+            }
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "unduck") == 0) {
+            if (river_playback_service_set_ducking(false, 1.0f) != RIVER_OK) {
+                printf("[river][diag] playback unduck failed\n");
+            }
+            return 0;
+        }
+
+        printf("[river][diag] usage: river playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
         return 0;
     }
 

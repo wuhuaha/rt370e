@@ -11,6 +11,7 @@
 #include "websocket/libwsclient.h"
 #include "websocket/wsclient_api.h"
 
+#include "river/river_audio_frame_ring.h"
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
 #include "river/river_tts_iflytek_credentials.h"
@@ -32,26 +33,44 @@
 #define RIVER_IFLYTEK_TTS_REQUEST_MAX              12288U
 #define RIVER_IFLYTEK_TTS_TEXT_MAX                 8000U
 #define RIVER_IFLYTEK_TTS_TX_MAX                   12288U
-#define RIVER_IFLYTEK_TTS_RX_MAX                   8192U
+#define RIVER_IFLYTEK_TTS_RX_MAX                   53248U
 #define RIVER_IFLYTEK_TTS_QUEUE_MAX                4U
 #define RIVER_IFLYTEK_TTS_SESSION_TIMEOUT_MS       30000U
-#define RIVER_IFLYTEK_TTS_POLL_INTERVAL_MS         50U
+#define RIVER_IFLYTEK_TTS_POLL_INTERVAL_MS         10U
 #define RIVER_IFLYTEK_TTS_SAMPLE_RATE              16000U
 #define RIVER_IFLYTEK_TTS_FRAME_MS                 16U
 #define RIVER_IFLYTEK_TTS_MONO_FRAME_SAMPLES       256U
 #define RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES         (RIVER_IFLYTEK_TTS_MONO_FRAME_SAMPLES * 2U)
 #define RIVER_IFLYTEK_TTS_STEREO_FRAME_BYTES       (RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES * 2U)
-#define RIVER_IFLYTEK_TTS_PLAYBACK_BUFFER_FRAMES   8U
-#define RIVER_IFLYTEK_TTS_DRAIN_WAIT_MS            250U
+#define RIVER_IFLYTEK_TTS_PLAYBACK_BUFFER_FRAMES   16U
+#define RIVER_IFLYTEK_TTS_START_BUFFER_FRAMES      24U
+#define RIVER_IFLYTEK_TTS_START_BUFFER_BYTES       (RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES * RIVER_IFLYTEK_TTS_START_BUFFER_FRAMES)
+#define RIVER_IFLYTEK_TTS_PCM_QUEUE_MS             1280U
+#define RIVER_IFLYTEK_TTS_PCM_QUEUE_FRAMES         (RIVER_IFLYTEK_TTS_PCM_QUEUE_MS / RIVER_IFLYTEK_TTS_FRAME_MS)
+#define RIVER_IFLYTEK_TTS_QUEUE_WAIT_MS            20U
+#define RIVER_IFLYTEK_TTS_QUEUE_SPACE_RETRY_MAX    24U
+#define RIVER_IFLYTEK_TTS_FEEDER_TASK_STACK        (1024U * 4U)
+#define RIVER_IFLYTEK_TTS_FEEDER_TASK_PRIORITY     5U
+#define RIVER_IFLYTEK_TTS_FEEDER_STOP_TIMEOUT_MS   12000U
+#define RIVER_IFLYTEK_TTS_DRAIN_MARGIN_MS          320U
+#define RIVER_IFLYTEK_TTS_DRAIN_MIN_MS             640U
+#define RIVER_IFLYTEK_TTS_DRAIN_MAX_MS             2500U
 #define RIVER_IFLYTEK_TTS_REF_HISTORY_MS           2048U
+#define RIVER_IFLYTEK_TTS_PCM_QUEUE_STORAGE_BYTES  (RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES * RIVER_IFLYTEK_TTS_PCM_QUEUE_FRAMES)
+#define RIVER_IFLYTEK_TTS_RESOURCE_POOL_BYTES      (RIVER_IFLYTEK_TTS_RX_MAX + RIVER_IFLYTEK_TTS_PCM_QUEUE_STORAGE_BYTES)
 
 typedef struct {
     bool initialized;
     bool running;
     bool playback_started;
+    bool feeder_running;
     bool completed;
     bool ws_closed;
     bool saw_audio;
+    bool input_done;
+    bool stop_requested;
+    bool interrupted;
+    bool failed;
     int last_code;
     uint32_t sessions_started;
     uint32_t sessions_ok;
@@ -64,17 +83,60 @@ typedef struct {
     uint32_t open_fail;
     uint32_t send_fail;
     uint32_t timeout_fail;
+    uint32_t queue_peak_bytes;
+    uint32_t queue_overflow;
+    uint32_t queue_starve_count;
+    uint32_t playback_epoch;
     rtos_mutex_t lock;
+    rtos_sema_t queue_ready;
+    rtos_sema_t queue_space;
+    rtos_task_t feeder_task;
     wsclient_context *wsclient;
+    uint8_t *resource_block;
+    size_t resource_block_bytes;
+    uint8_t *decode_buffer;
+    size_t decode_buffer_capacity;
+    uint8_t *pcm_queue_storage;
+    river_audio_frame_ring_t pcm_ring;
     size_t mono_pending_bytes;
     uint8_t mono_pending[RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES];
     uint8_t stereo_frame[RIVER_IFLYTEK_TTS_STEREO_FRAME_BYTES];
     char last_sid[80];
     char last_error[128];
+    char last_interrupt_reason[64];
     char last_text[96];
 } river_iflytek_tts_context_t;
 
 static river_iflytek_tts_context_t g_river_iflytek_tts;
+
+static void river_tts_feeder_task(void *param);
+
+static void river_tts_reset_binary_sema(rtos_sema_t sema)
+{
+    while (rtos_sema_take(sema, 0U) == RTK_SUCCESS) {
+    }
+}
+
+static bool river_tts_session_interrupted(void)
+{
+    return g_river_iflytek_tts.stop_requested || g_river_iflytek_tts.interrupted;
+}
+
+static void river_tts_set_last_interrupt_reason(const char *reason)
+{
+    snprintf(g_river_iflytek_tts.last_interrupt_reason,
+             sizeof(g_river_iflytek_tts.last_interrupt_reason),
+             "%s",
+             (reason != NULL && reason[0] != '\0') ? reason : "tts_interrupted");
+}
+
+static const char *river_tts_last_interrupt_reason(void)
+{
+    if (g_river_iflytek_tts.last_interrupt_reason[0] == '\0') {
+        return "tts_interrupted";
+    }
+    return g_river_iflytek_tts.last_interrupt_reason;
+}
 
 static size_t river_tts_url_encode(const char *src, char *dst, size_t dst_size)
 {
@@ -281,12 +343,163 @@ static void river_tts_set_last_text_preview(const char *text)
     snprintf(g_river_iflytek_tts.last_text, sizeof(g_river_iflytek_tts.last_text), "%s", text);
 }
 
+static river_status_t river_tts_prepare_resource_pool(void)
+{
+    river_status_t status;
+
+    if (g_river_iflytek_tts.resource_block != NULL &&
+        g_river_iflytek_tts.decode_buffer != NULL &&
+        g_river_iflytek_tts.pcm_queue_storage != NULL &&
+        g_river_iflytek_tts.pcm_ring.initialized) {
+        return RIVER_OK;
+    }
+
+    g_river_iflytek_tts.resource_block =
+        (uint8_t *)rtos_mem_zmalloc((uint32_t)RIVER_IFLYTEK_TTS_RESOURCE_POOL_BYTES);
+    if (g_river_iflytek_tts.resource_block == NULL) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    g_river_iflytek_tts.resource_block_bytes = RIVER_IFLYTEK_TTS_RESOURCE_POOL_BYTES;
+    g_river_iflytek_tts.decode_buffer = g_river_iflytek_tts.resource_block;
+    g_river_iflytek_tts.decode_buffer_capacity = RIVER_IFLYTEK_TTS_RX_MAX;
+    g_river_iflytek_tts.pcm_queue_storage =
+        g_river_iflytek_tts.resource_block + RIVER_IFLYTEK_TTS_RX_MAX;
+
+    status = river_audio_frame_ring_init_with_storage_ex(&g_river_iflytek_tts.pcm_ring,
+                                                         g_river_iflytek_tts.pcm_queue_storage,
+                                                         RIVER_IFLYTEK_TTS_PCM_QUEUE_STORAGE_BYTES,
+                                                         RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES,
+                                                         RIVER_IFLYTEK_TTS_PCM_QUEUE_FRAMES,
+                                                         RIVER_AUDIO_FRAME_RING_MODE_SPSC);
+    if (status != RIVER_OK) {
+        rtos_mem_free(g_river_iflytek_tts.resource_block);
+        g_river_iflytek_tts.resource_block = NULL;
+        g_river_iflytek_tts.resource_block_bytes = 0U;
+        g_river_iflytek_tts.decode_buffer = NULL;
+        g_river_iflytek_tts.decode_buffer_capacity = 0U;
+        g_river_iflytek_tts.pcm_queue_storage = NULL;
+        return status;
+    }
+
+    return RIVER_OK;
+}
+
+static river_status_t river_tts_ensure_decode_buffer(size_t capacity)
+{
+    if (capacity == 0U) {
+        return RIVER_ERR_ARG;
+    }
+    if (river_tts_prepare_resource_pool() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (g_river_iflytek_tts.decode_buffer_capacity >= capacity &&
+        g_river_iflytek_tts.decode_buffer != NULL) {
+        return RIVER_OK;
+    }
+
+    return RIVER_ERR_NO_MEMORY;
+}
+
+static river_status_t river_tts_ensure_pcm_queue(void)
+{
+    return river_tts_prepare_resource_pool();
+}
+
+static void river_tts_queue_reset(void)
+{
+    river_audio_frame_ring_reset(&g_river_iflytek_tts.pcm_ring);
+    g_river_iflytek_tts.mono_pending_bytes = 0U;
+}
+
+static size_t river_tts_queue_count(void)
+{
+    return (size_t)river_audio_frame_ring_count(&g_river_iflytek_tts.pcm_ring) *
+           RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES;
+}
+
+static river_status_t river_tts_queue_write(const uint8_t *pcm, size_t bytes)
+{
+    size_t offset;
+
+    if (pcm == NULL || bytes == 0U) {
+        return RIVER_OK;
+    }
+    if (river_tts_ensure_pcm_queue() != RIVER_OK) {
+        river_tts_set_last_error("tts_pcm_queue_alloc_failed");
+        return RIVER_ERR_NO_MEMORY;
+    }
+    offset = 0U;
+    while (offset < bytes) {
+        river_status_t status;
+        size_t copy_bytes;
+
+        copy_bytes = RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES - g_river_iflytek_tts.mono_pending_bytes;
+        if (copy_bytes > (bytes - offset)) {
+            copy_bytes = bytes - offset;
+        }
+
+        memcpy(g_river_iflytek_tts.mono_pending + g_river_iflytek_tts.mono_pending_bytes,
+               pcm + offset,
+               copy_bytes);
+        g_river_iflytek_tts.mono_pending_bytes += copy_bytes;
+        offset += copy_bytes;
+
+        if (g_river_iflytek_tts.mono_pending_bytes != RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES) {
+            continue;
+        }
+
+        status = river_audio_frame_ring_write(&g_river_iflytek_tts.pcm_ring,
+                                              g_river_iflytek_tts.mono_pending);
+        if (status == RIVER_ERR_NO_MEMORY) {
+            uint32_t retry;
+
+            for (retry = 0U; retry < RIVER_IFLYTEK_TTS_QUEUE_SPACE_RETRY_MAX; ++retry) {
+                if (river_tts_session_interrupted()) {
+                    river_tts_set_last_error("tts_interrupted");
+                    return RIVER_ERR_BUSY;
+                }
+
+                (void)rtos_sema_take(g_river_iflytek_tts.queue_space,
+                                     RIVER_IFLYTEK_TTS_QUEUE_WAIT_MS);
+                status = river_audio_frame_ring_write(&g_river_iflytek_tts.pcm_ring,
+                                                      g_river_iflytek_tts.mono_pending);
+                if (status == RIVER_OK) {
+                    break;
+                }
+            }
+        }
+        if (status != RIVER_OK) {
+            g_river_iflytek_tts.queue_overflow++;
+            river_tts_set_last_error("tts_pcm_queue_overflow");
+            return status;
+        }
+
+        g_river_iflytek_tts.mono_pending_bytes = 0U;
+        g_river_iflytek_tts.queue_peak_bytes =
+            river_audio_frame_ring_peak_count(&g_river_iflytek_tts.pcm_ring) *
+            RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES;
+        rtos_sema_give(g_river_iflytek_tts.queue_ready);
+    }
+
+    return RIVER_OK;
+}
+
+static river_status_t river_tts_queue_read_frame(uint8_t *buffer)
+{
+    if (buffer == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    return river_audio_frame_ring_read(&g_river_iflytek_tts.pcm_ring, buffer);
+}
+
 static river_status_t river_tts_prepare_playback(void)
 {
     river_playback_stream_config_t config;
 
-    if (river_playback_service_state() != RIVER_PLAYBACK_IDLE) {
-        river_playback_service_stop_stream();
+    if (river_playback_service_active()) {
+        (void)river_playback_service_interrupt_stream_ex("tts_prepare_preempt");
     }
 
     memset(&config, 0, sizeof(config));
@@ -308,6 +521,35 @@ static river_status_t river_tts_prepare_playback(void)
     return river_playback_service_start_stream(&config);
 }
 
+static uint32_t river_tts_compute_drain_wait_ms(void)
+{
+    river_playback_service_stats_t stats;
+    uint32_t bytes_per_ms;
+    uint32_t wait_ms;
+
+    river_playback_service_get_stats(&stats);
+    bytes_per_ms = (RIVER_IFLYTEK_TTS_SAMPLE_RATE * 2U * 2U) / 1000U;
+    if (bytes_per_ms == 0U || stats.track_buffer_bytes == 0U) {
+        return RIVER_IFLYTEK_TTS_DRAIN_MIN_MS;
+    }
+
+    /*
+     * Ameba's AudioTrack stop/flush path tends to cut the last tail if we stop
+     * right after feeder completion. Budget for one extra track-sized chunk to
+     * cover driver/DMA in-flight audio before issuing stop_stream().
+     */
+    wait_ms = (uint32_t)(((uint64_t)stats.track_buffer_bytes * 2ULL) / (uint64_t)bytes_per_ms);
+    wait_ms += RIVER_IFLYTEK_TTS_DRAIN_MARGIN_MS;
+    if (wait_ms < RIVER_IFLYTEK_TTS_DRAIN_MIN_MS) {
+        wait_ms = RIVER_IFLYTEK_TTS_DRAIN_MIN_MS;
+    }
+    if (wait_ms > RIVER_IFLYTEK_TTS_DRAIN_MAX_MS) {
+        wait_ms = RIVER_IFLYTEK_TTS_DRAIN_MAX_MS;
+    }
+
+    return wait_ms;
+}
+
 static river_status_t river_tts_write_aligned_frame(const uint8_t *mono_frame)
 {
     const int16_t *mono_samples;
@@ -319,6 +561,14 @@ static river_status_t river_tts_write_aligned_frame(const uint8_t *mono_frame)
     for (index = 0U; index < RIVER_IFLYTEK_TTS_MONO_FRAME_SAMPLES; ++index) {
         stereo_samples[index * 2U] = mono_samples[index];
         stereo_samples[index * 2U + 1U] = mono_samples[index];
+    }
+
+    if (g_river_iflytek_tts.playback_epoch == 0U ||
+        river_playback_service_epoch() != g_river_iflytek_tts.playback_epoch) {
+        river_tts_set_last_error(g_river_iflytek_tts.interrupted || g_river_iflytek_tts.stop_requested ?
+                                     "tts_interrupted" :
+                                     "playback_epoch_changed");
+        return RIVER_ERR_BUSY;
     }
 
     if (river_playback_service_write(g_river_iflytek_tts.stereo_frame,
@@ -335,38 +585,28 @@ static river_status_t river_tts_write_aligned_frame(const uint8_t *mono_frame)
     return RIVER_OK;
 }
 
-static river_status_t river_tts_play_pcm_chunk(const uint8_t *pcm, size_t bytes)
+static river_status_t river_tts_feed_ready_audio(void)
 {
-    size_t offset;
+    uint8_t mono_frame[RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES];
 
-    if (pcm == NULL || bytes == 0U) {
-        return RIVER_OK;
-    }
+    while (1) {
+        river_status_t status;
 
-    offset = 0U;
-    while (offset < bytes) {
-        size_t copy_bytes;
-
-        copy_bytes = RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES - g_river_iflytek_tts.mono_pending_bytes;
-        if (copy_bytes > (bytes - offset)) {
-            copy_bytes = bytes - offset;
+        status = river_tts_queue_read_frame(mono_frame);
+        if (status == RIVER_ERR_NOT_FOUND) {
+            return RIVER_OK;
+        }
+        if (status != RIVER_OK) {
+            river_tts_set_last_error("tts_pcm_queue_read_failed");
+            return status;
         }
 
-        memcpy(g_river_iflytek_tts.mono_pending + g_river_iflytek_tts.mono_pending_bytes,
-               pcm + offset,
-               copy_bytes);
-        g_river_iflytek_tts.mono_pending_bytes += copy_bytes;
-        offset += copy_bytes;
-
-        if (g_river_iflytek_tts.mono_pending_bytes == RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES) {
-            river_status_t status;
-
-            status = river_tts_write_aligned_frame(g_river_iflytek_tts.mono_pending);
-            if (status != RIVER_OK) {
-                return status;
-            }
-            g_river_iflytek_tts.mono_pending_bytes = 0U;
+        status = river_tts_write_aligned_frame(mono_frame);
+        if (status != RIVER_OK) {
+            return status;
         }
+
+        rtos_sema_give(g_river_iflytek_tts.queue_space);
     }
 
     return RIVER_OK;
@@ -387,6 +627,127 @@ static river_status_t river_tts_flush_pending_audio(void)
     }
     g_river_iflytek_tts.mono_pending_bytes = 0U;
     return RIVER_OK;
+}
+
+static river_status_t river_tts_start_feeder(void)
+{
+    g_river_iflytek_tts.feeder_running = true;
+    if (rtos_task_create(&g_river_iflytek_tts.feeder_task,
+                         "river_tts_feed",
+                         river_tts_feeder_task,
+                         NULL,
+                         RIVER_IFLYTEK_TTS_FEEDER_TASK_STACK,
+                         RIVER_IFLYTEK_TTS_FEEDER_TASK_PRIORITY) != RTK_SUCCESS) {
+        g_river_iflytek_tts.feeder_running = false;
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    return RIVER_OK;
+}
+
+static void river_tts_request_feeder_stop(void)
+{
+    g_river_iflytek_tts.stop_requested = true;
+    g_river_iflytek_tts.input_done = true;
+    g_river_iflytek_tts.playback_epoch = 0U;
+    river_tts_queue_reset();
+    rtos_sema_give(g_river_iflytek_tts.queue_ready);
+    rtos_sema_give(g_river_iflytek_tts.queue_space);
+}
+
+static bool river_tts_wait_feeder_stopped(uint32_t timeout_ms)
+{
+    uint32_t start_ms;
+
+    start_ms = rtos_time_get_current_system_time_ms();
+    while (g_river_iflytek_tts.feeder_running) {
+        rtos_sema_give(g_river_iflytek_tts.queue_ready);
+        if ((rtos_time_get_current_system_time_ms() - start_ms) > timeout_ms) {
+            return false;
+        }
+        rtos_time_delay_ms(10U);
+    }
+
+    return true;
+}
+
+static void river_tts_feeder_task(void *param)
+{
+    bool playback_opened;
+    river_status_t feed_status;
+
+    (void)param;
+    playback_opened = false;
+
+    while (!g_river_iflytek_tts.stop_requested) {
+        size_t queued_bytes;
+
+        queued_bytes = river_tts_queue_count();
+        if (!playback_opened &&
+            (queued_bytes >= RIVER_IFLYTEK_TTS_START_BUFFER_BYTES ||
+             ((g_river_iflytek_tts.input_done || g_river_iflytek_tts.completed || g_river_iflytek_tts.ws_closed) &&
+              (queued_bytes > 0U || g_river_iflytek_tts.mono_pending_bytes > 0U)))) {
+            if (river_tts_prepare_playback() != RIVER_OK) {
+                river_tts_set_last_error("tts_playback_start_failed");
+                g_river_iflytek_tts.failed = true;
+                break;
+            }
+            playback_opened = true;
+            g_river_iflytek_tts.playback_started = true;
+            g_river_iflytek_tts.playback_epoch = river_playback_service_epoch();
+        }
+
+        if (playback_opened) {
+            feed_status = river_tts_feed_ready_audio();
+            if (feed_status != RIVER_OK) {
+                if (feed_status == RIVER_ERR_BUSY &&
+                    (river_tts_session_interrupted() ||
+                     (g_river_iflytek_tts.playback_epoch != 0U &&
+                      river_playback_service_epoch() != g_river_iflytek_tts.playback_epoch))) {
+                    break;
+                }
+                river_tts_set_last_error("tts_playback_feed_failed");
+                g_river_iflytek_tts.failed = true;
+                break;
+            }
+        }
+
+        queued_bytes = river_tts_queue_count();
+        if ((g_river_iflytek_tts.input_done || g_river_iflytek_tts.completed || g_river_iflytek_tts.ws_closed) &&
+            queued_bytes == 0U) {
+            break;
+        }
+
+        if (queued_bytes == 0U) {
+            if (playback_opened &&
+                !g_river_iflytek_tts.input_done &&
+                !g_river_iflytek_tts.completed &&
+                !g_river_iflytek_tts.ws_closed &&
+                !g_river_iflytek_tts.stop_requested) {
+                g_river_iflytek_tts.queue_starve_count++;
+            }
+            rtos_sema_take(g_river_iflytek_tts.queue_ready, RIVER_IFLYTEK_TTS_QUEUE_WAIT_MS);
+        }
+    }
+
+    if (!g_river_iflytek_tts.failed &&
+        !river_tts_session_interrupted() &&
+        playback_opened &&
+        river_tts_flush_pending_audio() != RIVER_OK) {
+        river_tts_set_last_error("tts_playback_flush_failed");
+        g_river_iflytek_tts.failed = true;
+    } else if (!playback_opened) {
+        g_river_iflytek_tts.mono_pending_bytes = 0U;
+    } else if (river_tts_session_interrupted()) {
+        g_river_iflytek_tts.mono_pending_bytes = 0U;
+    }
+
+    g_river_iflytek_tts.input_done = true;
+    g_river_iflytek_tts.feeder_running = false;
+    g_river_iflytek_tts.playback_epoch = 0U;
+    rtos_sema_give(g_river_iflytek_tts.queue_ready);
+    rtos_sema_give(g_river_iflytek_tts.queue_space);
+    rtos_task_delete(NULL);
 }
 
 static void river_tts_ws_message_cb(wsclient_context **wsclient,
@@ -412,7 +773,8 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
     (void)opcode;
     (void)user_data;
 
-    if (g_river_iflytek_tts.wsclient == NULL ||
+    if (river_tts_session_interrupted() ||
+        g_river_iflytek_tts.wsclient == NULL ||
         g_river_iflytek_tts.wsclient->receivedData == NULL ||
         data_len <= 0) {
         return;
@@ -422,7 +784,10 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
     if (root == NULL) {
         g_river_iflytek_tts.decode_fail++;
         river_tts_set_last_error("response_json_parse_failed");
+        g_river_iflytek_tts.failed = true;
         g_river_iflytek_tts.completed = true;
+        g_river_iflytek_tts.input_done = true;
+        rtos_sema_give(g_river_iflytek_tts.queue_ready);
         return;
     }
 
@@ -442,7 +807,10 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
 
     if (code != 0) {
         river_tts_set_last_error(message_text != NULL ? message_text : "tts_error");
+        g_river_iflytek_tts.failed = true;
         g_river_iflytek_tts.completed = true;
+        g_river_iflytek_tts.input_done = true;
+        rtos_sema_give(g_river_iflytek_tts.queue_ready);
         cJSON_Delete(root);
         return;
     }
@@ -459,13 +827,16 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
 
     if (audio_b64 != NULL && audio_b64[0] != '\0') {
         decode_capacity = ((strlen(audio_b64) + 3U) / 4U) * 3U + 4U;
-        decoded_audio = (uint8_t *)rtos_mem_malloc((uint32_t)decode_capacity);
-        if (decoded_audio == NULL) {
+        if (river_tts_ensure_decode_buffer(decode_capacity) != RIVER_OK) {
             river_tts_set_last_error("tts_decode_alloc_failed");
+            g_river_iflytek_tts.failed = true;
             g_river_iflytek_tts.completed = true;
+            g_river_iflytek_tts.input_done = true;
+            rtos_sema_give(g_river_iflytek_tts.queue_ready);
             cJSON_Delete(root);
             return;
         }
+        decoded_audio = g_river_iflytek_tts.decode_buffer;
 
         decoded_audio_len = 0U;
         if (mbedtls_base64_decode(decoded_audio,
@@ -473,10 +844,12 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
                                   &decoded_audio_len,
                                   (const unsigned char *)audio_b64,
                                   strlen(audio_b64)) != 0) {
-            rtos_mem_free(decoded_audio);
             g_river_iflytek_tts.decode_fail++;
             river_tts_set_last_error("tts_audio_base64_decode_failed");
+            g_river_iflytek_tts.failed = true;
             g_river_iflytek_tts.completed = true;
+            g_river_iflytek_tts.input_done = true;
+            rtos_sema_give(g_river_iflytek_tts.queue_ready);
             cJSON_Delete(root);
             return;
         }
@@ -484,18 +857,20 @@ static void river_tts_ws_message_cb(wsclient_context **wsclient,
         g_river_iflytek_tts.audio_chunks++;
         g_river_iflytek_tts.audio_bytes += (uint32_t)decoded_audio_len;
         g_river_iflytek_tts.saw_audio = true;
-        if (river_tts_play_pcm_chunk(decoded_audio, decoded_audio_len) != RIVER_OK) {
-            rtos_mem_free(decoded_audio);
+        if (river_tts_queue_write(decoded_audio, decoded_audio_len) != RIVER_OK) {
+            g_river_iflytek_tts.failed = true;
             g_river_iflytek_tts.completed = true;
+            g_river_iflytek_tts.input_done = true;
+            rtos_sema_give(g_river_iflytek_tts.queue_ready);
             cJSON_Delete(root);
             return;
         }
-
-        rtos_mem_free(decoded_audio);
     }
 
     if (cJSON_IsNumber(status_obj) && status_obj->valueint == 2) {
         g_river_iflytek_tts.completed = true;
+        g_river_iflytek_tts.input_done = true;
+        rtos_sema_give(g_river_iflytek_tts.queue_ready);
     }
 
     cJSON_Delete(root);
@@ -506,6 +881,8 @@ static void river_tts_ws_close_cb(wsclient_context *wsclient, void *user_data)
     (void)wsclient;
     (void)user_data;
     g_river_iflytek_tts.ws_closed = true;
+    g_river_iflytek_tts.input_done = true;
+    rtos_sema_give(g_river_iflytek_tts.queue_ready);
 }
 
 static void river_tts_close_context(void)
@@ -575,7 +952,26 @@ river_status_t river_tts_iflytek_init(void)
     if (rtos_mutex_create(&g_river_iflytek_tts.lock) != RTK_SUCCESS) {
         return RIVER_ERR_NO_MEMORY;
     }
+    if (rtos_sema_create_binary(&g_river_iflytek_tts.queue_ready) != RTK_SUCCESS) {
+        rtos_mutex_delete(g_river_iflytek_tts.lock);
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (rtos_sema_create_binary(&g_river_iflytek_tts.queue_space) != RTK_SUCCESS) {
+        rtos_sema_delete(g_river_iflytek_tts.queue_ready);
+        rtos_mutex_delete(g_river_iflytek_tts.lock);
+        return RIVER_ERR_NO_MEMORY;
+    }
     if (river_ws_dispatch_init() != RIVER_OK) {
+        rtos_sema_delete(g_river_iflytek_tts.queue_space);
+        rtos_sema_delete(g_river_iflytek_tts.queue_ready);
+        rtos_mutex_delete(g_river_iflytek_tts.lock);
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (river_tts_prepare_resource_pool() != RIVER_OK) {
+        rtos_sema_delete(g_river_iflytek_tts.queue_space);
+        rtos_sema_delete(g_river_iflytek_tts.queue_ready);
+        rtos_mutex_delete(g_river_iflytek_tts.lock);
+        memset(&g_river_iflytek_tts, 0, sizeof(g_river_iflytek_tts));
         return RIVER_ERR_NO_MEMORY;
     }
     g_river_iflytek_tts.initialized = true;
@@ -584,7 +980,11 @@ river_status_t river_tts_iflytek_init(void)
 
 river_status_t river_tts_iflytek_submit_text(const char *text)
 {
-    char url[RIVER_IFLYTEK_TTS_URL_MAX];
+    char base_url[128];
+    char path_query[RIVER_IFLYTEK_TTS_URL_MAX];
+    char auth_url[RIVER_IFLYTEK_TTS_URL_MAX];
+    const char *handshake_path;
+    const char *query_string;
     uint32_t start_ms;
     river_status_t status;
 
@@ -615,31 +1015,67 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
 
     g_river_iflytek_tts.running = true;
     g_river_iflytek_tts.playback_started = false;
+    g_river_iflytek_tts.feeder_running = false;
     g_river_iflytek_tts.completed = false;
     g_river_iflytek_tts.ws_closed = false;
     g_river_iflytek_tts.saw_audio = false;
+    g_river_iflytek_tts.input_done = false;
+    g_river_iflytek_tts.stop_requested = false;
+    g_river_iflytek_tts.interrupted = false;
+    g_river_iflytek_tts.failed = false;
     g_river_iflytek_tts.audio_chunks = 0U;
     g_river_iflytek_tts.audio_bytes = 0U;
     g_river_iflytek_tts.playback_write_ok = 0U;
     g_river_iflytek_tts.playback_write_fail = 0U;
+    g_river_iflytek_tts.queue_peak_bytes = 0U;
+    g_river_iflytek_tts.queue_overflow = 0U;
+    g_river_iflytek_tts.queue_starve_count = 0U;
     g_river_iflytek_tts.last_code = 0;
+    g_river_iflytek_tts.playback_epoch = 0U;
     g_river_iflytek_tts.mono_pending_bytes = 0U;
     g_river_iflytek_tts.last_sid[0] = '\0';
     g_river_iflytek_tts.last_error[0] = '\0';
+    g_river_iflytek_tts.last_interrupt_reason[0] = '\0';
     river_tts_set_last_text_preview(text);
     g_river_iflytek_tts.sessions_started++;
     rtos_mutex_give(g_river_iflytek_tts.lock);
 
-    status = river_tts_build_auth_url(url, sizeof(url));
+    river_tts_reset_binary_sema(g_river_iflytek_tts.queue_ready);
+    river_tts_reset_binary_sema(g_river_iflytek_tts.queue_space);
+
+    if (river_tts_ensure_pcm_queue() != RIVER_OK) {
+        river_tts_set_last_error("tts_pcm_queue_alloc_failed");
+        goto submit_fail;
+    }
+    river_tts_queue_reset();
+
+    status = river_tts_build_auth_url(auth_url, sizeof(auth_url));
     if (status != RIVER_OK) {
         river_tts_set_last_error("tts_auth_url_build_failed");
         goto submit_fail;
     }
 
+    /* Ameba websocket SDK always formats the request line as "GET /%s HTTP/1.1".
+     * Keep the signed path as "/v2/tts", but pass "v2/tts?..." here so the actual
+     * handshake request line remains "GET /v2/tts?..." instead of "//v2/tts?...".
+     */
+    handshake_path = RIVER_IFLYTEK_TTS_PATH;
+    if (handshake_path[0] == '/') {
+        handshake_path++;
+    }
+    query_string = strstr(auth_url, "?");
+
+    snprintf(base_url, sizeof(base_url), "%s://%s", RIVER_IFLYTEK_TTS_SCHEME, RIVER_IFLYTEK_TTS_HOST);
+    snprintf(path_query,
+             sizeof(path_query),
+             "%s?%s",
+             handshake_path,
+             query_string != NULL ? query_string + 1 : "");
+
     g_river_iflytek_tts.wsclient =
-        create_wsclient(url,
+        create_wsclient(base_url,
                         RIVER_IFLYTEK_TTS_PORT,
-                        NULL,
+                        path_query,
                         NULL,
                         RIVER_IFLYTEK_TTS_TX_MAX,
                         RIVER_IFLYTEK_TTS_RX_MAX,
@@ -664,11 +1100,10 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
         goto submit_fail;
     }
 
-    if (river_tts_prepare_playback() != RIVER_OK) {
-        river_tts_set_last_error("tts_playback_start_failed");
+    if (river_tts_start_feeder() != RIVER_OK) {
+        river_tts_set_last_error("tts_feeder_start_failed");
         goto submit_fail;
     }
-    g_river_iflytek_tts.playback_started = true;
 
     if (river_tts_send_request(text) != RIVER_OK) {
         river_tts_set_last_error("tts_request_send_failed");
@@ -677,7 +1112,16 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
 
     start_ms = rtos_time_get_current_system_time_ms();
     while (!g_river_iflytek_tts.completed && !g_river_iflytek_tts.ws_closed) {
+        if (river_tts_session_interrupted()) {
+            break;
+        }
         ws_poll((int)RIVER_IFLYTEK_TTS_POLL_INTERVAL_MS, &g_river_iflytek_tts.wsclient);
+        if (river_tts_session_interrupted()) {
+            break;
+        }
+        if (g_river_iflytek_tts.failed) {
+            goto submit_fail;
+        }
         if ((rtos_time_get_current_system_time_ms() - start_ms) > RIVER_IFLYTEK_TTS_SESSION_TIMEOUT_MS) {
             g_river_iflytek_tts.timeout_fail++;
             river_tts_set_last_error("tts_session_timeout");
@@ -685,6 +1129,28 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
         }
     }
 
+    river_tts_close_context();
+    g_river_iflytek_tts.input_done = true;
+    rtos_sema_give(g_river_iflytek_tts.queue_ready);
+
+    if (!river_tts_wait_feeder_stopped(RIVER_IFLYTEK_TTS_FEEDER_STOP_TIMEOUT_MS)) {
+        river_tts_set_last_error("tts_feeder_stop_timeout");
+        goto submit_fail;
+    }
+    if (river_tts_session_interrupted()) {
+        if (g_river_iflytek_tts.playback_started) {
+            river_playback_service_interrupt_stream_ex(river_tts_last_interrupt_reason());
+            g_river_iflytek_tts.playback_started = false;
+        }
+        g_river_iflytek_tts.running = false;
+        RIVER_LOGI("tts interrupted sid=%s text=%s",
+                   g_river_iflytek_tts.last_sid[0] != '\0' ? g_river_iflytek_tts.last_sid : "-",
+                   g_river_iflytek_tts.last_text[0] != '\0' ? g_river_iflytek_tts.last_text : "-");
+        return RIVER_ERR_BUSY;
+    }
+    if (g_river_iflytek_tts.failed) {
+        goto submit_fail;
+    }
     if (!g_river_iflytek_tts.completed) {
         river_tts_set_last_error("tts_session_closed_early");
         goto submit_fail;
@@ -693,14 +1159,10 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
         river_tts_set_last_error("tts_no_audio");
         goto submit_fail;
     }
-    if (river_tts_flush_pending_audio() != RIVER_OK) {
-        goto submit_fail;
-    }
 
-    rtos_time_delay_ms(RIVER_IFLYTEK_TTS_DRAIN_WAIT_MS);
-    river_tts_close_context();
     if (g_river_iflytek_tts.playback_started) {
-        river_playback_service_stop_stream();
+        rtos_time_delay_ms(river_tts_compute_drain_wait_ms());
+        river_playback_service_stop_stream_ex("tts_complete");
         g_river_iflytek_tts.playback_started = false;
     }
     g_river_iflytek_tts.sessions_ok++;
@@ -713,19 +1175,44 @@ river_status_t river_tts_iflytek_submit_text(const char *text)
     return RIVER_OK;
 
 submit_fail:
-    river_tts_close_context();
-    if (g_river_iflytek_tts.playback_started) {
-        river_playback_service_stop_stream();
-        g_river_iflytek_tts.playback_started = false;
+    {
+        bool interrupted_before_stop = river_tts_session_interrupted();
+
+        river_tts_close_context();
+        river_tts_request_feeder_stop();
+        river_tts_wait_feeder_stopped(RIVER_IFLYTEK_TTS_FEEDER_STOP_TIMEOUT_MS);
+        if (interrupted_before_stop) {
+            if (g_river_iflytek_tts.playback_started) {
+                river_playback_service_interrupt_stream_ex(river_tts_last_interrupt_reason());
+                g_river_iflytek_tts.playback_started = false;
+            }
+            g_river_iflytek_tts.running = false;
+            RIVER_LOGI("tts interrupted sid=%s text=%s",
+                       g_river_iflytek_tts.last_sid[0] != '\0' ? g_river_iflytek_tts.last_sid : "-",
+                       g_river_iflytek_tts.last_text[0] != '\0' ? g_river_iflytek_tts.last_text : "-");
+            return RIVER_ERR_BUSY;
+        }
+        if (g_river_iflytek_tts.playback_started) {
+            river_playback_service_stop_stream_ex("tts_submit_fail");
+            g_river_iflytek_tts.playback_started = false;
+        }
+        g_river_iflytek_tts.sessions_fail++;
+        g_river_iflytek_tts.running = false;
+        RIVER_LOGW("tts speak failed sid=%s err=%s chunks=%lu audio_bytes=%lu completed=%s ws_closed=%s playback_started=%s",
+                   g_river_iflytek_tts.last_sid[0] != '\0' ? g_river_iflytek_tts.last_sid : "-",
+                   g_river_iflytek_tts.last_error[0] != '\0' ? g_river_iflytek_tts.last_error : "-",
+                   (unsigned long)g_river_iflytek_tts.audio_chunks,
+                   (unsigned long)g_river_iflytek_tts.audio_bytes,
+                   g_river_iflytek_tts.completed ? "yes" : "no",
+                   g_river_iflytek_tts.ws_closed ? "yes" : "no",
+                   g_river_iflytek_tts.playback_started ? "yes" : "no");
+        return RIVER_ERR_IO;
     }
-    g_river_iflytek_tts.sessions_fail++;
-    g_river_iflytek_tts.running = false;
-    return RIVER_ERR_IO;
 }
 
 void river_tts_iflytek_dump_status(void)
 {
-    RIVER_LOGI("tts provider=iflytek_ws running=%s sid=%s code=%d ok=%lu fail=%lu audio_chunks=%lu audio_bytes=%lu play_ok=%lu play_fail=%lu decode_fail=%lu open_fail=%lu send_fail=%lu timeout_fail=%lu last_text=%s last_err=%s",
+    RIVER_LOGI("tts provider=iflytek_ws running=%s sid=%s code=%d ok=%lu fail=%lu audio_chunks=%lu audio_bytes=%lu play_ok=%lu play_fail=%lu decode_fail=%lu open_fail=%lu send_fail=%lu timeout_fail=%lu q_cur=%lu q_peak=%lu q_overflow=%lu q_starve=%lu feeder=%s last_text=%s last_err=%s last_interrupt=%s",
                g_river_iflytek_tts.running ? "yes" : "no",
                g_river_iflytek_tts.last_sid[0] != '\0' ? g_river_iflytek_tts.last_sid : "-",
                g_river_iflytek_tts.last_code,
@@ -739,6 +1226,51 @@ void river_tts_iflytek_dump_status(void)
                (unsigned long)g_river_iflytek_tts.open_fail,
                (unsigned long)g_river_iflytek_tts.send_fail,
                (unsigned long)g_river_iflytek_tts.timeout_fail,
+               (unsigned long)river_tts_queue_count(),
+               (unsigned long)g_river_iflytek_tts.queue_peak_bytes,
+               (unsigned long)g_river_iflytek_tts.queue_overflow,
+               (unsigned long)g_river_iflytek_tts.queue_starve_count,
+               g_river_iflytek_tts.feeder_running ? "running" : "idle",
                g_river_iflytek_tts.last_text[0] != '\0' ? g_river_iflytek_tts.last_text : "-",
-               g_river_iflytek_tts.last_error[0] != '\0' ? g_river_iflytek_tts.last_error : "-");
+               g_river_iflytek_tts.last_error[0] != '\0' ? g_river_iflytek_tts.last_error : "-",
+               g_river_iflytek_tts.last_interrupt_reason[0] != '\0' ? g_river_iflytek_tts.last_interrupt_reason : "-");
+}
+
+river_status_t river_tts_iflytek_request_stop_with_reason(const char *reason)
+{
+    if (!g_river_iflytek_tts.initialized) {
+        return RIVER_ERR_NOT_FOUND;
+    }
+
+    if (rtos_mutex_take(g_river_iflytek_tts.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+        return RIVER_ERR_BUSY;
+    }
+
+    if (!g_river_iflytek_tts.running) {
+        rtos_mutex_give(g_river_iflytek_tts.lock);
+        return RIVER_ERR_NOT_FOUND;
+    }
+
+    g_river_iflytek_tts.stop_requested = true;
+    g_river_iflytek_tts.interrupted = true;
+    g_river_iflytek_tts.input_done = true;
+    g_river_iflytek_tts.ws_closed = true;
+    g_river_iflytek_tts.playback_epoch = 0U;
+    river_tts_set_last_interrupt_reason(reason);
+    river_tts_set_last_error("tts_interrupted");
+    rtos_mutex_give(g_river_iflytek_tts.lock);
+
+    river_tts_queue_reset();
+    if (g_river_iflytek_tts.playback_started) {
+        river_playback_service_interrupt_stream_ex(river_tts_last_interrupt_reason());
+        g_river_iflytek_tts.playback_started = false;
+    }
+    rtos_sema_give(g_river_iflytek_tts.queue_ready);
+    rtos_sema_give(g_river_iflytek_tts.queue_space);
+    return RIVER_OK;
+}
+
+river_status_t river_tts_iflytek_request_stop(void)
+{
+    return river_tts_iflytek_request_stop_with_reason(NULL);
 }

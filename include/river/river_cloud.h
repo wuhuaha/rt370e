@@ -41,7 +41,10 @@ typedef void (*river_cloud_asr_result_handler_t)(const river_cloud_asr_result_t 
 river_status_t river_cloud_adapter_init(void);
 river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_handler_t handler,
                                                       void *user_data);
+void river_cloud_adapter_notify_network_ready(void);
 river_status_t river_cloud_adapter_submit_text(const char *text);
+river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason);
+river_status_t river_cloud_adapter_interrupt_tts(void);
 bool river_cloud_utc_ready(void);
 const char *river_cloud_asr_provider_name(void);
 bool river_cloud_asr_streaming_supported(void);

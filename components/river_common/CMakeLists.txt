@@ -16,6 +16,7 @@ set(private_definitions)
 set(private_compile_options)
 
 ameba_list_append(private_sources
+    river_audio_frame_ring.c
     river_log.c
     river_runtime_stats.c
 )

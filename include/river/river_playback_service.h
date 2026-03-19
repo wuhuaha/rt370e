@@ -45,13 +45,24 @@ typedef struct {
     river_playback_priority_t priority;
     char stream_name[32];
     bool reference_export;
+    bool ducked;
+    uint32_t epoch;
+    uint32_t epoch_advance_count;
     size_t track_buffer_bytes;
     uint32_t start_count;
     uint32_t stop_count;
+    uint32_t interrupt_count;
+    uint32_t flush_count;
+    uint32_t duck_count;
     uint32_t write_ok;
     uint32_t write_fail;
     uint32_t ref_write_ok;
     uint32_t ref_write_fail;
+    float duck_gain;
+    char last_epoch_reason[48];
+    char last_control[24];
+    char last_control_reason[48];
+    char last_interrupt_reason[48];
 } river_playback_service_stats_t;
 
 typedef void (*river_playback_service_listener_t)(river_playback_state_t state,
@@ -67,10 +78,21 @@ river_status_t river_playback_service_write(const uint8_t *playback,
                                             const uint8_t *reference,
                                             size_t reference_bytes,
                                             bool block);
+river_status_t river_playback_service_stop_stream_ex(const char *reason);
+river_status_t river_playback_service_interrupt_stream_ex(const char *reason);
+river_status_t river_playback_service_flush_stream_ex(const char *reason);
+river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason);
 river_status_t river_playback_service_stop_stream(void);
+river_status_t river_playback_service_interrupt_stream(void);
+river_status_t river_playback_service_flush_stream(void);
+river_status_t river_playback_service_set_ducking(bool enabled, float gain);
 river_playback_state_t river_playback_service_state(void);
+uint32_t river_playback_service_epoch(void);
 const char *river_playback_service_state_name(river_playback_state_t state);
+bool river_playback_service_state_active(river_playback_state_t state);
+bool river_playback_service_active(void);
 bool river_playback_service_reference_enabled(void);
+bool river_playback_service_ducked(void);
 void river_playback_service_get_stats(river_playback_service_stats_t *stats);
 void river_playback_service_dump_status(void);
 

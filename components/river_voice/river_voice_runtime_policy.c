@@ -1,18 +1,48 @@
 #include "river/river_voice_runtime_policy.h"
 
-static bool river_voice_runtime_playback_active(river_playback_state_t state)
-{
-    return state == RIVER_PLAYBACK_PREPARING ||
-           state == RIVER_PLAYBACK_RUNNING ||
-           state == RIVER_PLAYBACK_DRAINING ||
-           state == RIVER_PLAYBACK_STOPPING;
-}
-
 static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t state)
 {
     return state == RIVER_INTERACTION_SPEAKING ||
            state == RIVER_INTERACTION_BARGE_IN_LISTENING ||
            state == RIVER_INTERACTION_ASR_STREAMING;
+}
+
+river_voice_stage_t river_voice_runtime_stage(void)
+{
+    switch (river_interaction_state_get()) {
+    case RIVER_INTERACTION_BOOTING:
+    case RIVER_INTERACTION_IDLE:
+    case RIVER_INTERACTION_WAKE_MONITORING:
+        return RIVER_VOICE_STAGE_WAKE;
+    case RIVER_INTERACTION_WAKE_CONFIRMED:
+    case RIVER_INTERACTION_LISTENING:
+    case RIVER_INTERACTION_ASR_STREAMING:
+    case RIVER_INTERACTION_THINKING:
+    case RIVER_INTERACTION_SPEAKING:
+    case RIVER_INTERACTION_BARGE_IN_LISTENING:
+    case RIVER_INTERACTION_FOLLOW_UP:
+    case RIVER_INTERACTION_ERROR_RECOVERING:
+    default:
+        return RIVER_VOICE_STAGE_POST_WAKE;
+    }
+}
+
+const char *river_voice_runtime_stage_name(river_voice_stage_t stage)
+{
+    switch (stage) {
+    case RIVER_VOICE_STAGE_WAKE:
+        return "wake";
+    case RIVER_VOICE_STAGE_POST_WAKE:
+        return "post_wake";
+    default:
+        return "unknown";
+    }
+}
+
+bool river_voice_runtime_stage_enabled(river_voice_preproc_profile_t profile,
+                                       river_voice_stage_t stage)
+{
+    return river_voice_profile_stage_enabled(profile, stage);
 }
 
 void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profile,
@@ -39,7 +69,7 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
         return;
     }
 
-    if (!river_voice_runtime_playback_active(eval->playback_state)) {
+    if (!river_playback_service_state_active(eval->playback_state)) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK;
         return;
     }

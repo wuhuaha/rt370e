@@ -40,6 +40,10 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
                                             river_voice_aec_gate_eval_t *eval);
 void river_voice_runtime_aec_gate_apply_reference(river_voice_aec_gate_eval_t *eval,
                                                   river_voice_reference_activity_t ref_activity);
+river_voice_stage_t river_voice_runtime_stage(void);
+const char *river_voice_runtime_stage_name(river_voice_stage_t stage);
+bool river_voice_runtime_stage_enabled(river_voice_preproc_profile_t profile,
+                                       river_voice_stage_t stage);
 const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason_t reason);
 const char *river_voice_runtime_reference_activity_name(river_voice_reference_activity_t activity);
 

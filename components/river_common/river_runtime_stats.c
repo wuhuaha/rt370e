@@ -18,6 +18,10 @@
 #define RIVER_RUNTIME_STATS_TOP_TASKS 3U
 
 static bool g_river_runtime_stats_initialized;
+static bool g_river_runtime_stats_lock_ready;
+static rtos_mutex_t g_river_runtime_stats_lock;
+static TaskStatus_t *g_river_runtime_stats_tasks;
+static UBaseType_t g_river_runtime_stats_tasks_capacity;
 
 static uint32_t river_runtime_stack_bytes(configSTACK_DEPTH_TYPE high_water_mark)
 {
@@ -115,8 +119,49 @@ static void river_runtime_format_cpu_top(char *buffer,
     }
 }
 
+static TaskStatus_t *river_runtime_stats_ensure_task_buffer(UBaseType_t required_capacity)
+{
+    TaskStatus_t *new_tasks;
+    UBaseType_t new_capacity;
+
+    if (required_capacity == 0U) {
+        return NULL;
+    }
+
+    if (g_river_runtime_stats_tasks != NULL &&
+        g_river_runtime_stats_tasks_capacity >= required_capacity) {
+        memset(g_river_runtime_stats_tasks,
+               0,
+               (size_t)g_river_runtime_stats_tasks_capacity * sizeof(TaskStatus_t));
+        return g_river_runtime_stats_tasks;
+    }
+
+    new_capacity = required_capacity + 4U;
+    new_tasks = (TaskStatus_t *)rtos_mem_calloc((uint32_t)new_capacity,
+                                                (uint32_t)sizeof(TaskStatus_t));
+    if (new_tasks == NULL) {
+        return NULL;
+    }
+
+    if (g_river_runtime_stats_tasks != NULL) {
+        rtos_mem_free(g_river_runtime_stats_tasks);
+    }
+
+    g_river_runtime_stats_tasks = new_tasks;
+    g_river_runtime_stats_tasks_capacity = new_capacity;
+    return g_river_runtime_stats_tasks;
+}
+
 void river_runtime_stats_init(void)
 {
+    if (!g_river_runtime_stats_lock_ready) {
+        if (rtos_mutex_create(&g_river_runtime_stats_lock) == 0) {
+            g_river_runtime_stats_lock_ready = true;
+        } else {
+            return;
+        }
+    }
+
     g_river_runtime_stats_initialized = true;
 }
 
@@ -152,9 +197,19 @@ void river_runtime_stats_snapshot(const char *reason)
         const TaskStatus_t *cap_task;
         const TaskStatus_t *echo_task;
 
+        if (!g_river_runtime_stats_lock_ready ||
+            rtos_mutex_take(g_river_runtime_stats_lock, RTOS_MAX_TIMEOUT) != 0) {
+            RIVER_LOGW("snapshot reason=%s heap_free=%lu heap_min=%lu task_stats=alloc_failed",
+                       snapshot_reason,
+                       (unsigned long)heap_free,
+                       (unsigned long)heap_min);
+            return;
+        }
+
         capacity = uxTaskGetNumberOfTasks() + 4U;
-        tasks = (TaskStatus_t *)rtos_mem_calloc((uint32_t)capacity, (uint32_t)sizeof(TaskStatus_t));
+        tasks = river_runtime_stats_ensure_task_buffer(capacity);
         if (tasks == NULL) {
+            rtos_mutex_give(g_river_runtime_stats_lock);
             RIVER_LOGW("snapshot reason=%s heap_free=%lu heap_min=%lu task_stats=alloc_failed",
                        snapshot_reason,
                        (unsigned long)heap_free,
@@ -163,7 +218,9 @@ void river_runtime_stats_snapshot(const char *reason)
         }
 
         total_runtime = 0U;
-        task_count = uxTaskGetSystemState(tasks, capacity, &total_runtime);
+        task_count = uxTaskGetSystemState(tasks,
+                                         g_river_runtime_stats_tasks_capacity,
+                                         &total_runtime);
         river_runtime_format_cpu_top(cpu_top, sizeof(cpu_top), tasks, task_count, total_runtime);
 
         vad_task = river_runtime_find_task(tasks, task_count, "river_vad_probe");
@@ -182,7 +239,6 @@ void river_runtime_stats_snapshot(const char *reason)
                        river_runtime_stack_bytes(cap_task->usStackHighWaterMark) : 0U),
                    (unsigned long)(echo_task != NULL ?
                        river_runtime_stack_bytes(echo_task->usStackHighWaterMark) : 0U));
-
-        rtos_mem_free(tasks);
+        rtos_mutex_give(g_river_runtime_stats_lock);
     }
 }

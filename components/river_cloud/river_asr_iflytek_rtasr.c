@@ -26,7 +26,7 @@
 #define RIVER_LOG_TAG "river.cloud.iflytek"
 
 #define RIVER_IFLYTEK_RTASR_URL_MAX            1024U
-#define RIVER_IFLYTEK_RTASR_TEXT_MAX           256U
+#define RIVER_IFLYTEK_RTASR_TEXT_MAX           2048U
 #define RIVER_IFLYTEK_RTASR_DESC_MAX           128U
 #define RIVER_IFLYTEK_RTASR_SIGNATURE_RAW_MAX  20U
 #define RIVER_IFLYTEK_RTASR_SIGNATURE_B64_MAX  64U
@@ -35,7 +35,12 @@
 #define RIVER_IFLYTEK_RTASR_QUERY_MAX          768U
 #define RIVER_IFLYTEK_RTASR_PATH_QUERY_MAX     896U
 #define RIVER_IFLYTEK_RTASR_TX_MAX             2048U
-#define RIVER_IFLYTEK_RTASR_RX_MAX             1024U
+/*
+ * RTASR may return multi-kilobyte result frames for longer utterances.
+ * Keep the websocket RX budget above the observed server payload size so
+ * frames are parsed instead of being discarded by wsclient_api.c.
+ */
+#define RIVER_IFLYTEK_RTASR_RX_MAX             12288U
 #define RIVER_IFLYTEK_RTASR_QUEUE_MAX          32U
 #define RIVER_IFLYTEK_RTASR_SEND_BLOCK_MS      200U
 #define RIVER_IFLYTEK_RTASR_CHUNK_BYTES        1280U
@@ -675,8 +680,6 @@ static void river_iflytek_ws_message_cb(wsclient_context **wsclient,
                                         int data_len,
                                         enum opcode_type opcode)
 {
-    char *payload;
-
     (void)wsclient;
     if (g_river_iflytek_rtasr.wsclient == NULL ||
         g_river_iflytek_rtasr.wsclient->receivedData == NULL || data_len <= 0) {
@@ -692,15 +695,9 @@ static void river_iflytek_ws_message_cb(wsclient_context **wsclient,
         return;
     }
 
-    payload = (char *)rtos_mem_zmalloc((uint32_t)data_len + 1U);
-    if (payload == NULL) {
-        return;
-    }
-    memcpy(payload, g_river_iflytek_rtasr.wsclient->receivedData, (size_t)data_len);
-    payload[data_len] = '\0';
     g_river_iflytek_rtasr.receive_messages++;
-    river_iflytek_handle_text_message(payload, data_len);
-    rtos_mem_free(payload);
+    river_iflytek_handle_text_message((const char *)g_river_iflytek_rtasr.wsclient->receivedData,
+                                      data_len);
 }
 
 static void river_iflytek_ws_dispatch_message(wsclient_context **wsclient,

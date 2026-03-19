@@ -4,12 +4,14 @@
 #include "river/river_app.h"
 #include "river/river_cloud.h"
 #include "river/river_interaction_state.h"
+#include "river/river_interaction_diag.h"
 #include "river/river_log.h"
 #include "river/river_online_control.h"
 #include "river/river_playback_service.h"
 #include "river/river_reference_service.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
+#include "river/river_voice_capture.h"
 #include "river/river_voice_profile.h"
 #include "river/river_wifi_station.h"
 
@@ -18,13 +20,11 @@
 
 static char g_river_app_last_partial[192];
 static bool g_river_app_asr_session_active;
+static bool g_river_app_barge_in_interrupt_requested;
 
 static bool river_app_playback_state_active(river_playback_state_t state)
 {
-    return state == RIVER_PLAYBACK_PREPARING ||
-           state == RIVER_PLAYBACK_RUNNING ||
-           state == RIVER_PLAYBACK_DRAINING ||
-           state == RIVER_PLAYBACK_STOPPING;
+    return river_playback_service_state_active(state);
 }
 
 static void river_app_sync_interaction_state(const char *reason)
@@ -70,6 +70,35 @@ static void river_app_on_voice_event(const river_voice_event_t *event)
     }
 }
 
+static void river_app_try_interrupt_playback_on_asr_text(const river_cloud_asr_result_t *result)
+{
+    river_interaction_state_t interaction_state;
+
+    if (result == NULL || result->text == NULL || result->text[0] == '\0') {
+        return;
+    }
+    if (!g_river_app_asr_session_active || g_river_app_barge_in_interrupt_requested) {
+        return;
+    }
+    if (!river_app_playback_state_active(river_playback_service_state())) {
+        return;
+    }
+
+    interaction_state = river_interaction_state_get();
+    if (interaction_state != RIVER_INTERACTION_SPEAKING &&
+        interaction_state != RIVER_INTERACTION_BARGE_IN_LISTENING) {
+        return;
+    }
+
+    RIVER_LOGI("barge-in text confirmed during playback: state=%s sid=%s text=%s -> interrupt tts",
+               river_interaction_state_name(interaction_state),
+               result->sid != NULL ? result->sid : "-",
+               result->text);
+    if (river_cloud_adapter_interrupt_tts_with_reason("asr_text_confirmed") == RIVER_OK) {
+        g_river_app_barge_in_interrupt_requested = true;
+    }
+}
+
 static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result,
                                           void *user_data)
 {
@@ -91,6 +120,7 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
                        result->provider_name != NULL ? result->provider_name : "-",
                        result->sid != NULL ? result->sid : "-",
                        result->text);
+            river_app_try_interrupt_playback_on_asr_text(result);
         }
         break;
     case RIVER_CLOUD_ASR_EVENT_FINAL:
@@ -99,9 +129,14 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-",
                    result->text != NULL ? result->text : "-");
+        if ((result->text != NULL) && (result->text[0] != '\0')) {
+            river_app_try_interrupt_playback_on_asr_text(result);
+            (void)river_interaction_diag_route_text(result->text, "asr_final", result->sid);
+        }
         break;
     case RIVER_CLOUD_ASR_EVENT_ERROR:
         g_river_app_asr_session_active = false;
+        g_river_app_barge_in_interrupt_requested = false;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGE("asr provider=%s error code=%d sid=%s msg=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
@@ -112,6 +147,7 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
         g_river_app_asr_session_active = true;
+        g_river_app_barge_in_interrupt_requested = false;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
@@ -120,11 +156,13 @@ static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
         g_river_app_asr_session_active = false;
+        g_river_app_barge_in_interrupt_requested = false;
         g_river_app_last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
         river_app_sync_interaction_state("asr_session_closed");
+        (void)river_interaction_diag_flush_deferred();
         break;
     default:
         break;
@@ -164,6 +202,9 @@ river_status_t river_app_boot(void)
 
     if (river_online_control_init() != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
+    }
+    if (river_interaction_diag_init() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
     }
 
 #ifdef CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
@@ -225,10 +266,12 @@ void river_app_print_status(void)
 #endif
     river_interaction_state_dump_status();
     river_playback_service_dump_status();
+    river_voice_capture_dump_status();
     river_reference_service_dump_status();
     river_voice_echo_dump_status();
     river_voice_vad_probe_dump_status();
     river_wifi_station_dump_status();
     river_cloud_adapter_dump_status();
     river_online_control_dump_status();
+    river_interaction_diag_dump_status();
 }

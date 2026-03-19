@@ -38,6 +38,10 @@ typedef struct {
     uint32_t write_fail;
     uint32_t read_ok;
     uint32_t read_miss;
+    uint32_t queue_frames;
+    uint32_t queue_peak_frames;
+    uint32_t queue_capacity_frames;
+    uint32_t dropped_frames;
 } river_reference_service_stats_t;
 
 river_status_t river_reference_service_init(void);

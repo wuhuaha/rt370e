@@ -8,441 +8,397 @@
 - Preserved WebRTC AECM experiment assets commit: `6546a11`
 - Current WebRTC AEC experiment snapshot commit: `b7684da`
 
-Current stable mainline runtime chain:
+Current stable product runtime chain:
 
 - `capture -> fixed_dsb -> silero_vad -> streaming asr`
 
-Current branch-level refactor additions:
+Current branch-level runtime additions already in progress:
 
 - `PlaybackService`
 - `ReferenceService`
 - `InteractionStateManager`
+- `InteractionDiag`
 - `VoiceProfile`
 - `RuntimePolicy`
+- async `Iflytek TTS` worker
+- playback-aware barge-in path
 
-Current preserved experiment assets:
+Current architecture/implementation documents:
 
-- `components/river_voice/river_voice_webrtc_aecm_adapter.c`
-- `components/river_voice/river_voice_webrtc_aecm_adapter.h`
-- `third_party/webrtc_aecm/`
-- `WEBRTC_AECM_RIVER_接入记录.md`
+- `AUDIO_DATAFLOW_QUEUE_ARCHITECTURE_ZH.md`
+- `AUDIO_DATAFLOW_QUEUE_IMPLEMENTATION_PLAN_ZH.md`
+- `VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH.md`
 
-These assets are intentionally preserved, but they are not part of the current stable runtime chain.
-
-## Product Direction
+## Current Product Direction
 
 Build a maintainable `RTL8730E` voice stack that prioritizes:
 
 - ASR accuracy
 - natural dialogue turn-taking
+- stable full-duplex interaction
 - replaceable acoustic modules
-- clean separation between stable product path and experimental acoustic profiles
+- clean separation between stable product path and experimental profiles
 
 For the current phase, the product path remains:
 
 - `fixed_dsb` as the default ASR front-end
 - `silero_vad` as the current VAD
 - online streaming ASR as the primary recognition backend
+- `Iflytek WS TTS` as the current debug / prompt playback backend
 
-`AEC` is treated as an optional barge-in capability, not a default always-on front-end stage.
+`AEC` remains an optional experimental capability, not part of the current default product mainline.
 
-## AEC Experiment Goal
+## Current Reality Check
 
-Land a WebRTC-based `AEC` experiment that can be evaluated professionally without destabilizing the current `fixed_dsb` ASR baseline.
+The branch has already moved beyond the old “AEC-only experiment” framing.
 
-The target behavior is:
+What is now technically true:
 
-- when native `capture ch3 ref` is unavailable or inactive:
-  - stay on the existing stable `fixed_dsb` path
-- when native `capture ch3 ref` is present, aligned, and active:
-  - route audio through `AEC + DSB`
+1. Playback-time ASR start is partially working
+   - logs already show `speaking -> barge_in_listening`
+   - logs already show ASR sessions can start while TTS is active
 
-This experiment must be isolated behind an explicit experimental profile or build-time switch. It must not silently change the default ASR path.
+2. The system is still not architecturally clean enough
+   - playback interruption is not yet fully unified under one control surface
+   - data-plane buffering models are still mixed
+   - TTS / websocket / playback memory peaks are still too high
+
+3. The next major work is not “tune AEC first”
+   - it is to stabilize the audio data plane and control plane
+   - then make barge-in and future AEC/KWS/DoA plug into a clean runtime
+
+## Preserved Experimental Assets
+
+The following assets remain intentionally preserved, but are not part of the default product path:
+
+- `components/river_voice/river_voice_webrtc_aecm_adapter.c`
+- `components/river_voice/river_voice_webrtc_aecm_adapter.h`
+- `third_party/webrtc_aecm/`
+- `WEBRTC_AECM_RIVER_接入记录.md`
+
+These assets are treated as optional experiments only.
 
 ## Non-Goals
 
-The following are explicitly out of scope for this branch:
+The following are explicitly out of scope for the immediate plan:
 
 - replacing `Silero VAD`
 - changing the online ASR provider
-- introducing SDK AEC/BF back into the runtime path
-- changing product-layer dialogue logic
-- landing unverified AEC behavior into the default ASR profile
+- bringing SDK AEC/BF back into the runtime path
+- redesigning product dialogue semantics before the runtime is stable
+- merging any experimental AEC path into the default profile prematurely
 
-## Constraints
-
-### Hardware / Runtime Constraints
-
-- board microphone array: `AMIC1 + AMIC3`
-- spacing: `50mm`
-- frame cadence in current voice path: `16ms @ 16kHz = 256 samples`
-- WebRTC AECM processing cadence: `10ms @ 16kHz = 160 samples`
-
-### Architectural Constraints
-
-- `river_voice_preproc` remains the only valid insertion boundary for AEC in the current architecture
-- `river_voice_vad_probe` must remain primarily a VAD / ASR validation path, not become a dumping ground for AEC-specific logic
-- `fixed_dsb` mainline must remain intact and independently testable
-
-## Engineering Principles
+## Current Engineering Principles
 
 1. Stable product path first
    - `fixed_dsb -> silero_vad -> asr` remains the reference chain.
 
-2. AEC as an explicit experiment
-   - no hidden runtime mode changes in the default profile.
+2. Data plane and control plane must be separated
+   - audio frames flow through bounded preallocated buffers
+   - start/stop/interrupt/duck go through explicit control paths
 
-3. Strict timing correctness before acoustic tuning
-   - solve `10ms AECM` and `16ms main frame` alignment before evaluating quality.
+3. Real-time path should avoid uncontrolled allocation
+   - no high-frequency `malloc/free` in the hot audio path
 
-4. Real reference only
-   - AEC is only meaningful when driven by a real native reference with stable timing.
+4. Use the right queue model for the right boundary
+   - `ping-pong` for DMA edges
+   - `SPSC ring` for audio frame handoff
+   - `command queue / mailbox` for control actions
 
-5. Observability before optimization
-   - add counters and state logs before making subjective tuning decisions.
+5. Full-duplex behavior must be explainable from logs
+   - playback state
+   - reference state
+   - VAD state
+   - ASR session state
+   - interruption cause
 
-## Implementation Plan
+## Target Architecture
 
-### Phase 0: Freeze the Reference Baseline
+The target runtime should converge toward:
 
-Goal:
+- hardware edge:
+  - `DMA ping-pong`
+- capture path:
+  - `CaptureTask -> fixed-frame VoiceRing -> VoicePipelineTask`
+- playback path:
+  - `TTS decode -> fixed-frame PlaybackRing -> PlaybackFeederTask -> AudioTrack`
+- reference path:
+  - `PlaybackFeederTask -> RefRing`
+- control path:
+  - `TurnManager / PlaybackCommandQueue / InteractionStateManager`
 
-- keep the current `fixed_dsb` ASR path as the reference implementation for all A/B comparisons
+The intended rule is:
 
-Tasks:
+- audio data moves through fixed-size frame buffers
+- interaction behavior moves through explicit state transitions and commands
 
-- confirm the default preproc backend remains `fixed_dsb`
-- confirm the current `Silero VAD` and ASR path continue to work without `AEC`
-- keep existing far-field VAD tuning separate from AEC acceptance criteria
+## Phase Plan
 
-Deliverable:
-
-- a reproducible no-AEC baseline for objective comparison
-
-Exit criteria:
-
-- current default path still produces stable ASR on board
-
-### Phase 1: Define an Explicit Experimental AEC Profile
-
-Goal:
-
-- create a dedicated profile or build switch for WebRTC AECM experiments
-
-Tasks:
-
-- keep `fixed_dsb` as the mainline product backend name
-- define a distinct experimental profile such as:
-  - `fixed_dsb_webrtc_aecm`
-- ensure logs always reflect the real active profile
-
-Deliverable:
-
-- clear separation between product path and experiment path
-
-Exit criteria:
-
-- no ambiguity in runtime logs or configuration about whether AEC is active
-
-### Phase 2: Solve 10ms / 16ms Frame Alignment
+### Phase 1: Stabilize the Current Mainline
 
 Goal:
 
-- guarantee that AECM output is time-aligned with the current main pipeline frame contract
+- make the current async TTS + ASR + barge-in path reliable enough for continued development
 
 Tasks:
 
-- document the frame contract:
-  - input to main pipeline: `256 samples`
-  - AECM internal step: `160 samples`
-- redesign adapter buffering so that:
-  - input frames can be sliced deterministically into AECM blocks
-  - output frames are reconstructed without mixing stale and current semantic frame boundaries
-- add instrumentation for:
-  - input samples pushed
-  - output samples popped
-  - FIFO depth
-  - underrun
-  - overrun
-  - dropped blocks
-
-Design requirement:
-
-- the adapter must make it explicit whether output corresponds to:
-  - exact-current frame
-  - delayed-but-contiguous frame
+- reduce TTS websocket / queue memory peak
+- keep TTS network receive and playback feeding decoupled
+- prevent large websocket frame handling from duplicating payload allocations
+- keep playback-time ASR session start working
+- make barge-in interruption behavior deterministic enough for validation
+- keep stats/logging useful but not overly noisy
 
 Deliverable:
 
-- a hardened AECM adapter with deterministic framing behavior
+- a stable board-usable full-duplex debug chain
 
 Exit criteria:
 
-- no frame-boundary ambiguity remains in the experiment chain
+- no recurring heap-collapse on normal TTS playback
+- TTS can either finish or be interrupted predictably
+- playback-time ASR start remains reproducible
 
-### Phase 3: Build a Real Playback Reference Validity Model
+### Phase 2: Unify Playback Control
 
 Goal:
 
-- prevent AEC from toggling on/off based on single-frame noise
+- stop scattering playback stop/interrupt logic across modules
 
 Tasks:
 
-- define reference states:
-  - `ref_missing`
-  - `ref_present_idle`
-  - `ref_present_active`
-- add runtime indicators:
-  - peak
-  - RMS or average energy
-  - active ratio in a sliding window
-- implement hysteresis:
-  - enter threshold
-  - exit threshold
-  - minimum active duration
-  - hangover before disable
-- forbid full AEC reset on every short inactive gap
+- define explicit playback commands:
+  - `start`
+  - `stop`
+  - `interrupt`
+  - `flush`
+  - `duck`
+- introduce `PlaybackEpoch`
+- centralize interruption handling in playback control
+- align reference lifecycle with playback lifecycle
 
 Deliverable:
 
-- stable AEC gating based on real playback activity, not single-frame spikes
+- one authoritative playback control surface
 
 Exit criteria:
 
-- AEC no longer flaps during short TTS pauses or brief playback silence gaps
+- playback interruption never depends on ad-hoc local stop calls only
+- old queued audio is not consumed after interrupt
 
-### Phase 4: Integrate AEC into `river_voice_preproc`
+### Phase 3: Normalize the Audio Data Plane
 
 Goal:
 
-- insert AEC only at the preproc boundary, keeping the rest of the chain unchanged
+- move mixed byte-buffer logic toward fixed-frame audio buffers
 
 Tasks:
 
-- converge the experimental profile to native `capture(3ch) = mic0 + mic1 + ref`
-- process microphone channels with WebRTC AECM before beamforming
-- keep `fixed_dsb` as the downstream spatial combine step
-- define precise behavior for four cases:
-  - no ref path
-  - ref path exists but inactive
-  - ref active and valid
-  - ref path degraded or adapter failure
-
-Required fallback policy:
-
-- on any AEC experiment failure, fall back to plain `fixed_dsb`
-- never block the ASR chain on AEC failure
+- convert capture ring from byte ring to fixed-frame ring
+- convert TTS PCM queue toward fixed-frame slots
+- convert reference distribution toward frame-based transport
+- keep the algorithm chain itself mostly direct:
+  - `frame -> preproc -> vad -> asr feed`
 
 Deliverable:
 
-- experimental `AEC + DSB` preproc path with safe fallback
+- uniform frame-based audio transport across major runtime boundaries
 
 Exit criteria:
 
-- AEC failure does not break ASR or VAD
+- capture / playback / reference all use explicit frame contracts
+- queue depth, overflow, underrun become directly measurable
+
+### Phase 4: Resource Pool and Low-Overhead Optimization
+
+Goal:
+
+- reduce runtime fragmentation and copy overhead after the frame model is stable
 
 Status:
 
-- completed on the current branch
-- native `capture(3ch) = mic0 + mic1 + ref` experiment path is integrated
-- runtime gate now depends on playback state, interaction state, and reference activity
-
-### Phase 5: Keep `vad_probe` Clean
-
-Goal:
-
-- avoid contaminating the main VAD validation path with AEC-only assumptions
+- done for the current flashable build
+- completed in code:
+  - frame ring now supports externally provided storage and `SPSC` mode where appropriate
+  - capture path now keeps persistent per-open buffers outside the realtime thread
+  - `VoiceFramePool` now owns VAD-probe scratch buffers
+  - `PlaybackFramePool` now owns playback-reference ring backing storage
+  - `TTS` now keeps a persistent session resource block for decode + PCM queue storage
+  - `TTS PCM queue` now runs on the explicit `SPSC` ring path
 
 Tasks:
 
-- expose enough reference diagnostics for AEC experiments
-- do not hardwire `vad_probe` into a permanently ref-dependent mode
-- keep `vad_probe` usable for:
-  - raw VAD validation
-  - DSB validation
-  - ASR stream validation
+- add `VoiceFramePool`
+- add `PlaybackFramePool`
+- convert suitable `SPSC` paths to lock-free or near-lock-free rings
+- remove remaining high-frequency heap churn in hot paths
 
 Deliverable:
 
-- `vad_probe` remains a general validation path rather than an AEC-specialized test harness
+- lower jitter, lower fragmentation, more predictable heap behavior
 
 Exit criteria:
 
-- VAD/ASR debugging remains possible even when AEC is disabled
+- hot paths no longer rely on repeated dynamic allocation
+- long-run stability improves under mixed ASR/TTS use
+
+### Phase 5: Expansion Hooks for AEC / KWS / DoA
+
+Goal:
+
+- prepare clean interfaces for future modules without polluting the stable path
 
 Status:
 
-- partially completed
-- `vad_probe` remains usable as the main validation path, but board-side AEC validation is still pending
-
-### Phase 6: Add AEC-Focused Observability
-
-Goal:
-
-- make AEC quality and failure modes visible in runtime logs
+- done for the current flashable build
+- completed in code:
+  - formal experimental `AEC` input/output contract is now queryable through `river_voice_experiment`
+  - wake-stage and post-wake-stage boundaries are now explicit in runtime policy
+  - side-path access is now reserved through a real frame-hook interface for `KWS / DoA / wake-guided beamforming`
+  - capability selection is now explicit through profile capability masks and build flags
 
 Tasks:
 
-- log profile and AEC state transitions
-- log adapter stats:
-  - blocks_in
-  - blocks_out
-  - fifo_depth
-  - underrun
-  - overrun
-  - reset_count
-- log reference stats:
-  - peak
-  - active ratio
-  - entered_active_count
-  - exited_active_count
-- log preproc fallback reason when experiment path is bypassed
+- define formal input/output contracts for experimental `AEC`
+- define wake-stage and post-wake-stage profile boundaries
+- reserve side-path access for:
+  - `KWS`
+  - `DoA`
+  - wake-guided beamforming
+- keep each capability selectable behind an explicit profile or build flag
 
 Deliverable:
 
-- actionable logs for AEC diagnosis
+- a runtime that can accept new acoustic modules without rewriting playback/capture plumbing
 
 Exit criteria:
 
-- every AEC bypass or fallback is explainable from logs
-
-### Phase 7: Acoustic Evaluation Matrix
-
-Goal:
-
-- evaluate AEC using controlled scenarios instead of ad-hoc impressions
-
-Scenarios:
-
-1. no playback, near-field speech
-2. no playback, far-field speech
-3. playback active, no user speech
-4. playback active, user barge-in near-field
-5. playback active, user barge-in far-field
-6. playback active with short pause in TTS
-7. playback active with bursty system prompt tones
-
-Metrics:
-
-- VAD trigger rate
-- ASR final accuracy
-- ASR empty-result rate
-- false cut / early endpoint rate
-- subjective barge-in responsiveness
-- heap and CPU deltas versus baseline
-
-Deliverable:
-
-- A/B table:
-  - baseline `fixed_dsb`
-  - experimental `webrtc_aecm + fixed_dsb`
-
-Exit criteria:
-
-- experiment has objective evidence, not just anecdotal preference
-
-### Phase 8: Decision Gate
-
-Goal:
-
-- decide whether WebRTC AECM is good enough to continue, needs redesign, or should be abandoned
-
-Decision outcomes:
-
-1. keep as experiment only
-2. continue tuning for productization
-3. replace with another AEC approach
-
-Promotion criteria:
-
-- no ASR regression in no-playback cases
-- improved or at least acceptable playback-interruption cases
-- stable runtime without frame corruption
-- acceptable resource overhead
+- future algorithm integration happens through interfaces, not invasive rewiring
 
 ## Immediate Work Breakdown
 
 ### Task A
 
-Create an explicit experimental profile and keep default `fixed_dsb` untouched.
+Keep the current `fixed_dsb` ASR baseline intact and independently testable.
+
+Status:
+
+- done for current refactor wave
+- mainline still stays on `capture -> fixed_dsb -> silero_vad -> streaming asr`
 
 ### Task B
 
-Refactor the existing `webrtc_aecm_adapter` into a deterministic `160 <-> 256` framing module with visible stats.
+Stabilize the async `Iflytek TTS` worker path:
+
+- reduce memory peak
+- keep queueing bounded
+- preserve playback completeness
+
+Status:
+
+- done for the current flashable build
+- `TTS websocket receive -> fixed-frame PCM queue -> feeder -> PlaybackService` is in place
+- websocket long-frame duplication and repeated hot-path heap churn have been reduced
+- `TTS` decode buffer and PCM queue backing storage now come from one persistent resource block
+- `TTS PCM queue` now runs through the explicit `SPSC` frame-ring path
 
 ### Task C
 
-Implement reference-active hysteresis:
+Make playback-time interruption authoritative:
 
-- enter threshold
-- exit threshold
-- stable window
-- hangover
+- ASR-session-start during playback should be able to interrupt or duck playback through one path
+
+Status:
+
+- done for the current control surface
+- `PlaybackService` now exposes centralized `stop / interrupt / flush / duck`
+- playback epoch is now the authoritative stale-audio invalidation mechanism
 
 ### Task D
 
-Integrate the experimental path into `river_voice_preproc` with guaranteed fallback to `fixed_dsb`.
+Refactor capture / playback / reference toward fixed-frame queue contracts.
+
+Status:
+
+- done for the current flashable build
+- capture ring: fixed-frame
+- TTS PCM queue: fixed-frame
+- playback reference transport: fixed-frame
+- frame-ring transport now also supports external backing storage so later pools do not need queue rewrites
 
 ### Task E
 
-Add logs and counters for:
+Add persistent observability for:
 
-- AEC state
-- adapter health
-- reference health
-- fallback reasons
+- queue peak
+- queue overflow
+- underrun / overrun
+- interruption source
+- playback epoch transitions
+
+Status:
+
+- done for the current flashable build
+- playback status now includes `epoch / epoch_adv / control reason / interrupt reason`
+- capture / reference / TTS status now expose queue depth and peak / overflow-style diagnostics
+- VAD diagnostics now include `ref_peak`
+- playback control operations emit explicit logs with reason propagation
 
 ### Task F
 
-Run the full acoustic evaluation matrix and compare against the `m3-asr-baseline-fixed-dsb` baseline.
+Document and validate resource baseline after each structural step.
+
+Status:
+
+- done for the current flashable build
+- `river status` now includes playback / capture / reference / TTS queue-state visibility
+- `river status` also emits `diag_status` runtime snapshot for quick board-side baseline capture
+- follow-up board validation still remains necessary, but the baseline capture path is now in place
 
 ## Current Immediate Focus
 
-1. keep the stable `fixed_dsb` baseline untouched
-2. validate the current gated WebRTC AECM experiment on board
-3. decide whether WebRTC AECM is worth continuing before moving into larger wake/profile/beamforming refactors
+1. board-validate the current `Phase 4 / Phase 5` implementation as one flashable unit
+2. re-check heap low-water mark and long-run stability under mixed ASR/TTS playback
+3. confirm whether playback underrun or capture/reference overflow changed after pool + `SPSC` adoption
+4. validate the new profile/stage/capability logs against actual runtime behavior
+5. only after that decide whether any further optimization is still justified
 
-## Risks
+## Main Risks
 
-### Risk 1: Frame Misalignment
+### Risk 1: Memory Collapse Under Full-Duplex Load
 
-If `AECM` output is not strictly aligned, it will damage:
+If websocket payload buffering, TTS queueing, playback buffers, and reference export stack up incorrectly, the heap can collapse during normal user flows.
 
-- VAD timing
-- ASR boundary quality
-- perceived responsiveness
+### Risk 2: Partial Full-Duplex Illusion
 
-This is the highest priority technical risk.
+The system may appear to “support barge-in” because ASR starts during playback, while still failing to give way in a product-acceptable manner.
 
-### Risk 2: Reference Flapping
+### Risk 3: Buffer Model Fragmentation
 
-If AEC enable/disable is based on single-frame peak detection, the adaptive state will never stabilize.
+If capture, TTS, playback, and reference all keep different buffer semantics, future AEC/KWS/DoA integration will become slower and riskier.
 
-### Risk 3: Over-processing
+### Risk 4: Premature Optimization
 
-Aggressive AEC in no-playback or weak-ref scenes can degrade ASR more than it helps.
-
-### Risk 4: Validation Contamination
-
-If `vad_probe` becomes AEC-specific, future debugging of VAD / DSB / ASR will become slower and less reliable.
+If lock-free queues and resource pools are introduced before the frame model is stable, debugging cost will rise sharply.
 
 ## Success Criteria
 
 This branch is successful only if all of the following hold:
 
 - default mainline `fixed_dsb` path remains intact
-- experimental `AEC` path is explicitly selectable
-- `10ms / 16ms` alignment is deterministic
-- AEC activation uses hysteresis and stable reference logic
-- no-playback ASR is not worse than the baseline
-- playback-interruption scenarios become measurably better or at least technically explainable
+- playback-time ASR can start reliably
+- playback interruption behavior is deterministic and explainable
+- hot paths avoid uncontrolled heap churn
+- major runtime boundaries use explicit, bounded frame contracts
+- future AEC/KWS/DoA integration can happen without re-breaking the base voice path
 
 ## Current Recommendation
 
-Proceed with WebRTC AECM only as an isolated experiment on `debug/webrtc-aec`.
+Proceed with the branch as an audio-runtime stabilization and refactor branch first, not as an AEC-tuning branch.
 
-Do not merge any AEC changes into the default runtime chain until:
+Use the preserved WebRTC AECM work only as an optional future experiment after:
 
-- frame alignment is proven correct
-- reference gating is stable
-- A/B acoustic results are documented against the `m3-asr-baseline-fixed-dsb` baseline
+- playback/control-plane unification is complete
+- frame contracts are normalized
+- memory peaks are under control
+- the base full-duplex runtime is stable on board

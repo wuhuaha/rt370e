@@ -3,6 +3,7 @@
 #include "river/river_voice_board.h"
 #include "river/river_voice_capture.h"
 #include "river/river_voice_detector.h"
+#include "river/river_voice_experiment.h"
 #include "river/river_voice_preproc.h"
 #include "river/river_reference_service.h"
 #include "river/river_voice_profile.h"
@@ -23,6 +24,7 @@ river_status_t river_voice_frontend_init(void)
     river_voice_preproc_dump_profile();
     river_voice_detector_dump_profile();
     river_voice_segment_sink_dump_profile();
+    river_voice_experiment_dump_profile();
     if (profile->experimental) {
         RIVER_LOGI("current board path keeps fixed_dsb as the stable beamforming baseline while reserving a dedicated native-3ch WebRTC AECM experiment profile");
         RIVER_LOGI("current validation path remains: capture(2mic+ref) -> fixed_dsb/webrtc_aecm(exp) -> silero -> stream/buffer bridge -> runtime logs");

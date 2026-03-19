@@ -67,6 +67,47 @@ typedef struct {
 
 static river_cloud_context_t g_river_cloud;
 
+static void river_cloud_log_time_ready_once(void);
+
+static uint32_t river_cloud_system_utc_seconds(void)
+{
+    uint32_t sec = 0U;
+    uint32_t usec = 0U;
+    time_t now;
+
+    sntp_get_system_time(&sec, &usec);
+    if (sec >= RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
+        return sec;
+    }
+
+    time(&now);
+    if (now >= (time_t)RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
+        return (uint32_t)now;
+    }
+
+    return 0U;
+}
+
+static uint32_t river_cloud_estimated_utc_seconds(void)
+{
+    uint32_t sec;
+
+    sec = river_cloud_system_utc_seconds();
+    if (sec != 0U) {
+        return sec;
+    }
+
+    if (g_river_cloud.time_seeded_from_build) {
+        uint64_t elapsed_ms;
+
+        elapsed_ms = (uint64_t)rtos_time_get_current_system_time_ms() -
+                     g_river_cloud.seeded_utc_rtos_ms;
+        return g_river_cloud.seeded_utc_epoch + (uint32_t)(elapsed_ms / 1000ULL);
+    }
+
+    return 0U;
+}
+
 static bool river_cloud_is_leap_year(int year)
 {
     return ((year % 4) == 0 && (year % 100) != 0) || ((year % 400) == 0);
@@ -152,29 +193,7 @@ static uint32_t river_cloud_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms
 
 uint32_t river_cloud_now_utc_seconds(void)
 {
-    uint32_t sec = 0U;
-    uint32_t usec = 0U;
-    time_t now;
-
-    sntp_get_system_time(&sec, &usec);
-    if (sec >= RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
-        return sec;
-    }
-
-    time(&now);
-    if (now >= (time_t)RIVER_CLOUD_TIME_READY_EPOCH_MIN) {
-        return (uint32_t)now;
-    }
-
-    if (g_river_cloud.time_seeded_from_build) {
-        uint64_t elapsed_ms;
-
-        elapsed_ms = (uint64_t)rtos_time_get_current_system_time_ms() -
-                     g_river_cloud.seeded_utc_rtos_ms;
-        return g_river_cloud.seeded_utc_epoch + (uint32_t)(elapsed_ms / 1000ULL);
-    }
-
-    return 0U;
+    return river_cloud_system_utc_seconds();
 }
 
 bool river_cloud_utc_ready(void)
@@ -184,7 +203,7 @@ bool river_cloud_utc_ready(void)
 
 static bool river_cloud_time_ready(void)
 {
-    return river_cloud_utc_ready();
+    return river_cloud_system_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
 }
 
 static void river_cloud_start_sntp_if_needed(void)
@@ -202,6 +221,22 @@ static void river_cloud_start_sntp_if_needed(void)
                (unsigned int)RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS);
 }
 
+static void river_cloud_kick_sntp_on_network_ready(void)
+{
+    if (river_cloud_time_ready()) {
+        river_cloud_log_time_ready_once();
+        return;
+    }
+
+    if (g_river_cloud.sntp_started) {
+        sntp_stop();
+        g_river_cloud.sntp_started = false;
+    }
+
+    river_cloud_start_sntp_if_needed();
+    RIVER_LOGI("sntp kick: network ready; request immediate sync");
+}
+
 static void river_cloud_seed_time_from_build_if_needed(void)
 {
     char month_text[4];
@@ -215,6 +250,10 @@ static void river_cloud_seed_time_from_build_if_needed(void)
     uint32_t seeded_utc_epoch;
 
     if (river_cloud_time_ready()) {
+        return;
+    }
+
+    if (g_river_cloud.time_seeded_from_build) {
         return;
     }
 
@@ -249,14 +288,11 @@ static void river_cloud_seed_time_from_build_if_needed(void)
     g_river_cloud.time_seeded_from_build = true;
     g_river_cloud.seeded_utc_epoch = seeded_utc_epoch;
     g_river_cloud.seeded_utc_rtos_ms = (uint64_t)rtos_time_get_current_system_time_ms();
-    sntp_set_system_time(seeded_utc_epoch, 0U);
-    if (river_cloud_time_ready()) {
-        RIVER_LOGI("seed system utc from build time: utc=%lu build_local=%s %s tz_offset_sec=%ld",
-                   (unsigned long)river_cloud_now_utc_seconds(),
-                   __DATE__,
-                   __TIME__,
-                   (long)RIVER_CLOUD_BUILD_TZ_OFFSET_SECONDS);
-    }
+    RIVER_LOGI("seed utc estimate from build time: est_utc=%lu build_local=%s %s tz_offset_sec=%ld",
+               (unsigned long)river_cloud_estimated_utc_seconds(),
+               __DATE__,
+               __TIME__,
+               (long)RIVER_CLOUD_BUILD_TZ_OFFSET_SECONDS);
 }
 
 static void river_cloud_log_time_ready_once(void)
@@ -488,6 +524,18 @@ river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_han
     return RIVER_OK;
 }
 
+void river_cloud_adapter_notify_network_ready(void)
+{
+    if (!g_river_cloud.initialized) {
+        return;
+    }
+
+    river_cloud_seed_time_from_build_if_needed();
+    river_cloud_kick_sntp_on_network_ready();
+    river_cloud_log_time_ready_once();
+    river_cloud_reset_stream_open_deferred_state();
+}
+
 river_status_t river_cloud_adapter_submit_text(const char *text)
 {
     river_status_t status;
@@ -508,8 +556,30 @@ river_status_t river_cloud_adapter_submit_text(const char *text)
     RIVER_LOGI("tts submit text=%s", text);
     river_runtime_stats_snapshot("tts_submit_start");
     status = river_tts_iflytek_submit_text(text);
-    river_runtime_stats_snapshot(status == RIVER_OK ? "tts_submit_finish" : "tts_submit_fail");
+    if (status == RIVER_OK) {
+        river_runtime_stats_snapshot("tts_submit_finish");
+    } else if (status == RIVER_ERR_BUSY) {
+        river_runtime_stats_snapshot("tts_submit_interrupt");
+    } else {
+        river_runtime_stats_snapshot("tts_submit_fail");
+    }
     return status;
+}
+
+river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason)
+{
+    river_status_t status;
+
+    status = river_tts_iflytek_request_stop_with_reason(reason);
+    if (status == RIVER_OK) {
+        RIVER_LOGI("tts interrupt requested: reason=%s", reason != NULL ? reason : "-");
+    }
+    return status;
+}
+
+river_status_t river_cloud_adapter_interrupt_tts(void)
+{
+    return river_cloud_adapter_interrupt_tts_with_reason(NULL);
 }
 
 const char *river_cloud_asr_provider_name(void)

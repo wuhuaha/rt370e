@@ -6,7 +6,9 @@
 #include "basic_types.h"
 #include "os_wrapper.h"
 
+#include "river/river_audio_frame_ring.h"
 #include "river/river_log.h"
+#include "river/river_playback_frame_pool.h"
 #include "river/river_voice_ref.h"
 
 #undef RIVER_LOG_TAG
@@ -17,12 +19,11 @@
 typedef struct {
     bool opened;
     rtos_mutex_t lock;
-    uint8_t *buffer;
-    size_t buffer_bytes;
+    river_audio_frame_ring_t ring;
+    uint8_t *discard_frame;
     size_t frame_bytes;
-    size_t queued_bytes;
-    size_t read_offset;
-    size_t write_offset;
+    uint32_t frame_capacity;
+    uint32_t dropped_frames;
     uint32_t sample_rate;
     uint32_t frame_ms;
     uint32_t channels;
@@ -31,39 +32,13 @@ typedef struct {
 
 static river_voice_ref_context_t g_river_voice_ref;
 
-static size_t river_voice_ref_min_size(size_t left, size_t right)
-{
-    return left < right ? left : right;
-}
-
-static void river_voice_ref_copy_in(size_t offset, const uint8_t *src, size_t bytes)
-{
-    size_t first_copy;
-
-    first_copy = river_voice_ref_min_size(bytes, g_river_voice_ref.buffer_bytes - offset);
-    memcpy(g_river_voice_ref.buffer + offset, src, first_copy);
-    if (bytes > first_copy) {
-        memcpy(g_river_voice_ref.buffer, src + first_copy, bytes - first_copy);
-    }
-}
-
-static void river_voice_ref_copy_out(size_t offset, uint8_t *dst, size_t bytes)
-{
-    size_t first_copy;
-
-    first_copy = river_voice_ref_min_size(bytes, g_river_voice_ref.buffer_bytes - offset);
-    memcpy(dst, g_river_voice_ref.buffer + offset, first_copy);
-    if (bytes > first_copy) {
-        memcpy(dst + first_copy, g_river_voice_ref.buffer, bytes - first_copy);
-    }
-}
-
 river_status_t river_voice_ref_open(uint32_t sample_rate,
                                     uint32_t frame_ms,
                                     uint32_t channels,
                                     uint32_t history_ms)
 {
     uint32_t history_frames;
+    river_playback_frame_pool_ref_view_t pool_view;
 
     if (sample_rate == 0U || frame_ms == 0U || channels == 0U) {
         return RIVER_ERR_ARG;
@@ -81,18 +56,32 @@ river_status_t river_voice_ref_open(uint32_t sample_rate,
     if (history_frames < 4U) {
         history_frames = 4U;
     }
-    g_river_voice_ref.buffer_bytes = g_river_voice_ref.frame_bytes * history_frames;
+    g_river_voice_ref.frame_capacity = history_frames;
 
     if (rtos_mutex_create(&g_river_voice_ref.lock) != RTK_SUCCESS) {
         return RIVER_ERR_NO_MEMORY;
     }
 
-    g_river_voice_ref.buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)g_river_voice_ref.buffer_bytes);
-    if (g_river_voice_ref.buffer == 0) {
+    memset(&pool_view, 0, sizeof(pool_view));
+    if (river_playback_frame_pool_acquire_ref(g_river_voice_ref.frame_bytes,
+                                              g_river_voice_ref.frame_capacity,
+                                              &pool_view) != RIVER_OK) {
         rtos_mutex_delete(g_river_voice_ref.lock);
         g_river_voice_ref.lock = 0;
         return RIVER_ERR_NO_MEMORY;
     }
+
+    if (river_audio_frame_ring_init_with_storage(&g_river_voice_ref.ring,
+                                                 pool_view.ring_storage,
+                                                 pool_view.ring_storage_bytes,
+                                                 g_river_voice_ref.frame_bytes,
+                                                 g_river_voice_ref.frame_capacity) != RIVER_OK) {
+        rtos_mutex_delete(g_river_voice_ref.lock);
+        g_river_voice_ref.lock = 0;
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    g_river_voice_ref.discard_frame = pool_view.discard_frame;
 
     g_river_voice_ref.opened = true;
     return RIVER_OK;
@@ -108,10 +97,8 @@ void river_voice_ref_reset(void)
         return;
     }
 
-    memset(g_river_voice_ref.buffer, 0, g_river_voice_ref.buffer_bytes);
-    g_river_voice_ref.queued_bytes = 0U;
-    g_river_voice_ref.read_offset = 0U;
-    g_river_voice_ref.write_offset = 0U;
+    river_audio_frame_ring_reset(&g_river_voice_ref.ring);
+    g_river_voice_ref.dropped_frames = 0U;
 
     rtos_mutex_give(g_river_voice_ref.lock);
 }
@@ -122,15 +109,13 @@ void river_voice_ref_close(void)
         return;
     }
 
-    if (g_river_voice_ref.buffer != 0) {
-        rtos_mem_free(g_river_voice_ref.buffer);
-        g_river_voice_ref.buffer = 0;
-    }
+    river_audio_frame_ring_deinit(&g_river_voice_ref.ring);
 
     if (g_river_voice_ref.lock != 0) {
         rtos_mutex_delete(g_river_voice_ref.lock);
         g_river_voice_ref.lock = 0;
     }
+    river_playback_frame_pool_release_ref();
 
     memset(&g_river_voice_ref, 0, sizeof(g_river_voice_ref));
 }
@@ -140,7 +125,7 @@ river_status_t river_voice_ref_push(const uint8_t *data, size_t bytes)
     if (!g_river_voice_ref.opened || data == 0 || bytes == 0U) {
         return RIVER_ERR_ARG;
     }
-    if (bytes != g_river_voice_ref.frame_bytes || bytes > g_river_voice_ref.buffer_bytes) {
+    if (bytes != g_river_voice_ref.frame_bytes) {
         return RIVER_ERR_ARG;
     }
 
@@ -148,18 +133,27 @@ river_status_t river_voice_ref_push(const uint8_t *data, size_t bytes)
         return RIVER_ERR_BUSY;
     }
 
-    while (g_river_voice_ref.queued_bytes + bytes > g_river_voice_ref.buffer_bytes) {
-        g_river_voice_ref.read_offset =
-            (g_river_voice_ref.read_offset + g_river_voice_ref.frame_bytes) % g_river_voice_ref.buffer_bytes;
-        g_river_voice_ref.queued_bytes -= g_river_voice_ref.frame_bytes;
+    {
+        river_status_t status;
+
+        status = river_audio_frame_ring_write(&g_river_voice_ref.ring, data);
+        if (status == RIVER_ERR_NO_MEMORY) {
+            if (g_river_voice_ref.discard_frame != 0 &&
+                river_audio_frame_ring_read(&g_river_voice_ref.ring,
+                                            g_river_voice_ref.discard_frame) == RIVER_OK) {
+                g_river_voice_ref.dropped_frames++;
+                status = river_audio_frame_ring_write(&g_river_voice_ref.ring, data);
+                if ((g_river_voice_ref.dropped_frames & 0x3FU) == 1U) {
+                    RIVER_LOGW("playback ref overflow: dropped=%lu frames=%lu capacity=%lu",
+                               (unsigned long)g_river_voice_ref.dropped_frames,
+                               (unsigned long)river_audio_frame_ring_count(&g_river_voice_ref.ring),
+                               (unsigned long)g_river_voice_ref.frame_capacity);
+                }
+            }
+        }
+        rtos_mutex_give(g_river_voice_ref.lock);
+        return status;
     }
-
-    river_voice_ref_copy_in(g_river_voice_ref.write_offset, data, bytes);
-    g_river_voice_ref.write_offset = (g_river_voice_ref.write_offset + bytes) % g_river_voice_ref.buffer_bytes;
-    g_river_voice_ref.queued_bytes += bytes;
-
-    rtos_mutex_give(g_river_voice_ref.lock);
-    return RIVER_OK;
 }
 
 river_status_t river_voice_ref_read(uint8_t *data, size_t bytes)
@@ -167,7 +161,7 @@ river_status_t river_voice_ref_read(uint8_t *data, size_t bytes)
     if (!g_river_voice_ref.opened || data == 0 || bytes == 0U) {
         return RIVER_ERR_ARG;
     }
-    if (bytes != g_river_voice_ref.frame_bytes || bytes > g_river_voice_ref.buffer_bytes) {
+    if (bytes != g_river_voice_ref.frame_bytes) {
         return RIVER_ERR_ARG;
     }
 
@@ -176,15 +170,11 @@ river_status_t river_voice_ref_read(uint8_t *data, size_t bytes)
         return RIVER_ERR_BUSY;
     }
 
-    if (g_river_voice_ref.queued_bytes < bytes) {
+    if (river_audio_frame_ring_read(&g_river_voice_ref.ring, data) != RIVER_OK) {
         memset(data, 0, bytes);
         rtos_mutex_give(g_river_voice_ref.lock);
         return RIVER_ERR_NOT_FOUND;
     }
-
-    river_voice_ref_copy_out(g_river_voice_ref.read_offset, data, bytes);
-    g_river_voice_ref.read_offset = (g_river_voice_ref.read_offset + bytes) % g_river_voice_ref.buffer_bytes;
-    g_river_voice_ref.queued_bytes -= bytes;
 
     rtos_mutex_give(g_river_voice_ref.lock);
     return RIVER_OK;
@@ -198,6 +188,35 @@ bool river_voice_ref_is_open(void)
 const char *river_voice_ref_backend_name(void)
 {
     return "playback_ring";
+}
+
+void river_voice_ref_get_stats(river_voice_ref_stats_t *stats)
+{
+    if (stats == NULL) {
+        return;
+    }
+
+    memset(stats, 0, sizeof(*stats));
+    if (!g_river_voice_ref.opened) {
+        return;
+    }
+
+    if (rtos_mutex_take(g_river_voice_ref.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+        return;
+    }
+
+    stats->opened = g_river_voice_ref.opened;
+    stats->frame_bytes = g_river_voice_ref.frame_bytes;
+    stats->sample_rate = g_river_voice_ref.sample_rate;
+    stats->frame_ms = g_river_voice_ref.frame_ms;
+    stats->channels = g_river_voice_ref.channels;
+    stats->history_ms = g_river_voice_ref.history_ms;
+    stats->queue_frames = g_river_voice_ref.ring.frame_count;
+    stats->queue_peak_frames = g_river_voice_ref.ring.peak_frame_count;
+    stats->queue_capacity_frames = g_river_voice_ref.frame_capacity;
+    stats->dropped_frames = g_river_voice_ref.dropped_frames;
+
+    rtos_mutex_give(g_river_voice_ref.lock);
 }
 
 void river_voice_ref_dump_profile(void)
