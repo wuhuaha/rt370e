@@ -8,7 +8,7 @@ This file contains tactical advice and immediate troubleshooting steps based on 
 
 ### 1. Diagnosis: Consistent `auth_fail (-4109)`
 **Status**: The SNTP/UTC barrier is REMOVED via build-time seeding. `BUSY (-3)` is GONE.
-**Current Blocker**: Every connection attempt to `Keeu` fails with `-4109`.
+**Current Blocker**: If the primary AP cannot be joined, verify the credentials currently configured in `include/river/river_wifi_credentials.h`.
 
 ### 2. Tactical Advice
 

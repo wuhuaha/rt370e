@@ -2,11 +2,13 @@
 
 ## Current Context
 
-- Current working branch: `debug/webrtc-aec`
+- Current working branch: `xiaozhi`
 - Stable ASR baseline tag: `m3-asr-baseline-fixed-dsb`
 - Stable ASR baseline commit: `e40e017`
+- Stable flashable full-duplex tag: `m4-full-duplex-bargein-stable`
+- Stable flashable full-duplex commit: `6290987`
 - Preserved WebRTC AECM experiment assets commit: `6546a11`
-- Current WebRTC AEC experiment snapshot commit: `b7684da`
+- Preserved WebRTC AEC experiment snapshot commit: `b7684da`
 
 Current stable product runtime chain:
 
@@ -22,12 +24,16 @@ Current branch-level runtime additions already in progress:
 - `RuntimePolicy`
 - async `Iflytek TTS` worker
 - playback-aware barge-in path
+- `VoiceFramePool / PlaybackFramePool`
+- experimental capability hooks for `AEC / KWS / DoA / wake-guided BF`
 
 Current architecture/implementation documents:
 
 - `AUDIO_DATAFLOW_QUEUE_ARCHITECTURE_ZH.md`
 - `AUDIO_DATAFLOW_QUEUE_IMPLEMENTATION_PLAN_ZH.md`
 - `VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH.md`
+- `XIAOZHI_REALTIME_INTERACTION_ARCHITECTURE_ZH.md`
+- `XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN_ZH.md`
 
 ## Current Product Direction
 
@@ -47,6 +53,31 @@ For the current phase, the product path remains:
 - `Iflytek WS TTS` as the current debug / prompt playback backend
 
 `AEC` remains an optional experimental capability, not part of the current default product mainline.
+
+The current branch objective is now to add `XiaoZhi` as a realtime conversation transport while preserving the existing split `ASR + TTS` cloud path as a flashable fallback baseline.
+
+## XiaoZhi Realtime Integration Direction
+
+`XiaoZhi` should be integrated as a single-session cloud dialogue transport, not as another copy of the current split-provider model.
+
+The intended branch-level mapping is:
+
+- transport/session:
+  - one websocket session per conversation window
+- uplink audio:
+  - `capture -> fixed_dsb -> mono -> Opus -> XiaoZhi`
+- downlink audio:
+  - `XiaoZhi audio -> Opus decode -> PlaybackService -> speaker`
+- text/events:
+  - `stt / llm / tts / mcp` all come through one session
+- interruption:
+  - local barge-in still goes through `PlaybackService` first, then sends `abort`
+
+The intended integration rule is:
+
+- keep current `Iflytek RTASR + Iflytek WS TTS` path buildable as the reference path
+- introduce `XiaoZhi` as a new realtime interaction path under the same `river` runtime
+- reuse existing `PlaybackService / ReferenceService / InteractionState / frame-ring` infrastructure instead of re-importing an ESP32 application framework
 
 ## Current Reality Check
 
@@ -275,6 +306,38 @@ Exit criteria:
 
 - future algorithm integration happens through interfaces, not invasive rewiring
 
+### Phase 6: XiaoZhi Realtime Session Integration
+
+Goal:
+
+- integrate XiaoZhi server as a first-class realtime conversation backend on top of the current stable duplex runtime
+
+Status:
+
+- implementation-complete on branch `xiaozhi`
+- protocol/session layer, `Opus` uplink/downlink, playback/barge-in mapping, and `MCP` bridge have landed
+- remaining work is now board validation, long-run stability checks, and parameter tightening
+
+Tasks:
+
+- add a dedicated `XiaoZhi` session transport layer
+- support websocket `hello / listen / abort / stt / tts / mcp`
+- add `Opus 16k/1ch/60ms` uplink
+- support server-driven downlink audio params and decode path
+- map `stt / tts / mcp` events into current `InteractionState / PlaybackService / OnlineControl`
+- preserve the current Iflytek split path as an explicit fallback/backend baseline
+
+Deliverable:
+
+- a board-usable realtime XiaoZhi interaction path with text, audio, barge-in, and device-control integration
+
+Exit criteria:
+
+- XiaoZhi session handshake is stable on board
+- realtime uplink/downlink audio runs through the existing runtime without breaking the stable fallback path
+- playback-time barge-in can interrupt local playback and propagate `abort` upstream
+- server-side `MCP` requests can drive the existing local device control surface
+
 ## Immediate Work Breakdown
 
 ### Task A
@@ -357,7 +420,22 @@ Status:
 
 ## Current Immediate Focus
 
-1. board-validate the current `Phase 4 / Phase 5` implementation as one flashable unit
+1. board-validate the XiaoZhi session handshake and confirm the session remains stable on device
+2. verify realtime uplink/downlink audio against the current flashable Iflytek fallback baseline
+3. confirm playback-time barge-in still interrupts locally first and propagates upstream `abort`
+4. validate `MCP` device control against the existing local online-control surface
+5. decide from measured heap/queue/runtime data whether any post-validation optimization is still justified
+
+## Current Reference Split
+
+Use the following mental split while implementing the branch:
+
+- stable fallback baseline:
+  - current flashable `Iflytek RTASR + Iflytek WS TTS`
+- active integration branch objective:
+  - `XiaoZhi realtime session + Opus + MCP`
+- preserved experiments:
+  - `WebRTC AECM / future acoustic modules`
 2. re-check heap low-water mark and long-run stability under mixed ASR/TTS playback
 3. confirm whether playback underrun or capture/reference overflow changed after pool + `SPSC` adoption
 4. validate the new profile/stage/capability logs against actual runtime behavior

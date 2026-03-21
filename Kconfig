@@ -8,6 +8,22 @@ config RIVER_ONLINE_CONTROL_EN
     bool "Enable online home control path"
     default y
 
+choice RIVER_CLOUD_BACKEND
+    prompt "Cloud voice backend"
+    default RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
+
+config RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
+    bool "Xiaozhi realtime session backend"
+    help
+      Build the XiaoZhi single-session realtime websocket voice path.
+
+config RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT
+    bool "Iflytek split ASR/TTS backend"
+    help
+      Build the legacy split cloud path with Iflytek RTASR + Iflytek TTS.
+
+endchoice
+
 config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y

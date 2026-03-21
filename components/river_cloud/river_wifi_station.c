@@ -1069,6 +1069,7 @@ static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
     g_river_wifi_station.connection_latched = false;
     g_river_wifi_station.last_connected_ip = 0U;
     g_river_wifi_station.last_connected_ssid[0] = '\0';
+    river_cloud_adapter_notify_network_lost();
 
     wifi_disconnect();
     rtos_time_delay_ms(300);

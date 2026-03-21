@@ -7,6 +7,19 @@
 
 #include "river/river_types.h"
 #include "river/river_voice_segment_sink.h"
+#include "river/river_xiaozhi_ws.h"
+
+#if defined(CONFIG_RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME)
+#define RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED 1
+#else
+#define RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED 0
+#endif
+
+#if defined(CONFIG_RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT)
+#define RIVER_CLOUD_BACKEND_IFLYTEK_ENABLED 1
+#else
+#define RIVER_CLOUD_BACKEND_IFLYTEK_ENABLED 0
+#endif
 
 typedef enum {
     RIVER_CLOUD_ASR_EVENT_PARTIAL = 0,
@@ -41,7 +54,9 @@ typedef void (*river_cloud_asr_result_handler_t)(const river_cloud_asr_result_t 
 river_status_t river_cloud_adapter_init(void);
 river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_handler_t handler,
                                                       void *user_data);
+river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config_t *config);
 void river_cloud_adapter_notify_network_ready(void);
+void river_cloud_adapter_notify_network_lost(void);
 river_status_t river_cloud_adapter_submit_text(const char *text);
 river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason);
 river_status_t river_cloud_adapter_interrupt_tts(void);
