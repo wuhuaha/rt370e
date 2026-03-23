@@ -7,6 +7,8 @@
 - Stable ASR baseline commit: `e40e017`
 - Stable flashable full-duplex tag: `m4-full-duplex-bargein-stable`
 - Stable flashable full-duplex commit: `6290987`
+- Stable XiaoZhi realtime integration tag: `xiaozhi-realtime-runs`
+- Stable XiaoZhi realtime integration commit: `39c31d7`
 - Preserved WebRTC AECM experiment assets commit: `6546a11`
 - Preserved WebRTC AEC experiment snapshot commit: `b7684da`
 
@@ -34,6 +36,7 @@ Current architecture/implementation documents:
 - `VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH.md`
 - `XIAOZHI_REALTIME_INTERACTION_ARCHITECTURE_ZH.md`
 - `XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN_ZH.md`
+- `WAKE_WORD_XIAOZHI_SESSION_WINDOW_ARCHITECTURE_ZH.md`
 
 ## Current Product Direction
 
@@ -54,7 +57,13 @@ For the current phase, the product path remains:
 
 `AEC` remains an optional experimental capability, not part of the current default product mainline.
 
-The current branch objective is now to add `XiaoZhi` as a realtime conversation transport while preserving the existing split `ASR + TTS` cloud path as a flashable fallback baseline.
+The current branch objective has moved in two steps:
+
+- first: integrate `XiaoZhi` as a realtime conversation transport while preserving the existing split `ASR + TTS` cloud path as a flashable fallback baseline
+- next: refactor admission and dialogue timing toward:
+  - local wake-word admission
+  - `XiaoZhi` conversation windows
+  - less VAD-driven per-utterance session slicing
 
 ## XiaoZhi Realtime Integration Direction
 
@@ -85,18 +94,19 @@ The branch has already moved beyond the old “AEC-only experiment” framing.
 
 What is now technically true:
 
-1. Playback-time ASR start is partially working
-   - logs already show `speaking -> barge_in_listening`
-   - logs already show ASR sessions can start while TTS is active
+1. XiaoZhi session transport is already functionally integrated
+   - OTA bootstrap, websocket hello, `stt / llm / tts / mcp`, `Opus` uplink/downlink, and local-first `abort` mapping are already landed on branch `xiaozhi`
 
-2. The system is still not architecturally clean enough
-   - playback interruption is not yet fully unified under one control surface
-   - data-plane buffering models are still mixed
-   - TTS / websocket / playback memory peaks are still too high
+2. The main experience gap is no longer protocol bring-up
+   - the current path still behaves too much like VAD-driven short listen segments
+   - perceived realtime remains worse than native XiaoZhi clients
+   - downlink playback still needs further stabilization to fully support the intended conversation model
 
 3. The next major work is not “tune AEC first”
-   - it is to stabilize the audio data plane and control plane
-   - then make barge-in and future AEC/KWS/DoA plug into a clean runtime
+   - it is to move from VAD-driven per-utterance session slicing toward:
+     - local wake-word admission
+     - post-wake conversation windows
+     - cleaner `auto -> later realtime` XiaoZhi semantics
 
 ## Preserved Experimental Assets
 
@@ -338,6 +348,125 @@ Exit criteria:
 - playback-time barge-in can interrupt local playback and propagate `abort` upstream
 - server-side `MCP` requests can drive the existing local device control surface
 
+### Phase 7: Wake-Word Admission and Conversation Window Refactor
+
+Goal:
+
+- reduce cloud idle cost and improve perceived realtime by replacing VAD-driven per-utterance listen slicing with:
+  - local wake-word admission
+  - XiaoZhi session windows
+  - a cleaner post-wake `auto` dialogue loop
+
+Status:
+
+- implementation-started on branch `xiaozhi`
+- Phase A minimal KWS loop is now landed in code:
+  - wake-stage `fixed_dsb` mono sidepath now feeds a board-side `log-mel` frontend
+  - exported DS-CNN wake-word model is now integrated through `TFLite Micro`
+  - wake-word hits now emit `RIVER_VOICE_EVENT_WAKEWORD` into the existing frontend/app event path
+  - board-side `TFLite Micro` runtime compatibility hardening is now landed:
+    - runtime/model tensor-type divergence is handled explicitly
+    - tensor byte-count vs element-count divergence no longer tears down the sidepath
+    - quantized-model scale/zero-point now resolve from flatbuffer schema first, with runtime tensor params only as fallback
+    - wake-word admission no longer runs cloud-side actions directly from the audio sidepath thread
+  - current work has passed build validation; board tuning and threshold calibration remain pending
+- Phase B/C minimum conversation-window refactor is now landed in code:
+  - wake-word hits now open a XiaoZhi post-wake `auto` conversation window
+  - idle VAD no longer owns cloud listen admission outside an active conversation window
+  - post-wake state now falls back through `FOLLOW_UP` before returning to `WAKE_MONITORING`
+  - conversation-window visibility is now exposed through runtime status logs
+  - current work has passed build validation; board semantics and timeout tuning remain pending
+- Phase D policy hardening is now partially landed in code:
+  - playback start no longer exports reference by default on profiles without native ref / AEC capability
+  - idle VAD is now suppressed while TTS playback is active on profiles that cannot support safe playback-time listen admission
+  - capture buffering headroom has been increased to reduce transient overflow during bring-up / networking pressure
+  - current work has passed build validation; board-side policy tuning remains pending
+
+Tasks:
+
+- integrate a local KWS backend on top of the current `fixed_dsb` mono path
+- add board-side `log-mel` feature extraction for the KWS model
+- define explicit wake-stage and post-wake-stage runtime ownership:
+  - wake stage:
+    - local KWS owns admission
+  - post-wake stage:
+    - XiaoZhi session window owns dialogue continuity
+- keep `silero_vad` in post-wake stage as an auxiliary module for:
+  - upload gating
+  - endpoint assistance
+  - barge-in
+  - session-window timeout
+- first land `KWS -> XiaoZhi auto conversation window`
+- defer `KWS -> XiaoZhi realtime conversation window` until playback/AEC readiness is proven
+
+Deliverable:
+
+- a board-usable wake-word-first dialogue runtime that feels closer to native XiaoZhi behavior while keeping cloud resource usage bounded
+
+Exit criteria:
+
+- idle state no longer depends on cloud-side session admission
+- wake-word hit reliably opens a post-wake conversation window
+- empty short listen segments are significantly reduced
+- short utterances are less likely to lose the first word than in the current VAD-driven model
+
+Implementation phases:
+
+- Phase A:
+  - board-side KWS minimum loop
+  - status:
+    - implementation-complete
+    - build-validated
+  - completed scope:
+    - import exported wake-word model into firmware tree
+    - add board-side `log-mel` feature extraction on top of the `fixed_dsb` mono wake-stage sidepath
+    - add `TFLite Micro` DS-CNN inference with a minimal op resolver
+    - add wake-word threshold / hold / cooldown / log-period build knobs
+    - emit wake-word events and app-level detection logs
+  - remaining follow-up:
+    - board-side score distribution capture
+    - threshold / cooldown tuning
+    - false accept / false reject validation under real speaker playback and room noise
+    - verify on-device behavior across board-side `TFLite Micro` tensor metadata variants after runtime hardening
+
+- Phase B:
+  - wake admission ownership refactor
+  - status:
+    - implementation-complete
+    - build-validated
+  - scope:
+    - switch idle admission from VAD-driven short listen slicing to local wake-word-first admission
+    - keep `silero_vad` active as an auxiliary module instead of the primary session boundary owner
+
+- Phase C:
+  - XiaoZhi post-wake conversation window
+  - status:
+    - implementation-complete
+    - build-validated
+  - scope:
+    - open a post-wake `auto` conversation window after KWS hit
+    - keep dialogue continuity across short pauses without reopening a new short listen segment each time
+
+- Phase D:
+  - barge-in / timeout / close-window policy
+  - status:
+    - implementation-in-progress
+    - build-validated for the current code wave
+  - scope:
+    - define post-wake timeout, silence close, and playback-time interruption rules on top of the new window model
+  - current landed subset:
+    - do not open playback reference paths by default on profiles without `AEC` / native ref support
+    - do not let playback-state VAD reopen cloud ASR while local TTS is active on profiles that cannot safely support duplex admission
+
+- Phase E:
+  - board tuning and acceptance validation
+  - status:
+    - pending
+  - scope:
+    - collect KWS hit/miss logs
+    - tune runtime thresholds
+    - confirm idle cloud cost reduction and improved perceived realtime
+
 ## Immediate Work Breakdown
 
 ### Task A
@@ -420,11 +549,11 @@ Status:
 
 ## Current Immediate Focus
 
-1. board-validate the XiaoZhi session handshake and confirm the session remains stable on device
-2. verify realtime uplink/downlink audio against the current flashable Iflytek fallback baseline
-3. confirm playback-time barge-in still interrupts locally first and propagates upstream `abort`
-4. validate `MCP` device control against the existing local online-control surface
-5. decide from measured heap/queue/runtime data whether any post-validation optimization is still justified
+1. preserve the current flashable XiaoZhi milestone as the branch reference point
+2. board-validate and tune the newly landed local wake-word backend on top of the current `fixed_dsb` mono path
+3. refactor XiaoZhi dialogue timing from per-utterance VAD slicing toward a post-wake conversation window
+4. use `auto` mode first; only consider `realtime` after playback/AEC readiness is proven
+5. continue tracking downlink playback stability because conversation-window quality depends on it
 
 ## Current Reference Split
 
@@ -434,12 +563,9 @@ Use the following mental split while implementing the branch:
   - current flashable `Iflytek RTASR + Iflytek WS TTS`
 - active integration branch objective:
   - `XiaoZhi realtime session + Opus + MCP`
+  - then `local KWS admission + XiaoZhi conversation window`
 - preserved experiments:
   - `WebRTC AECM / future acoustic modules`
-2. re-check heap low-water mark and long-run stability under mixed ASR/TTS playback
-3. confirm whether playback underrun or capture/reference overflow changed after pool + `SPSC` adoption
-4. validate the new profile/stage/capability logs against actual runtime behavior
-5. only after that decide whether any further optimization is still justified
 
 ## Main Risks
 
@@ -468,11 +594,17 @@ This branch is successful only if all of the following hold:
 - playback interruption behavior is deterministic and explainable
 - hot paths avoid uncontrolled heap churn
 - major runtime boundaries use explicit, bounded frame contracts
+- XiaoZhi session transport remains buildable and flashable
 - future AEC/KWS/DoA integration can happen without re-breaking the base voice path
+- local wake-word admission can be introduced without tearing down the current runtime layering
 
 ## Current Recommendation
 
-Proceed with the branch as an audio-runtime stabilization and refactor branch first, not as an AEC-tuning branch.
+Proceed with the branch as:
+
+- first: a stable XiaoZhi transport branch
+- next: a wake-word-first dialogue-runtime branch
+- not: an AEC-tuning-first branch
 
 Use the preserved WebRTC AECM work only as an optional future experiment after:
 
@@ -480,3 +612,4 @@ Use the preserved WebRTC AECM work only as an optional future experiment after:
 - frame contracts are normalized
 - memory peaks are under control
 - the base full-duplex runtime is stable on board
+- the wake-word admission and conversation-window runtime has been validated on board

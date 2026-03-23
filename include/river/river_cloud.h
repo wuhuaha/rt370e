@@ -60,6 +60,8 @@ void river_cloud_adapter_notify_network_lost(void);
 river_status_t river_cloud_adapter_submit_text(const char *text);
 river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason);
 river_status_t river_cloud_adapter_interrupt_tts(void);
+river_status_t river_cloud_adapter_begin_conversation_window(const char *source);
+bool river_cloud_adapter_conversation_window_active(void);
 bool river_cloud_utc_ready(void);
 const char *river_cloud_asr_provider_name(void);
 bool river_cloud_asr_streaming_supported(void);

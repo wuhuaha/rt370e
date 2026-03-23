@@ -23,6 +23,7 @@
 #include "river/river_voice_detector.h"
 #include "river/river_voice_experiment.h"
 #include "river/river_voice_frame_pool.h"
+#include "river/river_voice_kws.h"
 #include "river/river_voice_preproc.h"
 #include "river/river_voice_profile.h"
 #include "river/river_voice_segment_buffer.h"
@@ -727,10 +728,6 @@ static void river_voice_vad_probe_task(void *param)
                                           1U,
                                           &g_river_voice_vad_probe.diag_enhanced_peak,
                                           &g_river_voice_vad_probe.diag_enhanced_peak);
-        river_voice_experiment_submit_frame(RIVER_VOICE_EXPERIMENT_DOMAIN_PREPROC_MONO,
-                                            g_river_voice_vad_probe.enhanced_buffer,
-                                            g_river_voice_vad_probe.enhanced_chunk_bytes,
-                                            1U);
 
         if (river_voice_detector_process(&g_river_voice_vad_probe.detector,
                                          g_river_voice_vad_probe.enhanced_buffer,
@@ -741,6 +738,21 @@ static void river_voice_vad_probe_task(void *param)
             continue;
         }
         g_river_voice_vad_probe.diag_det_ok++;
+        if (river_voice_kws_active()) {
+            river_status_t kws_status = river_voice_kws_submit_frame(
+                g_river_voice_vad_probe.enhanced_buffer,
+                g_river_voice_vad_probe.enhanced_chunk_bytes,
+                detector_result.decision_valid,
+                detector_result.is_speech);
+
+            if (kws_status != RIVER_OK) {
+                RIVER_LOGW("kws submit failed: status=%d bytes=%lu vad_valid=%s speech=%s",
+                           (int)kws_status,
+                           (unsigned long)g_river_voice_vad_probe.enhanced_chunk_bytes,
+                           detector_result.decision_valid ? "yes" : "no",
+                           detector_result.is_speech ? "yes" : "no");
+            }
+        }
         if (detector_result.decision_valid) {
             river_status_t cloud_status;
             bool previous_vad_state;

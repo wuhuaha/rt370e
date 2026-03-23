@@ -1,0 +1,233 @@
+#include <stdio.h>
+#include <string.h>
+
+#include "river/river_log.h"
+#include "river/river_playback_service.h"
+#include "river/river_voice_kws.h"
+#include "river/river_voice_profile.h"
+#include "river/river_wifi_station.h"
+
+#include "river_cloud_internal.h"
+
+#undef RIVER_LOG_TAG
+#define RIVER_LOG_TAG "river.cloud"
+
+#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
+static bool river_cloud_xiaozhi_profile_supports_playback_reference(void)
+{
+    river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
+
+    return river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
+           river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF);
+}
+
+bool river_cloud_xiaozhi_idle_requires_wakeword(void)
+{
+#if defined(CONFIG_RIVER_VOICE_CAPABILITY_KWS) && CONFIG_RIVER_VOICE_CAPABILITY_KWS
+    return river_voice_kws_active();
+#else
+    return false;
+#endif
+}
+
+bool river_cloud_xiaozhi_playback_allows_vad_open(void)
+{
+    return river_cloud_xiaozhi_profile_supports_playback_reference();
+}
+
+void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason)
+{
+    uint64_t now_ms;
+    bool was_active;
+
+    if (duration_ms == 0U) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    was_active = g_river_cloud.xiaozhi_window_active;
+    g_river_cloud.xiaozhi_window_active = true;
+    g_river_cloud.xiaozhi_window_deadline_ms = now_ms + (uint64_t)duration_ms;
+    if (!was_active) {
+        RIVER_LOGI("xiaozhi conversation window opened: source=%s mode=auto timeout_ms=%lu",
+                   reason != NULL ? reason : "-",
+                   (unsigned long)duration_ms);
+    }
+}
+
+void river_cloud_xiaozhi_window_close(const char *reason)
+{
+    if (!g_river_cloud.xiaozhi_window_active && !river_xiaozhi_session_open()) {
+        return;
+    }
+
+    g_river_cloud.xiaozhi_window_active = false;
+    g_river_cloud.xiaozhi_window_deadline_ms = 0U;
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_listen_stop_pending = false;
+    if (g_river_cloud.xiaozhi_listening && river_xiaozhi_session_open()) {
+        (void)river_xiaozhi_send_listen_stop();
+    }
+    g_river_cloud.xiaozhi_listening = false;
+    river_cloud_pre_roll_reset();
+    river_xiaozhi_close_session();
+    g_river_cloud.xiaozhi_session_id[0] = '\0';
+    RIVER_LOGI("xiaozhi conversation window closed: reason=%s",
+               reason != NULL ? reason : "-");
+}
+
+void river_cloud_xiaozhi_copy_session_id_from_transport(void)
+{
+    const char *sid;
+
+    sid = river_xiaozhi_session_id();
+    if (sid != NULL && sid[0] != '\0') {
+        snprintf(g_river_cloud.xiaozhi_session_id,
+                 sizeof(g_river_cloud.xiaozhi_session_id),
+                 "%s",
+                 sid);
+    }
+}
+
+const char *river_cloud_xiaozhi_current_sid(void)
+{
+    return g_river_cloud.xiaozhi_session_id[0] != '\0' ?
+               g_river_cloud.xiaozhi_session_id :
+               river_xiaozhi_session_id();
+}
+
+void river_cloud_xiaozhi_finalize_pending_text(void)
+{
+    if (!g_river_cloud.xiaozhi_pending_text_valid || g_river_cloud.xiaozhi_pending_text_finalized ||
+        g_river_cloud.xiaozhi_pending_text[0] == '\0') {
+        return;
+    }
+
+    g_river_cloud.xiaozhi_pending_text_finalized = true;
+    river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_FINAL,
+                                g_river_cloud.xiaozhi_pending_text,
+                                river_cloud_xiaozhi_current_sid(),
+                                NULL,
+                                0,
+                                true);
+}
+
+void river_cloud_xiaozhi_emit_session_started(void)
+{
+    if (!g_river_cloud.xiaozhi_listening) {
+        return;
+    }
+
+    river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_SESSION_STARTED,
+                                NULL,
+                                river_cloud_xiaozhi_current_sid(),
+                                NULL,
+                                0,
+                                false);
+}
+
+void river_cloud_xiaozhi_emit_session_closed(void)
+{
+    if (!g_river_cloud.xiaozhi_listening) {
+        return;
+    }
+
+    g_river_cloud.xiaozhi_listening = false;
+    river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED,
+                                NULL,
+                                river_cloud_xiaozhi_current_sid(),
+                                NULL,
+                                0,
+                                false);
+}
+
+void river_cloud_xiaozhi_check_window_timeout(void)
+{
+    uint64_t now_ms;
+
+    if (!g_river_cloud.xiaozhi_window_active ||
+        g_river_cloud.xiaozhi_window_deadline_ms == 0U) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (now_ms < g_river_cloud.xiaozhi_window_deadline_ms) {
+        return;
+    }
+
+    if (g_river_cloud.stream_active || g_river_cloud.xiaozhi_playback_active ||
+        g_river_cloud.xiaozhi_tts_stop_pending ||
+        river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) != 0U) {
+        return;
+    }
+
+    river_cloud_xiaozhi_window_close("followup_timeout");
+}
+
+river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
+{
+    river_status_t status;
+
+    if (!river_xiaozhi_session_open()) {
+        status = river_xiaozhi_open_session();
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+    g_river_cloud.xiaozhi_listen_stop_pending = false;
+    if (!g_river_cloud.xiaozhi_listening) {
+        status = river_xiaozhi_send_listen_start("auto");
+        if (status != RIVER_OK) {
+            return status;
+        }
+        g_river_cloud.xiaozhi_listening = true;
+    }
+    g_river_cloud.xiaozhi_pending_text_valid = false;
+    g_river_cloud.xiaozhi_pending_text_finalized = false;
+    g_river_cloud.xiaozhi_pending_text[0] = '\0';
+    river_cloud_xiaozhi_emit_session_started();
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
+{
+    river_status_t status;
+
+    if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    if (!river_wifi_station_is_connected()) {
+        return RIVER_ERR_BUSY;
+    }
+
+    river_cloud_start_sntp_if_needed();
+    river_cloud_seed_time_from_build_if_needed();
+    if (!river_cloud_time_ready()) {
+        return RIVER_ERR_BUSY;
+    }
+
+    if (!river_xiaozhi_session_open()) {
+        status = river_xiaozhi_open_session();
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+    if (!g_river_cloud.xiaozhi_listening) {
+        status = river_xiaozhi_send_listen_start("auto");
+        if (status != RIVER_OK) {
+            return status;
+        }
+        g_river_cloud.xiaozhi_listening = true;
+    }
+
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, source);
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    river_cloud_pre_roll_reset();
+    g_river_cloud.xiaozhi_listen_stop_pending = false;
+    return RIVER_OK;
+}
+#endif

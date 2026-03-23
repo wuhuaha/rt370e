@@ -46,6 +46,7 @@ endif()
 if(CONFIG_RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME)
     ameba_list_append(private_sources
         river_opus_codec.c
+        river_cloud_xiaozhi_session.c
         river_xiaozhi_mcp_bridge.c
         river_xiaozhi_ws.c
     )

@@ -15,7 +15,7 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.capture"
 
-#define RIVER_VOICE_CAPTURE_RING_BUF_MS    1280U
+#define RIVER_VOICE_CAPTURE_RING_BUF_MS    1600U
 #define RIVER_VOICE_CAPTURE_THREAD_STACK   (1024U * 4U)
 /* Priority 6: Above all other voice/app tasks to ensure IPC responsiveness */
 #define RIVER_VOICE_CAPTURE_THREAD_PRIO    6U

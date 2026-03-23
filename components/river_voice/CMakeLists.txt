@@ -48,6 +48,12 @@ ameba_list_append(private_sources
     generated/river_silero_vad_model_data.cc
 )
 
+if(CONFIG_RIVER_VOICE_CAPABILITY_KWS)
+    ameba_list_append(private_sources
+        river_voice_kws.cc
+    )
+endif()
+
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
     ${c_CMPT_AUDIO_DIR}/interfaces

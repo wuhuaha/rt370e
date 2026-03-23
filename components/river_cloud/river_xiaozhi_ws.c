@@ -104,6 +104,18 @@ typedef struct {
     char activation_code[RIVER_XIAOZHI_ACTIVATION_CODE_MAX];
     char activation_message[RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX];
     char activation_challenge[RIVER_XIAOZHI_ACTIVATION_CHALLENGE_MAX];
+    /*
+     * Keep bootstrap/open-session scratch buffers in the long-lived context
+     * instead of on small worker stacks. Wakeword admission can open a xiaozhi
+     * session from river_wake_evt, and 4KB response/path/header locals were
+     * corrupting the return path on CA32.
+     */
+    char bootstrap_response[RIVER_XIAOZHI_HTTP_RESPONSE_MAX];
+    char open_base_url[RIVER_XIAOZHI_BASE_URL_MAX];
+    char open_path[RIVER_XIAOZHI_PATH_MAX];
+    char open_header_fields[RIVER_XIAOZHI_HEADER_FIELDS_MAX];
+    char open_device_id[RIVER_XIAOZHI_DEVICE_ID_MAX];
+    char open_client_id[RIVER_XIAOZHI_CLIENT_ID_MAX];
 } river_xiaozhi_context_t;
 
 static river_xiaozhi_context_t g_river_xiaozhi;
@@ -1712,7 +1724,6 @@ const char *river_xiaozhi_activation_challenge(void)
 
 river_status_t river_xiaozhi_bootstrap(void)
 {
-    char response[RIVER_XIAOZHI_HTTP_RESPONSE_MAX];
     int status_code = 0;
     river_status_t status;
     static const char k_payload[] =
@@ -1740,8 +1751,8 @@ river_status_t river_xiaozhi_bootstrap(void)
 
     status = river_xiaozhi_http_post_json(g_river_xiaozhi.ota_url,
                                           k_payload,
-                                          response,
-                                          sizeof(response),
+                                          g_river_xiaozhi.bootstrap_response,
+                                          sizeof(g_river_xiaozhi.bootstrap_response),
                                           &status_code);
     if (status != RIVER_OK) {
         river_xiaozhi_note_bootstrap_failure(river_xiaozhi_last_error(), status_code, "transport_error");
@@ -1750,13 +1761,15 @@ river_status_t river_xiaozhi_bootstrap(void)
     if (status_code != 200) {
         river_xiaozhi_note_bootstrap_failure("xiaozhi_ota_http_status_invalid",
                                              status_code,
-                                             response);
+                                             g_river_xiaozhi.bootstrap_response);
         return RIVER_ERR_IO;
     }
 
-    status = river_xiaozhi_parse_bootstrap_response(response);
+    status = river_xiaozhi_parse_bootstrap_response(g_river_xiaozhi.bootstrap_response);
     if (status != RIVER_OK) {
-        river_xiaozhi_note_bootstrap_failure(river_xiaozhi_last_error(), status_code, response);
+        river_xiaozhi_note_bootstrap_failure(river_xiaozhi_last_error(),
+                                             status_code,
+                                             g_river_xiaozhi.bootstrap_response);
         return status;
     }
 
@@ -1782,11 +1795,6 @@ river_status_t river_xiaozhi_bootstrap(void)
 
 river_status_t river_xiaozhi_open_session(void)
 {
-    char base_url[RIVER_XIAOZHI_BASE_URL_MAX];
-    char path[RIVER_XIAOZHI_PATH_MAX];
-    char header_fields[RIVER_XIAOZHI_HEADER_FIELDS_MAX];
-    char device_id[RIVER_XIAOZHI_DEVICE_ID_MAX];
-    char client_id[RIVER_XIAOZHI_CLIENT_ID_MAX];
     int port;
     river_status_t status;
     uint32_t waited_ms = 0U;
@@ -1820,27 +1828,29 @@ river_status_t river_xiaozhi_open_session(void)
     river_xiaozhi_close_context(false);
     g_river_xiaozhi.session_id[0] = '\0';
     g_river_xiaozhi.last_error[0] = '\0';
-    memset(base_url, 0, sizeof(base_url));
-    memset(path, 0, sizeof(path));
-    memset(header_fields, 0, sizeof(header_fields));
+    memset(g_river_xiaozhi.open_base_url, 0, sizeof(g_river_xiaozhi.open_base_url));
+    memset(g_river_xiaozhi.open_path, 0, sizeof(g_river_xiaozhi.open_path));
+    memset(g_river_xiaozhi.open_header_fields, 0, sizeof(g_river_xiaozhi.open_header_fields));
+    memset(g_river_xiaozhi.open_device_id, 0, sizeof(g_river_xiaozhi.open_device_id));
+    memset(g_river_xiaozhi.open_client_id, 0, sizeof(g_river_xiaozhi.open_client_id));
 
     status = river_xiaozhi_parse_url(g_river_xiaozhi.url,
-                                     base_url,
-                                     sizeof(base_url),
+                                     g_river_xiaozhi.open_base_url,
+                                     sizeof(g_river_xiaozhi.open_base_url),
                                      &port,
-                                     path,
-                                     sizeof(path));
+                                     g_river_xiaozhi.open_path,
+                                     sizeof(g_river_xiaozhi.open_path));
     if (status != RIVER_OK) {
         river_xiaozhi_set_last_error("xiaozhi_url_parse_failed");
         return status;
     }
 
-    status = river_xiaozhi_build_headers(header_fields,
-                                         sizeof(header_fields),
-                                         device_id,
-                                         sizeof(device_id),
-                                         client_id,
-                                         sizeof(client_id));
+    status = river_xiaozhi_build_headers(g_river_xiaozhi.open_header_fields,
+                                         sizeof(g_river_xiaozhi.open_header_fields),
+                                         g_river_xiaozhi.open_device_id,
+                                         sizeof(g_river_xiaozhi.open_device_id),
+                                         g_river_xiaozhi.open_client_id,
+                                         sizeof(g_river_xiaozhi.open_client_id));
     if (status != RIVER_OK) {
         river_xiaozhi_set_last_error("xiaozhi_headers_build_failed");
         return status;
@@ -1853,9 +1863,9 @@ river_status_t river_xiaozhi_open_session(void)
     }
 
     g_river_xiaozhi.wsclient =
-        create_wsclient(base_url,
+        create_wsclient(g_river_xiaozhi.open_base_url,
                         port,
-                        path,
+                        g_river_xiaozhi.open_path,
                         NULL,
                         RIVER_XIAOZHI_WS_TX_MAX,
                         RIVER_XIAOZHI_WS_RX_MAX,
@@ -1866,8 +1876,8 @@ river_status_t river_xiaozhi_open_session(void)
     }
 
     if (ws_handshake_set_header_fields(g_river_xiaozhi.wsclient,
-                                       header_fields,
-                                       (int)strlen(header_fields)) != 0) {
+                                       g_river_xiaozhi.open_header_fields,
+                                       (int)strlen(g_river_xiaozhi.open_header_fields)) != 0) {
         river_xiaozhi_set_last_error("xiaozhi_header_fields_set_failed");
         river_xiaozhi_close_context(false);
         return RIVER_ERR_IO;
@@ -1886,8 +1896,8 @@ river_status_t river_xiaozhi_open_session(void)
     RIVER_LOGI("xiaozhi connecting: url=%s protocol=%u device_id=%s client_id=%s",
                g_river_xiaozhi.url,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
-               device_id,
-               client_id);
+               g_river_xiaozhi.open_device_id,
+               g_river_xiaozhi.open_client_id);
     if (ws_connect_url(g_river_xiaozhi.wsclient) < 0) {
         river_xiaozhi_set_last_error("xiaozhi_ws_connect_failed");
         river_xiaozhi_close_context(false);

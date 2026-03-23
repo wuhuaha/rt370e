@@ -1,5 +1,7 @@
 #include <stddef.h>
 
+#include "platform_autoconf.h"
+
 #include "river/river_voice_profile.h"
 
 #ifndef CONFIG_RIVER_VOICE_CAPABILITY_AEC_EXPERIMENT

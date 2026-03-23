@@ -22,6 +22,7 @@ typedef void (*river_voice_event_handler_t)(const river_voice_event_t *event);
 
 river_status_t river_voice_frontend_init(void);
 void river_voice_frontend_set_handler(river_voice_event_handler_t handler);
+river_status_t river_voice_frontend_dispatch_event(const river_voice_event_t *event);
 const char *river_voice_frontend_mode_name(void);
 const char *river_voice_preproc_backend_name(void);
 const char *river_voice_preproc_profile_name(void);

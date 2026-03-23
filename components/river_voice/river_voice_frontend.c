@@ -4,10 +4,15 @@
 #include "river/river_voice_capture.h"
 #include "river/river_voice_detector.h"
 #include "river/river_voice_experiment.h"
+#include "river/river_voice_kws.h"
 #include "river/river_voice_preproc.h"
 #include "river/river_reference_service.h"
 #include "river/river_voice_profile.h"
 #include "river/river_voice_segment_sink.h"
+
+#ifndef CONFIG_RIVER_VOICE_CAPABILITY_KWS
+#define CONFIG_RIVER_VOICE_CAPABILITY_KWS 0
+#endif
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.frontend"
@@ -25,6 +30,19 @@ river_status_t river_voice_frontend_init(void)
     river_voice_detector_dump_profile();
     river_voice_segment_sink_dump_profile();
     river_voice_experiment_dump_profile();
+#if CONFIG_RIVER_VOICE_CAPABILITY_KWS
+    {
+        river_status_t status = river_voice_kws_init();
+        if (status != RIVER_OK) {
+            RIVER_LOGW("kws init failed status=%d; continue with stable non-kws path",
+                       (int)status);
+            RIVER_LOGW("wake admission fallback: idle VAD admission remains enabled because local KWS is inactive");
+        } else {
+            river_voice_kws_dump_profile();
+            RIVER_LOGI("wake-stage validation path: capture -> fixed_dsb -> log_mel -> dscnn_kws -> wake event");
+        }
+    }
+#endif
     if (profile->experimental) {
         RIVER_LOGI("current board path keeps fixed_dsb as the stable beamforming baseline while reserving a dedicated native-3ch WebRTC AECM experiment profile");
         RIVER_LOGI("current validation path remains: capture(2mic+ref) -> fixed_dsb/webrtc_aecm(exp) -> silero -> stream/buffer bridge -> runtime logs");
@@ -40,7 +58,18 @@ river_status_t river_voice_frontend_init(void)
 void river_voice_frontend_set_handler(river_voice_event_handler_t handler)
 {
     g_river_voice_handler = handler;
-    (void)g_river_voice_handler;
+}
+
+river_status_t river_voice_frontend_dispatch_event(const river_voice_event_t *event)
+{
+    if (event == 0) {
+        return RIVER_ERR_ARG;
+    }
+    if (g_river_voice_handler == 0) {
+        return RIVER_ERR_NOT_FOUND;
+    }
+    g_river_voice_handler(event);
+    return RIVER_OK;
 }
 
 const char *river_voice_frontend_mode_name(void)

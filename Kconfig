@@ -178,6 +178,62 @@ config RIVER_SILERO_VAD_EMA_SHIFT
     default 0
     depends on RIVER_VOICE_DETECTOR_SILERO_VAD
 
+config RIVER_VOICE_CAPABILITY_KWS
+    bool "Enable local wake-word sidepath"
+    default y
+    help
+      Enables the wake-stage local KWS sidepath on top of the current
+      fixed_dsb mono stream. When enabled, the active voice profile exposes
+      the KWS capability and the board runs a local DS-CNN wake-word model.
+
+config RIVER_KWS_TENSOR_ARENA_KB
+    int "Wake-word KWS tensor arena size in KB"
+    range 32 512
+    default 160
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_SCORE_THRESHOLD_Q15
+    int "Wake-word KWS trigger threshold in q15"
+    range 1 32767
+    default 27852
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_TRIGGER_HOLD_FRAMES
+    int "Wake-word KWS consecutive trigger frames"
+    range 1 8
+    default 2
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_COOLDOWN_MS
+    int "Wake-word KWS cooldown in milliseconds"
+    range 0 10000
+    default 1800
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_LOG_PERIOD_MS
+    int "Wake-word KWS status log period in milliseconds"
+    range 100 10000
+    default 1000
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_INFERENCE_STRIDE_FRAMES
+    int "Wake-word KWS inference stride in mel frames"
+    range 1 32
+    default 2
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_VAD_PRE_ROLL_MS
+    int "Wake-word KWS VAD-gated pre-roll in milliseconds"
+    range 0 1000
+    default 320
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_INPUT_QUEUE_FRAMES
+    int "Wake-word KWS worker queue capacity in frames"
+    range 8 128
+    default 64
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
 config RIVER_VAD_PROBE_DIAG_WINDOW_MS
     int "Pure VAD probe diagnostic window in milliseconds"
     range 16 1000
