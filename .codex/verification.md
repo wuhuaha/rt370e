@@ -1662,3 +1662,55 @@ Expected result:
 - project profile still expands the app range to `0x08600000`, so flashing remains valid only with the project-owned profile/tooling
 - current `river_voice_kws.cc` resolver still registers only the existing `6` ops and does not register `AddPad()`
 - `git diff --stat xiaozhi..DS-CNN` shows documentation-only divergence, confirming no new runtime source delta has been introduced on this branch
+
+## Step 5.6
+Phase 2 runtime landing:
+```bash
+cd /root/ameba-river
+
+python3 /root/river-openwakeword-lab/tools/openwakeword/export_embedded_model.py \
+  --tflite-model /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_student_round6_targeted/export/xiaou_student_round6_targeted_int8.tflite \
+  --output-dir /root/ameba-river/components/river_voice/generated \
+  --model-name xiaou_student_round6_targeted_int8 \
+  --symbol-name kws_model_round6_targeted \
+  --primary-threshold 0.65 \
+  --notes "Round6 targeted DS-CNN student experimental embedded variant for DS-CNN branch"
+
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+
+ls -l build_RTL8730E/km4_boot_all.bin \
+      build_RTL8730E/km0_km4_ca32_app.bin \
+      build_RTL8730E/ota_all.bin \
+      components/river_voice/generated/xiaou_student_round6_targeted_int8_model_data.h \
+      components/river_voice/generated/xiaou_student_round6_targeted_int8_metadata.json
+
+python3 - <<'PY'
+import os
+app_size = os.path.getsize('/root/ameba-river/build_RTL8730E/km0_km4_ca32_app.bin')
+start = 0x08040000
+end = start + app_size
+limit = 0x08300000
+print('app_size', app_size)
+print('app_end', hex(end))
+print('overflow_bytes_vs_sdk_stock', max(0, end - limit))
+PY
+
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg -n "round6_targeted_experimental|kws backend: dscnn runtime=tflite_micro" -S
+sed -n '1,200p' components/river_voice/generated/xiaou_student_round6_targeted_int8_metadata.json
+git status --short
+```
+
+Expected result:
+- generated embedded assets exist for the imported round6 targeted student
+- build finishes with `Build done`
+- `prj.conf` selects `CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL=y`
+- `components/river_voice/river_voice_kws.cc` now supports `PAD` and model-variant selection
+- final image sizes are:
+  - `km4_boot_all.bin`: `51872`
+  - `km0_km4_ca32_app.bin`: `3573088`
+  - `ota_all.bin`: `3573120`
+- the app image still exceeds stock SDK range but by the reduced amount:
+  - `overflow_bytes_vs_sdk_stock = 689504`
+- `strings` confirms the landed runtime now contains `round6_targeted_experimental`
+- `git status --short` after staging/commit prep shows only this step's tracked changes plus the user-owned `.env`

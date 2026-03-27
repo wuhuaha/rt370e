@@ -186,6 +186,25 @@ config RIVER_VOICE_CAPABILITY_KWS
       fixed_dsb mono stream. When enabled, the active voice profile exposes
       the KWS capability and the board runs a local DS-CNN wake-word model.
 
+choice RIVER_KWS_MODEL_VARIANT
+    prompt "Wake-word KWS embedded model variant"
+    default RIVER_KWS_MODEL_VARIANT_BASELINE
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
+config RIVER_KWS_MODEL_VARIANT_BASELINE
+    bool "Current baseline embedded model"
+    help
+      Keep the repository baseline embedded DS-CNN wake-word model.
+
+config RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL
+    bool "Round6 targeted student experimental model"
+    help
+      Use the round6 targeted DS-CNN student exported from
+      /root/river-openwakeword-lab. This is an engineering smoke-test
+      variant for the DS-CNN branch and is not yet a deploy-ready model.
+
+endchoice
+
 config RIVER_KWS_TENSOR_ARENA_KB
     int "Wake-word KWS tensor arena size in KB"
     range 32 512

@@ -985,3 +985,33 @@
 - Updated `plan.md` accordingly:
   - `Phase 1` marked completed
   - `Phase 2` marked current, with the explicit rule that only minimal runtime integration is allowed from this baseline
+
+## Step 5.6
+- Completed `Phase 2: Runtime Integration Decision` on branch `DS-CNN` and chose the lowest-risk landing path:
+  - keep the existing baseline embedded KWS model as a selectable fallback
+  - import the `/root/river-openwakeword-lab` round6 targeted DS-CNN student as the default experimental model for this branch
+  - solve only the minimum runtime compatibility gap needed for that student
+- Added KWS model-variant selection to `Kconfig`:
+  - `RIVER_KWS_MODEL_VARIANT_BASELINE`
+  - `RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL`
+- Set `prj.conf` on branch `DS-CNN` to select:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL=y`
+- Imported the exported round6 targeted student into project-owned generated assets:
+  - `components/river_voice/generated/xiaou_student_round6_targeted_int8_model_data.h`
+  - `components/river_voice/generated/xiaou_student_round6_targeted_int8_metadata.json`
+- Updated `components/river_voice/river_voice_kws.cc` so the board runtime now:
+  - conditionally selects baseline vs round6 student at compile time
+  - registers `AddPad()` for the experimental student path
+  - increases KWS resolver capacity from `6` to `7`
+  - logs the active model variant string at runtime
+- Full `RTL8730E` build passed with the experimental student selected by default.
+- Verified landing results:
+  - the final firmware now contains the string `round6_targeted_experimental`
+  - image sizes became:
+    - `km4_boot_all.bin`: `51872`
+    - `km0_km4_ca32_app.bin`: `3573088`
+    - `ota_all.bin`: `3573120`
+  - compared with the previous baseline build, the app image shrank by `32768` bytes because the imported experimental student is smaller than the old embedded model
+  - despite the size reduction, the app image still exceeds the SDK stock NOR app range, so this branch still depends on the project-owned flash profile and `tools/river_flash.py`
+- Explicit decision retained in docs:
+  - this is an engineering smoke / board-validation landing, not a deploy-ready model-quality decision

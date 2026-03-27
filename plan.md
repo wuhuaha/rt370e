@@ -120,7 +120,7 @@ Build 通过后，立即审视：
 
 ### Phase 2: Runtime Integration Decision
 
-Status: current
+Status: completed
 
 只有在 `build` 通过之后，才进入以下二选一判断：
 
@@ -132,6 +132,48 @@ Status: current
 - 给当前 TFLM resolver 增加 `PAD` 支持
 - 或重新导出一个不依赖 `PAD` 的 student 模型
 
+本次决策：
+
+- 采用“最小化 runtime 集成”路线
+- 不直接删除当前基线模型
+- 在 `DS-CNN` 分支中把 `/root/river-openwakeword-lab` 的 `round6 targeted` student 作为默认实验模型接入
+- 同时保留基线模型回退开关，避免把实验模型硬编码成不可逆替换
+
+本次落地：
+
+- 在 `Kconfig` 中新增 KWS 模型变体选择
+  - `RIVER_KWS_MODEL_VARIANT_BASELINE`
+  - `RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL`
+- 在 `prj.conf` 中将 `DS-CNN` 分支默认切到 `RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL=y`
+- 将 `round6 targeted` 导出的 `int8 TFLite` 生成嵌入式头文件：
+  - `components/river_voice/generated/xiaou_student_round6_targeted_int8_model_data.h`
+  - `components/river_voice/generated/xiaou_student_round6_targeted_int8_metadata.json`
+- 在 `river_voice_kws.cc` 中完成运行时接入：
+  - 支持按配置选择 baseline / round6 student
+  - resolver 增加 `AddPad()`
+  - op capacity 从 `6` 调整到 `7`
+  - 启动日志增加 `variant=%s`
+
+本次结果：
+
+- 完整 build 已通过
+- 当前默认实验模型已真实编入固件
+- 通过 `strings` 可见固件中包含：
+  - `round6_targeted_experimental`
+- 新镜像尺寸：
+  - `km4_boot_all.bin` = `51872`
+  - `km0_km4_ca32_app.bin` = `3573088`
+  - `ota_all.bin` = `3573120`
+- 相对上一版 baseline：
+  - 主应用镜像缩小 `32768` 字节
+- 仍然超过 SDK stock app 上限，但超出量下降到 `689504` 字节
+  - 继续要求使用项目自定义 profile 与 `tools/river_flash.py`
+
+当前判断：
+
+- 工程上：已经具备板端编译落地条件
+- 模型质量上：仍然只能视为实验模型，不可作为 deploy 默认结论
+
 ## Explicitly Deferred
 
 以下内容本轮暂不优先：
@@ -140,6 +182,15 @@ Status: current
 - teacher / assistant / KD 落地
 - `/root/kws-training-pro` 旧 student 权重直接上板
 - 为了迁模型而先改 SDK
+
+## Next Step
+
+下一步应进入板端 smoke：
+
+- 烧录当前 `DS-CNN` 分支固件
+- 观察启动日志中的 `variant=round6_targeted_experimental`
+- 验证本地 VAD + KWS 链路是否正常启动
+- 再决定是否继续做唤醒实测和阈值/策略微调
 
 ## Exit Criteria For This Step
 

@@ -1,0 +1,12 @@
+{
+  "model_name": "xiaou_student_round6_targeted_int8",
+  "symbol_name": "kws_model_round6_targeted",
+  "source_tflite": "/root/river-openwakeword-lab/artifacts/openwakeword/xiaou_student_round6_targeted/export/xiaou_student_round6_targeted_int8.tflite",
+  "sha256": "bc91294cd1e35d263f5ac7b90672eaf26c3fd65e37f759ca5c0eaa3fc4da21d7",
+  "primary_threshold": 0.65,
+  "weak_threshold": 0.0,
+  "frame_ms": 80,
+  "step_ms": 80,
+  "input_feature_frames": 16,
+  "notes": "Round6 targeted DS-CNN student experimental embedded variant for DS-CNN branch"
+}

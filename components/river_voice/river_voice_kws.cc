@@ -28,7 +28,17 @@ extern "C" {
 #include "river/river_voice_kws.h"
 }
 
+#if defined(CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL)
+#include "generated/xiaou_student_round6_targeted_int8_model_data.h"
+#define RIVER_KWS_MODEL_DATA kws_model_round6_targeted
+#define RIVER_KWS_MODEL_DATA_LEN kws_model_round6_targeted_len
+#define RIVER_KWS_MODEL_VARIANT_NAME "round6_targeted_experimental"
+#else
 #include "generated/river_wake_word_model_data.h"
+#define RIVER_KWS_MODEL_DATA kws_model
+#define RIVER_KWS_MODEL_DATA_LEN kws_model_len
+#define RIVER_KWS_MODEL_VARIANT_NAME "baseline_embedded"
+#endif
 
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
@@ -83,7 +93,7 @@ extern "C" {
 #define RIVER_KWS_FFT_BINS ((RIVER_KWS_WINDOW_SAMPLES / 2U) + 1U)
 #define RIVER_KWS_TENSOR_ARENA_BYTES \
     ((uint32_t)CONFIG_RIVER_KWS_TENSOR_ARENA_KB * 1024U)
-#define RIVER_KWS_OP_COUNT 6U
+#define RIVER_KWS_OP_COUNT 7U
 #define RIVER_KWS_EXPECTED_INPUT_VALUES \
     (RIVER_KWS_FEATURE_FRAMES * RIVER_KWS_MEL_BINS)
 #define RIVER_KWS_ALLOCATION_ALIGNMENT 32U
@@ -604,6 +614,7 @@ static river_status_t river_voice_kws_register_ops(
         return RIVER_ERR_ARG;
     }
     if (resolver->AddQuantize() != kTfLiteOk ||
+        resolver->AddPad() != kTfLiteOk ||
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
         resolver->AddMean() != kTfLiteOk ||
@@ -1439,14 +1450,14 @@ extern "C" river_status_t river_voice_kws_init(void)
         return RIVER_ERR_NO_MEMORY;
     }
 
-    g_river_voice_kws->model = tflite::GetModel(kws_model);
+    g_river_voice_kws->model = tflite::GetModel(RIVER_KWS_MODEL_DATA);
     if (g_river_voice_kws->model == NULL ||
         g_river_voice_kws->model->version() != TFLITE_SCHEMA_VERSION) {
         RIVER_LOGE("kws model/schema unsupported: model=%p model_version=%d schema=%d model_bytes=%lu",
                    (void *)g_river_voice_kws->model,
                    g_river_voice_kws->model != NULL ? g_river_voice_kws->model->version() : -1,
                    (int)TFLITE_SCHEMA_VERSION,
-                   (unsigned long)sizeof(kws_model));
+                   (unsigned long)RIVER_KWS_MODEL_DATA_LEN);
         status = RIVER_ERR_UNSUPPORTED;
         goto fail;
     }
@@ -1469,7 +1480,7 @@ extern "C" river_status_t river_voice_kws_init(void)
     if (g_river_voice_kws->interpreter->AllocateTensors() != kTfLiteOk) {
         RIVER_LOGE("kws AllocateTensors failed: arena=%uKB model=%luB",
                    (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
-                   (unsigned long)sizeof(kws_model));
+                   (unsigned long)RIVER_KWS_MODEL_DATA_LEN);
         status = RIVER_ERR_NO_MEMORY;
         goto fail;
     }
@@ -1841,9 +1852,10 @@ extern "C" void river_voice_kws_dump_profile(void)
     int32_t mean_milli = (int32_t)lroundf(RIVER_KWS_FEATURE_MEAN * 1000.0f);
     uint32_t std_milli = (uint32_t)lroundf(RIVER_KWS_FEATURE_STD * 1000.0f);
 
-    RIVER_LOGI("kws backend: dscnn runtime=tflite_micro input=98x40x1 log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u queue=%u",
+    RIVER_LOGI("kws backend: dscnn runtime=tflite_micro input=98x40x1 log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u queue=%u",
                (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
-               (unsigned long)sizeof(kws_model),
+               (unsigned long)RIVER_KWS_MODEL_DATA_LEN,
+               RIVER_KWS_MODEL_VARIANT_NAME,
                (unsigned int)CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES,
                (unsigned int)CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15,
                (unsigned int)CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES,
