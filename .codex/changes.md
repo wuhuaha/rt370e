@@ -908,3 +908,22 @@
   - `km4_boot_all.bin`: `51872`
   - `km0_km4_ca32_app.bin`: `3605856`
   - `ota_all.bin`: `3605888`
+
+## Step 5.2
+- On branch `DS-CNN`, completed a focused migration assessment of the DS-CNN training stack under `/root/kws-training-pro` against the current `ameba-river` board runtime contract.
+- Added [DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md](/root/ameba-river/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md) as the formal report for this review.
+- Core conclusion captured in the report:
+  - the DS-CNN architecture and teacher-student methodology are worth reusing
+  - the existing student weights should **not** be treated as directly deployable on the current board
+  - the biggest blocker is feature-contract mismatch, not network topology
+- High-signal findings recorded:
+  - `/root/kws-training-pro` contains both an old `40x101` path and a newer `40x98` path
+  - the newer `train_dscnn_v2.py` still trains with `extract_from_array()`, which does not match the current board-side `river_voice_kws.cc` frontend exactly
+  - the current KD loss in `train_dscnn_v2.py` is not a robust production-quality formulation for a binary wakeword student
+  - the repo's validation script still validates the older `dscnn_v1` path and cannot be used as the final board deployment gate
+- The report also includes a phased landing plan:
+  - freeze board feature truth
+  - import architecture only
+  - rebuild the student training chain under the current board contract
+  - unify evaluation
+  - export int8 TFLite and validate on board

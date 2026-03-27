@@ -1522,3 +1522,35 @@ Expected result:
   - `build_RTL8730E/km4_boot_all.bin 51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin 3605856`
   - `build_RTL8730E/ota_all.bin 3605888`
+
+## Step 5.2
+Migration assessment evidence collection:
+```bash
+cd /root/ameba-river
+git branch --show-current
+git status --short
+
+sed -n '1,220p' /root/kws-training-pro/README.md
+sed -n '1,220p' /root/kws-training-pro/model_dscnn.py
+sed -n '1,260p' /root/kws-training-pro/train_dscnn_v2.py
+sed -n '1,220p' /root/kws-training-pro/river_kws_features.py
+sed -n '1,220p' /root/kws-training-pro/validate_final.py
+sed -n '1,240p' /root/kws-training-pro/configs/training_config.yaml
+sed -n '1,260p' /root/kws-training-pro/DOCS_QUANT_DEPLOY.md
+sed -n '1,240p' /root/ameba-river/components/river_voice/river_voice_kws.cc
+sed -n '820,1075p' /root/ameba-river/components/river_voice/river_voice_kws.cc
+sed -n '1,220p' /root/ameba-river/components/river_voice/river_voice_frontend.c
+sed -n '1,240p' /root/ameba-river/KWS_PIPELINE_ZH.md
+rg -n "CONFIG_RIVER_KWS_TENSOR_ARENA_KB|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15|CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES|CONFIG_RIVER_KWS_COOLDOWN_MS|CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES|CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS" /root/ameba-river/prj.conf -S
+find /root/kws-training-pro/models -maxdepth 3 -type f \( -name '*.onnx' -o -name '*.tflite' -o -name '*.pth' \) -printf '%P\t%s\n' | sort
+```
+
+Expected review outcome:
+- current branch is `DS-CNN`
+- worktree remains clean except the user-owned untracked `.env`
+- evidence shows two distinct student paths in `/root/kws-training-pro`:
+  - legacy `40x101`
+  - newer `40x98`
+- evidence also shows the current board contract in `ameba-river` is `98x40`, VAD-gated, streaming, and not equivalent to the legacy path
+- the final written conclusion is captured in:
+  - `DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md`
