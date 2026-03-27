@@ -894,3 +894,17 @@
 - Added root-level [TIPS.md](/root/ameba-river/TIPS.md) as the first-stop runtime troubleshooting guide for recurring serial-log signatures such as `auth_fail`, `busy`, and provider bring-up issues.
 - Added a dedicated active Wi-Fi issue record in [.codex/issues.md](/root/ameba-river/.codex/issues.md) so transient field failures can be tracked with symptoms, mitigations, and closure criteria.
 \n## Step 5\n- **Asynchronous Architecture Overhaul**: Implemented river_cloud_wk worker and Ring Buffer system.\n- **IPC Protection**: Task priority tuning to resolve net_connect -82 and IPC timeouts.\n- **Embedded Hardening**: Decomposed WS URL init and Multi-AP failover.\n- **Memory Audit**: Integrated vPortGetHeapStats for fragmentation tracking.
+
+## Step 5.1
+- Switched to branch `xiaozhi` and ran a full `RTL8730E` build at commit `43737ec`.
+- This step is verification-only:
+  - no firmware source files were changed
+  - the goal was to confirm that the current `xiaozhi` branch still produces complete images
+- Full build completed successfully and produced:
+  - `build_RTL8730E/km4_boot_all.bin`
+  - `build_RTL8730E/km0_km4_ca32_app.bin`
+  - `build_RTL8730E/ota_all.bin`
+- Current image sizes from this run:
+  - `km4_boot_all.bin`: `51872`
+  - `km0_km4_ca32_app.bin`: `3605856`
+  - `ota_all.bin`: `3605888`

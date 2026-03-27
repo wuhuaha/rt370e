@@ -1497,3 +1497,28 @@ Expected additional runtime behavior:
 - If the SSID is found by scan, the app should prefer the deterministic candidate-bound attempt first:
   - `connect strategy=scan_exact ssid=Keeu channel=<n> sec=<security> ...`
 - `basic` should remain as a later fallback rather than the default first path once scan metadata exists.
+
+## Step 5.1
+Full `xiaozhi` branch build verification:
+```bash
+cd /root/ameba-river
+git branch --show-current
+git rev-parse --short HEAD
+
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+
+stat -c '%n %s %y' \
+  build_RTL8730E/km4_boot_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin \
+  build_RTL8730E/ota_all.bin
+```
+
+Expected result:
+- current branch is `xiaozhi`
+- HEAD is `43737ec`
+- build finishes with `Build done`
+- image artifacts exist and are non-zero; on this run:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3605856`
+  - `build_RTL8730E/ota_all.bin 3605888`
