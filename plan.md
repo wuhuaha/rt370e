@@ -79,7 +79,7 @@ python3 /root/ameba-rtos-1.2/ameba.py build -p
 
 ### Phase 1: Build Result Review
 
-Status: current
+Status: completed
 
 Build 通过后，立即审视：
 
@@ -89,9 +89,38 @@ Build 通过后，立即审视：
 
 本阶段只做“工程可用性”判断，不做模型效果判断。
 
+本次结论：
+
+- 二进制大小无异常膨胀
+  - 与 `xiaozhi` 分支最近一次完整 build 基线一致：
+    - `km4_boot_all.bin` = `51872`
+    - `km0_km4_ca32_app.bin` = `3605856`
+    - `ota_all.bin` = `3605888`
+- 当前 `DS-CNN` 分支相对 `xiaozhi` 的差异仍然只是文档与计划层，不包含新的运行时代码改动，因此当前固件行为基线仍可视为 `xiaozhi` 运行时基线
+- 当前主应用镜像仍然超出 SDK stock profile 的 app 下载上限
+  - app start = `0x08040000`
+  - app end = `0x083B0560`
+  - 相对 SDK stock `0x08300000` 超出 `722272` 字节
+  - 因此继续要求使用项目自定义 profile 与 `tools/river_flash.py`
+- 当前 KWS runtime 的 op resolver 仍只注册 `6` 个 op：
+  - `Quantize`
+  - `Conv2D`
+  - `DepthwiseConv2D`
+  - `Mean`
+  - `FullyConnected`
+  - `Logistic`
+- 这意味着：
+  - 当前 build-stable baseline 没问题
+  - 但如果后续导入依赖 `PAD` 的 student 模型，必须先补 resolver 或重新导出 no-pad 模型
+
+评审决定：
+
+- 当前分支先保持为 `build-stable` 基线
+- Phase 2 可以开始，但前提是明确采用“最小化 runtime 集成”而不是直接替换当前板端 KWS 路径
+
 ### Phase 2: Runtime Integration Decision
 
-Status: pending
+Status: current
 
 只有在 `build` 通过之后，才进入以下二选一判断：
 

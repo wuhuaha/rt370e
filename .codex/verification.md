@@ -1617,3 +1617,48 @@ Expected result:
 - `git status --short` shows only:
   - tracked doc changes from this step
   - the user-owned untracked `.env`
+
+## Step 5.5
+Build result review:
+```bash
+cd /root/ameba-river
+git branch --show-current
+git status --short
+
+git show 10fec1e:.codex/changes.md | tail -n 20
+ls -l build_RTL8730E/km4_boot_all.bin \
+      build_RTL8730E/km0_km4_ca32_app.bin \
+      build_RTL8730E/ota_all.bin
+
+python3 - <<'PY'
+app_size=3605856
+start=0x08040000
+end=start+app_size
+limit=0x08300000
+print(hex(start), hex(end))
+print('fits_sdk_stock', end <= limit)
+print('overflow_bytes', max(0, end - limit))
+PY
+
+sed -n '1,80p' board/rtl8730e/profiles/RTL8730E_NOR.json
+sed -n '1,80p' board/rtl8730e/profiles/RTL8730E_NOR.sdk.json
+
+sed -n '596,618p' components/river_voice/river_voice_kws.cc
+git diff --stat xiaozhi..DS-CNN
+sed -n '1,220p' plan.md
+```
+
+Expected result:
+- current branch is `DS-CNN`
+- worktree remains clean except the user-owned `.env` before this step's tracked doc edits
+- current image sizes match the last verified `xiaozhi` baseline exactly:
+  - `km4_boot_all.bin`: `51872`
+  - `km0_km4_ca32_app.bin`: `3605856`
+  - `ota_all.bin`: `3605888`
+- app placement does **not** fit the SDK stock app range:
+  - start `0x08040000`
+  - end `0x083B0560`
+  - overflow `722272` bytes beyond stock `0x08300000`
+- project profile still expands the app range to `0x08600000`, so flashing remains valid only with the project-owned profile/tooling
+- current `river_voice_kws.cc` resolver still registers only the existing `6` ops and does not register `AddPad()`
+- `git diff --stat xiaozhi..DS-CNN` shows documentation-only divergence, confirming no new runtime source delta has been introduced on this branch

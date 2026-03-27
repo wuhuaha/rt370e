@@ -961,3 +961,27 @@
   - `build_RTL8730E/km4_boot_all.bin`: `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin`: `3605856`
   - `build_RTL8730E/ota_all.bin`: `3605888`
+
+## Step 5.5
+- Completed `Phase 1: Build Result Review` on branch `DS-CNN` after the successful full build verification.
+- High-signal review findings:
+  - current image sizes are identical to the last verified `xiaozhi` full-build baseline, so there is no new binary-size inflation on this branch
+  - `git diff --stat xiaozhi..DS-CNN` shows the branch currently differs only in documentation and planning files, not in runtime source code
+  - the app image still exceeds the SDK stock NOR app range and therefore still depends on the project-owned development flash profile
+  - current app placement math:
+    - start address `0x08040000`
+    - end address `0x083B0560`
+    - overflow against stock `0x08300000`: `722272` bytes
+  - the current KWS runtime op resolver still registers only:
+    - `Quantize`
+    - `Conv2D`
+    - `DepthwiseConv2D`
+    - `Mean`
+    - `FullyConnected`
+    - `Logistic`
+- Review conclusion:
+  - the current `DS-CNN` branch is still a valid build-stable / flash-stable baseline as long as the project custom profile and `tools/river_flash.py` are used
+  - future migration of student assets from `/root/river-openwakeword-lab` must first solve the op-compatibility gate if the imported model requires `PAD`
+- Updated `plan.md` accordingly:
+  - `Phase 1` marked completed
+  - `Phase 2` marked current, with the explicit rule that only minimal runtime integration is allowed from this baseline
