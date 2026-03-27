@@ -1,266 +1,122 @@
-# Ameba River Architectural Refactor Plan
+# DS-CNN Branch Execution Plan
 
-Date: 2026-03-23
+Date: 2026-03-27
+Branch: `DS-CNN`
 
-## Refactor Intent
+## Current Objective
 
-This refactor is not a cosmetic cleanup. The target is a top-level architectural correction of the project so that it behaves like a durable real-time voice product codebase rather than an accumulated prototype.
+先做完整 `build` 验证，再决定是否继续做运行时迁移或模型集成。
 
-Reference style:
+当前这一步的目标不是继续训练，也不是直接落板新模型，而是先确认当前分支在现有代码状态下能够稳定编译，并产出可用镜像。
 
-- thin application entrypoint
-- explicit session ownership
-- policy separated from transport
-- runtime-critical paths isolated from orchestration
-- observable state transitions
-- small modules with single responsibility and predictable coupling
+## Why Build First
 
-The architectural benchmark is closer to projects such as `livekit/agents`: session-centric orchestration, strong runtime boundaries, and clear control/data-plane separation.
+近期已经完成两份迁移评估：
 
-Companion documents:
+- `DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md`
+- `RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md`
 
-- `ARCHITECTURE_REFACTOR_BLUEPRINT_ZH.md`
-- `REFACTOR_TODO_ZH.md`
-- `KWS_PIPELINE_ZH.md`
+结论已经比较明确：
 
-## Current Diagnosis
+- `/root/kws-training-pro` 更适合作为方法参考，不适合直接迁现成 student 权重
+- `/root/river-openwakeword-lab` 是当前更有价值的外部训练工作区
+- 但该工作区当前导出的 student 仍然是 `no-deploy`
+- 另外，当前板端 `components/river_voice/river_voice_kws.cc` 的 TFLM resolver 还没有补 `AddPad()`，因此不能在未验证的情况下直接推进 runtime 集成
 
-The project already contains strong functional building blocks, but the codebase still shows several signs of architectural drift:
+所以本分支当前最合理的顺序是：
 
-1. Top-level orchestration logic is too easy to accumulate in app-facing modules.
-2. Cloud transport, conversation-window policy, uplink/downlink workers, and ASR bridge state are still concentrated in very large modules.
-3. Voice-path code mixes hard real-time data movement, DSP/KWS runtime, diagnostics, and experiment hooks in ways that make performance reasoning harder than it should be.
-4. The project has useful runtime logs, but ownership boundaries are not yet sharp enough for every log line to map cleanly to one subsystem owner.
-5. Some interfaces are still callback-shaped around historical growth rather than around stable domain concepts.
+1. 先确认当前工程完整可编译
+2. 再确认镜像大小、产物路径、基础集成状态
+3. 然后再进入运行时集成决策
 
-This means performance bugs, memory regressions, and behavioral regressions are still more expensive to localize than they should be.
+## Current Baseline
 
-## Architectural North Star
+当前板端 KWS 运行时基线：
 
-The target structure is:
+- feature contract: `98x40` streaming log-mel
+- source file: `components/river_voice/river_voice_kws.cc`
+- build entry: `build.md`
 
-### 1. Bootstrap Layer
+当前分支决策约束：
 
-Owns only:
+- 不修改 `/root/ameba-rtos-1.2` SDK 源码
+- 先保住当前工程 build 基线
+- 外部训练工作区继续保留在 `/root/river-openwakeword-lab`
 
-- process boot order
-- service initialization
-- dependency wiring
-- top-level status dump
+## Immediate Plan
 
-Must not own:
+### Phase 0: Full Build Verification
 
-- wake admission policy
-- ASR/playback synchronization
-- conversation session lifecycle
+Status: completed
 
-### 2. Session Coordination Layer
+执行标准命令：
 
-Owns only:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
 
-- interaction-state transitions
-- wakeword admission sequencing
-- ASR session open/close semantics
-- playback interruption and barge-in policy
+检查项：
 
-Must not own:
+- 编译过程无新增错误
+- 产物存在并更新时间戳正常
+- 重点产物：
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin`
+  - `build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+- 如需要额外打包检查，再核对：
+  - `build_RTL8730E/ota_all.bin`
 
-- low-level transport details
-- DSP/KWS implementation
-- UI or hardware initialization
+若 build 失败，本分支优先修 build，不进行后续迁移。
 
-### 3. Voice Runtime Layer
+本次结果：
 
-Owns only:
+- `build` 已通过
+- 产物已生成：
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3605856`
+  - `build_RTL8730E/ota_all.bin` = `3605888`
 
-- capture / preproc / detector / KWS data plane
-- runtime queueing and gating
-- latency-sensitive worker execution
+### Phase 1: Build Result Review
 
-Must not own:
+Status: current
 
-- conversation policy
-- cloud session policy
+Build 通过后，立即审视：
 
-### 4. Cloud Session Layer
+- 二进制大小是否异常膨胀
+- 当前 `DS-CNN` 分支是否已经引入运行时不兼容依赖
+- 当前代码是否仍然保持可烧录、可继续联调的状态
 
-Owns only:
+本阶段只做“工程可用性”判断，不做模型效果判断。
 
-- provider session lifecycle
-- conversation window policy
-- uplink/downlink transport workers
-- provider-specific state machines
-- ASR/TTS bridge behavior
+### Phase 2: Runtime Integration Decision
 
-Must not own:
+Status: pending
 
-- app interaction policy
-- wake admission decisions
+只有在 `build` 通过之后，才进入以下二选一判断：
 
-### 5. Capability/Policy Layer
+1. 保持当前分支作为纯 build-stable 基线，继续补板端运行时观测
+2. 开始最小化迁入 `/root/river-openwakeword-lab` 中已经验证过的 student/runtime 资产
 
-Owns only:
+若进入迁移阶段，首个硬约束是先解决以下一项：
 
-- product behavior toggles
-- profile/capability selection
-- experiment gating
+- 给当前 TFLM resolver 增加 `PAD` 支持
+- 或重新导出一个不依赖 `PAD` 的 student 模型
 
-It should be possible to inspect one module and understand whether a behavior is transport policy, voice runtime policy, or product policy.
+## Explicitly Deferred
 
-## Completed In This Wave
+以下内容本轮暂不优先：
 
-### Wave 1: Extract Runtime Session Coordination
+- 新一轮训练
+- teacher / assistant / KD 落地
+- `/root/kws-training-pro` 旧 student 权重直接上板
+- 为了迁模型而先改 SDK
 
-Completed:
+## Exit Criteria For This Step
 
-- extracted runtime orchestration from `components/river_core/river_app.c`
-- introduced `components/river_core/river_session_coordinator.c`
-- introduced private coordinator interface `components/river_core/river_session_coordinator.h`
-- rewired app boot to register coordinator callbacks instead of owning wake/ASR/playback policy directly
-- rebuilt full firmware successfully after the extraction
+只有满足以下条件，本步才算完成：
 
-Result:
-
-- `river_app.c` is reduced to a thin bootstrap/wiring role
-- session policy now has an explicit owner
-- future refactors can move faster without using `river_app.c` as a shared dumping ground
-
-## Refactor Roadmap
-
-### Phase A: Session Boundary Hardening
-
-Status: in progress
-
-Goals:
-
-- keep `river_app.c` as a pure bootstrap module
-- keep all wake / ASR / playback coordination in the session coordinator
-- prevent new policy logic from leaking back into bootstrap code
-
-Acceptance:
-
-- no new runtime policy branches added to `river_app.c`
-- all interaction-state transitions originate from explicit subsystem owners
-
-### Phase B: Cloud Adapter Decomposition
-
-Status: next
-
-Primary target:
-
-- `components/river_cloud/river_cloud_adapter.c`
-
-Current issue:
-
-- one file still owns provider runtime, conversation windowing, pre-roll, transport workers, diagnostics, and public adapter API
-
-Planned split:
-
-- `river_cloud_session_policy.*`
-  owns conversation window lifecycle, wake/follow-up timing, provider-independent session policy
-- `river_cloud_xiaozhi_runtime.*`
-  owns xiaozhi transport runtime, worker tasks, uplink/downlink ring handling, websocket event processing
-- `river_cloud_asr_bridge.*`
-  owns provider-facing audio open/push/close flow and ASR result fanout
-
-Acceptance:
-
-- provider runtime and product policy become separable
-- cloud adapter public API becomes a façade, not the implementation sink
-
-### Phase C: Voice Runtime Decomposition
-
-Status: planned
-
-Primary targets:
-
-- `components/river_voice/river_voice_kws.cc`
-- `components/river_voice/river_voice_vad_probe.c`
-
-Planned split:
-
-- KWS frontend/runtime worker
-- KWS gate + pre-roll queue management
-- VAD probe diagnostics/reporting
-- experiment sidepath routing
-
-Acceptance:
-
-- hot-path runtime code can be profiled without wading through diagnostics and orchestration logic
-- queueing behavior and feature-generation behavior have clear ownership
-- the living KWS runtime reference in `KWS_PIPELINE_ZH.md` stays aligned with code and logs
-
-### Phase D: Public Interface Cleanup
-
-Status: planned
-
-Goals:
-
-- distinguish public headers from component-private headers consistently
-- reduce accidental public API exposure
-- standardize callback signatures around domain events rather than historical convenience
-
-Acceptance:
-
-- internal modules no longer appear under `include/river/` unless they are stable public contracts
-- private headers are local to their owning component
-
-### Phase E: Reliability and Performance Audit
-
-Status: planned
-
-Goals:
-
-- eliminate duplicated state ownership
-- review queue sizing and memory residency
-- audit retry / close / reset paths
-- ensure repeated wake-session-open-close cycles do not fragment heap or duplicate work
-
-Acceptance:
-
-- steady-state memory behavior is observable
-- repeated session cycles do not reintroduce wake storms, duplicate opens, or backlog growth
-
-## Immediate Next Slice
-
-The next highest-value refactor slice is `river_cloud_adapter.c`.
-
-Reason:
-
-- it is still the largest concentration of mixed concerns
-- it sits on the fault line between transport, policy, and runtime workers
-- its current size makes reopen bugs, memory pressure, and session-edge regressions harder to reason about than necessary
-
-Immediate implementation goal:
-
-- extract conversation-window policy and provider runtime into separate internal modules while keeping the existing public API stable
-
-## Current Wave TODO
-
-- establish a cloud-internal contract file so context ownership is explicit
-- extract xiaozhi conversation-window and session policy out of `river_cloud_adapter.c`
-- keep `river_cloud_adapter.c` as the external API façade and provider bridge entrypoint
-- rebuild full firmware after the slice lands
-
-## Engineering Guardrails
-
-During the remaining refactor waves:
-
-1. No large-file rewrite without a clear ownership split.
-2. No behavior-preserving cleanup that does not improve boundaries, observability, or runtime cost.
-3. Every new module must have a crisp owner and a short responsibility statement.
-4. Public interfaces should remain stable unless the replacement is materially better and the migration is done in the same wave.
-5. Every architecture slice must compile before the next slice starts.
-
-## Success Criteria
-
-This refactor is successful only if the project becomes measurably easier to evolve:
-
-- smaller modules
-- clearer ownership
-- more predictable runtime behavior
-- less cross-module hidden coupling
-- easier debugging from logs
-- easier future performance work without destabilizing product behavior
-
-The standard is not "cleaner code". The standard is "production-grade structure that remains maintainable under ongoing feature pressure".
+- `build` 成功
+- 核心镜像产物存在
+- `.codex/changes.md` 与 `.codex/verification.md` 已更新
+- 提交本步结果

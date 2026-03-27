@@ -1590,3 +1590,30 @@ Expected review outcome:
 - evidence shows the exported student currently contains `PAD`, while the current branch resolver does not yet register `AddPad()`
 - the final written conclusion is captured in:
   - `RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md`
+
+## Step 5.4
+Plan update and full build verification:
+```bash
+cd /root/ameba-river
+sed -n '1,220p' plan.md
+
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+
+ls -l build_RTL8730E/km4_boot_all.bin \
+      build_RTL8730E/km0_km4_ca32_app.bin \
+      build_RTL8730E/ota_all.bin
+
+git status --short
+```
+
+Expected result:
+- `plan.md` now makes full build verification the first gate on branch `DS-CNN`
+- build finishes with `Build done`
+- current top-level artifacts exist with the verified sizes:
+  - `build_RTL8730E/km4_boot_all.bin`: `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin`: `3605856`
+  - `build_RTL8730E/ota_all.bin`: `3605888`
+- `git status --short` shows only:
+  - tracked doc changes from this step
+  - the user-owned untracked `.env`

@@ -945,3 +945,19 @@
   - keep `river-openwakeword-lab` as the external training lab
   - treat the host teacher as reference/mining infrastructure
   - treat the board-aligned DS-CNN student path as the real deployment direction
+
+## Step 5.4
+- On branch `DS-CNN`, replaced the stale architecture-refactor plan in `plan.md` with a branch-specific execution plan that puts full firmware build verification ahead of any further DS-CNN runtime migration.
+- Recorded the current decision order in `plan.md`:
+  - Phase 0: full build verification
+  - Phase 1: review binary size and integration risk
+  - Phase 2: only then choose whether to import runtime assets from `/root/river-openwakeword-lab`
+- Captured the current runtime constraint directly in the plan:
+  - current board KWS contract is `98x40` streaming log-mel
+  - `/root/river-openwakeword-lab` remains the preferred external training lab
+  - current exported student may require `PAD` support before runtime integration
+- Executed the standard full build for the current `DS-CNN` branch and confirmed the build baseline is healthy.
+- Verified current top-level image artifacts after the successful build:
+  - `build_RTL8730E/km4_boot_all.bin`: `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin`: `3605856`
+  - `build_RTL8730E/ota_all.bin`: `3605888`
