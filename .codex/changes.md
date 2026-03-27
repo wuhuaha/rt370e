@@ -927,3 +927,21 @@
   - rebuild the student training chain under the current board contract
   - unify evaluation
   - export int8 TFLite and validate on board
+
+## Step 5.3
+- On branch `DS-CNN`, completed a second migration assessment focused on `/root/river-openwakeword-lab` as the current external OpenWakeWord + DS-CNN training workspace.
+- Added [RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md](/root/ameba-river/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md) as the formal report for this review.
+- Core judgment captured in the report:
+  - `/root/river-openwakeword-lab` has substantially higher migration value than `/root/kws-training-pro`
+  - the board-aligned student feature chain, student trainer, and int8 export path are worth reusing directly
+  - the current workspace is engineering-mature but still not deployment-ready in model quality
+- High-signal findings recorded:
+  - the student extractor in `river-openwakeword-lab` now matches the current board `98x40 log-mel` contract much more closely than the older `kws-training-pro` implementation
+  - `round6` student artifacts prove `train -> int8 tflite -> packaging` is already reproducible
+  - the current best student remains `no-deploy` because board negative FPR is still too high
+  - `assistant / KD / student verifier` are still documented but not actually implemented as runnable scripts
+  - the current exported student includes `PAD`, while the current `DS-CNN` branch board resolver does not yet register `AddPad()`
+- The report also clarifies the recommended role split:
+  - keep `river-openwakeword-lab` as the external training lab
+  - treat the host teacher as reference/mining infrastructure
+  - treat the board-aligned DS-CNN student path as the real deployment direction

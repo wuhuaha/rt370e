@@ -1554,3 +1554,39 @@ Expected review outcome:
 - evidence also shows the current board contract in `ameba-river` is `98x40`, VAD-gated, streaming, and not equivalent to the legacy path
 - the final written conclusion is captured in:
   - `DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md`
+
+## Step 5.3
+OpenWakeWord external lab migration assessment evidence collection:
+```bash
+cd /root/ameba-river
+git branch --show-current
+git status --short
+
+sed -n '1,240p' /root/river-openwakeword-lab/tools/openwakeword/README.md
+sed -n '1,260p' /root/river-openwakeword-lab/tools/openwakeword/river_kws_features.py
+sed -n '1,640p' /root/river-openwakeword-lab/tools/openwakeword/train_xiaou_student_dscnn.py
+sed -n '1,640p' /root/river-openwakeword-lab/tools/openwakeword/export_xiaou_student_tflite.py
+sed -n '1,320p' /root/river-openwakeword-lab/tools/openwakeword/extract_xiaou_student_features.py
+sed -n '1,320p' /root/river-openwakeword-lab/tools/openwakeword/extract_xiaou_teacher_features.py
+sed -n '1,260p' /root/river-openwakeword-lab/tools/openwakeword/eval_xiaou_guanjia.py
+
+cat /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_student_round6_baseline/training/xiaou_student_round6_baseline_report.json
+cat /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_student_round6_targeted/training/xiaou_student_round6_targeted_report.json
+cat /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_student_round6_targeted/export/xiaou_student_round6_targeted_int8_export_report.json
+cat /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_teacher_round5/eval/board_eval_corrected_report.json
+find /root/river-openwakeword-lab/artifacts/openwakeword/xiaou_teacher_round6 -maxdepth 3 -type f | sort
+
+rg -n "assistant|soft target|KD|distill" /root/river-openwakeword-lab/tools/openwakeword /root/river-openwakeword-lab/docs -S
+ls -1 /root/river-openwakeword-lab/tools/openwakeword/train_xiaou_teacher_assistant.py /root/river-openwakeword-lab/tools/openwakeword/train_xiaou_student_verifier.py /root/river-openwakeword-lab/tools/openwakeword/eval_xiaou_student.py 2>/dev/null || true
+
+sed -n '590,640p' /root/ameba-river/components/river_voice/river_voice_kws.cc
+```
+
+Expected review outcome:
+- current branch is `DS-CNN`
+- worktree remains clean except the user-owned untracked `.env`
+- evidence shows `/root/river-openwakeword-lab` already has a board-aligned `98x40` student feature path plus reproducible int8 export
+- evidence also shows the current best `round6` student is still `no-deploy` because board negative FPR remains too high
+- evidence shows the exported student currently contains `PAD`, while the current branch resolver does not yet register `AddPad()`
+- the final written conclusion is captured in:
+  - `RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md`
