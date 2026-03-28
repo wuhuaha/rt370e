@@ -1802,3 +1802,22 @@ Expected result:
   - `interaction_diag=compiled=no`
   - `online control service init: text_debug=%s`
 - `git status --short` shows only this step's tracked source/doc edits plus the user-owned `.env`
+
+## Step 5.9
+Check for legacy `plan.md.bk` backup:
+```bash
+cd /root/ameba-river
+
+ls -l plan.md.bk plan.md
+find /root/ameba-river -name 'plan.md.bk' -o -name '*.bk' | sort
+git log --all --name-only -- plan.md.bk
+git status --short
+```
+
+Expected result:
+- `plan.md` exists
+- `plan.md.bk` does not exist at repository root
+- repository-wide search returns no `plan.md.bk`
+- `git log --all --name-only -- plan.md.bk` returns no tracked history for that file
+- current authoritative plan remains `plan.md`
+- `git status --short` remains clean except the user-owned `.env`

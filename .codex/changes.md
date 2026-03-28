@@ -1082,3 +1082,18 @@
   - the wake -> XiaoZhi realtime target flow
   - the VAD-assisted runtime expectation
   - the new debug-gating state and current image sizes
+
+## Step 5.9
+- Checked whether the repository still contains a backup file named `plan.md.bk` before deciding whether to merge or delete it.
+- Verified that:
+  - `/root/ameba-river/plan.md.bk` does not exist
+  - a full repository search found no `plan.md.bk` and no relevant `*.bk` backup artifact
+  - `git log --all --name-only -- plan.md.bk` returned no history, so this backup file is not part of the current tracked repository history
+- Conclusion:
+  - there is no in-repo `plan.md.bk` left to merge or delete
+  - the current authoritative execution plan remains `plan.md`
+  - the latest `plan.md` already subsumes the useful planning state:
+    - DS-CNN experimental runtime landing
+    - wake -> XiaoZhi realtime target flow
+    - VAD-assisted audio bridge
+    - compile-time gating for online text/TTS debug injection
