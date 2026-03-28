@@ -1039,3 +1039,46 @@
   - `build.md` now explicitly documents that the current app image still requires the project-owned flash profile even when using the official GUI tool
 - Refreshed `doc/PROJECT_STATUS_ZH.md` so it no longer describes the old `xiaozhi` branch as the current baseline and instead captures the present `DS-CNN` branch status.
 - Chose not to delete any relocated summary Markdown in this step because each moved file still has traceability or comparison value; only location and indexing were cleaned up.
+
+## Step 5.8
+- Tightened the `DS-CNN` branch around the intended runtime business flow:
+  - local wake word
+  - XiaoZhi realtime session after wake
+  - VAD-assisted audio bridge
+  - no local online text/TTS debug injection compiled by default
+- Added two compile-time gates in `Kconfig`:
+  - `RIVER_CLOUD_TEXT_DEBUG_EN`
+  - `RIVER_INTERACTION_DIAG_EN`
+- Set both gates to `n` in `prj.conf` so the default `DS-CNN` branch firmware no longer carries:
+  - direct `river echo` / `river tts` cloud text/TTS debug injection
+  - local `river interaction ...` text router / tts test / deferred-tts worker
+- Switched `components/river_core/CMakeLists.txt` to compile either:
+  - `river_interaction_diag.c` when enabled
+  - `river_interaction_diag_stub.c` when disabled
+- Added `components/river_core/river_interaction_diag_stub.c` so the runtime interface remains stable while the heavy local interaction debug implementation is excluded from the image.
+- Updated `components/river_diag/river_diag_cmd.c` so debug-only monitor commands are compile-gated:
+  - `river echo`
+  - `river tts`
+  - `river interaction ...`
+- Kept board-useful commands intact:
+  - `river status`
+  - `river xiaozhi ...`
+  - `river playback ...`
+  - `river audio ...`
+  - `river device ...`
+- Updated `components/river_cloud/river_online_control.c` so:
+  - device control remains available for XiaoZhi MCP tool execution
+  - `river_online_control_echo()` becomes a stub when cloud text debug is disabled
+  - status logs show whether text debug was compiled or stubbed
+- Verified the full `RTL8730E` build after the gating changes.
+- Measured size impact:
+  - `build_RTL8730E/km0_km4_ca32_app.bin` shrank from `3573088` to `3564896`
+  - `build_RTL8730E/ota_all.bin` shrank from `3573120` to `3564928`
+  - app delta for this step: `-8192` bytes
+- Measured representative object-level impact:
+  - `river_interaction_diag.o` was about `80K`; replaced by `river_interaction_diag_stub.o` about `7.8K`
+  - `river_diag_cmd.o` dropped from about `35K` to about `29K`
+- Updated `README.md` and `plan.md` so the current repo entrypoints now reflect:
+  - the wake -> XiaoZhi realtime target flow
+  - the VAD-assisted runtime expectation
+  - the new debug-gating state and current image sizes

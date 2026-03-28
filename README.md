@@ -10,6 +10,7 @@ Current working branch:
 Current engineering objective:
 - keep the branch `build-stable`
 - verify the board runtime with the newly landed experimental `DS-CNN` wake model
+- keep the target business flow as `wake word -> XiaoZhi realtime session`, with VAD-assisted audio uplink
 - do board smoke before any further model iteration
 
 Current default local wake path on this branch:
@@ -19,6 +20,7 @@ Current KWS runtime state:
 - baseline model fallback is still retained
 - the default experimental model variant is `round6_targeted_experimental`
 - `PAD` op support has already been added to the board TFLM resolver for this model
+- local interaction debug router and direct cloud text/TTS debug injection are now compile-time gated and disabled by default on this branch
 
 Externalized workspaces:
 - training / TTS / host recording lab assets are maintained in `/root/river-openwakeword-lab`
@@ -34,8 +36,8 @@ python3 /root/ameba-rtos-1.2/ameba.py build -p
 
 Latest verified output sizes on this branch:
 - `build_RTL8730E/km4_boot_all.bin` = `51872`
-- `build_RTL8730E/km0_km4_ca32_app.bin` = `3573088`
-- `build_RTL8730E/ota_all.bin` = `3573120`
+- `build_RTL8730E/km0_km4_ca32_app.bin` = `3564896`
+- `build_RTL8730E/ota_all.bin` = `3564928`
 
 See [build.md](/root/ameba-river/build.md) for the validated build and flash path.
 
@@ -58,7 +60,9 @@ Important note:
 Board smoke target for this branch:
 - boot the board successfully
 - confirm startup log contains `variant=round6_targeted_experimental`
+- confirm status logs show `interaction_diag=compiled=no`
 - confirm local `VAD + KWS` chain starts normally
+- confirm wakeup can enter the XiaoZhi realtime conversation window with VAD-assisted audio flow
 - then decide whether the experimental runtime should remain the default lab profile
 
 ## Repository Entry Files

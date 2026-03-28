@@ -28,6 +28,24 @@ config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
 
+config RIVER_CLOUD_TEXT_DEBUG_EN
+    bool "Enable cloud text/TTS debug injection"
+    default n
+    help
+      Build the direct text-driven cloud debug path used by commands like
+      `river echo` / `river tts`. Keep disabled for the wake -> XiaoZhi
+      realtime product flow to avoid carrying text/TTS debug helpers in the
+      firmware image.
+
+config RIVER_INTERACTION_DIAG_EN
+    bool "Enable local interaction diagnostic router"
+    default n
+    help
+      Build the local text intent router, TTS test path, deferred TTS worker,
+      and related monitor commands under `river interaction ...`.
+      This is a debug aid and is not required for the target flow:
+      wake word -> XiaoZhi realtime session, with VAD-assisted audio uplink.
+
 choice RIVER_LOG_DEFAULT_LEVEL
     prompt "Default river log level"
     default RIVER_LOG_LEVEL_INFO

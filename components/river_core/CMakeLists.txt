@@ -17,10 +17,19 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_app.c
-    river_interaction_diag.c
     river_interaction_state.c
     river_session_coordinator.c
 )
+
+if(CONFIG_RIVER_INTERACTION_DIAG_EN)
+    ameba_list_append(private_sources
+        river_interaction_diag.c
+    )
+else()
+    ameba_list_append(private_sources
+        river_interaction_diag_stub.c
+    )
+endif()
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include

@@ -5,9 +5,14 @@ Branch: `DS-CNN`
 
 ## Current Objective
 
-先做完整 `build` 验证，再决定是否继续做运行时迁移或模型集成。
+当前优先目标已经从“先 build”切到“板端业务流收口”：
 
-当前这一步的目标不是继续训练，也不是直接落板新模型，而是先确认当前分支在现有代码状态下能够稳定编译，并产出可用镜像。
+- 唤醒词本地检测
+- 唤醒后进入 `XiaoZhi realtime` 会话
+- 由当前 `VAD` 辅助音频开闭与上行
+- 在线文本/TTS 调试注入代码默认不编入 bin，以降低体积并减少无关运行时分支
+
+当前这一步的目标不是继续训练，而是先把板端运行时边界和镜像体积收紧，再做板端 smoke。
 
 ## Why Build First
 
@@ -174,6 +179,58 @@ Status: completed
 - 工程上：已经具备板端编译落地条件
 - 模型质量上：仍然只能视为实验模型，不可作为 deploy 默认结论
 
+### Phase 3: Debug-Path Compile Gating
+
+Status: completed
+
+目标：
+
+- 保留目标业务流：`wake word -> XiaoZhi realtime session`
+- 保留当前 `VAD` 辅助的云音频桥
+- 裁掉与目标流无关的在线文本/TTS 调试注入逻辑
+
+本次落地：
+
+- 在 `Kconfig` 中新增两个编译期开关：
+  - `RIVER_CLOUD_TEXT_DEBUG_EN`
+  - `RIVER_INTERACTION_DIAG_EN`
+- 在 `prj.conf` 中将这两个开关默认设为 `n`
+- `river_interaction_diag.c` 改为按开关二选一：
+  - 开启时编译真实诊断实现
+  - 关闭时编译 `river_interaction_diag_stub.c`
+- `river_diag_cmd.c` 按开关裁掉以下命令分支：
+  - `river echo`
+  - `river tts`
+  - `river interaction ...`
+- `river_online_control_echo()` 改为在调试关闭时直接返回 `RIVER_ERR_UNSUPPORTED`
+- `river device ...` 仍然保留，并直接走设备控制服务，不再依赖本地 interaction diag
+
+本次结果：
+
+- 完整 build 已通过
+- 运行时仍保留：
+  - 本地 `DS-CNN` 唤醒
+  - `XiaoZhi realtime` 会话链
+  - `VAD probe` 音频桥
+  - `MCP -> device control` 落地
+- 调试态标识已进入固件：
+  - `interaction_diag=compiled=no`
+  - `online control service init: text_debug=%s`
+- 新镜像尺寸：
+  - `km4_boot_all.bin` = `51872`
+  - `km0_km4_ca32_app.bin` = `3564896`
+  - `ota_all.bin` = `3564928`
+- 相对上一版 `DS-CNN` 运行时实验固件：
+  - 主应用镜像再缩小 `8192` 字节
+- 关键对象变化：
+  - `river_interaction_diag.o` 由约 `80K` 降为 `river_interaction_diag_stub.o` 约 `7.8K`
+  - `river_diag_cmd.o` 由约 `35K` 降到约 `29K`
+
+当前判断：
+
+- 这一步已经把“在线 ASR/TTS 调试注入层”和“目标业务流”分离开
+- 下一步应直接进入板端 smoke，而不是继续往 bin 里塞新的调试逻辑
+
 ## Explicitly Deferred
 
 以下内容本轮暂不优先：
@@ -189,7 +246,9 @@ Status: completed
 
 - 烧录当前 `DS-CNN` 分支固件
 - 观察启动日志中的 `variant=round6_targeted_experimental`
-- 验证本地 VAD + KWS 链路是否正常启动
+- 验证 `interaction_diag=compiled=no`
+- 验证本地 `VAD + KWS` 链路是否正常启动
+- 验证唤醒后是否进入 `XiaoZhi realtime` 会话，并由当前 `VAD` 辅助音频上行
 - 再决定是否继续做唤醒实测和阈值/策略微调
 
 ## Exit Criteria For This Step

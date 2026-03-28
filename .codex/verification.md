@@ -1748,3 +1748,57 @@ Expected result:
 - `build.md` clearly states that the current branch still requires the project custom flash profile
 - `doc/PROJECT_STATUS_ZH.md` reflects the present `DS-CNN` runtime/build state
 - `git status --short` shows only this step's tracked doc moves/edits plus the user-owned `.env`
+
+## Step 5.8
+Debug-path compile gating for wake -> XiaoZhi runtime:
+```bash
+cd /root/ameba-river
+
+sed -n '1,220p' Kconfig
+sed -n '1,120p' prj.conf
+sed -n '1,220p' components/river_core/CMakeLists.txt
+sed -n '1,220p' components/river_core/river_interaction_diag_stub.c
+sed -n '1,260p' components/river_cloud/river_online_control.c
+sed -n '1,260p' components/river_diag/river_diag_cmd.c
+
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+
+ls -l build_RTL8730E/km4_boot_all.bin \
+      build_RTL8730E/km0_km4_ca32_app.bin \
+      build_RTL8730E/ota_all.bin
+
+ls -lh \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_core/CMakeFiles/river_core_target_img2_ap.dir/river_interaction_diag_stub.o \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_diag/CMakeFiles/river_diag_target_img2_ap.dir/river_diag_cmd.o \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_cloud/CMakeFiles/river_cloud_target_img2_ap.dir/river_online_control.o
+
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg -n "interaction_diag=compiled=no|online control service init: text_debug=%s|devices: text_debug=%s|round6_targeted_experimental" -S
+git status --short
+```
+
+Expected result:
+- `Kconfig` contains:
+  - `RIVER_CLOUD_TEXT_DEBUG_EN`
+  - `RIVER_INTERACTION_DIAG_EN`
+- `prj.conf` explicitly sets:
+  - `CONFIG_RIVER_CLOUD_TEXT_DEBUG_EN=n`
+  - `CONFIG_RIVER_INTERACTION_DIAG_EN=n`
+- `components/river_core/CMakeLists.txt` selects `river_interaction_diag_stub.c` when interaction diag is disabled
+- `components/river_diag/river_diag_cmd.c` compile-gates:
+  - `river echo`
+  - `river tts`
+  - `river interaction ...`
+- full build finishes with `Build done`
+- current image sizes are:
+  - `km4_boot_all.bin` = `51872`
+  - `km0_km4_ca32_app.bin` = `3564896`
+  - `ota_all.bin` = `3564928`
+- representative objects show the expected reduction:
+  - `river_interaction_diag_stub.o` about `7.8K`
+  - `river_diag_cmd.o` about `29K`
+- final firmware strings still include:
+  - `round6_targeted_experimental`
+  - `interaction_diag=compiled=no`
+  - `online control service init: text_debug=%s`
+- `git status --short` shows only this step's tracked source/doc edits plus the user-owned `.env`

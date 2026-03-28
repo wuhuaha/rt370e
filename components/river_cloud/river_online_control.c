@@ -4,6 +4,12 @@
 #include "river/river_log.h"
 #include "river/river_online_control.h"
 
+#if defined(CONFIG_RIVER_CLOUD_TEXT_DEBUG_EN)
+#define RIVER_CLOUD_TEXT_DEBUG_ENABLED 1
+#else
+#define RIVER_CLOUD_TEXT_DEBUG_ENABLED 0
+#endif
+
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.control"
 
@@ -44,7 +50,8 @@ river_status_t river_online_control_init(void)
         g_river_devices[index].is_on = 0;
     }
 
-    RIVER_LOGI("online control service init");
+    RIVER_LOGI("online control service init: text_debug=%s",
+               RIVER_CLOUD_TEXT_DEBUG_ENABLED ? "compiled" : "stubbed");
     return RIVER_OK;
 }
 
@@ -54,7 +61,12 @@ river_status_t river_online_control_echo(const char *text)
         return RIVER_ERR_ARG;
     }
 
+#if RIVER_CLOUD_TEXT_DEBUG_ENABLED
     return river_cloud_adapter_submit_text(text);
+#else
+    (void)text;
+    return RIVER_ERR_UNSUPPORTED;
+#endif
 }
 
 river_status_t river_online_control_set_device(const char *device_name, const char *action_name)
@@ -83,7 +95,8 @@ void river_online_control_dump_status(void)
 {
     unsigned int index;
 
-    RIVER_LOGI("devices:");
+    RIVER_LOGI("devices: text_debug=%s",
+               RIVER_CLOUD_TEXT_DEBUG_ENABLED ? "compiled" : "stubbed");
     for (index = 0; index < (sizeof(g_river_devices) / sizeof(g_river_devices[0])); ++index) {
         RIVER_LOGI("  %s=%s",
                    g_river_devices[index].name,

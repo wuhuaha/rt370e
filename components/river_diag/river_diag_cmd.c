@@ -14,21 +14,37 @@
 #include "river/river_voice.h"
 
 #ifdef CONFIG_RIVER_DIAG_CMD_EN
+#if defined(CONFIG_RIVER_CLOUD_TEXT_DEBUG_EN)
+#define RIVER_CLOUD_TEXT_DEBUG_ENABLED 1
+#else
+#define RIVER_CLOUD_TEXT_DEBUG_ENABLED 0
+#endif
+
+#if defined(CONFIG_RIVER_INTERACTION_DIAG_EN)
+#define RIVER_INTERACTION_DIAG_ENABLED 1
+#else
+#define RIVER_INTERACTION_DIAG_ENABLED 0
+#endif
+
 #define RIVER_ECHO_TEXT_MAX 128
 #define RIVER_XIAOZHI_TEXT_MAX 384
 
 static void river_diag_help(void)
 {
     printf("\triver status\n");
+#if RIVER_CLOUD_TEXT_DEBUG_ENABLED
     printf("\triver echo <text>\n");
     printf("\triver tts <text>\n");
+#endif
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     printf("\triver xiaozhi <status|set|ota|bootstrap|disable|protocol|mcp|connect|disconnect|listen|abort>\n");
 #endif
+#if RIVER_INTERACTION_DIAG_ENABLED
     printf("\triver interaction <status|intents|tts_test>\n");
     printf("\triver interaction asr <text>\n");
     printf("\triver interaction device <light|fan|curtain|socket> <on|off>\n");
     printf("\triver interaction invoke <intent_name>\n");
+#endif
     printf("\triver playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
@@ -72,7 +88,9 @@ static void river_diag_join_args(u16 argc, u8 *argv[], u16 start, char *out_text
 
 static u32 river_diag_cmd(u16 argc, u8 *argv[])
 {
+#if RIVER_CLOUD_TEXT_DEBUG_ENABLED || RIVER_INTERACTION_DIAG_ENABLED
     char echo_text[RIVER_ECHO_TEXT_MAX];
+#endif
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     char xiaozhi_text[RIVER_XIAOZHI_TEXT_MAX];
 #endif
@@ -91,6 +109,10 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
     if (strcmp((const char *)argv[0], "echo") == 0 ||
         strcmp((const char *)argv[0], "tts") == 0) {
+#if !RIVER_CLOUD_TEXT_DEBUG_ENABLED
+        printf("[river][diag] cloud text/tts debug disabled in current build\n");
+        return 0;
+#else
         if (argc < 2) {
             printf("[river][diag] missing tts text\n");
             return 0;
@@ -101,6 +123,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             printf("[river][diag] echo failed\n");
         }
         return 0;
+#endif
     }
 
     if (strcmp((const char *)argv[0], "xiaozhi") == 0) {
@@ -304,15 +327,18 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             return 0;
         }
 
-        if (river_interaction_diag_execute_device((const char *)argv[1],
-                                                  (const char *)argv[2],
-                                                  "diag_cli_legacy_device") != RIVER_OK) {
+        if (river_online_control_set_device((const char *)argv[1],
+                                            (const char *)argv[2]) != RIVER_OK) {
             printf("[river][diag] invalid device command\n");
         }
         return 0;
     }
 
     if (strcmp((const char *)argv[0], "interaction") == 0) {
+#if !RIVER_INTERACTION_DIAG_ENABLED
+        printf("[river][diag] interaction diag disabled in current build\n");
+        return 0;
+#else
         if (argc < 2) {
             printf("[river][diag] usage: river interaction <status|intents|tts_test|asr|device|invoke>\n");
             return 0;
@@ -376,6 +402,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
         printf("[river][diag] usage: river interaction <status|intents|tts_test|asr|device|invoke>\n");
         return 0;
+#endif
     }
 
     if (strcmp((const char *)argv[0], "playback") == 0) {
