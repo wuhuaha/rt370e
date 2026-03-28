@@ -1015,3 +1015,27 @@
   - despite the size reduction, the app image still exceeds the SDK stock NOR app range, so this branch still depends on the project-owned flash profile and `tools/river_flash.py`
 - Explicit decision retained in docs:
   - this is an engineering smoke / board-validation landing, not a deploy-ready model-quality decision
+
+## Step 5.7
+- Reorganized repository-level Markdown entrypoints to reduce root-directory clutter on branch `DS-CNN`.
+- Created `doc/` as the new home for summary, report, design, migration-review, and historical note files.
+- Moved the following classes of root docs into `doc/`:
+  - migration assessments
+  - architecture / refactor proposals
+  - frontend / KWS / AEC / VAD chain notes
+  - historical milestone and pitfall summaries
+  - project status snapshots
+- Kept ongoing root entry files in place:
+  - `README.md`
+  - `plan.md`
+  - `build.md`
+  - `AGENTS.md`
+  - `TIPS.md`
+  - `REVIEW.md`
+- Added `doc/README.md` as the index for the relocated report/archive documents.
+- Refreshed ongoing root docs to match the current `DS-CNN` branch state:
+  - `README.md` now reflects the current branch, DS-CNN runtime objective, validated image sizes, flash constraints, and the new `doc/` layout
+  - `plan.md` now points to the migration reports under `doc/`
+  - `build.md` now explicitly documents that the current app image still requires the project-owned flash profile even when using the official GUI tool
+- Refreshed `doc/PROJECT_STATUS_ZH.md` so it no longer describes the old `xiaozhi` branch as the current baseline and instead captures the present `DS-CNN` branch status.
+- Chose not to delete any relocated summary Markdown in this step because each moved file still has traceability or comparison value; only location and indexing were cleaned up.

@@ -1714,3 +1714,37 @@ Expected result:
   - `overflow_bytes_vs_sdk_stock = 689504`
 - `strings` confirms the landed runtime now contains `round6_targeted_experimental`
 - `git status --short` after staging/commit prep shows only this step's tracked changes plus the user-owned `.env`
+
+## Step 5.7
+Repository Markdown reorganization:
+```bash
+cd /root/ameba-river
+
+find . -maxdepth 1 -type f -name '*.md' | sort
+find doc -maxdepth 1 -type f -name '*.md' | sort
+
+sed -n '1,220p' README.md
+sed -n '1,220p' plan.md
+sed -n '1,220p' build.md
+sed -n '1,220p' doc/README.md
+sed -n '1,220p' doc/PROJECT_STATUS_ZH.md
+
+rg -n 'doc/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md|doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md' plan.md
+git status --short
+```
+
+Expected result:
+- repository root keeps only the ongoing entry Markdown files:
+  - `AGENTS.md`
+  - `README.md`
+  - `REVIEW.md`
+  - `TIPS.md`
+  - `build.md`
+  - `plan.md`
+- `doc/` exists and contains the relocated summary/report/design Markdown files
+- `README.md` reflects the current `DS-CNN` branch rather than the old `xiaozhi`-focused baseline
+- `README.md` points readers to `doc/README.md` and the key migrated reports
+- `plan.md` references the migration reports under `doc/`
+- `build.md` clearly states that the current branch still requires the project custom flash profile
+- `doc/PROJECT_STATUS_ZH.md` reflects the present `DS-CNN` runtime/build state
+- `git status --short` shows only this step's tracked doc moves/edits plus the user-owned `.env`

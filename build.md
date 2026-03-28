@@ -59,6 +59,13 @@ python3 tools/river_flash.py -p /dev/ttyUSB0
 ameba.py monitor -p /dev/ttyUSB0 -b 1500000
 ```
 
+补充说明：
+
+- 当前 `DS-CNN` 分支主应用镜像已验证可编译，但仍然超过 SDK stock `RTL8730E` app 区间上限。
+- 因此继续要求使用项目自定义 profile：
+  - `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`
+- 如果使用官方 GUI 下载工具，也必须加载上面的项目 profile，而不是工具自带的默认 `RTL8730E` profile。
+
 ## 5. 常用构建流程
 
 ### 增量构建
