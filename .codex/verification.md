@@ -2013,6 +2013,53 @@ Pass signals:
   - `Connected to websocket server`
   - `xiaozhi conversation window opened: source=wakeword ...`
 
+## Step 5.15
+Rebuild the firmware after removing per-packet heap allocation from XiaoZhi uplink websocket framing:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Flash and validate the XiaoZhi wake-to-uplink path on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side validation flow:
+- Boot the board and let Wi-Fi connect.
+- Trigger the wake word once and keep speaking for a few seconds after wake confirmation.
+- Continue watching the serial log through websocket connect, ASR streaming, and the first STT result.
+
+Pass signals:
+- the transport still opens normally:
+  - `xiaozhi connecting: ...`
+  - `Connected to websocket server`
+  - `server hello: sid=...`
+- the uplink stream still starts and carries speech:
+  - `asr stream active: provider=xiaozhi_realtime ...`
+  - `stt sid=... text=...`
+- there is no new transport regression on the uplink hot path:
+  - no repeated `xiaozhi uplink send failed`
+  - no `binary_payload_too_large`
+  - no `binary_send_failed`
+
+Scope note:
+- This step only removes heap churn from the XiaoZhi uplink websocket framing path.
+- It is not expected to fix the separate downlink/playback heap failure seen later in `river_xz_down`.
+
 Fail signals:
 - the board logs one wake hit, then no retry behavior appears and XiaoZhi never connects
 - the wake must be spoken a second time after Wi-Fi/time becomes ready

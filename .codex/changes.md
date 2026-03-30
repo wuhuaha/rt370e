@@ -1212,3 +1212,23 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only reworked existing control flow and logging; it did not add new large runtime assets.
+
+## Step 5.15
+- Completed the next `Phase 1` hot-path cleanup in the XiaoZhi transport layer, scoped narrowly to per-packet heap churn on uplink websocket binary framing.
+- Updated [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c) so `river_xiaozhi_send_binary_frame()` no longer calls `rtos_mem_malloc/free` for protocol `v2/v3` audio frames:
+  - added a long-lived transport scratch buffer in `g_river_xiaozhi`
+  - reused that buffer for websocket binary frame header + payload assembly
+  - kept raw-payload passthrough behavior for non-`v2/v3` protocol handling
+- Added an explicit framed-payload size guard tied to the current project contract:
+  - max framed XiaoZhi uplink payload is now enforced as `512B`
+  - oversize payloads fail fast with `binary_payload_too_large` instead of falling into hidden heap growth or fragmentation
+- Why this step matters:
+  - XiaoZhi uplink audio runs on a steady hot path
+  - per-frame heap allocation here adds avoidable fragmentation and latency risk on embedded targets
+  - this keeps the optimization local to the websocket framing layer before later memory-budget work on playback/downlink
+- Verified a full local `RTL8730E` build after the change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because the step replaces transient heap usage with a small fixed in-context scratch buffer inside already-allocated runtime state.

@@ -64,6 +64,19 @@ typedef struct {
     uint8_t payload[];
 } __attribute__((packed)) river_xiaozhi_binary_v3_t;
 
+enum {
+    RIVER_XIAOZHI_BINARY_V2_HEADER_BYTES = sizeof(river_xiaozhi_binary_v2_t),
+    RIVER_XIAOZHI_BINARY_V3_HEADER_BYTES = sizeof(river_xiaozhi_binary_v3_t),
+    /*
+     * The current uplink path already encodes Opus into a fixed 512-byte
+     * packet buffer in river_cloud_adapter. Keep the websocket framing
+     * scratch sized to that contract instead of allocating per packet.
+     */
+    RIVER_XIAOZHI_BINARY_PAYLOAD_MAX = 512U,
+    RIVER_XIAOZHI_BINARY_FRAME_MAX =
+        RIVER_XIAOZHI_BINARY_PAYLOAD_MAX + RIVER_XIAOZHI_BINARY_V2_HEADER_BYTES
+};
+
 typedef struct {
     bool initialized;
     bool session_open;
@@ -116,6 +129,7 @@ typedef struct {
     char open_header_fields[RIVER_XIAOZHI_HEADER_FIELDS_MAX];
     char open_device_id[RIVER_XIAOZHI_DEVICE_ID_MAX];
     char open_client_id[RIVER_XIAOZHI_CLIENT_ID_MAX];
+    uint8_t binary_frame[RIVER_XIAOZHI_BINARY_FRAME_MAX];
 } river_xiaozhi_context_t;
 
 static river_xiaozhi_context_t g_river_xiaozhi;
@@ -321,46 +335,24 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
                                                       size_t payload_bytes,
                                                       uint32_t timestamp_ms)
 {
-    uint8_t *buffer = NULL;
-    size_t total_bytes = 0U;
+    uint8_t *buffer = (uint8_t *)payload;
+    size_t total_bytes = payload_bytes;
     river_status_t status = RIVER_ERR_IO;
     bool locked = false;
+    uint16_t protocol_version = g_river_xiaozhi.config.protocol_version;
 
     if (payload == NULL || payload_bytes == 0U) {
         return RIVER_ERR_BUSY;
     }
 
-    if (g_river_xiaozhi.config.protocol_version == 2U) {
-        river_xiaozhi_binary_v2_t *bp2;
-
-        total_bytes = sizeof(*bp2) + payload_bytes;
-        buffer = (uint8_t *)rtos_mem_malloc((uint32_t)total_bytes);
-        if (buffer == NULL) {
-            return RIVER_ERR_NO_MEMORY;
-        }
-        bp2 = (river_xiaozhi_binary_v2_t *)buffer;
-        bp2->version = htons(g_river_xiaozhi.config.protocol_version);
-        bp2->type = htons(type);
-        bp2->reserved = 0U;
-        bp2->timestamp = htonl(timestamp_ms);
-        bp2->payload_size = htonl((uint32_t)payload_bytes);
-        memcpy(bp2->payload, payload, payload_bytes);
-    } else if (g_river_xiaozhi.config.protocol_version == 3U) {
-        river_xiaozhi_binary_v3_t *bp3;
-
-        total_bytes = sizeof(*bp3) + payload_bytes;
-        buffer = (uint8_t *)rtos_mem_malloc((uint32_t)total_bytes);
-        if (buffer == NULL) {
-            return RIVER_ERR_NO_MEMORY;
-        }
-        bp3 = (river_xiaozhi_binary_v3_t *)buffer;
-        bp3->type = (uint8_t)type;
-        bp3->reserved = 0U;
-        bp3->payload_size = htons((uint16_t)payload_bytes);
-        memcpy(bp3->payload, payload, payload_bytes);
-    } else {
-        buffer = (uint8_t *)payload;
-        total_bytes = payload_bytes;
+    if ((protocol_version == 2U || protocol_version == 3U) &&
+        payload_bytes > RIVER_XIAOZHI_BINARY_PAYLOAD_MAX) {
+        river_xiaozhi_set_last_error("binary_payload_too_large");
+        RIVER_LOGW("xiaozhi binary payload too large: protocol=%u payload=%luB max=%uB",
+                   (unsigned int)protocol_version,
+                   (unsigned long)payload_bytes,
+                   (unsigned int)RIVER_XIAOZHI_BINARY_PAYLOAD_MAX);
+        return RIVER_ERR_ARG;
     }
 
     locked = river_xiaozhi_transport_lock();
@@ -368,6 +360,30 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
         g_river_xiaozhi.wsclient->readyState != WSC_OPEN) {
         status = RIVER_ERR_BUSY;
         goto exit;
+    }
+
+    if (protocol_version == 2U) {
+        river_xiaozhi_binary_v2_t *bp2;
+
+        total_bytes = RIVER_XIAOZHI_BINARY_V2_HEADER_BYTES + payload_bytes;
+        buffer = g_river_xiaozhi.binary_frame;
+        bp2 = (river_xiaozhi_binary_v2_t *)buffer;
+        bp2->version = htons(protocol_version);
+        bp2->type = htons(type);
+        bp2->reserved = 0U;
+        bp2->timestamp = htonl(timestamp_ms);
+        bp2->payload_size = htonl((uint32_t)payload_bytes);
+        memcpy(bp2->payload, payload, payload_bytes);
+    } else if (protocol_version == 3U) {
+        river_xiaozhi_binary_v3_t *bp3;
+
+        total_bytes = RIVER_XIAOZHI_BINARY_V3_HEADER_BYTES + payload_bytes;
+        buffer = g_river_xiaozhi.binary_frame;
+        bp3 = (river_xiaozhi_binary_v3_t *)buffer;
+        bp3->type = (uint8_t)type;
+        bp3->reserved = 0U;
+        bp3->payload_size = htons((uint16_t)payload_bytes);
+        memcpy(bp3->payload, payload, payload_bytes);
     }
 
     if (ws_sendBinary(buffer, (int)total_bytes, 1, g_river_xiaozhi.wsclient) == 0) {
@@ -379,9 +395,6 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
 
 exit:
     river_xiaozhi_transport_unlock(locked);
-    if (buffer != payload) {
-        rtos_mem_free(buffer);
-    }
     return status;
 }
 
