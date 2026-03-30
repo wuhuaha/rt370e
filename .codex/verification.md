@@ -1919,3 +1919,29 @@ Fail signals:
 - CA32 still logs malloc failure during XiaoZhi TTS start
 - if it fails, record the new `xWantedSize` and the remaining free heap
 - if compact fallback also fails, the next step should shrink playback buffering further or reduce the generic playback service allocation policy
+
+## Step 5.12
+Documentation verification for the refactor execution baseline:
+```bash
+cd /root/ameba-river
+git diff --check -- doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md doc/README.md .codex/changes.md .codex/verification.md
+sed -n '1,240p' doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md
+sed -n '1,120p' doc/README.md
+git status --short
+```
+
+Expected result:
+- `git diff --check` returns no whitespace or patch-format issues
+- `doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md` contains:
+  - refactor goals
+  - prioritized problem list
+  - phased execution order
+  - per-step delivery rules
+- `doc/README.md` lists `PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md` in:
+  - `当前优先阅读`
+  - `架构与实现`
+- `git status --short` shows only this step's tracked doc updates plus the user-owned `.env`
+
+Runtime/build note:
+- This is a documentation-only step.
+- No firmware build or board flash is required for this step because no runtime code changed.

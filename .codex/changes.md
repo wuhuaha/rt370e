@@ -1144,3 +1144,24 @@
 - Expected runtime effect:
   - first playback attempt now uses about half the prior frame multiplier
   - compact fallback is now tighter again if the first playback open still cannot fit
+
+## Step 5.12
+- Added a new execution-oriented refactor document at `doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md`.
+- This document is intentionally different from the existing architecture blueprints:
+  - it is based on the current `DS-CNN` codebase and recent board/runtime logs
+  - it prioritizes work by `correctness -> memory/hot path -> boundaries -> size/clean code`
+  - it turns the current review findings into phased, stepwise work that can be committed and verified incrementally
+- Captured the current top-priority refactor targets:
+  - wakeword deferred admission should become retryable instead of lossy
+  - time-ready semantics should be unified
+  - XiaoZhi uplink should stop allocating per packet on the hot path
+  - playback and pre-roll memory budgeting should become explicit
+  - `river_voice -> river_cloud` direct dependencies should be removed in later phases
+  - the current large files should be split by façade / policy / runtime / diagnostics responsibility
+- Updated `doc/README.md` so the new refactor execution plan is discoverable from:
+  - `当前优先阅读`
+  - `架构与实现`
+- Kept this step documentation-only on purpose:
+  - no source code behavior changed
+  - no firmware image content changed
+  - this step exists to establish the refactor baseline before rewriting `plan.md`
