@@ -1340,3 +1340,43 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only tightens runtime websocket buffer limits and does not add code or assets.
+
+## Step 5.20
+- Fixed the next XiaoZhi follow-up failure mode after the earlier uplink heap fix.
+- Observed board failure before this step:
+  - wake and websocket connect succeeded
+  - ASR stream entered
+  - later logs showed capture-side backlog and transport send pressure:
+    - `capture frame ring overflow: dropped=...`
+    - `ws_sendData: ERROR: Not get usable buffer, Please enlarge max_queue_size!`
+    - `xiaozhi uplink send failed: status=-6`
+- Root cause addressed in this step:
+  - the XiaoZhi cloud path still allowed follow-up reopening logic to run from the VAD/audio processing thread
+  - if the websocket transport had already been closed or become unavailable, that thread could fall into a synchronous reopen path at the wrong layer
+  - this is exactly the kind of stall that starves capture consumption and turns into `capture frame ring overflow`
+  - keeping the conversation window open after transport loss also allowed stale follow-up state to keep pushing toward the websocket queue instead of failing closed
+- Updated project code in:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- What changed:
+  - added a local-only `xiaozhi` conversation-window abort helper that resets window/follow-up state without re-entering websocket close logic
+  - this keeps the websocket close callback path deadlock-safe while still letting the cloud layer fail closed immediately on transport loss
+  - on `RIVER_XIAOZHI_EVENT_SESSION_CLOSED`, the cloud adapter now:
+    - logs the transport-close context
+    - aborts the local conversation window first
+    - emits the ASR `session_closed` signal with the corrected interaction-state ordering
+    - clears cached uplink/downlink/session state so stale follow-up traffic does not linger
+  - during follow-up auto-open, if the transport is already unavailable, the VAD path now aborts the window and returns `RIVER_ERR_BUSY` instead of trying to synchronously reconnect from the audio thread
+- Why this step matters:
+  - it prevents transport recovery from being driven by the real-time audio/VAD path
+  - it removes the state leak where a dead XiaoZhi websocket could leave follow-up logic active long enough to back up capture and websocket send queues
+  - it preserves the intended explicit recovery path:
+    - first wakeword opens a session from the wake worker
+    - stale follow-up does not try to do network recovery from the VAD worker
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only tightens state/flow control and does not add assets or enlarge static buffers.

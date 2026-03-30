@@ -77,6 +77,26 @@ void river_cloud_xiaozhi_window_close(const char *reason)
                reason != NULL ? reason : "-");
 }
 
+void river_cloud_xiaozhi_window_abort_local(const char *reason)
+{
+    bool should_log;
+
+    should_log = g_river_cloud.xiaozhi_window_active ||
+                 g_river_cloud.xiaozhi_listening ||
+                 g_river_cloud.xiaozhi_listen_stop_pending ||
+                 g_river_cloud.xiaozhi_open_speech_frames != 0U;
+
+    g_river_cloud.xiaozhi_window_active = false;
+    g_river_cloud.xiaozhi_window_deadline_ms = 0U;
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_listen_stop_pending = false;
+    river_cloud_pre_roll_reset();
+    if (should_log) {
+        RIVER_LOGW("xiaozhi conversation window aborted: reason=%s",
+                   reason != NULL ? reason : "-");
+    }
+}
+
 void river_cloud_xiaozhi_copy_session_id_from_transport(void)
 {
     const char *sid;

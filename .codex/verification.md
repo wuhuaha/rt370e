@@ -2253,3 +2253,49 @@ Interpretation:
 - Fail:
   - if `max tx buf len` appears, one of the control JSON payloads is larger than expected and the tx limit must be raised moderately
   - if queue exhaustion appears without heap failure, queue depth may need a small follow-up increase while keeping the reduced tx buffer size
+
+## Step 5.20
+Rebuild the firmware after tightening XiaoZhi follow-up handling on transport loss:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Flash and validate the XiaoZhi transport-loss recovery path on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side validation flow:
+- Boot the board, let Wi-Fi connect, and trigger XiaoZhi with the wake word.
+- If the server or transport later closes unexpectedly, watch for the new fail-closed logs:
+  - `xiaozhi transport closed: sid=... window=... stream=... playback=...`
+  - `xiaozhi conversation window aborted: reason=transport_closed`
+- After that point, keep watching for the previous bad symptoms.
+
+Pass signals:
+- no repeating `capture frame ring overflow: dropped=...`
+- no websocket queue pressure warning:
+  - `ERROR: Not get usable buffer, Please enlarge max_queue_size!`
+- no repeated `xiaozhi uplink send failed: status=-6` caused by stale follow-up traffic
+- after transport loss, the device fails closed and waits for a fresh wake path instead of trying to recover from the audio thread
+
+Useful interpretation:
+- Pass:
+  - the real-time VAD/capture path is no longer being used as a transport-recovery thread
+  - stale follow-up state is being cleared promptly when XiaoZhi transport dies
+- Fail:
+  - if `capture frame ring overflow` still appears immediately after a XiaoZhi transport/session drop, there is still another blocking path inside the audio-side open/feed flow and that path needs to be isolated next

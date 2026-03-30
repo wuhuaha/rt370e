@@ -168,6 +168,7 @@ bool river_cloud_xiaozhi_idle_requires_wakeword(void);
 bool river_cloud_xiaozhi_playback_allows_vad_open(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
 void river_cloud_xiaozhi_window_close(const char *reason);
+void river_cloud_xiaozhi_window_abort_local(const char *reason);
 void river_cloud_xiaozhi_copy_session_id_from_transport(void);
 const char *river_cloud_xiaozhi_current_sid(void);
 void river_cloud_xiaozhi_finalize_pending_text(void);
