@@ -2388,3 +2388,47 @@ Expected result:
 - the note records that current images still fit the project profile range
 - if a USB-bridged serial node is present, `river_flash.py` prints the project profile path before download:
   - `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`
+
+## Step 5.24
+Rebuild after tightening XiaoZhi idle admission:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3593568`
+  - `build_RTL8730E/ota_all.bin 3593600`
+
+Board validation after flash:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let Wi-Fi connect and SNTP become ready
+- before speaking the wakeword, speak a few short voice bursts near the microphones
+- then watch the runtime logs
+
+Pass signals:
+- no repeated spam of:
+  - `xiaozhi conversation window aborted: reason=followup_transport_unavailable`
+- `stream_busy` no longer rises simply because idle speech was detected before a wakeword
+- the first XiaoZhi session still opens only after a real wakeword path:
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+  - `Connected to websocket server`
+  - `server hello`
+
+If KWS is inactive at boot, expected warning now becomes:
+- `kws init failed status=...; continue with stable non-kws path`
+- `wake admission fallback disabled: idle VAD admission stays wakeword-gated while local KWS is inactive`

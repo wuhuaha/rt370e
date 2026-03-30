@@ -4,7 +4,6 @@
 
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
-#include "river/river_voice_kws.h"
 #include "river/river_voice_profile.h"
 #include "river/river_wifi_station.h"
 
@@ -25,7 +24,7 @@ static bool river_cloud_xiaozhi_profile_supports_playback_reference(void)
 bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 {
 #if defined(CONFIG_RIVER_VOICE_CAPABILITY_KWS) && CONFIG_RIVER_VOICE_CAPABILITY_KWS
-    return river_voice_kws_active();
+    return true;
 #else
     return false;
 #endif

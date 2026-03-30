@@ -37,7 +37,7 @@ river_status_t river_voice_frontend_init(void)
         if (status != RIVER_OK) {
             RIVER_LOGW("kws init failed status=%d; continue with stable non-kws path",
                        (int)status);
-            RIVER_LOGW("wake admission fallback: idle VAD admission remains enabled because local KWS is inactive");
+            RIVER_LOGW("wake admission fallback disabled: idle VAD admission stays wakeword-gated while local KWS is inactive");
         } else {
             river_voice_kws_dump_profile();
             RIVER_LOGI("wake-stage validation path: capture -> fixed_dsb -> log_mel -> local_kws -> wake event");

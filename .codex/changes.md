@@ -1442,3 +1442,24 @@
   - prefer `usbipd-win` plus `/dev/ttyUSB0` or `/dev/ttyACM0`
   - always flash through `python3 tools/river_flash.py ...`
 - This step is documentation-only and does not change firmware code or binary assets.
+
+## Step 5.24
+- Tightened XiaoZhi idle-admission policy so an enabled KWS build remains wakeword-gated even if the local KWS runtime is temporarily inactive.
+- Updated [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c):
+  - `river_cloud_xiaozhi_idle_requires_wakeword()` now keys off build capability, not runtime `river_voice_kws_active()`
+  - this removes the legacy fallback where idle pure-VAD speech could reopen XiaoZhi from the audio path when local KWS init/runtime was down
+- Updated [components/river_voice/river_voice_frontend.c](/root/ameba-river/components/river_voice/river_voice_frontend.c):
+  - corrected the boot warning text to state that idle VAD admission stays wakeword-gated while local KWS is inactive
+  - this keeps logs aligned with the new policy instead of falsely claiming that legacy VAD admission remains enabled
+- Why this step matters:
+  - fixes the observed runtime where a single speech burst in `wake_monitoring` repeatedly printed:
+    - `xiaozhi conversation window aborted: reason=followup_transport_unavailable`
+  - prevents pure VAD from repeatedly trying to open a XiaoZhi follow-up session before any real wakeword/session window exists
+  - keeps the intended contract intact:
+    - first turn must come from wakeword admission
+    - follow-up auto-open only happens inside an already-opened conversation window
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
+  - `build_RTL8730E/ota_all.bin` = `3593600`
