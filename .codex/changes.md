@@ -1260,3 +1260,23 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only corrected runtime buffer sizing math and logging; it did not add new assets or large static buffers.
+
+## Step 5.17
+- Added a temporary board-bring-up tuning step to make wake-word validation much easier while the current embedded KWS model is still weak.
+- Updated [prj.conf](/root/ameba-river/prj.conf) only:
+  - lowered `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` from `21299` to `8192`
+  - added an inline comment marking this as a temporary permissive threshold for board-side wake-path validation
+- Kept scope intentionally narrow:
+  - no KWS runtime code changed
+  - no model asset changed
+  - no hold/cooldown/stride/gate queue parameter changed
+- Why this step matters:
+  - current field logs show wake hits are possible but the model is not robust enough for comfortable board-side iteration
+  - lowering the primary score threshold also lowers the fallback gate threshold automatically through the existing runtime derivation in `river_voice_kws.cc`
+  - this gives a fast bring-up path for validating wake -> XiaoZhi connect -> ASR/TTS session flow before spending more time on model quality
+- Verified a full local `RTL8730E` build after the config change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only adjusts a config threshold and does not alter runtime assets or large static allocations.
