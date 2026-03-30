@@ -234,6 +234,57 @@ Expected review result:
   - `98x40x1` vs `40x98x1` input-layout mismatch
 - the plan files state that BC-ResNet replacement is the immediate hotfix track before further refactor work continues
 
+## Step 5.22
+Rebuild the firmware after the BC-ResNet replacement:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes are:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3593568`
+  - `build_RTL8730E/ota_all.bin 3593600`
+
+Flash and validate the new KWS runtime on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side pass signals:
+- KWS initializes successfully without resolver or tensor-allocation failure
+- boot logs include the new shape/layout line:
+  - `kws input shape: src=schema dims=[1,40,98,1] layout=mels_frames`
+- backend profile log reflects the replaced model:
+  - `kws backend: runtime=tflite_micro input=40x98x1 ... variant=bc_resnet_best`
+- wake pipeline remains active:
+  - `wake-stage validation path: capture -> fixed_dsb -> log_mel -> local_kws -> wake event`
+- after speaking the wake word, logs show:
+  - `wakeword hit: text=小欧管家 ...`
+  - followed by `xiaozhi connecting: ...`
+
+Failure signals to watch:
+- `kws init failed status=...`
+- `kws op resolver registration failed`
+- `kws AllocateTensors failed`
+- `kws input shape unsupported`
+
+Interpretation:
+- Pass:
+  - BC-ResNet has been integrated into the existing board runtime contract successfully
+  - the board is filling the model input tensor in the correct `40x98x1` order
+- Fail:
+  - if `AllocateTensors failed` appears, arena budget must be reassessed next
+  - if `input shape unsupported` appears, the embedded asset or model metadata does not match the expected deployment contract
+
 ## Step 4.7
 Build and flash:
 ```bash

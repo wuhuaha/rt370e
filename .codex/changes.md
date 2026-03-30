@@ -1396,5 +1396,33 @@
 - Why this step matters:
   - it freezes the replacement contract before code churn starts
   - it prevents the runtime implementation from drifting into ad hoc model-specific fixes
-  - it makes the next implementation commit auditable against a concrete plan
+- it makes the next implementation commit auditable against a concrete plan
 - No product code or embedded assets changed in this step.
+
+## Step 5.22
+- Replaced the current baseline embedded wake-word asset with `bc_resnet_best.tflite` from `kws-training-pro`.
+- Updated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - regenerated the baseline-slot model data from `models/bc_resnet_ultra/bc_resnet_best.tflite`
+  - kept the existing symbol names `kws_model` and `kws_model_len`
+  - new embedded model size is `56024B`
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - increased `RIVER_KWS_OP_COUNT` from `7` to `8`
+  - registered `Add` in the TFLM resolver so BC-ResNet residual paths are supported
+  - added model-driven input-shape parsing with schema-first, runtime-fallback behavior
+  - accepted both board-supported layouts:
+    - `[1, 98, 40, 1]`
+    - `[1, 40, 98, 1]`
+  - added direct `mels_frames` write order support so BC-ResNet does not need an extra transpose buffer
+  - updated profile logs to print the real embedded input shape and active variant name
+- Updated [components/river_voice/river_voice_frontend.c](/root/ameba-river/components/river_voice/river_voice_frontend.c):
+  - changed the wake-stage validation log from model-specific `dscnn_kws` wording to neutral `local_kws`
+- Why this step matters:
+  - the runtime is no longer hard-wired to a single `98x40x1` model layout
+  - BC-ResNet can now be loaded without resolver failure on missing `Add`
+  - the model replacement stayed confined to the existing baseline slot without expanding Kconfig complexity
+- Verified a full local `RTL8730E` build after the replacement.
+- New image sizes after this step:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
+  - `build_RTL8730E/ota_all.bin` = `3593600`
+- Image size decreased relative to the previous baseline because the BC-ResNet asset is smaller than the previous embedded wake-word model.

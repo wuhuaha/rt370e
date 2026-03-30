@@ -38,7 +38,7 @@ extern "C" {
 #include "generated/river_wake_word_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_len
-#define RIVER_KWS_MODEL_VARIANT_NAME "baseline_embedded"
+#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_best"
 #endif
 
 #include "tensorflow/lite/c/common.h"
@@ -94,7 +94,7 @@ extern "C" {
 #define RIVER_KWS_FFT_BINS ((RIVER_KWS_WINDOW_SAMPLES / 2U) + 1U)
 #define RIVER_KWS_TENSOR_ARENA_BYTES \
     ((uint32_t)CONFIG_RIVER_KWS_TENSOR_ARENA_KB * 1024U)
-#define RIVER_KWS_OP_COUNT 7U
+#define RIVER_KWS_OP_COUNT 8U
 #define RIVER_KWS_EXPECTED_INPUT_VALUES \
     (RIVER_KWS_FEATURE_FRAMES * RIVER_KWS_MEL_BINS)
 #define RIVER_KWS_ALLOCATION_ALIGNMENT 32U
@@ -128,6 +128,11 @@ typedef enum {
     RIVER_KWS_QUEUE_ITEM_PCM = 0U,
     RIVER_KWS_QUEUE_ITEM_RESET = 1U
 } river_voice_kws_queue_item_type_t;
+
+typedef enum {
+    RIVER_KWS_INPUT_LAYOUT_FRAMES_MELS = 0U,
+    RIVER_KWS_INPUT_LAYOUT_MELS_FRAMES = 1U
+} river_voice_kws_input_layout_t;
 
 typedef struct {
     uint32_t type;
@@ -187,6 +192,8 @@ typedef struct {
     TfLiteType model_output_type;
     TfLiteType effective_input_type;
     TfLiteType effective_output_type;
+    river_voice_kws_input_layout_t input_layout;
+    uint32_t input_shape[4];
     float input_scale;
     int input_zero_point;
     float output_scale;
@@ -271,9 +278,55 @@ static const char *river_voice_kws_tensor_type_name(TfLiteType type)
     }
 }
 
+static const char *river_voice_kws_input_layout_name(
+    river_voice_kws_input_layout_t layout)
+{
+    switch (layout) {
+    case RIVER_KWS_INPUT_LAYOUT_FRAMES_MELS:
+        return "frames_mels";
+    case RIVER_KWS_INPUT_LAYOUT_MELS_FRAMES:
+        return "mels_frames";
+    default:
+        return "unknown";
+    }
+}
+
 static const tflite::Tensor *river_voice_kws_model_io_tensor(
     const tflite::Model *model,
     bool input);
+
+static bool river_voice_kws_copy_schema_shape(
+    const flatbuffers::Vector<int32_t> *shape,
+    uint32_t dims_out[4],
+    size_t *dim_count)
+{
+    size_t index;
+
+    if (dim_count != NULL) {
+        *dim_count = 0U;
+    }
+    if (dims_out != NULL) {
+        memset(dims_out, 0, sizeof(uint32_t) * 4U);
+    }
+    if (shape == NULL || shape->size() == 0U || shape->size() > 4U) {
+        return false;
+    }
+
+    for (index = 0U; index < shape->size(); ++index) {
+        int32_t dim = shape->Get(index);
+
+        if (dim < 0) {
+            return false;
+        }
+        if (dims_out != NULL) {
+            dims_out[index] = (uint32_t)dim;
+        }
+    }
+    if (dim_count != NULL) {
+        *dim_count = shape->size();
+    }
+    return true;
+}
 
 static TfLiteType river_voice_kws_model_tensor_type_name_to_tflite(
     tflite::TensorType type)
@@ -376,6 +429,98 @@ static bool river_voice_kws_schema_quant_params(const tflite::Model *model,
     }
     if (zero_point != NULL) {
         *zero_point = (int)zero_point64;
+    }
+    return true;
+}
+
+static bool river_voice_kws_schema_io_shape(const tflite::Model *model,
+                                            bool input,
+                                            uint32_t dims_out[4],
+                                            size_t *dim_count)
+{
+    const tflite::Tensor *tensor;
+
+    tensor = river_voice_kws_model_io_tensor(model, input);
+    if (tensor == NULL) {
+        return false;
+    }
+
+    return river_voice_kws_copy_schema_shape(tensor->shape(), dims_out, dim_count);
+}
+
+static bool river_voice_kws_runtime_io_shape(const TfLiteTensor *tensor,
+                                             uint32_t dims_out[4],
+                                             size_t *dim_count)
+{
+    const TfLiteIntArray *dims;
+    int index;
+
+    if (dim_count != NULL) {
+        *dim_count = 0U;
+    }
+    if (dims_out != NULL) {
+        memset(dims_out, 0, sizeof(uint32_t) * 4U);
+    }
+    if (tensor == NULL || tensor->dims == NULL || tensor->dims->size <= 0 ||
+        tensor->dims->size > 4) {
+        return false;
+    }
+
+    dims = tensor->dims;
+    for (index = 0; index < dims->size; ++index) {
+        if (dims->data[index] < 0) {
+            return false;
+        }
+        if (dims_out != NULL) {
+            dims_out[index] = (uint32_t)dims->data[index];
+        }
+    }
+    if (dim_count != NULL) {
+        *dim_count = (size_t)dims->size;
+    }
+    return true;
+}
+
+static bool river_voice_kws_detect_input_layout(
+    const tflite::Model *model,
+    const TfLiteTensor *input_tensor,
+    river_voice_kws_input_layout_t *layout,
+    uint32_t dims_out[4],
+    const char **source)
+{
+    uint32_t dims[4];
+    size_t dim_count = 0U;
+
+    if (source != NULL) {
+        *source = "none";
+    }
+    if (river_voice_kws_schema_io_shape(model, true, dims, &dim_count)) {
+        if (source != NULL) {
+            *source = "schema";
+        }
+    } else if (river_voice_kws_runtime_io_shape(input_tensor, dims, &dim_count)) {
+        if (source != NULL) {
+            *source = "runtime";
+        }
+    } else {
+        return false;
+    }
+
+    if (dim_count != 4U || dims[0] != 1U || dims[3] != 1U) {
+        return false;
+    }
+    if (dims[1] == RIVER_KWS_FEATURE_FRAMES &&
+        dims[2] == RIVER_KWS_MEL_BINS) {
+        *layout = RIVER_KWS_INPUT_LAYOUT_FRAMES_MELS;
+    } else if (dims[1] == RIVER_KWS_MEL_BINS &&
+               dims[2] == RIVER_KWS_FEATURE_FRAMES) {
+        *layout = RIVER_KWS_INPUT_LAYOUT_MELS_FRAMES;
+    } else {
+        return false;
+    }
+
+    if (dims_out != NULL) {
+        memcpy(dims_out, dims, sizeof(dims));
     }
     return true;
 }
@@ -616,6 +761,7 @@ static river_status_t river_voice_kws_register_ops(
     }
     if (resolver->AddQuantize() != kTfLiteOk ||
         resolver->AddPad() != kTfLiteOk ||
+        resolver->AddAdd() != kTfLiteOk ||
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
         resolver->AddMean() != kTfLiteOk ||
@@ -959,34 +1105,69 @@ static void river_voice_kws_fill_input_tensor(river_voice_kws_context_t *context
         }
     }
 
-    for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
-        uint32_t history_index =
-            (context->mel_history_write_index + frame_index) %
-            RIVER_KWS_FEATURE_FRAMES;
-        for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
-            float relative_db =
-                context->log_mel_history[history_index][mel_index] - max_db;
-            float normalized;
-            int quantized;
+    if (context->input_layout == RIVER_KWS_INPUT_LAYOUT_FRAMES_MELS) {
+        for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
+            uint32_t history_index =
+                (context->mel_history_write_index + frame_index) %
+                RIVER_KWS_FEATURE_FRAMES;
+            for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
+                float relative_db =
+                    context->log_mel_history[history_index][mel_index] - max_db;
+                float normalized;
+                int quantized;
 
-            if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
-                relative_db = RIVER_KWS_FEATURE_DB_MIN;
+                if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
+                    relative_db = RIVER_KWS_FEATURE_DB_MIN;
+                }
+                if (relative_db > 0.0f) {
+                    relative_db = 0.0f;
+                }
+                normalized =
+                    (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                if (dst_u8 != NULL) {
+                    quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
+                                context->input_zero_point;
+                    *dst_u8++ = river_voice_kws_clamp_u8(quantized);
+                } else if (dst_i8 != NULL) {
+                    quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
+                                context->input_zero_point;
+                    *dst_i8++ = river_voice_kws_clamp_i8(quantized);
+                } else if (dst_f32 != NULL) {
+                    *dst_f32++ = normalized;
+                }
             }
-            if (relative_db > 0.0f) {
-                relative_db = 0.0f;
-            }
-            normalized =
-                (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
-            if (dst_u8 != NULL) {
-                quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
-                            context->input_zero_point;
-                *dst_u8++ = river_voice_kws_clamp_u8(quantized);
-            } else if (dst_i8 != NULL) {
-                quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
-                            context->input_zero_point;
-                *dst_i8++ = river_voice_kws_clamp_i8(quantized);
-            } else if (dst_f32 != NULL) {
-                *dst_f32++ = normalized;
+        }
+    } else {
+        /* BC-ResNet 导出的 NHWC 输入是 [1, 40, 98, 1]，这里直接按目标布局写入，避免额外转置缓冲。 */
+        for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
+            for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
+                uint32_t history_index =
+                    (context->mel_history_write_index + frame_index) %
+                    RIVER_KWS_FEATURE_FRAMES;
+                float relative_db =
+                    context->log_mel_history[history_index][mel_index] - max_db;
+                float normalized;
+                int quantized;
+
+                if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
+                    relative_db = RIVER_KWS_FEATURE_DB_MIN;
+                }
+                if (relative_db > 0.0f) {
+                    relative_db = 0.0f;
+                }
+                normalized =
+                    (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                if (dst_u8 != NULL) {
+                    quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
+                                context->input_zero_point;
+                    *dst_u8++ = river_voice_kws_clamp_u8(quantized);
+                } else if (dst_i8 != NULL) {
+                    quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
+                                context->input_zero_point;
+                    *dst_i8++ = river_voice_kws_clamp_i8(quantized);
+                } else if (dst_f32 != NULL) {
+                    *dst_f32++ = normalized;
+                }
             }
         }
     }
@@ -1402,6 +1583,7 @@ extern "C" river_status_t river_voice_kws_init(void)
     const void *output_tensor_data;
     const char *input_quant_source;
     const char *output_quant_source;
+    const char *input_shape_source;
 
     if (g_river_voice_kws != NULL) {
         return RIVER_OK;
@@ -1561,6 +1743,18 @@ extern "C" river_status_t river_voice_kws_init(void)
         status = RIVER_ERR_UNSUPPORTED;
         goto fail;
     }
+    if (!river_voice_kws_detect_input_layout(g_river_voice_kws->model,
+                                             g_river_voice_kws->input_tensor,
+                                             &g_river_voice_kws->input_layout,
+                                             g_river_voice_kws->input_shape,
+                                             &input_shape_source)) {
+        RIVER_LOGE("kws input shape unsupported: runtime_in=%s model_in=%s input_bytes=%lu",
+                   river_voice_kws_tensor_type_name(g_river_voice_kws->input_tensor->type),
+                   river_voice_kws_tensor_type_name(g_river_voice_kws->model_input_type),
+                   (unsigned long)g_river_voice_kws->input_tensor->bytes);
+        status = RIVER_ERR_UNSUPPORTED;
+        goto fail;
+    }
 
     input_value_count = RIVER_KWS_EXPECTED_INPUT_VALUES;
     input_elements = input_value_count;
@@ -1681,6 +1875,13 @@ extern "C" river_status_t river_voice_kws_init(void)
                output_quant_source,
                (long)lroundf(g_river_voice_kws->output_scale * 1000000.0f),
                (long)g_river_voice_kws->output_zero_point);
+    RIVER_LOGI("kws input shape: src=%s dims=[%lu,%lu,%lu,%lu] layout=%s",
+               input_shape_source,
+               (unsigned long)g_river_voice_kws->input_shape[0],
+               (unsigned long)g_river_voice_kws->input_shape[1],
+               (unsigned long)g_river_voice_kws->input_shape[2],
+               (unsigned long)g_river_voice_kws->input_shape[3],
+               river_voice_kws_input_layout_name(g_river_voice_kws->input_layout));
     RIVER_LOGI("kws alloc: ctx=%p ctx_raw=%p arena=%p arena_raw=%p align=%u input_bytes=%lu output_bytes=%lu",
                (void *)g_river_voice_kws,
                g_river_voice_kws_allocation,
@@ -1852,8 +2053,23 @@ extern "C" void river_voice_kws_dump_profile(void)
 {
     int32_t mean_milli = (int32_t)lroundf(RIVER_KWS_FEATURE_MEAN * 1000.0f);
     uint32_t std_milli = (uint32_t)lroundf(RIVER_KWS_FEATURE_STD * 1000.0f);
+    unsigned long input_dim1 =
+        (g_river_voice_kws != NULL && g_river_voice_kws->input_shape[1] != 0U) ?
+            (unsigned long)g_river_voice_kws->input_shape[1] :
+            (unsigned long)RIVER_KWS_FEATURE_FRAMES;
+    unsigned long input_dim2 =
+        (g_river_voice_kws != NULL && g_river_voice_kws->input_shape[2] != 0U) ?
+            (unsigned long)g_river_voice_kws->input_shape[2] :
+            (unsigned long)RIVER_KWS_MEL_BINS;
+    unsigned long input_dim3 =
+        (g_river_voice_kws != NULL && g_river_voice_kws->input_shape[3] != 0U) ?
+            (unsigned long)g_river_voice_kws->input_shape[3] :
+            1UL;
 
-    RIVER_LOGI("kws backend: dscnn runtime=tflite_micro input=98x40x1 log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u queue=%u",
+    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u queue=%u",
+               input_dim1,
+               input_dim2,
+               input_dim3,
                (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
                (unsigned long)RIVER_KWS_MODEL_DATA_LEN,
                RIVER_KWS_MODEL_VARIANT_NAME,
