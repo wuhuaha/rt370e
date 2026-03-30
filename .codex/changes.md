@@ -1546,3 +1546,27 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
   - `build_RTL8730E/ota_all.bin` = `3601792`
+
+## Step 5.29
+- Fixed the next KWS runtime failure after boot init recovered: patched `MEAN` eval no longer depends on `node->builtin_data` staying valid.
+- Updated [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):
+  - introduced a project-local patched op-data wrapper around `tflite::OpDataReduce`
+  - cached `ReducerOptions.keep_dims` during `init`
+  - switched `prepare` to pass the embedded `OpDataReduce` to SDK `PrepareMeanOrSumHelper(...)`
+  - switched `eval` to use the cached `keep_dims` instead of reading `TfLiteReducerParams` from `node->builtin_data`
+  - tightened axis resolution to reject reduce patterns with more than `2` axes instead of risking local buffer overwrite
+- Why this step was necessary:
+  - after Step `5.28`, the board log showed KWS could boot and open the gate, but actual inference still failed in the patched `MEAN` eval path:
+    - `params != NULL was not true`
+    - `Node MEAN ... failed to invoke`
+    - `kws worker process failed: status=-6`
+  - this proved the remaining blocker had moved from `prepare` to runtime `eval`
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model asset was changed again
+  - the patch keeps reusing SDK reduce prepare logic while only caching the single reducer flag that the project-side eval actually needs
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
+  - `build_RTL8730E/ota_all.bin` = `3601792`

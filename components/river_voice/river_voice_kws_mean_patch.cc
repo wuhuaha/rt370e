@@ -13,6 +13,11 @@
 
 namespace {
 
+struct river_voice_kws_mean_patch_op_data {
+    tflite::OpDataReduce reduce;
+    bool keep_dims;
+};
+
 template <typename T>
 static T river_voice_kws_mean_patch_clamp(int32_t value)
 {
@@ -37,6 +42,9 @@ static bool river_voice_kws_mean_patch_resolve_axes(const int *axis_data,
         *axes_len_out = 0;
     }
     if (axis_data == NULL || axes_out == NULL || rank <= 0 || axis_count <= 0) {
+        return false;
+    }
+    if (axis_count > 2) {
         return false;
     }
 
@@ -100,8 +108,9 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     const TfLiteEvalTensor *input;
     const TfLiteEvalTensor *axis;
     TfLiteEvalTensor *output;
+    const river_voice_kws_mean_patch_op_data *patch_data;
     const tflite::OpDataReduce *op_data;
-    const TfLiteReducerParams *params;
+    bool keep_dims;
     const T *input_data;
     T *output_data;
     int axes[2];
@@ -121,14 +130,16 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     input = tflite::micro::GetEvalInput(context, node, 0);
     axis = tflite::micro::GetEvalInput(context, node, 1);
     output = tflite::micro::GetEvalOutput(context, node, 0);
-    op_data = static_cast<const tflite::OpDataReduce *>(node->user_data);
-    params = reinterpret_cast<const TfLiteReducerParams *>(node->builtin_data);
+    patch_data = static_cast<const river_voice_kws_mean_patch_op_data *>(
+        node->user_data);
+    op_data = patch_data != NULL ? &patch_data->reduce : NULL;
+    keep_dims = patch_data != NULL ? patch_data->keep_dims : false;
 
     TF_LITE_ENSURE(context, input != NULL);
     TF_LITE_ENSURE(context, axis != NULL);
     TF_LITE_ENSURE(context, output != NULL);
+    TF_LITE_ENSURE(context, patch_data != NULL);
     TF_LITE_ENSURE(context, op_data != NULL);
-    TF_LITE_ENSURE(context, params != NULL);
     TF_LITE_ENSURE_EQ(context, axis->type, kTfLiteInt32);
     TF_LITE_ENSURE_EQ(context, input->dims->size, 4);
 
@@ -151,7 +162,7 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     axis0 = axes[0];
     axis1 = axes_len > 1 ? axes[1] : -1;
 
-    if (axes_len == 1 && params->keep_dims && axis0 == 2) {
+    if (axes_len == 1 && keep_dims && axis0 == 2) {
         TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
         TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
         TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
@@ -178,7 +189,7 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
         return kTfLiteOk;
     }
 
-    if (axes_len == 1 && params->keep_dims && axis0 == 1) {
+    if (axes_len == 1 && keep_dims && axis0 == 1) {
         TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
         TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
         TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
@@ -208,7 +219,7 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     if (axes_len == 2 && axis0 == 1 && axis1 == 2) {
         const int count = h * w;
 
-        if (params->keep_dims) {
+        if (keep_dims) {
             TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
             TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
             TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
@@ -248,22 +259,32 @@ static void *river_voice_kws_mean_patch_init(TfLiteContext *context,
                                              const char *buffer,
                                              size_t length)
 {
-    void *op_data;
+    river_voice_kws_mean_patch_op_data *patch_data;
+    const TfLiteReducerParams *params;
 
-    (void)buffer;
     (void)length;
-    op_data = context->AllocatePersistentBuffer(
-        context, sizeof(tflite::OpDataReduce));
-    return new (op_data) tflite::OpDataReduce();
+    patch_data = static_cast<river_voice_kws_mean_patch_op_data *>(
+        context->AllocatePersistentBuffer(context, sizeof(*patch_data)));
+    if (patch_data == NULL) {
+        return NULL;
+    }
+    memset(patch_data, 0, sizeof(*patch_data));
+    params = reinterpret_cast<const TfLiteReducerParams *>(buffer);
+    patch_data->keep_dims = params != NULL ? params->keep_dims : false;
+    return patch_data;
 }
 
 static TfLiteStatus river_voice_kws_mean_patch_prepare(TfLiteContext *context,
                                                        TfLiteNode *node)
 {
+    river_voice_kws_mean_patch_op_data *patch_data;
+
     TF_LITE_ENSURE(context, context != NULL);
     TF_LITE_ENSURE(context, node != NULL);
-    return tflite::PrepareMeanOrSumHelper(
-        context, node, static_cast<tflite::OpDataReduce *>(node->user_data));
+    patch_data =
+        static_cast<river_voice_kws_mean_patch_op_data *>(node->user_data);
+    TF_LITE_ENSURE(context, patch_data != NULL);
+    return tflite::PrepareMeanOrSumHelper(context, node, &patch_data->reduce);
 }
 
 static TfLiteStatus river_voice_kws_mean_patch_eval(TfLiteContext *context,

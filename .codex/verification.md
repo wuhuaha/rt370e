@@ -2596,3 +2596,51 @@ Pass signals:
 Fail interpretation:
 - if the old `axis->type` or `Node MEAN ... failed to prepare` lines still appear, the board is still running a pre-fix image or the flash did not actually complete
 - if boot succeeds but a `Data abort` appears again after `kws gate open`, then `prepare` is fixed and the remaining issue is in the patched `MEAN` eval path
+
+## Step 5.29
+Rebuild after caching `keep_dims` inside the patched KWS `MEAN` op:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3601760`
+  - `build_RTL8730E/ota_all.bin 3601792`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board boot completely
+- confirm KWS still initializes and reaches `kws gate open`
+- then say the wakeword a few times and keep watching the first real inference window
+
+Pass signals:
+- these runtime failure lines no longer appear:
+  - `params != NULL was not true`
+  - `Node MEAN ... failed to invoke`
+  - `kws worker process failed: status=-6`
+- KWS proceeds to a real inference result instead of failing inside patched `MEAN`:
+  - `kws gate open`
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+
+Secondary observation:
+- if `kws tensor data drift: ...` still appears but wakeword can complete and no worker failure follows, capture it anyway because it may indicate a separate runtime-handle issue
+
+Fail interpretation:
+- if `params != NULL was not true` still appears, the board is still running a pre-fix image
+- if `Node MEAN ... failed to invoke` still appears with a different message, capture the new exact log because the blocker has moved past the old builtin-data dependency
+- if `wakeword hit` still never appears but there are no `MEAN` failures anymore, the remaining problem is no longer operator bring-up; it has moved to threshold / score / wake path behavior
