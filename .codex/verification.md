@@ -1821,3 +1821,54 @@ Expected result:
 - `git log --all --name-only -- plan.md.bk` returns no tracked history for that file
 - current authoritative plan remains `plan.md`
 - `git status --short` remains clean except the user-owned `.env`
+
+## Step 5.10
+Rebuild the firmware with the baseline embedded KWS model selected:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Optional local build checks:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_KWS_MODEL_VARIANT_(BASELINE|ROUND6_TARGETED_EXPERIMENTAL)" \
+  build_RTL8730E/build/project_ap/.config_ca32 \
+  build_RTL8730E/build/project_hp/.config_km4
+strings -a build_RTL8730E/build/project_ap/image/target_img2.axf | rg "baseline_embedded|round6_targeted_experimental"
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Flash and run the isolation check on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected boot/runtime evidence:
+- KWS startup log shows `variant=baseline_embedded`
+- the log no longer shows `variant=round6_targeted_experimental`
+- boot still shows:
+  - `online control service init: text_debug=stubbed`
+  - `interaction_diag=compiled=no`
+  - VAD probe autostart and XiaoZhi realtime init lines
+
+Board-side pass/fail check:
+- Let the board reach the first Wi-Fi connect attempt under the same boot conditions that previously crashed.
+- Watch the period around:
+  - `kws gate open`
+  - `connect attempt=1`
+- Pass:
+  - the board stays alive through Wi-Fi connect attempts and no dual `Data abort` appears
+- Fail:
+  - a crash still occurs with `variant=baseline_embedded`
+  - if it does, collect the new abort addresses before changing any more runtime paths
+
+Interpretation:
+- Stable with `baseline_embedded`:
+  - treat the round6 experimental DS-CNN model/runtime combination as the primary regression
+- Still crashes with `baseline_embedded`:
+  - continue investigating the general KWS runtime path or surrounding memory pressure, not XiaoZhi session logic first

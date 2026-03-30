@@ -1097,3 +1097,27 @@
     - wake -> XiaoZhi realtime target flow
     - VAD-assisted audio bridge
     - compile-time gating for online text/TTS debug injection
+
+## Step 5.10
+- Isolated the board crash investigation away from the experimental DS-CNN student model by switching the default KWS embedded variant back to the repository baseline model in `prj.conf`.
+- Kept the product path unchanged for this step:
+  - local KWS still enabled
+  - VAD probe still active
+  - wake -> XiaoZhi realtime path still intact
+  - only the embedded wake-word model variant changed
+- Verified the generated build configs now select:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_BASELINE=y`
+  - `# CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL is not set`
+- Verified the built CA32 image now embeds `baseline_embedded` instead of `round6_targeted_experimental`.
+- Built `RTL8730E` successfully after the switch.
+- Captured updated image sizes after the isolation change:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Compared with the prior experimental-model build:
+  - app image increased by `32768` bytes
+  - this size increase is expected for this isolation step and is smaller risk than continuing to ship the model variant currently implicated by the crash trace
+- Current conclusion:
+  - the next board flash is now a high-signal A/B check
+  - if the crash disappears with `baseline_embedded`, the experimental round6 model/runtime combination is the primary suspect
+  - if the crash persists, investigation should continue inside the general KWS runtime path rather than in XiaoZhi session logic
