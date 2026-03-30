@@ -219,6 +219,21 @@ Manual check:
 Interpretation:
 - The repeating beep is clean and recognizable:
 
+## Step 5.21
+Documentation review:
+```bash
+cd /root/ameba-river
+sed -n '1,220p' doc/KWS_BC_RESNET_REPLACEMENT_PLAN_ZH.md
+sed -n '1,220p' .codex/plan.md
+sed -n '1,220p' plan.md
+```
+
+Expected review result:
+- the replacement plan explicitly records the two direct blockers:
+  - missing `Add` op
+  - `98x40x1` vs `40x98x1` input-layout mismatch
+- the plan files state that BC-ResNet replacement is the immediate hotfix track before further refactor work continues
+
 ## Step 4.7
 Build and flash:
 ```bash

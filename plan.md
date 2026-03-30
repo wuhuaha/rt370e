@@ -7,6 +7,12 @@ Branch: `DS-CNN`
 
 当前分支目标已经从“继续模型迁移”切换为“先把现有板端链路重构到稳定、可维护、可继续扩展的基线”。
 
+但在继续主线重构前，当前插入一个更高优先级的短平快热修步骤：
+
+- 先把基线 `KWS` 模型替换为 `bc_resnet_best.tflite`
+- 验证新的本地唤醒模型能否更稳定地拉起 `XiaoZhi` 会话
+- 完成该替换后，再继续后续主线重构
+
 当前优先级顺序：
 
 1. 修正运行时正确性
@@ -72,6 +78,29 @@ Status: completed
 
 - `doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md`
 - 本文件
+
+### Phase 0.5: BC-ResNet Hotfix Replacement
+
+Status: in progress
+
+目标：
+
+- 把当前基线唤醒词模型替换为 `bc_resnet_best.tflite`
+- 只做最小运行时适配，不引入新的模型分支复杂度
+
+范围：
+
+- `components/river_voice/river_voice_kws.cc`
+- `components/river_voice/river_voice_frontend.c`
+- `components/river_voice/generated/river_wake_word_model_data.h`
+- `doc/KWS_BC_RESNET_REPLACEMENT_PLAN_ZH.md`
+
+成功标准：
+
+- resolver 支持 `Add`
+- 板端能识别并按模型真实输入布局填充张量
+- `bc_resnet_best` 能成功通过本地 build 集成到镜像
+- 板端唤醒后能继续进入 `XiaoZhi` 会话链路
 
 ### Phase 1: Correctness First
 

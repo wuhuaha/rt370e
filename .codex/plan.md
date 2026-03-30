@@ -57,6 +57,28 @@ For the current phase, the product path remains:
 
 `AEC` remains an optional experimental capability, not part of the current default product mainline.
 
+## Immediate Hotfix Track: BC-ResNet KWS Replacement
+
+Status:
+
+- in progress
+
+Goal:
+
+- replace the current baseline embedded wake-word model with `bc_resnet_best.tflite`
+- keep board-side runtime changes minimal and reversible
+- validate `wake -> XiaoZhi session` with the new model before returning to broader refactor work
+
+Execution rule:
+
+1. land a dedicated replacement plan document first
+2. adapt the KWS runtime only where required:
+   - `Add` op registration
+   - model-driven input layout handling
+3. replace the baseline embedded model asset
+4. keep threshold permissive for current board-side validation
+5. verify by full local build first, then by board wake/session logs
+
 The current branch objective has moved in two steps:
 
 - first: integrate `XiaoZhi` as a realtime conversation transport while preserving the existing split `ASR + TTS` cloud path as a flashable fallback baseline

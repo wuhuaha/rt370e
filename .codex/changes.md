@@ -1380,3 +1380,21 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only tightens state/flow control and does not add assets or enlarge static buffers.
+
+## Step 5.21
+- Landed the dedicated BC-ResNet wake-word replacement plan before touching runtime code.
+- Added [doc/KWS_BC_RESNET_REPLACEMENT_PLAN_ZH.md](/root/ameba-river/doc/KWS_BC_RESNET_REPLACEMENT_PLAN_ZH.md) to record:
+  - why `bc_resnet_best.tflite` cannot be dropped in directly
+  - the exact two runtime blockers:
+    - missing `Add` op registration
+    - input layout mismatch between current `98x40x1` write order and BC-ResNet `40x98x1`
+  - the chosen minimal-change replacement strategy
+  - validation focus and remaining risks
+- Updated both plan trackers:
+  - [plan.md](/root/ameba-river/plan.md)
+  - [.codex/plan.md](/root/ameba-river/.codex/plan.md)
+- Why this step matters:
+  - it freezes the replacement contract before code churn starts
+  - it prevents the runtime implementation from drifting into ad hoc model-specific fixes
+  - it makes the next implementation commit auditable against a concrete plan
+- No product code or embedded assets changed in this step.
