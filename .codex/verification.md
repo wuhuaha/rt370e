@@ -1872,3 +1872,50 @@ Interpretation:
   - treat the round6 experimental DS-CNN model/runtime combination as the primary regression
 - Still crashes with `baseline_embedded`:
   - continue investigating the general KWS runtime path or surrounding memory pressure, not XiaoZhi session logic first
+
+## Step 5.11
+Rebuild the firmware after shrinking XiaoZhi downlink playback buffering:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Optional local source check:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES|RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK" \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected source result:
+- `RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 3U`
+- `RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 2U`
+
+Flash and reproduce the same wake -> XiaoZhi -> TTS path on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- Trigger wakeword and let XiaoZhi proceed into a spoken reply so downlink playback starts.
+- Watch for these lines around TTS start:
+  - `xiaozhi conversation window opened`
+  - `asr session started`
+  - `tts sid=... state=start`
+
+Pass signals:
+- TTS playback starts without `Malloc failed. Core:[CA32], Task:[river_xz_down]`
+- no `xWantedSize:46144`
+- ideally a new playback line appears:
+  - `xiaozhi playback start: ... mode=no_ref`
+  - or, if the first attempt is still too large, a retry line appears first:
+    `xiaozhi playback start retry: status=... -> compact mode no_ref buffer_frames=2`
+
+Fail signals:
+- CA32 still logs malloc failure during XiaoZhi TTS start
+- if it fails, record the new `xWantedSize` and the remaining free heap
+- if compact fallback also fails, the next step should shrink playback buffering further or reduce the generic playback service allocation policy

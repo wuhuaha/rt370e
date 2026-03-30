@@ -1121,3 +1121,26 @@
   - the next board flash is now a high-signal A/B check
   - if the crash disappears with `baseline_embedded`, the experimental round6 model/runtime combination is the primary suspect
   - if the crash persists, investigation should continue inside the general KWS runtime path rather than in XiaoZhi session logic
+
+## Step 5.11
+- Reduced the XiaoZhi downlink playback buffer sizing again to lower CA32 heap pressure when TTS playback starts.
+- Updated [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h):
+  - `RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES: 6 -> 3`
+  - `RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK: 4 -> 2`
+- Left the rest of the XiaoZhi realtime path unchanged:
+  - wakeword admission
+  - websocket/session setup
+  - uplink audio framing
+  - downlink ring depth and playback start threshold
+- Rationale:
+  - the latest successful wake -> XiaoZhi session log showed the new blocker is not recognition or websocket setup
+  - the failure moved to CA32 playback start, with `river_xz_down` hitting `Malloc failed ... xWantedSize:46144`
+  - the playback service multiplies the track minimum buffer by `buffer_frame_count`, so shrinking these constants is the direct low-risk lever for this allocation
+- Verified a full `RTL8730E` build after the buffer reduction.
+- Current packaged image sizes remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Expected runtime effect:
+  - first playback attempt now uses about half the prior frame multiplier
+  - compact fallback is now tighter again if the first playback open still cannot fit
