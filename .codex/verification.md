@@ -2365,3 +2365,26 @@ Useful interpretation:
   - stale follow-up state is being cleared promptly when XiaoZhi transport dies
 - Fail:
   - if `capture frame ring overflow` still appears immediately after a XiaoZhi transport/session drop, there is still another blocking path inside the audio-side open/feed flow and that path needs to be isolated next
+
+## Step 5.23
+Documentation check:
+```bash
+cd /root/ameba-river
+test -f knowledge/WSL2_FLASH_TROUBLESHOOTING_ZH.md
+sed -n '1,220p' knowledge/WSL2_FLASH_TROUBLESHOOTING_ZH.md
+```
+
+If the WSL2 flashing issue recurs, re-run the recorded triage flow:
+```bash
+cd /root/ameba-river
+source env.sh
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/ttyS* 2>/dev/null
+stty -F /dev/ttyUSB0 -a
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+```
+
+Expected result:
+- the knowledge note exists under `knowledge/`
+- the note records that current images still fit the project profile range
+- if a USB-bridged serial node is present, `river_flash.py` prints the project profile path before download:
+  - `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`

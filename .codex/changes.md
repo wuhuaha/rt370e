@@ -1426,3 +1426,19 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
   - `build_RTL8730E/ota_all.bin` = `3593600`
 - Image size decreased relative to the previous baseline because the BC-ResNet asset is smaller than the previous embedded wake-word model.
+
+## Step 5.23
+- Added a project knowledge note for the resolved WSL2 flashing issue:
+  - [knowledge/WSL2_FLASH_TROUBLESHOOTING_ZH.md](/root/ameba-river/knowledge/WSL2_FLASH_TROUBLESHOOTING_ZH.md)
+- Captured the concrete conclusion from this incident:
+  - `0xE8 Address error` was not caused by the current firmware size exceeding the project flash profile
+  - the real risk area is WSL2 serial-device visibility and whether the project-owned flash profile is actually being used
+- Documented the verified size facts used during diagnosis:
+  - current `km0_km4_ca32_app.bin` is `3593568B`
+  - current `ota_all.bin` is `3593600B`
+  - both still fit inside the project app range `0x08040000-0x08600000`
+- Recorded the WSL2-specific operational guidance:
+  - do not assume `COM3 -> /dev/ttyS2` is usable just because the numbering matches
+  - prefer `usbipd-win` plus `/dev/ttyUSB0` or `/dev/ttyACM0`
+  - always flash through `python3 tools/river_flash.py ...`
+- This step is documentation-only and does not change firmware code or binary assets.
