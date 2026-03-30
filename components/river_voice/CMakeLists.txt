@@ -51,6 +51,7 @@ ameba_list_append(private_sources
 if(CONFIG_RIVER_VOICE_CAPABILITY_KWS)
     ameba_list_append(private_sources
         river_voice_kws.cc
+        river_voice_kws_mean_patch.cc
     )
 endif()
 

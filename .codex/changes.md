@@ -1481,3 +1481,30 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
   - `build_RTL8730E/ota_all.bin` = `3593600`
+
+## Step 5.26
+- Fixed the `bc_resnet_best` wake path crash that happened on the first real KWS inference after `kws gate open`.
+- Added project-side patched quantized `MEAN` support:
+  - [components/river_voice/river_voice_kws_mean_patch.h](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.h)
+  - [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc)
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - include the patched `MEAN` registration
+  - replace the fixed `MicroMutableOpResolver` usage with a local resolver that can register the project-side patched builtin `MEAN`
+  - keep the rest of the BC-ResNet operator set unchanged
+- Updated [components/river_voice/CMakeLists.txt](/root/ameba-river/components/river_voice/CMakeLists.txt):
+  - build the new patched `MEAN` source only when KWS capability is enabled
+- Why this step was necessary:
+  - the board log showed KWS boot was successful, but the first real inference crashed immediately after:
+    - `kws gate open: ...`
+    - `Data abort with Data Fault Status Register 0x00001a11`
+  - symbolication placed the fault inside TensorFlow Lite Micro quantized `MEAN`
+  - the failing CA32 store target was unaligned, so the safest fix was to keep SDK sources untouched and replace only the project's KWS-side `MEAN` registration path
+- Why this is the chosen fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no wakeword model asset was changed again
+  - the patch is scoped to the known BC-ResNet reduction patterns used by the current model
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
+  - `build_RTL8730E/ota_all.bin` = `3601792`

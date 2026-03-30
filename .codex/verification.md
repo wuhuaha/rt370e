@@ -2478,3 +2478,48 @@ Pass signals:
 
 Fail interpretation:
 - if `AllocateTensors failed` still appears with the new arena, collect the new exact `Requested/available/missing` numbers first; do not guess at the next size bump
+
+## Step 5.26
+Rebuild after adding the project-side patched `MEAN` op for BC-ResNet KWS:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images become:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3601760`
+  - `build_RTL8730E/ota_all.bin 3601792`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board boot, connect Wi-Fi, and complete SNTP sync
+- say the wakeword a few times until the runtime reaches `kws gate open`
+- keep watching the serial log during the first real KWS inference window
+
+Pass signals:
+- these old crash lines do not appear anymore:
+  - `Data abort with Data Fault Status Register 0x00001a11`
+  - immediate reboot right after `kws gate open`
+- KWS reaches a real wake result instead of crashing:
+  - `kws gate open`
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+- no patch fallback error is printed:
+  - `river kws mean patch got unsupported reduce pattern`
+
+Fail interpretation:
+- if the board still crashes, capture the new fault PC/LR and full first-crash stack; do not assume it is still the same `MEAN` issue
+- if `river kws mean patch got unsupported reduce pattern` appears, capture the full surrounding KWS logs because the model is using a reduce pattern outside the currently patched cases

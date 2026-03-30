@@ -41,6 +41,8 @@ extern "C" {
 #define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_best"
 #endif
 
+#include "river_voice_kws_mean_patch.h"
+
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
@@ -121,8 +123,130 @@ extern "C" {
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.kws"
 
-typedef tflite::MicroMutableOpResolver<RIVER_KWS_OP_COUNT>
-    river_voice_kws_op_resolver_t;
+class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
+  public:
+    river_voice_kws_op_resolver_t()
+        : registrations_len_(0U), builtin_parsers_len_(0U)
+    {
+    }
+
+    const TFLMRegistration *FindOp(tflite::BuiltinOperator op) const override
+    {
+        unsigned int index;
+
+        if (op == tflite::BuiltinOperator_CUSTOM) {
+            return NULL;
+        }
+        for (index = 0U; index < registrations_len_; ++index) {
+            if (registrations_[index].builtin_code == (int32_t)op) {
+                return &registrations_[index];
+            }
+        }
+        return NULL;
+    }
+
+    const TFLMRegistration *FindOp(const char *op) const override
+    {
+        (void)op;
+        return NULL;
+    }
+
+    tflite::TfLiteBridgeBuiltinParseFunction
+    GetOpDataParser(tflite::BuiltinOperator op) const override
+    {
+        unsigned int index;
+
+        for (index = 0U; index < builtin_parsers_len_; ++index) {
+            if (builtin_codes_[index] == op) {
+                return builtin_parsers_[index];
+            }
+        }
+        return NULL;
+    }
+
+    TfLiteStatus AddQuantize()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_QUANTIZE,
+                          tflite::Register_QUANTIZE(), tflite::ParseQuantize);
+    }
+
+    TfLiteStatus AddPad()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_PAD, tflite::Register_PAD(),
+                          tflite::ParsePad);
+    }
+
+    TfLiteStatus AddAdd()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_ADD, tflite::Register_ADD(),
+                          tflite::ParseAdd);
+    }
+
+    TfLiteStatus AddConv2D()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_CONV_2D,
+                          tflite::Register_CONV_2D(), tflite::ParseConv2D);
+    }
+
+    TfLiteStatus AddDepthwiseConv2D()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_DEPTHWISE_CONV_2D,
+                          tflite::Register_DEPTHWISE_CONV_2D(),
+                          tflite::ParseDepthwiseConv2D);
+    }
+
+    TfLiteStatus AddPatchedMean()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_MEAN,
+                          river_voice_kws_RegisterPatchedMean(),
+                          tflite::ParseReducer);
+    }
+
+    TfLiteStatus AddFullyConnected()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_FULLY_CONNECTED,
+                          tflite::Register_FULLY_CONNECTED(),
+                          tflite::ParseFullyConnected);
+    }
+
+    TfLiteStatus AddLogistic()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_LOGISTIC,
+                          tflite::Register_LOGISTIC(),
+                          tflite::ParseLogistic);
+    }
+
+  private:
+    TfLiteStatus AddBuiltin(tflite::BuiltinOperator op,
+                            const TFLMRegistration &registration,
+                            tflite::TfLiteBridgeBuiltinParseFunction parser)
+    {
+        TFLMRegistration *dst;
+
+        if (registrations_len_ >= RIVER_KWS_OP_COUNT ||
+            builtin_parsers_len_ >= RIVER_KWS_OP_COUNT) {
+            return kTfLiteError;
+        }
+        if (FindOp(op) != NULL) {
+            return kTfLiteError;
+        }
+        dst = &registrations_[registrations_len_++];
+        *dst = registration;
+        dst->builtin_code = (int32_t)op;
+        dst->custom_name = NULL;
+        builtin_codes_[builtin_parsers_len_] = op;
+        builtin_parsers_[builtin_parsers_len_] = parser;
+        ++builtin_parsers_len_;
+        return kTfLiteOk;
+    }
+
+    TFLMRegistration registrations_[RIVER_KWS_OP_COUNT];
+    tflite::BuiltinOperator builtin_codes_[RIVER_KWS_OP_COUNT];
+    tflite::TfLiteBridgeBuiltinParseFunction
+        builtin_parsers_[RIVER_KWS_OP_COUNT];
+    unsigned int registrations_len_;
+    unsigned int builtin_parsers_len_;
+};
 
 typedef enum {
     RIVER_KWS_QUEUE_ITEM_PCM = 0U,
@@ -481,6 +605,57 @@ static bool river_voice_kws_runtime_io_shape(const TfLiteTensor *tensor,
     return true;
 }
 
+static bool river_voice_kws_resolve_io_shape(const tflite::Model *model,
+                                             const TfLiteTensor *tensor,
+                                             bool input,
+                                             uint32_t dims_out[4],
+                                             size_t *dim_count,
+                                             const char **source)
+{
+    if (source != NULL) {
+        *source = "none";
+    }
+    if (river_voice_kws_schema_io_shape(model, input, dims_out, dim_count)) {
+        if (source != NULL) {
+            *source = "schema";
+        }
+        return true;
+    }
+    if (river_voice_kws_runtime_io_shape(tensor, dims_out, dim_count)) {
+        if (source != NULL) {
+            *source = "runtime";
+        }
+        return true;
+    }
+    return false;
+}
+
+static bool river_voice_kws_shape_element_count(const uint32_t *dims,
+                                                size_t dim_count,
+                                                size_t *element_count)
+{
+    size_t count = 1U;
+    size_t index;
+
+    if (element_count != NULL) {
+        *element_count = 0U;
+    }
+    if (dims == NULL || dim_count == 0U) {
+        return false;
+    }
+
+    for (index = 0U; index < dim_count; ++index) {
+        if (dims[index] == 0U) {
+            return false;
+        }
+        count *= (size_t)dims[index];
+    }
+    if (element_count != NULL) {
+        *element_count = count;
+    }
+    return true;
+}
+
 static bool river_voice_kws_detect_input_layout(
     const tflite::Model *model,
     const TfLiteTensor *input_tensor,
@@ -491,18 +666,12 @@ static bool river_voice_kws_detect_input_layout(
     uint32_t dims[4];
     size_t dim_count = 0U;
 
-    if (source != NULL) {
-        *source = "none";
-    }
-    if (river_voice_kws_schema_io_shape(model, true, dims, &dim_count)) {
-        if (source != NULL) {
-            *source = "schema";
-        }
-    } else if (river_voice_kws_runtime_io_shape(input_tensor, dims, &dim_count)) {
-        if (source != NULL) {
-            *source = "runtime";
-        }
-    } else {
+    if (!river_voice_kws_resolve_io_shape(model,
+                                          input_tensor,
+                                          true,
+                                          dims,
+                                          &dim_count,
+                                          source)) {
         return false;
     }
 
@@ -764,7 +933,7 @@ static river_status_t river_voice_kws_register_ops(
         resolver->AddAdd() != kTfLiteOk ||
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
-        resolver->AddMean() != kTfLiteOk ||
+        resolver->AddPatchedMean() != kTfLiteOk ||
         resolver->AddFullyConnected() != kTfLiteOk ||
         resolver->AddLogistic() != kTfLiteOk) {
         return RIVER_ERR_UNSUPPORTED;
@@ -1584,6 +1753,10 @@ extern "C" river_status_t river_voice_kws_init(void)
     const char *input_quant_source;
     const char *output_quant_source;
     const char *input_shape_source;
+    const char *output_shape_source;
+    uint32_t output_shape[4];
+    size_t output_dim_count = 0U;
+    size_t output_value_count = 0U;
 
     if (g_river_voice_kws != NULL) {
         return RIVER_OK;
@@ -1755,6 +1928,23 @@ extern "C" river_status_t river_voice_kws_init(void)
         status = RIVER_ERR_UNSUPPORTED;
         goto fail;
     }
+    if (!river_voice_kws_resolve_io_shape(g_river_voice_kws->model,
+                                          g_river_voice_kws->output_tensor,
+                                          false,
+                                          output_shape,
+                                          &output_dim_count,
+                                          &output_shape_source) ||
+        !river_voice_kws_shape_element_count(output_shape,
+                                             output_dim_count,
+                                             &output_value_count) ||
+        output_value_count != 1U) {
+        RIVER_LOGE("kws output shape unsupported: runtime_out=%s model_out=%s output_bytes=%lu",
+                   river_voice_kws_tensor_type_name(g_river_voice_kws->output_tensor->type),
+                   river_voice_kws_tensor_type_name(g_river_voice_kws->model_output_type),
+                   (unsigned long)g_river_voice_kws->output_tensor->bytes);
+        status = RIVER_ERR_UNSUPPORTED;
+        goto fail;
+    }
 
     input_value_count = RIVER_KWS_EXPECTED_INPUT_VALUES;
     input_elements = input_value_count;
@@ -1882,6 +2072,13 @@ extern "C" river_status_t river_voice_kws_init(void)
                (unsigned long)g_river_voice_kws->input_shape[2],
                (unsigned long)g_river_voice_kws->input_shape[3],
                river_voice_kws_input_layout_name(g_river_voice_kws->input_layout));
+    RIVER_LOGI("kws output shape: src=%s dims=[%lu,%lu,%lu,%lu] values=%lu",
+               output_shape_source,
+               (unsigned long)output_shape[0],
+               (unsigned long)output_shape[1],
+               (unsigned long)output_shape[2],
+               (unsigned long)output_shape[3],
+               (unsigned long)output_value_count);
     RIVER_LOGI("kws alloc: ctx=%p ctx_raw=%p arena=%p arena_raw=%p align=%u input_bytes=%lu output_bytes=%lu",
                (void *)g_river_voice_kws,
                g_river_voice_kws_allocation,
