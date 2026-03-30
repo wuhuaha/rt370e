@@ -1521,6 +1521,28 @@
   - required delivery report fields and acceptance gates
 - Why this step matters:
   - the current `bc_resnet_best.tflite` is usable, but it forced the firmware side to add a patched `MEAN`
-  - long-term binary size and maintenance are better served by a native export type that avoids `MEAN`
-  - this reduces ambiguity when handing requirements to the training side
+- long-term binary size and maintenance are better served by a native export type that avoids `MEAN`
+- this reduces ambiguity when handing requirements to the training side
 - This step is documentation-only and does not change firmware code or binary assets.
+
+## Step 5.28
+- Fixed the boot-time KWS init regression introduced by the project-side patched `MEAN` op.
+- Updated [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):
+  - simplified `river_voice_kws_mean_patch_prepare()`
+  - removed the project-side tensor prevalidation from `prepare`
+  - delegated `prepare` directly to SDK `tflite::PrepareMeanOrSumHelper(...)`
+- Why this step was necessary:
+  - the latest board boot log proved KWS never initialized, so wakeword could never trigger:
+    - `axis->type != kTfLiteInt32 (0 != 2)`
+    - `Node MEAN ... failed to prepare`
+    - `kws AllocateTensors failed: arena=192KB model=56024B`
+  - this failure happened in the patched op `prepare` path before any real KWS inference started
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model asset was changed again
+  - the project keeps the scoped patched `MEAN` eval path, but reuses the SDK's compatible `prepare` logic instead of trying to duplicate it locally
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
+  - `build_RTL8730E/ota_all.bin` = `3601792`

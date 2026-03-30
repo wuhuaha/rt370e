@@ -260,35 +260,10 @@ static void *river_voice_kws_mean_patch_init(TfLiteContext *context,
 static TfLiteStatus river_voice_kws_mean_patch_prepare(TfLiteContext *context,
                                                        TfLiteNode *node)
 {
-    tflite::MicroContext *micro_context;
-    TfLiteTensor *input = NULL;
-    TfLiteTensor *axis = NULL;
-    TfLiteTensor *output = NULL;
-    TfLiteStatus status = kTfLiteError;
-
     TF_LITE_ENSURE(context, context != NULL);
     TF_LITE_ENSURE(context, node != NULL);
-
-    micro_context = tflite::GetMicroContext(context);
-    input = micro_context->AllocateTempInputTensor(node, 0);
-    axis = micro_context->AllocateTempInputTensor(node, 1);
-    output = micro_context->AllocateTempOutputTensor(node, 0);
-    TF_LITE_ENSURE(context, input != NULL);
-    TF_LITE_ENSURE(context, axis != NULL);
-    TF_LITE_ENSURE(context, output != NULL);
-    TF_LITE_ENSURE_EQ(context, node->inputs->size, 2);
-    TF_LITE_ENSURE_EQ(context, node->outputs->size, 1);
-    TF_LITE_ENSURE_EQ(context, axis->type, kTfLiteInt32);
-    TF_LITE_ENSURE(context,
-                   input->type == kTfLiteInt8 || input->type == kTfLiteInt16);
-    TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-    TF_LITE_ENSURE_EQ(context, input->dims->size, 4);
-    status = tflite::PrepareMeanOrSumHelper(
+    return tflite::PrepareMeanOrSumHelper(
         context, node, static_cast<tflite::OpDataReduce *>(node->user_data));
-    micro_context->DeallocateTempTfLiteTensor(output);
-    micro_context->DeallocateTempTfLiteTensor(axis);
-    micro_context->DeallocateTempTfLiteTensor(input);
-    return status;
 }
 
 static TfLiteStatus river_voice_kws_mean_patch_eval(TfLiteContext *context,

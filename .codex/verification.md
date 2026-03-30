@@ -2548,3 +2548,51 @@ Manual check:
 Expected outcome:
 - no firmware rebuild is required for this step
 - no binary output changes are expected for this step
+
+## Step 5.28
+Rebuild after letting the patched KWS `MEAN` op reuse SDK `prepare`:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3601760`
+  - `build_RTL8730E/ota_all.bin 3601792`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board complete boot and watch the KWS init block before testing wakeword
+- confirm the old `MEAN prepare` failure is gone
+- after Wi-Fi and SNTP are ready, say the wakeword a few times
+
+Pass signals:
+- these old boot-failure lines no longer appear:
+  - `axis->type != kTfLiteInt32 (0 != 2)`
+  - `Node MEAN ... failed to prepare`
+  - `kws AllocateTensors failed: arena=192KB model=56024B`
+- KWS init logs appear normally again, for example:
+  - `kws tensor io: ...`
+  - `kws alloc: ...`
+  - `kws backend: ...`
+- after a real wakeword, runtime proceeds past boot monitoring:
+  - `kws gate open`
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+
+Fail interpretation:
+- if the old `axis->type` or `Node MEAN ... failed to prepare` lines still appear, the board is still running a pre-fix image or the flash did not actually complete
+- if boot succeeds but a `Data abort` appears again after `kws gate open`, then `prepare` is fixed and the remaining issue is in the patched `MEAN` eval path
