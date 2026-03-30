@@ -318,6 +318,11 @@ static uint32_t river_cloud_system_utc_seconds(void)
     return 0U;
 }
 
+static bool river_cloud_system_time_ready(void)
+{
+    return river_cloud_system_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
+}
+
 static uint32_t river_cloud_estimated_utc_seconds(void)
 {
     uint32_t sec;
@@ -433,7 +438,12 @@ bool river_cloud_utc_ready(void)
 
 bool river_cloud_time_ready(void)
 {
-    return river_cloud_system_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
+    return river_cloud_system_time_ready();
+}
+
+bool river_cloud_wake_admission_time_ready(void)
+{
+    return river_cloud_estimated_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
 }
 
 void river_cloud_start_sntp_if_needed(void)
@@ -537,6 +547,37 @@ void river_cloud_log_time_ready_once(void)
 
     g_river_cloud.time_ready_announced = true;
     RIVER_LOGI("sntp ready: utc=%lu", (unsigned long)river_cloud_now_utc_seconds());
+}
+
+void river_cloud_log_wake_admission_deferred_once(river_status_t status)
+{
+    bool wifi_connected;
+    bool time_ready;
+
+    wifi_connected = river_wifi_station_is_connected();
+    time_ready = river_cloud_wake_admission_time_ready();
+    if ((g_river_cloud.wake_admission_defer_status == (int)status) &&
+        (g_river_cloud.wake_admission_defer_wifi_connected == wifi_connected) &&
+        (g_river_cloud.wake_admission_defer_time_ready == time_ready)) {
+        return;
+    }
+
+    g_river_cloud.wake_admission_defer_status = (int)status;
+    g_river_cloud.wake_admission_defer_wifi_connected = wifi_connected;
+    g_river_cloud.wake_admission_defer_time_ready = time_ready;
+    RIVER_LOGI("wake admission deferred: provider=%s status=%d wifi=%s admission_time_ready=%s system_time_ready=%s",
+               river_cloud_asr_provider_name(),
+               (int)status,
+               river_wifi_station_status_name(),
+               time_ready ? "yes" : "no",
+               river_cloud_time_ready() ? "yes" : "no");
+}
+
+void river_cloud_reset_wake_admission_deferred_state(void)
+{
+    g_river_cloud.wake_admission_defer_status = 0;
+    g_river_cloud.wake_admission_defer_wifi_connected = false;
+    g_river_cloud.wake_admission_defer_time_ready = false;
 }
 
 static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
@@ -1387,6 +1428,7 @@ void river_cloud_adapter_notify_network_ready(void)
     river_cloud_kick_sntp_on_network_ready();
     river_cloud_log_time_ready_once();
     river_cloud_reset_stream_open_deferred_state();
+    river_cloud_reset_wake_admission_deferred_state();
 }
 
 void river_cloud_adapter_notify_network_lost(void)
@@ -1396,6 +1438,7 @@ void river_cloud_adapter_notify_network_lost(void)
     }
 
     river_cloud_reset_stream_open_deferred_state();
+    river_cloud_reset_wake_admission_deferred_state();
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {

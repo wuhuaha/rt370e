@@ -85,10 +85,14 @@ typedef struct {
     uint32_t final_results;
     uint32_t error_results;
     bool time_ready_announced;
+    bool wake_admission_estimate_announced;
     bool time_seeded_from_build;
     int stream_open_defer_status;
     bool stream_open_defer_wifi_connected;
     bool stream_open_defer_time_ready;
+    int wake_admission_defer_status;
+    bool wake_admission_defer_wifi_connected;
+    bool wake_admission_defer_time_ready;
     uint32_t seeded_utc_epoch;
     uint64_t seeded_utc_rtos_ms;
     uint32_t stream_started_ms;
@@ -144,9 +148,12 @@ typedef struct {
 extern river_cloud_context_t g_river_cloud;
 
 bool river_cloud_time_ready(void);
+bool river_cloud_wake_admission_time_ready(void);
 void river_cloud_start_sntp_if_needed(void);
 void river_cloud_seed_time_from_build_if_needed(void);
 void river_cloud_log_time_ready_once(void);
+void river_cloud_log_wake_admission_deferred_once(river_status_t status);
+void river_cloud_reset_wake_admission_deferred_state(void);
 void river_cloud_pre_roll_reset(void);
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED

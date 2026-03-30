@@ -1967,3 +1967,60 @@ Expected result:
 Runtime/build note:
 - This is a documentation-only step.
 - No firmware build or board flash is required for this step because no runtime code changed.
+
+## Step 5.14
+Rebuild the firmware after the wake admission retry and XiaoZhi admission-time cleanup:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Flash and validate the wake-before-SNTP scenario on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side validation flow:
+- Boot the board and wait until:
+  - Wi-Fi is still connecting or has just connected
+  - `sntp ready: utc=...` has not appeared yet
+- Speak the wake word once during that window.
+- Continue watching the serial log without speaking the wake word again.
+
+Pass signals:
+- the log shows a held wake instead of a one-shot loss:
+  - `wakeword queued ...`
+  - optionally `wakeword admission deferred; retry pending ...`
+- the cloud side explains the defer reason without log spam:
+  - `wake admission deferred: provider=xiaozhi_realtime status=-4 wifi=... admission_time_ready=... system_time_ready=...`
+- if system time is still not ready but build-seeded time is usable, the log may show:
+  - `wake admission proceeding with build-seeded utc estimate`
+- after the transient busy condition clears, the same wake should continue into:
+  - `xiaozhi connecting: ...`
+  - `Connected to websocket server`
+  - `xiaozhi conversation window opened: source=wakeword ...`
+
+Fail signals:
+- the board logs one wake hit, then no retry behavior appears and XiaoZhi never connects
+- the wake must be spoken a second time after Wi-Fi/time becomes ready
+- `wakeword admission failed: status=...` appears for a retryable busy path
+
+Interpretation:
+- Pass:
+  - the wake admission path is no longer lossy under transient Wi-Fi / time readiness conditions
+- Fail:
+  - if retries appear but never converge, continue by inspecting the precise busy reason in the new cloud log
+  - if no retries appear, re-check the wake worker state in `river_session_coordinator.c`

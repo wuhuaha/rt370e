@@ -16,6 +16,7 @@
 
 #define RIVER_SESSION_WAKEWORD_TASK_STACK (1024U * 8U)
 #define RIVER_SESSION_WAKEWORD_TASK_PRIO  3U
+#define RIVER_SESSION_WAKEWORD_RETRY_MS   250U
 
 typedef struct {
     rtos_mutex_t lock;
@@ -23,6 +24,7 @@ typedef struct {
     rtos_task_t task;
     bool task_running;
     bool pending;
+    bool deferred_logged;
     int confidence;
     char text[32];
 } river_session_wakeword_context_t;
@@ -49,6 +51,14 @@ static void river_session_wakeword_unlock(void)
     if (g_river_session_coordinator.wakeword.lock != NULL) {
         (void)rtos_mutex_give(g_river_session_coordinator.wakeword.lock);
     }
+}
+
+static void river_session_wakeword_clear_locked(void)
+{
+    g_river_session_coordinator.wakeword.pending = false;
+    g_river_session_coordinator.wakeword.deferred_logged = false;
+    g_river_session_coordinator.wakeword.confidence = 0;
+    g_river_session_coordinator.wakeword.text[0] = '\0';
 }
 
 static bool river_session_playback_state_active(river_playback_state_t state)
@@ -78,6 +88,8 @@ static void river_session_wakeword_worker(void *param)
 {
     char wake_text[sizeof(g_river_session_coordinator.wakeword.text)];
     int confidence;
+    river_status_t status;
+    bool log_deferred;
 
     (void)param;
     wake_text[0] = '\0';
@@ -103,19 +115,47 @@ static void river_session_wakeword_worker(void *param)
                      "%s",
                      g_river_session_coordinator.wakeword.text);
             confidence = g_river_session_coordinator.wakeword.confidence;
-            g_river_session_coordinator.wakeword.pending = false;
-            g_river_session_coordinator.wakeword.text[0] = '\0';
-            g_river_session_coordinator.wakeword.confidence = 0;
             river_session_wakeword_unlock();
 
-            if (river_cloud_adapter_begin_conversation_window("wakeword") == RIVER_OK) {
+            status = river_cloud_adapter_begin_conversation_window("wakeword");
+            if (status == RIVER_OK) {
+                if (river_session_wakeword_lock()) {
+                    river_session_wakeword_clear_locked();
+                    river_session_wakeword_unlock();
+                }
                 river_interaction_state_set(RIVER_INTERACTION_WAKE_CONFIRMED,
                                             "wakeword_detected");
-            } else {
-                RIVER_LOGW("wakeword admission deferred: text=%s confidence=%d",
+                continue;
+            }
+
+            if (status != RIVER_ERR_BUSY) {
+                if (river_session_wakeword_lock()) {
+                    river_session_wakeword_clear_locked();
+                    river_session_wakeword_unlock();
+                }
+                RIVER_LOGE("wakeword admission failed: status=%d text=%s confidence=%d",
+                           (int)status,
                            wake_text[0] != '\0' ? wake_text : "-",
                            confidence);
+                continue;
             }
+
+            log_deferred = false;
+            if (river_session_wakeword_lock()) {
+                if (g_river_session_coordinator.wakeword.pending &&
+                    !g_river_session_coordinator.wakeword.deferred_logged) {
+                    g_river_session_coordinator.wakeword.deferred_logged = true;
+                    log_deferred = true;
+                }
+                river_session_wakeword_unlock();
+            }
+            if (log_deferred) {
+                RIVER_LOGW("wakeword admission deferred; retry pending text=%s confidence=%d status=%d",
+                           wake_text[0] != '\0' ? wake_text : "-",
+                           confidence,
+                           (int)status);
+            }
+            rtos_time_delay_ms(RIVER_SESSION_WAKEWORD_RETRY_MS);
         }
     }
 }
@@ -190,6 +230,7 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
                      event->text != NULL ? event->text : "");
             g_river_session_coordinator.wakeword.confidence = event->confidence;
         }
+        g_river_session_coordinator.wakeword.deferred_logged = false;
         river_session_wakeword_unlock();
         RIVER_LOGI("wakeword coalesced while pending text=%s confidence=%d",
                    event->text != NULL ? event->text : "-",
@@ -203,6 +244,7 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
              event->text != NULL ? event->text : "");
     g_river_session_coordinator.wakeword.confidence = event->confidence;
     g_river_session_coordinator.wakeword.pending = true;
+    g_river_session_coordinator.wakeword.deferred_logged = false;
     river_session_wakeword_unlock();
 
     RIVER_LOGI("wakeword queued text=%s confidence=%d",

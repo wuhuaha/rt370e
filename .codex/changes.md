@@ -1182,3 +1182,33 @@
   - no runtime source changed
   - no binary content changed
   - this step exists to make the root project entrypoint consistent before starting code refactors
+
+## Step 5.14
+- Completed the first code refactor step under `Phase 1`, focused on wake admission correctness rather than structural file splitting.
+- Updated `components/river_core/river_session_coordinator.c` so wakeword admission is no longer lossy when the cloud side is temporarily unavailable:
+  - a pending wakeword is no longer cleared before admission succeeds
+  - `RIVER_ERR_BUSY` now keeps the wake event pending and retries from the wake worker every `250 ms`
+  - non-retryable admission failures still clear the pending wake and log an error
+  - deferred admission logging is rate-limited so retries do not spam the log on every poll
+- Updated `components/river_cloud/river_cloud_adapter.c` and `components/river_cloud/river_cloud_internal.h` to make the cloud-side time semantics explicit for this path:
+  - `river_cloud_time_ready()` remains the strict system-time / SNTP-ready gate
+  - new internal `river_cloud_wake_admission_time_ready()` uses the best available wake-admission time source, including build-seeded UTC estimate
+  - added a deduplicated `wake admission deferred` log path that reports:
+    - `wifi`
+    - `admission_time_ready`
+    - `system_time_ready`
+- Updated `components/river_cloud/river_cloud_xiaozhi_session.c` so XiaoZhi wake admission now:
+  - starts SNTP and seeds build time as before
+  - allows wake admission to proceed when build-seeded UTC estimate is available even if system time is not yet SNTP-ready
+  - logs once when wake admission proceeds using the build-seeded UTC estimate
+  - resets the deferred-state tracker after successful admission or network lifecycle changes
+- Practical effect of this step:
+  - a wakeword hit that happens before SNTP convergence should no longer be dropped permanently
+  - the board can now hold the wake event and enter XiaoZhi once the transient busy condition clears
+  - logs now make it explicit whether the blocker was Wi-Fi, strict system time, or whether wake admission proceeded on the build-seeded estimate
+- Verified a full local `RTL8730E` build after the change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only reworked existing control flow and logging; it did not add new large runtime assets.

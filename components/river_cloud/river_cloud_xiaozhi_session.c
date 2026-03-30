@@ -199,14 +199,22 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    if (!river_wifi_station_is_connected()) {
-        return RIVER_ERR_BUSY;
-    }
-
     river_cloud_start_sntp_if_needed();
     river_cloud_seed_time_from_build_if_needed();
-    if (!river_cloud_time_ready()) {
+    if (!river_wifi_station_is_connected()) {
+        river_cloud_log_wake_admission_deferred_once(RIVER_ERR_BUSY);
         return RIVER_ERR_BUSY;
+    }
+    if (!river_cloud_wake_admission_time_ready()) {
+        river_cloud_log_wake_admission_deferred_once(RIVER_ERR_BUSY);
+        return RIVER_ERR_BUSY;
+    }
+    river_cloud_reset_wake_admission_deferred_state();
+    if (!river_cloud_time_ready() &&
+        g_river_cloud.time_seeded_from_build &&
+        !g_river_cloud.wake_admission_estimate_announced) {
+        g_river_cloud.wake_admission_estimate_announced = true;
+        RIVER_LOGI("wake admission proceeding with build-seeded utc estimate");
     }
 
     if (!river_xiaozhi_session_open()) {
