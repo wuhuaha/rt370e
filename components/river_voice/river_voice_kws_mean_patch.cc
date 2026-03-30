@@ -162,12 +162,21 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     axis0 = axes[0];
     axis1 = axes_len > 1 ? axes[1] : -1;
 
-    if (axes_len == 1 && keep_dims && axis0 == 2) {
-        TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[2], 1);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
+    if (axes_len == 1 && axis0 == 2) {
+        if (output->dims->size == 4) {
+            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[2], 1);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
+        } else if (output->dims->size == 3) {
+            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[2], c);
+        } else {
+            MicroPrintf("river kws mean patch axis=2 unsupported output rank=%d",
+                        output->dims->size);
+            return kTfLiteError;
+        }
         for (b = 0; b < n; ++b) {
             for (hi = 0; hi < h; ++hi) {
                 for (ci = 0; ci < c; ++ci) {
@@ -189,12 +198,21 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
         return kTfLiteOk;
     }
 
-    if (axes_len == 1 && keep_dims && axis0 == 1) {
-        TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[2], w);
-        TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
+    if (axes_len == 1 && axis0 == 1) {
+        if (output->dims->size == 4) {
+            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[2], w);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
+        } else if (output->dims->size == 3) {
+            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[1], w);
+            TF_LITE_ENSURE_EQ(context, output->dims->data[2], c);
+        } else {
+            MicroPrintf("river kws mean patch axis=1 unsupported output rank=%d",
+                        output->dims->size);
+            return kTfLiteError;
+        }
         for (b = 0; b < n; ++b) {
             for (wi = 0; wi < w; ++wi) {
                 for (ci = 0; ci < c; ++ci) {
@@ -219,16 +237,19 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
     if (axes_len == 2 && axis0 == 1 && axis1 == 2) {
         const int count = h * w;
 
-        if (keep_dims) {
-            TF_LITE_ENSURE_EQ(context, output->dims->size, 4);
+        if (output->dims->size == 4) {
             TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
             TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
             TF_LITE_ENSURE_EQ(context, output->dims->data[2], 1);
             TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
-        } else {
-            TF_LITE_ENSURE_EQ(context, output->dims->size, 2);
+        } else if (output->dims->size == 2) {
             TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
             TF_LITE_ENSURE_EQ(context, output->dims->data[1], c);
+        } else {
+            MicroPrintf(
+                "river kws mean patch axes=1,2 unsupported output rank=%d",
+                output->dims->size);
+            return kTfLiteError;
         }
 
         for (b = 0; b < n; ++b) {
@@ -251,7 +272,10 @@ static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
         return kTfLiteOk;
     }
 
-    MicroPrintf("river kws mean patch got unsupported reduce pattern");
+    MicroPrintf(
+        "river kws mean patch got unsupported reduce pattern axes_len=%d axis0=%d axis1=%d keep_dims=%d in_rank=%d out_rank=%d",
+        axes_len, axis0, axis1, keep_dims ? 1 : 0, input->dims->size,
+        output->dims->size);
     return kTfLiteError;
 }
 

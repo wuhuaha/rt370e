@@ -2644,3 +2644,54 @@ Fail interpretation:
 - if `params != NULL was not true` still appears, the board is still running a pre-fix image
 - if `Node MEAN ... failed to invoke` still appears with a different message, capture the new exact log because the blocker has moved past the old builtin-data dependency
 - if `wakeword hit` still never appears but there are no `MEAN` failures anymore, the remaining problem is no longer operator bring-up; it has moved to threshold / score / wake path behavior
+
+## Step 5.30
+Rebuild after broadening patched KWS `MEAN` matching from `keep_dims` to output-shape-based matching:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3601760`
+  - `build_RTL8730E/ota_all.bin 3601792`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board boot fully, connect Wi-Fi, and complete SNTP sync
+- say the wakeword a few times until runtime reaches `kws gate open`
+- keep watching the first real KWS inference window after gate open
+
+Pass signals:
+- these runtime failure lines no longer appear:
+  - `river kws mean patch got unsupported reduce pattern`
+  - `Node MEAN (number 3) failed to invoke with status 1`
+  - `kws worker process failed: status=-6`
+- KWS proceeds past patched `MEAN` into a real wake path result:
+  - `kws gate open`
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+
+Fail interpretation:
+- if `river kws mean patch got unsupported reduce pattern` still appears, capture the new full log line including:
+  - `axes_len`
+  - `axis0`
+  - `axis1`
+  - `keep_dims`
+  - `in_rank`
+  - `out_rank`
+- if `MEAN` errors disappear but `wakeword hit` still never appears, operator bring-up is no longer the blocker; the next issue is threshold / score / wake-path behavior
+- if `kws tensor data drift: ...` still appears after `MEAN` succeeds, treat it as a separate runtime-handle issue in the KWS tensor plumbing rather than another reduce-pattern issue

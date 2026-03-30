@@ -1570,3 +1570,41 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
   - `build_RTL8730E/ota_all.bin` = `3601792`
+
+## Step 5.30
+- Fixed the remaining KWS runtime failure where patched `MEAN` rejected the live `bc_resnet_best` reduce pattern as unsupported.
+- Reviewed the embedded wakeword model topology from [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - all model `MEAN` nodes are normal reductions on axes `[2]`, `[1]`, or `[1,2]`
+  - the blocker was not a new operator pattern in the model
+  - the blocker was the project-side patch matching too narrowly on `keep_dims`
+- Updated [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):
+  - changed patched `MEAN` eval matching from `axis + keep_dims` to `axis + output shape`
+  - explicitly supports the observed model output layouts:
+    - `axis=2` with rank-`4` output `[N,H,1,C]`
+    - `axis=2` with rank-`3` output `[N,H,C]`
+    - `axis=1` with rank-`4` output `[N,1,W,C]`
+    - `axis=1` with rank-`3` output `[N,W,C]`
+    - `axes=1,2` with rank-`4` output `[N,1,1,C]`
+    - `axes=1,2` with rank-`2` output `[N,C]`
+  - expanded the unsupported-pattern log so any remaining mismatch now prints:
+    - `axes_len`
+    - `axis0`
+    - `axis1`
+    - `keep_dims`
+    - `in_rank`
+    - `out_rank`
+- Why this step was necessary:
+  - the latest board log showed KWS could now boot and run, but each real inference still failed with:
+    - `river kws mean patch got unsupported reduce pattern`
+    - `Node MEAN (number 3) failed to invoke`
+    - `kws worker process failed: status=-6`
+  - model inspection showed op `3` is a standard `MEAN(axis=[2])`, so the patch needed to recognize the real output layout instead of rejecting it
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model asset was changed again
+  - the fix stays scoped to the project's patched KWS `MEAN` eval path
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
+  - `build_RTL8730E/ota_all.bin` = `3601792`
