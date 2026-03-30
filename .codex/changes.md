@@ -1463,3 +1463,21 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
   - `build_RTL8730E/ota_all.bin` = `3593600`
+
+## Step 5.25
+- Fixed the current `bc_resnet` wake path boot failure by increasing the KWS tensor arena in [prj.conf](/root/ameba-river/prj.conf):
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` from `160` to `192`
+- Why this step was necessary:
+  - the board log showed KWS never initialized after boot:
+    - `Failed to resize buffer. Requested: 159744, available 152920, missing: 6824`
+    - `kws AllocateTensors failed: arena=160KB model=56024B`
+  - once `AllocateTensors` fails, local KWS is inactive, so no wakeword can ever be detected and XiaoZhi will never enter the websocket connect path from idle wake monitoring
+- Why this is the minimal fix:
+  - no SDK source was modified
+  - no model asset or operator set was changed in this step
+  - the failure was a straightforward tensor-arena capacity miss after the model swap, so the first correction is to size the arena for the real model footprint
+- Verified a full local `RTL8730E` build after the config bump.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
+  - `build_RTL8730E/ota_all.bin` = `3593600`

@@ -2432,3 +2432,49 @@ Pass signals:
 If KWS is inactive at boot, expected warning now becomes:
 - `kws init failed status=...; continue with stable non-kws path`
 - `wake admission fallback disabled: idle VAD admission stays wakeword-gated while local KWS is inactive`
+
+## Step 5.25
+Rebuild after increasing the BC-ResNet KWS tensor arena:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3593568`
+  - `build_RTL8730E/ota_all.bin 3593600`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board boot and watch the KWS initialization phase before Wi-Fi connect completes
+- confirm the old boot failure is gone
+- then say the wakeword a few times after Wi-Fi and time sync are ready
+
+Pass signals:
+- these old failure lines no longer appear:
+  - `Failed to resize buffer. Requested: 159744, available 152920, missing: 6824`
+  - `kws AllocateTensors failed: arena=160KB model=56024B`
+- KWS boot logs appear normally again, for example:
+  - `kws tensor io: ...`
+  - `kws alloc: ...`
+  - `kws backend: ...`
+- after a real wakeword, the runtime reaches the XiaoZhi connect path again:
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+  - `Connected to websocket server`
+
+Fail interpretation:
+- if `AllocateTensors failed` still appears with the new arena, collect the new exact `Requested/available/missing` numbers first; do not guess at the next size bump
