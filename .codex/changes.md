@@ -1310,3 +1310,33 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only adds source comments and does not alter compiled behavior or runtime assets.
+
+## Step 5.19
+- Fixed the next XiaoZhi runtime memory failure on the uplink path after wake/session open had already succeeded.
+- Observed board failure before this step:
+  - websocket connect succeeded
+  - `server hello` arrived
+  - ASR streaming entered
+  - then `river_xz_up` failed with:
+    - `Malloc failed ... [xWantedSize:8320]`
+    - followed by `INIC-E WIFI TRX IPC 4 timeout`
+- Root cause:
+  - XiaoZhi websocket transport was created with `RIVER_XIAOZHI_WS_TX_MAX=8192`
+  - Ameba SDK `wsclient` dynamically allocates `tx_buf_len + 16` per queued send buffer item
+  - under low free heap, the next uplink queue expansion in `river_xz_up` tried to allocate another `~8 KB` send buffer and failed
+- Updated [include/river/river_xiaozhi_credentials.h](/root/ameba-river/include/river/river_xiaozhi_credentials.h) only:
+  - lowered `RIVER_XIAOZHI_WS_TX_MAX` from `8192` to `1024`
+  - lowered `RIVER_XIAOZHI_WS_QUEUE_MAX` from `16` to `4`
+  - documented why the reduced values are still sufficient for the current project contract:
+    - uplink Opus/binary frames are already bounded well below `512 B` payload plus framing
+    - current hello/listen/abort JSON and MCP envelopes remain within the reduced headroom
+- Why this step matters:
+  - this directly removes the exact `~8 KB` dynamic allocation class seen in the crash log
+  - it also caps worst-case websocket send-queue growth so heap pressure fails earlier and smaller instead of fragmenting late
+  - scope stays narrow because no cloud/session logic or protocol payload shape was changed
+- Verified a full local `RTL8730E` build after the config change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only tightens runtime websocket buffer limits and does not add code or assets.

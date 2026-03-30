@@ -2199,3 +2199,57 @@ Runtime/build note:
 - This is a comment-only maintenance step.
 - No new board-side behavior is expected, so a full flash/functional regression pass is not mandatory for this step.
 - If a spot check is desired, boot logs should remain identical to the previous functional build.
+
+## Step 5.19
+Rebuild the firmware after tightening XiaoZhi websocket uplink tx buffer sizing:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Flash and validate the XiaoZhi wake-to-uplink path on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side validation flow:
+- Boot the board, wait for Wi-Fi connect, and trigger XiaoZhi with the wake word.
+- Confirm the session still opens normally:
+  - `Connected to websocket server`
+  - `server hello: sid=...`
+  - `asr stream active: provider=xiaozhi_realtime ...`
+- Keep speaking for a few seconds so `river_xz_up` continuously sends uplink Opus frames.
+
+Pass signals:
+- the previous large uplink heap allocation no longer appears:
+  - no `Malloc failed. Core:[CA32], Task:[river_xz_up], [xWantedSize:8320]`
+- the transport remains alive during continuous speech:
+  - no immediate `INIC-E WIFI TRX IPC 4 timeout`
+  - `stt sid=... text=...` or later cloud-side results can still arrive
+- wake/session open behavior is unchanged
+
+Failure signals to watch:
+- `json_send_failed`
+- `binary_send_failed`
+- `ERROR: The length of data exceeded the max tx buf len`
+- `ERROR: Not get usable buffer, Please enlarge max_queue_size!`
+
+Interpretation:
+- Pass:
+  - the uplink websocket buffer contract is now aligned with the real packet size and no longer burns heap on `~8 KB` queue items
+- Fail:
+  - if `max tx buf len` appears, one of the control JSON payloads is larger than expected and the tx limit must be raised moderately
+  - if queue exhaustion appears without heap failure, queue depth may need a small follow-up increase while keeping the reduced tx buffer size

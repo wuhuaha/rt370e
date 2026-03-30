@@ -25,9 +25,19 @@
  */
 #define RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS  20U
 
-#define RIVER_XIAOZHI_WS_TX_MAX                 8192
+/*
+ * XiaoZhi uplink audio is already bounded by the project-side Opus packet and
+ * websocket binary frame contract, so keeping an 8 KB wsclient tx buffer only
+ * wastes heap and makes queue growth fail late under pressure.
+ *
+ * 1024 B covers:
+ * - current Opus/binary uplink packets (well below 512 B payload + framing)
+ * - hello/listen/abort control JSON
+ * - current MCP response envelopes
+ */
+#define RIVER_XIAOZHI_WS_TX_MAX                 1024
 #define RIVER_XIAOZHI_WS_RX_MAX                 12288
-#define RIVER_XIAOZHI_WS_QUEUE_MAX              16
+#define RIVER_XIAOZHI_WS_QUEUE_MAX              4
 #define RIVER_XIAOZHI_OPEN_READY_WAIT_MS        10000U
 #define RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC      10U
 
