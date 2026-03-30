@@ -1508,3 +1508,19 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
   - `build_RTL8730E/ota_all.bin` = `3601792`
+
+## Step 5.27
+- Added a training-side KWS export contract for future embedded-friendly wakeword models:
+  - [knowledge/KWS_MODEL_EXPORT_CONTRACT_ZH.md](/root/ameba-river/knowledge/KWS_MODEL_EXPORT_CONTRACT_ZH.md)
+- This document is intended to be handed directly to the model-training team.
+- The contract makes the deployment boundary explicit:
+  - fixed input/output expectations for `Ameba River`
+  - int8-only export requirement
+  - operator whitelist and blacklist
+  - explicit prohibition on post-export graph rewriting
+  - required delivery report fields and acceptance gates
+- Why this step matters:
+  - the current `bc_resnet_best.tflite` is usable, but it forced the firmware side to add a patched `MEAN`
+  - long-term binary size and maintenance are better served by a native export type that avoids `MEAN`
+  - this reduces ambiguity when handing requirements to the training side
+- This step is documentation-only and does not change firmware code or binary assets.

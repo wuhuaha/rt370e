@@ -2523,3 +2523,28 @@ Pass signals:
 Fail interpretation:
 - if the board still crashes, capture the new fault PC/LR and full first-crash stack; do not assume it is still the same `MEAN` issue
 - if `river kws mean patch got unsupported reduce pattern` appears, capture the full surrounding KWS logs because the model is using a reduce pattern outside the currently patched cases
+
+## Step 5.27
+Review the new KWS export contract document:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' knowledge/KWS_MODEL_EXPORT_CONTRACT_ZH.md
+```
+
+Expected review result:
+- the document clearly specifies:
+  - input/output tensor contract
+  - int8 quantization requirement
+  - operator whitelist
+  - operator blacklist
+  - export-side prohibition on post-export graph rewriting
+  - required delivery report fields
+  - acceptance criteria for training-side handoff
+
+Manual check:
+- confirm the document can be forwarded directly to the training team without needing firmware-side explanation
+- confirm it explicitly states that future embedded export types should avoid `MEAN`
+
+Expected outcome:
+- no firmware rebuild is required for this step
+- no binary output changes are expected for this step
