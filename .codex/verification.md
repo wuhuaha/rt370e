@@ -2172,3 +2172,30 @@ Expected side effect:
 Scope note:
 - This is a temporary bring-up tuning step only.
 - Once wake/session flow is validated, the threshold should be tightened again or replaced by a better model/calibration pass.
+
+## Step 5.18
+Rebuild the firmware after adding Chinese comments to project-owned source files:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+git diff --stat
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Review check:
+- `git diff --stat` shows comment-only source updates across the project-owned code tree
+- no generated model data or SDK source is modified
+
+Runtime/build note:
+- This is a comment-only maintenance step.
+- No new board-side behavior is expected, so a full flash/functional regression pass is not mandatory for this step.
+- If a spot check is desired, boot logs should remain identical to the previous functional build.

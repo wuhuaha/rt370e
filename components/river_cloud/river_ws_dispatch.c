@@ -1,3 +1,4 @@
+/* WebSocket 分发器：把底层回调路由到具体云端连接实例。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>

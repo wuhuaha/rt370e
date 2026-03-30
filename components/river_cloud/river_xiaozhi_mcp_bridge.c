@@ -1,3 +1,4 @@
+/* 小智 MCP 桥接实现：把云端工具调用映射到本地控制接口。 */
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>

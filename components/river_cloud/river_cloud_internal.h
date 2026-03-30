@@ -1,3 +1,4 @@
+/* 云端模块内部共享状态、常量与上下文定义。 */
 #ifndef RIVER_CLOUD_INTERNAL_H
 #define RIVER_CLOUD_INTERNAL_H
 

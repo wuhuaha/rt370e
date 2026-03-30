@@ -1,3 +1,4 @@
+/* 交互状态枚举与状态机接口。 */
 #ifndef AMEBA_RIVER_INTERACTION_STATE_H
 #define AMEBA_RIVER_INTERACTION_STATE_H
 

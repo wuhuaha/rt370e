@@ -1,3 +1,4 @@
+/* 语音运行时策略接口：集中评估 AEC 门控和系统就绪状态。 */
 #ifndef AMEBA_RIVER_VOICE_RUNTIME_POLICY_H
 #define AMEBA_RIVER_VOICE_RUNTIME_POLICY_H
 

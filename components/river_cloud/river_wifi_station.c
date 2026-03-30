@@ -1,3 +1,4 @@
+/* Wi-Fi STA 管理实现：负责连接策略、重试与状态统计输出。 */
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>

@@ -1,3 +1,4 @@
+/* 原始采集接口：封装 AudioRecord 打开、读取和运行时统计。 */
 #ifndef AMEBA_RIVER_VOICE_CAPTURE_H
 #define AMEBA_RIVER_VOICE_CAPTURE_H
 

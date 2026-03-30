@@ -1,3 +1,4 @@
+/* 语音帧缓冲池：复用采集、增强和参考缓冲，降低碎片化风险。 */
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

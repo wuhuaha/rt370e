@@ -1,3 +1,4 @@
+/* Wi-Fi STA 管理接口。 */
 #ifndef AMEBA_RIVER_WIFI_STATION_H
 #define AMEBA_RIVER_WIFI_STATION_H
 

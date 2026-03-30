@@ -1,3 +1,4 @@
+/* 语音配置档与能力位定义。 */
 #ifndef AMEBA_RIVER_VOICE_PROFILE_H
 #define AMEBA_RIVER_VOICE_PROFILE_H
 

@@ -1,3 +1,4 @@
+/* 语音运行时策略实现：根据交互态和参考活动决定能力门控。 */
 #include "river/river_voice_runtime_policy.h"
 
 static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t state)

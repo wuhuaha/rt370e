@@ -1,3 +1,4 @@
+/* 小智 WebSocket 协议实现：处理 OTA bootstrap、消息收发与音频上行。 */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

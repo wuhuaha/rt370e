@@ -1,3 +1,4 @@
+/* 云端 ASR Provider 私有抽象：统一流式/批量接口与回调约定。 */
 #ifndef AMEBA_RIVER_ASR_PROVIDER_INTERNAL_H
 #define AMEBA_RIVER_ASR_PROVIDER_INTERNAL_H
 

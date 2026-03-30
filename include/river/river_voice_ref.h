@@ -1,3 +1,4 @@
+/* 语音参考数据接口：管理回放参考流的打开、写入和读取。 */
 #ifndef AMEBA_RIVER_VOICE_REF_H
 #define AMEBA_RIVER_VOICE_REF_H
 

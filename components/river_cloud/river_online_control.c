@@ -1,3 +1,4 @@
+/* 在线控制示例实现：当前维护本地设备状态并提供文本调试回显。 */
 #include <string.h>
 
 #include "river/river_cloud.h"

@@ -1,3 +1,4 @@
+/* 云端适配总控：管理 SNTP、ASR/TTS、会话窗口和与语音前端的桥接。 */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

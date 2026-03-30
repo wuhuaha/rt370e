@@ -1,3 +1,4 @@
+/* 播放服务接口：统一管理 TTS/提示音流的启动、写入和抢占。 */
 #ifndef AMEBA_RIVER_PLAYBACK_SERVICE_H
 #define AMEBA_RIVER_PLAYBACK_SERVICE_H
 

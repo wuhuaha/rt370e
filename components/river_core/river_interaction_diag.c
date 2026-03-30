@@ -1,3 +1,4 @@
+/* 交互诊断实现：提供文本路由、意图模拟和延迟 TTS 测试入口。 */
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>

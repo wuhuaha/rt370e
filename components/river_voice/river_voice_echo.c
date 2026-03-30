@@ -1,3 +1,4 @@
+/* 板级回声调试路径：把采集和预处理结果延迟回放到扬声器。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

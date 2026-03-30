@@ -1,3 +1,4 @@
+/* Opus 编解码器薄封装：把云端音频参数转换为统一项目接口。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

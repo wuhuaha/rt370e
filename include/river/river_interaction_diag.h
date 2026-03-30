@@ -1,3 +1,4 @@
+/* 交互诊断接口：用于命令注入、意图模拟和状态排障。 */
 #ifndef AMEBA_RIVER_INTERACTION_DIAG_H
 #define AMEBA_RIVER_INTERACTION_DIAG_H
 

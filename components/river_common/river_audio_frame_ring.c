@@ -1,3 +1,4 @@
+/* 通用音频帧环形缓冲：统一处理采集、播放和参考流的帧级排队。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

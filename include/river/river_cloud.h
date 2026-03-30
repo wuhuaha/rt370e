@@ -1,3 +1,4 @@
+/* 云端适配层公共接口：统一抽象在线 ASR、TTS 与会话状态。 */
 #ifndef AMEBA_RIVER_CLOUD_H
 #define AMEBA_RIVER_CLOUD_H
 

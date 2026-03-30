@@ -1,3 +1,4 @@
+/* 实验侧路实现：给调试和未来实验能力提供帧级旁路挂点。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

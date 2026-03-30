@@ -1,3 +1,4 @@
+/* 语音配置档表：定义各实验档位的通道、能力与阶段掩码。 */
 #include <stddef.h>
 
 #include "platform_autoconf.h"

@@ -1,3 +1,4 @@
+/* 交互状态机：记录设备当前所处的人机交互阶段和切换原因。 */
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>

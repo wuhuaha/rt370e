@@ -1,3 +1,4 @@
+/* 小智 MCP 桥接私有接口。 */
 #ifndef AMEBA_RIVER_XIAOZHI_MCP_BRIDGE_H
 #define AMEBA_RIVER_XIAOZHI_MCP_BRIDGE_H
 

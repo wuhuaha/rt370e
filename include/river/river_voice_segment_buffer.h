@@ -1,3 +1,4 @@
+/* 语音分段缓冲接口：管理 VAD 片段的前滚、后滚和输出状态。 */
 #ifndef AMEBA_RIVER_VOICE_SEGMENT_BUFFER_H
 #define AMEBA_RIVER_VOICE_SEGMENT_BUFFER_H
 

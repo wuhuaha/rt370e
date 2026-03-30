@@ -1,3 +1,4 @@
+/* 讯飞实时转写服务的静态凭据与默认连接参数。 */
 #ifndef AMEBA_RIVER_ASR_IFLYTEK_CREDENTIALS_H
 #define AMEBA_RIVER_ASR_IFLYTEK_CREDENTIALS_H
 

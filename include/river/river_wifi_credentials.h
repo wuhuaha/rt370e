@@ -1,3 +1,4 @@
+/* 板级临时 Wi-Fi 凭据。 */
 #ifndef AMEBA_RIVER_WIFI_CREDENTIALS_H
 #define AMEBA_RIVER_WIFI_CREDENTIALS_H
 

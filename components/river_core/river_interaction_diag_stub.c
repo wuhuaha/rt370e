@@ -1,3 +1,4 @@
+/* 交互诊断桩实现：在裁剪诊断功能时保持接口和调用点稳定。 */
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
 #include "river/river_online_control.h"

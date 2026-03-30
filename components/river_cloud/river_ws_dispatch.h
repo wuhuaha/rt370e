@@ -1,3 +1,4 @@
+/* WebSocket 分发器私有接口。 */
 #ifndef AMEBA_RIVER_WS_DISPATCH_H
 #define AMEBA_RIVER_WS_DISPATCH_H
 

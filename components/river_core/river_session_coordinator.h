@@ -1,3 +1,4 @@
+/* 会话协调器对外接口：负责连接语音事件、播放事件和云端结果。 */
 #ifndef AMEBA_RIVER_SESSION_COORDINATOR_H
 #define AMEBA_RIVER_SESSION_COORDINATOR_H
 

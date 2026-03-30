@@ -1,3 +1,4 @@
+/* 应用编排入口：按依赖顺序拉起 Wi-Fi、云端、语音和交互子系统。 */
 #include "river/river_app.h"
 #include "river/river_cloud.h"
 #include "river/river_interaction_state.h"
@@ -22,6 +23,7 @@ river_status_t river_app_boot(void)
     RIVER_LOGI("ameba-river boot");
     RIVER_LOGI("target=RTL8730E");
 
+    /* 先初始化所有基础服务，再绑定跨模块回调关系。 */
     river_runtime_stats_init();
     if (river_interaction_state_init() != RIVER_OK) {
         return RIVER_ERR_NO_MEMORY;
@@ -92,6 +94,7 @@ void river_app_print_status(void)
     const char *profile_name;
     const river_voice_profile_config_t *profile;
 
+    /* 统一汇总当前构建配置和各运行时子系统状态，便于串口诊断。 */
     profile = river_voice_profile_active();
     profile_name = river_voice_preproc_profile_name();
     RIVER_LOGI("local_frontend=%s", river_voice_frontend_mode_name());

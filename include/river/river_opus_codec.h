@@ -1,3 +1,4 @@
+/* Opus 编解码器封装，屏蔽底层库句柄和参数细节。 */
 #ifndef AMEBA_RIVER_OPUS_CODEC_H
 #define AMEBA_RIVER_OPUS_CODEC_H
 

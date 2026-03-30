@@ -1,3 +1,4 @@
+/* VAD 探针路径：独立观察采集、检测和流式桥接的实时行为。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

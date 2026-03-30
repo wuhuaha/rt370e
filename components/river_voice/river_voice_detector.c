@@ -1,3 +1,4 @@
+/* 语音检测抽象层：在统一入口下选择具体检测后端。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

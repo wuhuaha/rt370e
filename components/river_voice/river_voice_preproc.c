@@ -1,3 +1,4 @@
+/* 预处理抽象层：统一调度不同的波束形成/AEC 预处理后端。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

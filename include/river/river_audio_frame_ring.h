@@ -1,3 +1,4 @@
+/* 通用音频帧环形缓冲接口，供采集、播放和参考流复用。 */
 #ifndef AMEBA_RIVER_AUDIO_FRAME_RING_H
 #define AMEBA_RIVER_AUDIO_FRAME_RING_H
 

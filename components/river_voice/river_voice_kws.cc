@@ -1,3 +1,4 @@
+/* 唤醒词后端：完成特征提取、TFLite Micro 推理和触发判定。 */
 #include <math.h>
 #include <new>
 #include <limits.h>

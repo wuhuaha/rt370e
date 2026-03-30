@@ -1,3 +1,4 @@
+/* 预处理抽象层：屏蔽固定波束形成或 AEC 等不同后端实现。 */
 #ifndef AMEBA_RIVER_VOICE_PREPROC_H
 #define AMEBA_RIVER_VOICE_PREPROC_H
 

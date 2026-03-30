@@ -1,3 +1,4 @@
+/* 项目基础类型与统一错误码定义。 */
 #ifndef AMEBA_RIVER_TYPES_H
 #define AMEBA_RIVER_TYPES_H
 

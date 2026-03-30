@@ -1,3 +1,4 @@
+/* 语音前端主控：串起采集、预处理、VAD、KWS 和分段输出。 */
 #include "river/river_log.h"
 #include "river/river_voice.h"
 #include "river/river_voice_board.h"

@@ -1,3 +1,4 @@
+/* 回放参考服务：把播放流导出为 AEC/参考链路可消费的历史音频。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

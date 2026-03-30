@@ -1,3 +1,4 @@
+/* 小智会话编排：处理唤醒准入、会话窗口、ASR/TTS 与回放衔接。 */
 #include <stdio.h>
 #include <string.h>
 

@@ -1,3 +1,4 @@
+/* 语音分段缓冲实现：围绕 VAD 生命周期组织前滚/后滚音频片段。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

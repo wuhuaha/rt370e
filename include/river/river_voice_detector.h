@@ -1,3 +1,4 @@
+/* 语音检测器抽象：统一封装 VAD/后续检测模型的运行接口。 */
 #ifndef AMEBA_RIVER_VOICE_DETECTOR_H
 #define AMEBA_RIVER_VOICE_DETECTOR_H
 

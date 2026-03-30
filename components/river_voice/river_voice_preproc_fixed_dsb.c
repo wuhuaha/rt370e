@@ -1,3 +1,4 @@
+/* 固定延时求和预处理实现，可按运行时策略接入 WebRTC AECM。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

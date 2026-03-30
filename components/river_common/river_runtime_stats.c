@@ -1,3 +1,4 @@
+/* 运行时统计模块：定期采样任务占用、栈余量和堆水位。 */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

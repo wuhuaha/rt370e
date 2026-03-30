@@ -1,3 +1,4 @@
+/* 小智 WebSocket 协议接口与事件结构定义。 */
 #ifndef AMEBA_RIVER_XIAOZHI_WS_H
 #define AMEBA_RIVER_XIAOZHI_WS_H
 

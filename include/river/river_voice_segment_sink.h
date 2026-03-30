@@ -1,3 +1,4 @@
+/* 语音分段下游接口：把完成的音频片段交给具体上传或处理后端。 */
 #ifndef AMEBA_RIVER_VOICE_SEGMENT_SINK_H
 #define AMEBA_RIVER_VOICE_SEGMENT_SINK_H
 

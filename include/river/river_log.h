@@ -1,3 +1,4 @@
+/* 项目统一日志接口与等级定义。 */
 #ifndef AMEBA_RIVER_LOG_H
 #define AMEBA_RIVER_LOG_H
 

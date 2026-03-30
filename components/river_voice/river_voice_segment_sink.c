@@ -1,3 +1,4 @@
+/* 语音分段桥接：把分段数据转交给当前云端或后续下游。 */
 #include <string.h>
 
 #include "river/river_cloud.h"

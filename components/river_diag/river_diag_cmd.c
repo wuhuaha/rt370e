@@ -1,3 +1,4 @@
+/* 串口诊断命令入口：集中暴露状态查询、音频测试和云端调试命令。 */
 #include <stdio.h>
 #include <string.h>
 
@@ -65,6 +66,7 @@ static void river_diag_join_args(u16 argc, u8 *argv[], u16 start, char *out_text
     out_text[0] = '\0';
     offset = 0;
 
+    /* 把命令行剩余参数重新拼成完整文本，便于透传到云端或调试模块。 */
     for (index = start; index < argc; ++index) {
         int written;
 
@@ -96,6 +98,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 #endif
     const char *audio_action;
 
+    /* 统一从这里分发所有 `river ...` 诊断子命令。 */
     if (argc == 0) {
         river_diag_help();
         return 0;

@@ -1,3 +1,4 @@
+/* 播放服务实现：统一管理 AudioTrack 生命周期、抢占和参考输出。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

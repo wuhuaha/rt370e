@@ -1,3 +1,4 @@
+/* 会话协调器：衔接唤醒、云端会话、播放状态和交互状态机。 */
 #include <stdio.h>
 #include <string.h>
 

@@ -1,3 +1,4 @@
+/* WebRTC AECM 适配层：补齐参考 FIFO、门控和块级处理封装。 */
 #include "river_voice_webrtc_aecm_adapter.h"
 
 #include <stdbool.h>

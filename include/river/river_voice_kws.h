@@ -1,3 +1,4 @@
+/* 唤醒词模块公共接口。 */
 #ifndef AMEBA_RIVER_VOICE_KWS_H
 #define AMEBA_RIVER_VOICE_KWS_H
 

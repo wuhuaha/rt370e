@@ -1,3 +1,4 @@
+/* 云端 ASR Provider 注册表：按名称查找当前可用的识别后端。 */
 #include <stddef.h>
 #include <string.h>
 

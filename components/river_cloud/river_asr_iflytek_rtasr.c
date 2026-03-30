@@ -1,3 +1,4 @@
+/* 讯飞实时转写接入实现：负责鉴权、WebSocket 会话和结果回调。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

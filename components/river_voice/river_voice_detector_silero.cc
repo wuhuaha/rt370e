@@ -1,3 +1,4 @@
+/* Silero VAD 后端：封装 TFLite Micro 推理和阈值化语音判定。 */
 #include <new>
 
 #include "basic_types.h"

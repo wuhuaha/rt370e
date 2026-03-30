@@ -1,3 +1,4 @@
+/* 板级语音阵列描述：集中记录麦克风拓扑和增益基线。 */
 #ifndef AMEBA_RIVER_VOICE_BOARD_H
 #define AMEBA_RIVER_VOICE_BOARD_H
 

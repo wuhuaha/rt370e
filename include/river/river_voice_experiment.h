@@ -1,3 +1,4 @@
+/* 实验侧路接口：给调试/实验模块保留帧级挂接点。 */
 #ifndef AMEBA_RIVER_VOICE_EXPERIMENT_H
 #define AMEBA_RIVER_VOICE_EXPERIMENT_H
 

@@ -1,3 +1,4 @@
+/* 在线控制抽象：封装文本回显与设备控制入口。 */
 #ifndef AMEBA_RIVER_ONLINE_CONTROL_H
 #define AMEBA_RIVER_ONLINE_CONTROL_H
 

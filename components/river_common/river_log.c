@@ -1,3 +1,4 @@
+/* 项目统一日志实现：提供时间戳、等级过滤和可选的二级输出。 */
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -139,6 +140,7 @@ void river_log_vwrite(river_log_level_t level,
     river_log_trim_newline(message);
     timestamp_ms = river_log_timestamp_ms();
 
+    /* 统一在这里串行化输出，避免多任务日志互相穿插。 */
     river_log_ensure_mutex();
     if (g_river_log.mutex_ready) {
         (void)rtos_mutex_take(g_river_log.mutex, MUTEX_WAIT_TIMEOUT);

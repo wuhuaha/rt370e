@@ -1,3 +1,4 @@
+/* 运行时统计采样接口。 */
 #ifndef AMEBA_RIVER_RUNTIME_STATS_H
 #define AMEBA_RIVER_RUNTIME_STATS_H
 

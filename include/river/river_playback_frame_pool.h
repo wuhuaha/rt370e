@@ -1,3 +1,4 @@
+/* 播放缓冲池接口：集中管理播放参考路径所需的临时内存。 */
 #ifndef AMEBA_RIVER_PLAYBACK_FRAME_POOL_H
 #define AMEBA_RIVER_PLAYBACK_FRAME_POOL_H
 

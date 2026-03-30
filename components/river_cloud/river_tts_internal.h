@@ -1,3 +1,4 @@
+/* 云端 TTS 私有接口：当前由讯飞实现承载。 */
 #ifndef AMEBA_RIVER_TTS_INTERNAL_H
 #define AMEBA_RIVER_TTS_INTERNAL_H
 

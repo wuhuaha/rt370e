@@ -1,3 +1,4 @@
+/* 语音前端总接口：对外暴露事件、调试路径和状态查询能力。 */
 #ifndef AMEBA_RIVER_VOICE_H
 #define AMEBA_RIVER_VOICE_H
 

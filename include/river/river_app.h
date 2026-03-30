@@ -1,3 +1,4 @@
+/* River 应用主入口与状态输出接口。 */
 #ifndef AMEBA_RIVER_APP_H
 #define AMEBA_RIVER_APP_H
 

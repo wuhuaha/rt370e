@@ -1,3 +1,4 @@
+/* 原始采集实现：负责双麦 AudioRecord 打开、读取和统计。 */
 #include <stdbool.h>
 #include <string.h>
 

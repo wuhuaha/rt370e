@@ -1,3 +1,4 @@
+/* 语音前端帧缓冲池接口：集中复用采集/增强/参考缓冲。 */
 #ifndef AMEBA_RIVER_VOICE_FRAME_POOL_H
 #define AMEBA_RIVER_VOICE_FRAME_POOL_H
 

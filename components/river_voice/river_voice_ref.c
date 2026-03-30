@@ -1,3 +1,4 @@
+/* 语音参考环实现：缓存播放参考数据供预处理链路按帧读取。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

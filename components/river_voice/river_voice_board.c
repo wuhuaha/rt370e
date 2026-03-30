@@ -1,3 +1,4 @@
+/* 板级语音拓扑实现：集中固化当前 EVB 的双麦阵列参数。 */
 #include <stdbool.h>
 
 #include "audio/audio_control.h"

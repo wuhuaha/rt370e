@@ -1,3 +1,4 @@
+/* 播放参考服务接口：向 AEC/参考链路提供稳定的回放历史数据。 */
 #ifndef AMEBA_RIVER_REFERENCE_SERVICE_H
 #define AMEBA_RIVER_REFERENCE_SERVICE_H
 

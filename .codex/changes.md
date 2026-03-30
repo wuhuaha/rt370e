@@ -1280,3 +1280,33 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because this step only adjusts a config threshold and does not alter runtime assets or large static allocations.
+
+## Step 5.18
+- Added concise Chinese comments across the project-owned source tree to improve code navigation without turning the code into comment noise.
+- Scope of this step:
+  - covered all manually maintained `*.c` / `*.cc` / `*.h` files under:
+    - `app/`
+    - `components/river_common`
+    - `components/river_core`
+    - `components/river_diag`
+    - `components/river_cloud`
+    - `components/river_voice`
+    - `include/river`
+  - excluded:
+    - `components/river_voice/generated/*`
+    - `CMakeLists.txt`
+    - SDK code under `/root/ameba-rtos-1.2`
+- Comment style used in this step:
+  - file-level Chinese summaries for each project-owned source/header file
+  - a small number of focused inline comments on non-obvious orchestration paths
+  - no line-by-line explanatory noise on self-explanatory code
+- Practical effect:
+  - each module now states its responsibility at file entry
+  - internal/private headers and public headers are easier to scan when tracing responsibilities across `core`, `cloud`, and `voice`
+  - complex boot/log/diag dispatch paths now have a few explicit intent comments where they help most
+- Verified a full local `RTL8730E` build after the comment-only change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only adds source comments and does not alter compiled behavior or runtime assets.

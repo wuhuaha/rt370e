@@ -1,3 +1,4 @@
+/* 播放帧缓冲池：集中分配参考回放路径需要的环形缓存和丢弃帧。 */
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

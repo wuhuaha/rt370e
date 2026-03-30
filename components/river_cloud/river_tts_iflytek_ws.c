@@ -1,3 +1,4 @@
+/* 讯飞 TTS WebSocket 接入：负责文本下发、音频接收与播放投递。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
