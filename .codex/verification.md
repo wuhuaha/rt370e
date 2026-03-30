@@ -1945,3 +1945,25 @@ Expected result:
 Runtime/build note:
 - This is a documentation-only step.
 - No firmware build or board flash is required for this step because no runtime code changed.
+
+## Step 5.13
+Documentation verification for the root execution plan rewrite:
+```bash
+cd /root/ameba-river
+git diff --check -- plan.md .codex/changes.md .codex/verification.md
+sed -n '1,260p' plan.md
+git status --short
+```
+
+Expected result:
+- `git diff --check` returns no whitespace issues
+- `plan.md` now contains:
+  - current refactor objective
+  - current baseline and guardrails
+  - `Phase 0` through `Phase 5`
+  - `Immediate Next Step` pointing to wake admission retry and time-ready cleanup
+- `git status --short` shows only this step's tracked doc updates plus the user-owned `.env`
+
+Runtime/build note:
+- This is a documentation-only step.
+- No firmware build or board flash is required for this step because no runtime code changed.

@@ -1165,3 +1165,20 @@
   - no source code behavior changed
   - no firmware image content changed
   - this step exists to establish the refactor baseline before rewriting `plan.md`
+
+## Step 5.13
+- Rewrote the root `plan.md` so it now reflects the actual branch objective: staged refactoring of the current runtime rather than the older migration/smoke narrative.
+- The new `plan.md` now aligns with `doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md` and captures:
+  - the current baseline chain
+  - current runtime/architecture risks
+  - explicit guardrails for refactor steps
+  - a phased execution order from correctness to memory to boundaries to size cleanup
+  - the immediate next code step: wake admission retry plus time-ready semantics cleanup
+- Removed outdated guidance from the old root plan that no longer matched the current branch state:
+  - experimental model migration framing
+  - old smoke-first execution path
+  - stale phase history that had already served as historical record in `.codex`
+- Kept this step documentation-only:
+  - no runtime source changed
+  - no binary content changed
+  - this step exists to make the root project entrypoint consistent before starting code refactors
