@@ -1232,3 +1232,31 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
   - `build_RTL8730E/ota_all.bin` = `3597696`
 - Image size remained unchanged because the step replaces transient heap usage with a small fixed in-context scratch buffer inside already-allocated runtime state.
+
+## Step 5.16
+- Completed the next `Phase 1` memory-budget cleanup on the playback path, focused on the XiaoZhi downlink/TTS startup failure that previously attempted a `~46KB` AudioTrack allocation in `river_xz_down`.
+- Updated [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c) so playback buffer sizing now matches the service API semantics:
+  - `buffer_frame_count` is treated as the target number of application playback frames
+  - `AudioTrack_GetMinBufferBytes()` is treated as the SDK minimum whole-track buffer budget
+  - final track buffer bytes now use:
+    - `max(min_buffer_bytes, playback_frame_bytes * buffer_frame_count)`
+  - the old behavior incorrectly multiplied the SDK minimum buffer by `buffer_frame_count`, which over-allocated playback memory when `min_buffer_bytes` was already larger than a single app frame
+- Added a startup log for playback streams so the actual runtime budget is now visible on board:
+  - stream name
+  - sample rate / frame duration
+  - per-frame bytes
+  - SDK `min` bytes
+  - application `target` bytes
+  - final `track` bytes
+  - whether playback reference export is enabled
+- Updated [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h) to document the intended meaning of `buffer_frame_count`, so the service contract is explicit in code rather than hidden in implementation.
+- Why this step matters:
+  - the previous XiaoZhi downlink failure aligned with `15360B * 3 = 46080B`, meaning the service was tripling the SDK minimum whole-track buffer
+  - this change preserves the SDK minimum while removing the extra amplification
+  - the fix is generic for all playback-service users, but it directly targets the observed XiaoZhi downlink memory failure
+- Verified a full local `RTL8730E` build after the change.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3597664`
+  - `build_RTL8730E/ota_all.bin` = `3597696`
+- Image size remained unchanged because this step only corrected runtime buffer sizing math and logging; it did not add new assets or large static buffers.

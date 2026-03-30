@@ -116,6 +116,52 @@ static float river_playback_service_clamp_gain(float gain)
     return gain;
 }
 
+static river_status_t river_playback_service_compute_buffer_bytes(
+    const river_playback_stream_config_t *config,
+    size_t min_buffer_bytes,
+    size_t *track_buffer_bytes_out,
+    size_t *desired_buffer_bytes_out)
+{
+    uint32_t desired_frame_count;
+    uint64_t desired_buffer_bytes64;
+    size_t desired_buffer_bytes;
+    size_t track_buffer_bytes;
+
+    if (config == NULL || track_buffer_bytes_out == NULL || desired_buffer_bytes_out == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    desired_frame_count = config->buffer_frame_count;
+    if (desired_frame_count == 0U) {
+        desired_frame_count = 4U;
+    }
+
+    /*
+     * AudioTrack_GetMinBufferBytes() already reports the SDK's minimum whole
+     * track buffer size. buffer_frame_count models how many application audio
+     * frames we want queued, so take the larger of the two budgets instead of
+     * multiplying the SDK minimum again.
+     */
+    desired_buffer_bytes64 =
+        (uint64_t)config->playback_frame_bytes * (uint64_t)desired_frame_count;
+    if (desired_buffer_bytes64 == 0U || desired_buffer_bytes64 > UINT32_MAX) {
+        return RIVER_ERR_ARG;
+    }
+
+    desired_buffer_bytes = (size_t)desired_buffer_bytes64;
+    track_buffer_bytes = min_buffer_bytes;
+    if (track_buffer_bytes < desired_buffer_bytes) {
+        track_buffer_bytes = desired_buffer_bytes;
+    }
+    if (track_buffer_bytes == 0U || track_buffer_bytes > UINT32_MAX) {
+        return RIVER_ERR_ARG;
+    }
+
+    *track_buffer_bytes_out = track_buffer_bytes;
+    *desired_buffer_bytes_out = desired_buffer_bytes;
+    return RIVER_OK;
+}
+
 static void river_playback_service_notify_locked(void)
 {
     if (g_river_playback_service.listener == NULL) {
@@ -367,7 +413,9 @@ river_status_t river_playback_service_register_listener(river_playback_service_l
 river_status_t river_playback_service_start_stream(const river_playback_stream_config_t *config)
 {
     AudioTrackConfig track_config;
+    size_t min_buffer_bytes;
     size_t track_buffer_bytes;
+    size_t desired_buffer_bytes;
     uint32_t category_type;
     river_status_t status;
 
@@ -427,18 +475,25 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    track_buffer_bytes = AudioTrack_GetMinBufferBytes(g_river_playback_service.track,
-                                                      category_type,
-                                                      config->sample_rate,
-                                                      AUDIO_FORMAT_PCM_16_BIT,
-                                                      config->playback_channels);
-    if (track_buffer_bytes < config->playback_frame_bytes) {
-        track_buffer_bytes = config->playback_frame_bytes;
-    }
-    if (config->buffer_frame_count > 1U) {
-        track_buffer_bytes *= config->buffer_frame_count;
-    } else {
-        track_buffer_bytes *= 4U;
+    min_buffer_bytes = AudioTrack_GetMinBufferBytes(g_river_playback_service.track,
+                                                    category_type,
+                                                    config->sample_rate,
+                                                    AUDIO_FORMAT_PCM_16_BIT,
+                                                    config->playback_channels);
+    status = river_playback_service_compute_buffer_bytes(config,
+                                                         min_buffer_bytes,
+                                                         &track_buffer_bytes,
+                                                         &desired_buffer_bytes);
+    if (status != RIVER_OK) {
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
+        river_playback_service_close_locked();
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
+        rtos_mutex_give(g_river_playback_service.lock);
+        RIVER_LOGE("playback buffer compute failed: min=%luB frame=%luB frames=%lu",
+                   (unsigned long)min_buffer_bytes,
+                   (unsigned long)config->playback_frame_bytes,
+                   (unsigned long)config->buffer_frame_count);
+        return status;
     }
 
     memset(&track_config, 0, sizeof(track_config));
@@ -477,6 +532,17 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
     g_river_playback_service.stats.track_buffer_bytes = track_buffer_bytes;
     g_river_playback_service.stats.start_count++;
     river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
+    RIVER_LOGI("playback start: stream=%s rate=%luHz frame=%lums frame_bytes=%luB min=%luB target=%luB track=%luB ref=%s",
+               g_river_playback_service.stats.stream_name[0] != '\0' ?
+                   g_river_playback_service.stats.stream_name :
+                   "-",
+               (unsigned long)config->sample_rate,
+               (unsigned long)config->frame_ms,
+               (unsigned long)config->playback_frame_bytes,
+               (unsigned long)min_buffer_bytes,
+               (unsigned long)desired_buffer_bytes,
+               (unsigned long)track_buffer_bytes,
+               config->reference_export ? "yes" : "no");
 
     rtos_mutex_give(g_river_playback_service.lock);
     return RIVER_OK;

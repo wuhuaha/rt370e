@@ -31,6 +31,7 @@ typedef struct {
     uint32_t playback_channels;
     uint32_t bits_per_sample;
     size_t playback_frame_bytes;
+    /* Target application-side queued frames, not a multiplier on SDK minBuffer. */
     uint32_t buffer_frame_count;
     float volume_left;
     float volume_right;

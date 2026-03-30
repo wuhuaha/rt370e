@@ -2060,6 +2060,57 @@ Scope note:
 - This step only removes heap churn from the XiaoZhi uplink websocket framing path.
 - It is not expected to fix the separate downlink/playback heap failure seen later in `river_xz_down`.
 
+## Step 5.16
+Rebuild the firmware after correcting playback-service buffer sizing:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images exist
+- current sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3597664`
+  - `build_RTL8730E/ota_all.bin 3597696`
+
+Flash and validate the XiaoZhi downlink playback path on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py flash -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side validation flow:
+- Boot the board, let Wi-Fi connect, and trigger XiaoZhi with a wake word.
+- After websocket connect succeeds, ask a short question so TTS downlink playback is exercised.
+- Watch the first playback startup logs in `river_xz_down`.
+
+Pass signals:
+- playback now reports its computed budget explicitly:
+  - `playback start: stream=xiaozhi_tts ... min=...B target=...B track=...B ref=yes|no`
+- the final `track=` budget is no longer inflated to the old `~46080B` class caused by `minBuffer * 3`
+- XiaoZhi TTS can proceed into playback without the old allocation failure:
+  - no `Malloc failed. Core:[CA32], Task:[river_xz_down], ... [xWantedSize:46144]`
+  - no immediate `INIC-E WIFI TRX IPC 4 timeout` following playback startup
+- normal session flow continues:
+  - `tts sid=... state=start`
+  - `tts sid=... state=sentence_start text=...`
+  - playback state transitions continue instead of aborting at track creation
+
+Failure signals to watch:
+- `track=` still lands in the old oversized class around `46080B`
+- `AudioTrack_Init failed`
+- `Malloc failed ... xWantedSize:46144`
+
+Scope note:
+- This step corrects the playback-service buffer sizing math.
+- It does not yet shrink the reference-export pool or other downlink/runtime allocations; if board heap is still too tight after this change, that should be handled as the next separate step.
+
 Fail signals:
 - the board logs one wake hit, then no retry behavior appears and XiaoZhi never connects
 - the wake must be spoken a second time after Wi-Fi/time becomes ready
