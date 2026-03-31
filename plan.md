@@ -5,7 +5,7 @@ Branch: `DS-CNN`
 
 ## Current Objective
 
-当前分支的首要目标不再是继续做唤醒模型迁移，而是先把现有板端链路跑稳。
+当前分支的首要目标仍然是把现有板端链路跑稳，但最新日志表明当前最先要收口的已经不是播放，而是 `KWS` worker 输入队列本身。
 
 已经完成并验证的事项：
 
@@ -14,16 +14,18 @@ Branch: `DS-CNN`
 
 当前最高优先级问题：
 
-- 多轮 `xiaozhi` 会话后，`heap_free` 从约 `79KB` 快速跌到约 `8KB`
-- `TTS` 播放仍会出现 `underrun`
-- 现象更像播放路径资源生命周期不稳，而不是 `KWS` 再次失效
+- `KWS` 队列频繁卡在 `queue=40/40`
+- 日志出现 `kws queue dropped control item: type=1`
+- `river_kws` CPU 占用异常偏高，且唤醒分数长期卡在 `234 pm` 左右，无法触发阈值
+- 这些现象说明当前先要修掉 gate/reset 控制项在拥塞时丢失的问题，再继续看播放与堆水位
 
 当前优先级顺序：
 
-1. 播放资源稳定性与堆水位
-2. `xiaozhi` 热路径内存预算收紧
-3. session / time-ready 语义收口
-4. 模块边界与大文件拆分
+1. `KWS` 队列完整性与 gate rearm 可靠性
+2. 播放资源稳定性与堆水位
+3. `xiaozhi` 热路径内存预算收紧
+4. session / time-ready 语义收口
+5. 模块边界与大文件拆分
 
 ## Current Baseline
 
@@ -40,6 +42,9 @@ Branch: `DS-CNN`
 
 从用户日志看，当前最可疑的热点是：
 
+- `components/river_voice/river_voice_kws.cc`
+  - `input_ring` 原来以 `SPSC` 模式初始化，但生产者拥塞路径里也会主动 `read` 旧项做淘汰
+  - 这会破坏 ring 的使用契约，并直接解释为什么 `RESET` 控制项会在满队列时被挤掉
 - `components/river_voice/river_playback_service.c`
   - 每次 `TTS` 都重新 `AudioTrack_Create -> Init -> Start -> Destroy`
 - `components/river_cloud/river_cloud_adapter.c`
@@ -69,9 +74,29 @@ Status: completed
 
 - 已从实际串口日志确认二次唤醒恢复正常
 
-### Phase 1: Playback Stability
+### Phase 1: KWS Queue Integrity
 
 Status: in progress
+
+目标：
+
+- 修复 `KWS` 输入队列在 gate 开关和 reset 重置时的控制项丢失
+- 避免 `queue=40/40` 长时间钉死后把 worker 拖成高 CPU 忙转
+
+范围：
+
+- `components/river_voice/river_voice_kws.cc`
+
+成功标准：
+
+- 不再出现 `kws queue dropped control item: type=1`
+- gate rearm 时旧 PCM backlog 会被主动清掉，而不是把新的 `RESET` 控制项挤掉
+- `kws status` 不再长时间停留在 `queue=40/40` 且 `dropped` 快速增长
+- 板端重新出现稳定唤醒，或至少先证明控制路径已经恢复正常
+
+### Phase 2: Playback Stability
+
+Status: next
 
 目标：
 
@@ -90,7 +115,7 @@ Status: in progress
 - 多轮对话后 `heap_free` 不再像当前这样持续塌陷
 - `underrun` 频率下降，或至少可和堆变化直接关联
 
-### Phase 2: XiaoZhi Hot Path Memory Budget
+### Phase 3: XiaoZhi Hot Path Memory Budget
 
 Status: next
 
@@ -103,7 +128,7 @@ Status: next
 - `components/river_cloud/river_cloud_adapter.c`
 - `components/river_cloud/river_xiaozhi_ws.c`
 
-### Phase 3: Session Contract Cleanup
+### Phase 4: Session Contract Cleanup
 
 Status: planned
 
@@ -112,7 +137,7 @@ Status: planned
 - 收口 `time_ready` / `utc_ready` / session admission 契约
 - 避免把“短时条件未就绪”和“真实失败”混在一起
 
-### Phase 4: Boundary Cleanup
+### Phase 5: Boundary Cleanup
 
 Status: planned
 
@@ -123,16 +148,18 @@ Status: planned
 
 ## Immediate Next Step
 
-下一步先完成 `Phase 1`：
+下一步先完成 `Phase 1` 的板端闭环：
 
-1. 在播放服务里复用兼容 `AudioTrack`
-2. 给播放 start / stop 加堆快照
-3. 用多轮 `xiaozhi` 会话日志验证：
-   - `reuse=yes` 是否出现
-   - `heap_free` 是否回稳
-   - `underrun` 是否改善
+1. 用 `LOCKED` ring 替代原来的错误 `SPSC` 用法
+2. gate reset 前清掉陈旧 PCM backlog，确保新的 `RESET` 控制项一定能入队
+3. 满队列时优先保留控制项，不再让 PCM 淘汰掉 `RESET`
+4. 用板端日志验证：
+   - `kws queue dropped control item: type=1` 是否消失
+   - `kws gate rearm cleared stale queue: ...` 是否出现
+   - `queue=40/40` 是否不再长期钉死
+   - 唤醒命中是否恢复
 
 原因：
 
-- 当前用户日志里最突出的回归不是唤醒，而是播放后的内存塌陷
-- 这个方向改动范围小，最适合先做板端闭环
+- 最新用户日志已经把优先级重新排清楚：当前最硬的阻塞是 `KWS` 控制路径被满队列破坏
+- 先把 `KWS` worker 队列契约修正，后续播放与堆问题的日志才有分析价值

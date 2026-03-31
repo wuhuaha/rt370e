@@ -1982,3 +1982,36 @@
   - confirm later TTS starts show `reuse=yes`
   - compare playback snapshots before and after each turn to verify `heap_free` no longer collapses across turns
   - confirm whether `underrun` frequency decreases or at least correlates with low-heap snapshots
+
+## Step 5.43
+- Updated [plan.md](/root/ameba-river/plan.md) again so the active branch plan matches the newest user logs:
+  - playback reuse remains relevant, but the immediate blocker is now `KWS` queue saturation and control-item loss
+  - the top priority is now `KWS` queue integrity before further playback tuning
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the KWS input ring from `RIVER_AUDIO_FRAME_RING_MODE_SPSC` to `RIVER_AUDIO_FRAME_RING_MODE_LOCKED`
+  - removed the old generic enqueue path that treated PCM and control items the same under overflow
+  - added `river_voice_kws_clear_input_queue(...)` so gate-reset can explicitly drain stale backlog before rearming
+  - changed `river_voice_kws_enqueue_reset(...)` to clear queued stale items before writing a fresh `RESET`
+  - changed `river_voice_kws_enqueue_pcm(...)` so a full queue preserves an older control item instead of discarding it in favor of new PCM
+  - added a new info log:
+    - `kws gate rearm cleared stale queue: pcm=%lu ctrl=%lu`
+- Root-cause summary:
+  - the new user logs showed `queue=40/40` pinned, rapidly rising `dropped`, repeated `kws queue dropped control item: type=1`, and `river_kws` CPU climbing very high
+  - `river_voice_kws.cc` initialized the worker input ring as `SPSC`, but the producer overflow path also performed `river_audio_frame_ring_read(...)` to evict old items
+  - that violates the ring contract and makes the gate/reset control flow unreliable exactly in the failure mode seen on the board
+  - once `RESET` control items are dropped under backlog, the worker can stay busy chewing stale PCM and never cleanly rearm for the next gate/open cycle
+- Why this is the minimal change:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no KWS model, thresholds, features, or wake text were changed
+  - the fix is limited to queue correctness and overflow policy, which is the narrowest local explanation for the observed logs
+- Verified locally:
+  - full `RTL8730E` build succeeds
+  - output images remain:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Next board verification target:
+  - confirm `kws queue dropped control item: type=1` disappears
+  - confirm gate transitions no longer leave the queue pinned at `40/40` with fast-growing drop counters
+  - confirm `kws gate rearm cleared stale queue: ...` appears when backlog has to be drained
+  - then re-check whether wake hits recover or whether the next blocker is now the front-end audio amplitude / clipping path

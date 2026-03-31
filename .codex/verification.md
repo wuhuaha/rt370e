@@ -3329,3 +3329,70 @@ Observed local result on `2026-03-31`:
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.43
+Rebuild after hardening KWS queue overflow handling and gate-reset rearm:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Runtime repro for this step:
+```text
+1. Let the board boot and wait until Wi-Fi and SNTP are ready
+2. Speak around the board for 10-20 seconds, including several short speech bursts and pauses
+3. Watch the repeated `kws status`, `kws gate open/close`, and `river.stats` lines before the first successful wake
+4. Then clearly say: 小欧管家
+5. If wake succeeds, repeat one more wake cycle without rebooting
+```
+
+Primary pass criteria:
+- the old control-item loss symptom is gone:
+  - no `kws queue dropped control item: type=1`
+- gate rearm can now explicitly drain stale backlog when needed:
+  - `kws gate rearm cleared stale queue: pcm=... ctrl=...`
+- KWS queue no longer remains stuck at saturation across many gate transitions:
+  - avoid repeated `kws status: ... queue=40/40 ... dropped=...` for long periods
+  - avoid `kws gate open: ... queue=40/40` immediately followed by more control-item loss
+
+Secondary checks:
+- `river_kws` CPU share should no longer dominate snapshots as severely as in the failure log
+- if wake hits recover, confirm the normal lines reappear:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued text=小欧管家`
+- if queue behavior is fixed but scores still stay near `234 pm`, record the nearby `cap_peak` / `afe_peak` lines because the next suspect becomes front-end audio saturation or feature quality, not queue control
+
+Interpretation:
+- if control-item loss disappears and queue saturation improves, this step fixed the deterministic KWS worker queue bug
+- if control-item loss disappears but wake still never crosses threshold, the next debugging target is the front-end audio path rather than queue correctness
+- if `queue=40/40` and dropped counters still explode even after this fix, re-check for another producer/consumer contract violation outside the current KWS ring
+
+Observed local result on `2026-03-31`:
+- pass:
+  - local `RTL8730E` build succeeded
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
