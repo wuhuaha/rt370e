@@ -38,11 +38,15 @@ extern "C" {
 #include "generated/river_wake_word_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_len
-#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_best"
+#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_epoch1_debug"
 #endif
 
 #ifndef CONFIG_RIVER_KWS_MEAN_PATCH_EN
 #define CONFIG_RIVER_KWS_MEAN_PATCH_EN 0
+#endif
+
+#ifndef CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
+#define CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN 0
 #endif
 
 #if CONFIG_RIVER_KWS_MEAN_PATCH_EN
@@ -102,7 +106,14 @@ extern "C" {
 #define RIVER_KWS_FFT_BINS ((RIVER_KWS_WINDOW_SAMPLES / 2U) + 1U)
 #define RIVER_KWS_TENSOR_ARENA_BYTES \
     ((uint32_t)CONFIG_RIVER_KWS_TENSOR_ARENA_KB * 1024U)
-#define RIVER_KWS_OP_COUNT 8U
+#define RIVER_KWS_BASE_OP_COUNT 7U
+#if CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
+#define RIVER_KWS_LEGACY_OP_COUNT 2U
+#else
+#define RIVER_KWS_LEGACY_OP_COUNT 0U
+#endif
+#define RIVER_KWS_OP_COUNT \
+    (RIVER_KWS_BASE_OP_COUNT + RIVER_KWS_LEGACY_OP_COUNT)
 #define RIVER_KWS_EXPECTED_INPUT_VALUES \
     (RIVER_KWS_FEATURE_FRAMES * RIVER_KWS_MEL_BINS)
 #define RIVER_KWS_ALLOCATION_ALIGNMENT 32U
@@ -201,6 +212,14 @@ class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
                           tflite::ParseDepthwiseConv2D);
     }
 
+    TfLiteStatus AddAveragePool2D()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_AVERAGE_POOL_2D,
+                          tflite::Register_AVERAGE_POOL_2D(),
+                          tflite::ParsePool);
+    }
+
+#if CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
     TfLiteStatus AddMean()
     {
         return AddBuiltin(tflite::BuiltinOperator_MEAN, tflite::Register_MEAN(),
@@ -222,6 +241,7 @@ class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
                           tflite::Register_FULLY_CONNECTED(),
                           tflite::ParseFullyConnected);
     }
+#endif
 
     TfLiteStatus AddLogistic()
     {
@@ -947,15 +967,21 @@ static river_status_t river_voice_kws_register_ops(
         resolver->AddAdd() != kTfLiteOk ||
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
+        resolver->AddAveragePool2D() != kTfLiteOk ||
+        resolver->AddLogistic() != kTfLiteOk) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+#if CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
 #if CONFIG_RIVER_KWS_MEAN_PATCH_EN
         resolver->AddPatchedMean() != kTfLiteOk ||
 #else
         resolver->AddMean() != kTfLiteOk ||
 #endif
-        resolver->AddFullyConnected() != kTfLiteOk ||
-        resolver->AddLogistic() != kTfLiteOk) {
+        resolver->AddFullyConnected() != kTfLiteOk) {
         return RIVER_ERR_UNSUPPORTED;
     }
+#endif
     return RIVER_OK;
 }
 

@@ -2862,3 +2862,70 @@ Expected monitor behavior:
 Important interpretation:
 - this step is a prep step for the incoming no-`MEAN` model, not a claim that the old `MEAN` model is now runtime-safe on this branch
 - if you flash this build before replacing the model asset, do not treat old-model KWS runtime behavior as the acceptance criterion for this step
+
+## Step 5.35
+Rebuild the prep branch after switching the embedded KWS asset to the no-`MEAN` model and compiling legacy KWS compatibility out by default:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+rg -n "CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN" \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32 \
+  build_RTL8730E/build/project_hp/.config_km4 \
+  build_RTL8730E/build/project_lp/.config_km0
+rg -n "river_voice_kws_mean_patch\\.o|river_voice_kws_mean_patch\\.cc" \
+  build_RTL8730E/build/build.ninja \
+  build_RTL8730E/build/compile_commands.json
+```
+
+Expected build result:
+- build completes successfully on branch `prep/kws-no-mean-model`
+- output images are:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- generated configs show legacy KWS compatibility is compiled out by default:
+  - `# CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN is not set`
+- the final `rg` against `build.ninja` and `compile_commands.json` returns no match, confirming `river_voice_kws_mean_patch.cc` is not compiled in this default no-`MEAN` build
+
+Flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects, trigger a software reboot to capture the full boot log:
+```text
+AT+RST
+```
+
+Pass signals from the rebooted board log:
+- KWS init completes with the new embedded model:
+  - `kws quant: in_src=schema scale_u6=34970 zp=-3 out_src=schema scale_u6=3906 zp=-128`
+  - `kws input shape: src=schema dims=[1,40,98,1] layout=mels_frames`
+  - `kws output shape: src=schema dims=[1,1,1,1] values=1`
+  - `kws backend: ... model=54104B variant=bc_resnet_epoch1_debug ...`
+- non-mainline debug isolation still holds:
+  - `audio_echo=compiled=no`
+- normal platform bring-up still works:
+  - Wi-Fi associates and gets `ip=192.168.5.20`
+  - `sntp ready: utc=...`
+- live wake path still works after the migration:
+  - `kws gate open`
+  - `kws gate close`
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+  - `Connected to websocket server`
+- these old failure signatures do not appear in the observed boot / init window:
+  - `Node MEAN (number 3) failed to invoke`
+  - `river kws mean patch got unsupported reduce pattern`
+  - `Data abort with Data Fault Status Register`
+
+Interpretation:
+- this step validates migration readiness of the no-`MEAN` model on the current board/runtime baseline
+- if wakeword accuracy is still weak, that is now a model-quality / threshold problem rather than a `MEAN` operator bring-up blocker

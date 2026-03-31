@@ -234,9 +234,20 @@ config RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL
 
 endchoice
 
+config RIVER_KWS_LEGACY_MODEL_COMPAT_EN
+    bool "Build legacy KWS model compatibility ops"
+    default n
+    depends on RIVER_VOICE_CAPABILITY_KWS
+    help
+      Build legacy KWS operator compatibility for older embedded models
+      that still require ops such as `MEAN` and `FULLY_CONNECTED`.
+      Keep this disabled for the current no-MEAN baseline so unused op
+      registrations and legacy-only strings stay out of the default image.
+
 config RIVER_KWS_MEAN_PATCH_EN
     bool "Build temporary KWS MEAN patch"
     default n
+    depends on RIVER_KWS_LEGACY_MODEL_COMPAT_EN
     depends on RIVER_VOICE_CAPABILITY_KWS
     help
       Build the project-side KWS MEAN registration patch used only for

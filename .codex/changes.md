@@ -1716,3 +1716,52 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3556704`
   - `build_RTL8730E/ota_all.bin` = `3556736`
 - Relative to Step `5.32`, the main app images dropped by `36864` bytes.
+
+## Step 5.35
+- Migrated the prep branch to the new no-`MEAN` KWS model and tightened the default KWS resolver so the mainline image only carries operators required by the current embedded model.
+- Updated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - replaced the embedded baseline asset with `bc_resnet_epoch1_debug.tflite`
+  - preserved the exported symbol names `kws_model` / `kws_model_len`
+  - new embedded model size is `54104` bytes
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the default embedded model variant name to `bc_resnet_epoch1_debug`
+  - added `AVERAGE_POOL_2D` registration for the new model
+  - split resolver capacity into:
+    - always-on mainline ops for the no-`MEAN` model
+    - legacy-only `MEAN` / `FULLY_CONNECTED` compatibility ops behind a build switch
+  - kept the default build path free of legacy KWS compatibility registrations
+- Updated [Kconfig](/root/ameba-river/Kconfig) and [prj.conf](/root/ameba-river/prj.conf):
+  - added `CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN`, default `n`
+  - made `CONFIG_RIVER_KWS_MEAN_PATCH_EN` depend on the new legacy-compat switch
+  - explicitly kept `CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN=n` in the prep branch and left the `MEAN` patch path unreachable in the default build
+- Why this step was necessary:
+  - the new model removes the problematic `MEAN` op entirely, but the runtime still needed `AVERAGE_POOL_2D` support to boot the graph
+  - after the branch objective shifted to the no-`MEAN` model, leaving legacy KWS op registrations in the default resolver would keep unused code paths and strings in the mainline image
+  - isolating legacy KWS compatibility at build time keeps future troubleshooting options without polluting the default product path
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - the old-model compatibility path is not deleted; it is explicitly opt-in
+  - the mainline runtime now matches the actual operator set of the embedded no-`MEAN` model
+- Verified a full local `RTL8730E` build after the migration and resolver cleanup.
+- Verified generated configs keep legacy KWS compatibility compiled out by default:
+  - `# CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN is not set`
+- Verified the current default build does not compile `river_voice_kws_mean_patch.cc`.
+- Verified board flash and serial boot after the migration:
+  - KWS init completed with `dims=[1,40,98,1]`, output `values=1`, and `model=54104B variant=bc_resnet_epoch1_debug`
+  - `audio_echo=compiled=no` still proves the earlier non-mainline voice isolation remains effective
+  - Wi-Fi association, DHCP, and SNTP all completed normally after reboot
+  - observed live KWS runtime with no legacy-op failures:
+    - `kws gate open`
+    - `kws gate close`
+    - `wakeword hit: text=小欧管家`
+    - `wakeword queued`
+  - observed wakeword-to-cloud handoff still works:
+    - `xiaozhi connecting`
+    - `Connected to websocket server`
+    - `server hello: sid=...`
+  - no `Node MEAN ...`, no `unsupported reduce pattern`, and no data-abort signature appeared during boot and init observation
+- Image sizes after this step are:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+  - `build_RTL8730E/ota_all.bin` = `3560832`
+- Relative to Step `5.34`, the main app images increased by `4096` bytes because of the new embedded model and its required op set, while the default build still keeps legacy KWS compatibility code compiled out.
