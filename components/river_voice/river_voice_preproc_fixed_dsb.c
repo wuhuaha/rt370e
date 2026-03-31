@@ -71,6 +71,7 @@ static int16_t river_voice_preproc_clamp_q15(int32_t value)
     return (int16_t)value;
 }
 
+#ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
 static bool river_voice_preproc_sample_fifo_init(
     river_voice_preproc_fixed_dsb_context_t *context,
     uint32_t capacity_samples)
@@ -203,6 +204,7 @@ static void river_voice_preproc_note_gate_reason(
         context->last_gate_reason = gate_eval->reason;
     }
 }
+#endif
 
 river_status_t river_voice_preproc_fixed_dsb_open(river_voice_preproc_t *preproc)
 {

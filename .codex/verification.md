@@ -2817,3 +2817,48 @@ First board-side check for the new model:
 - confirm boot, Wi-Fi, and SNTP still complete
 - confirm the first `kws gate open` no longer produces any `Node MEAN ...` log
 - if a crash still happens, capture the new fault PC/LR before assuming it is related to the old `MEAN` issue
+
+## Step 5.34
+Rebuild the prep branch with non-mainline voice paths compiled out by default:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+rg -n "CONFIG_RIVER_KWS_MEAN_PATCH_EN|CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN|CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN" \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32 \
+  build_RTL8730E/build/project_hp/.config_km4 \
+  build_RTL8730E/build/project_lp/.config_km0
+rg -n "river_voice_kws_mean_patch\\.o|river_voice_kws_mean_patch\\.cc" \
+  build_RTL8730E/build/build.ninja \
+  build_RTL8730E/build/compile_commands.json
+```
+
+Expected build result:
+- build completes successfully on branch `prep/kws-no-mean-model`
+- output images are:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3556704`
+  - `build_RTL8730E/ota_all.bin 3556736`
+- generated configs show all prep-branch isolation gates are off:
+  - `# CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN is not set`
+  - `# CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN is not set`
+  - `# CONFIG_RIVER_KWS_MEAN_PATCH_EN is not set`
+- the final `rg` against `build.ninja` and `compile_commands.json` returns no match, confirming `river_voice_kws_mean_patch.cc` is not compiled in this default prep build
+
+Optional quick monitor sanity check:
+```text
+river
+river audio
+river audio probe status
+```
+
+Expected monitor behavior:
+- `river` help no longer advertises `river audio <start|stop|status>`, `river audio echo ...`, or `river audio diag ...`
+- `river audio` reports that audio echo debug is disabled in the current build
+- `river audio probe status` still works
+
+Important interpretation:
+- this step is a prep step for the incoming no-`MEAN` model, not a claim that the old `MEAN` model is now runtime-safe on this branch
+- if you flash this build before replacing the model asset, do not treat old-model KWS runtime behavior as the acceptance criterion for this step

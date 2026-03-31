@@ -28,6 +28,15 @@ config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
 
+config RIVER_AUDIO_ECHO_DEBUG_EN
+    bool "Build board audio echo debug path"
+    default n
+    help
+      Build the standalone board audio echo loopback path and related
+      monitor commands. Keep disabled for the normal wake -> XiaoZhi
+      product flow to avoid carrying extra debug-only code and strings
+      in the firmware image.
+
 config RIVER_CLOUD_TEXT_DEBUG_EN
     bool "Enable cloud text/TTS debug injection"
     default n
@@ -67,10 +76,12 @@ endchoice
 config RIVER_AUDIO_ECHO_AUTOSTART
     bool "Autostart board audio echo at boot"
     default n
+    depends on RIVER_AUDIO_ECHO_DEBUG_EN
 
 config RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     bool "Enable audio echo diagnostics by default"
     default n
+    depends on RIVER_AUDIO_ECHO_DEBUG_EN
 
 config RIVER_VAD_PROBE_AUTOSTART
     bool "Autostart pure VAD probe at boot"
@@ -222,6 +233,16 @@ config RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL
       variant for the DS-CNN branch and is not yet a deploy-ready model.
 
 endchoice
+
+config RIVER_KWS_MEAN_PATCH_EN
+    bool "Build temporary KWS MEAN patch"
+    default n
+    depends on RIVER_VOICE_CAPABILITY_KWS
+    help
+      Build the project-side KWS MEAN registration patch used only for
+      legacy embedded models that still need MEAN bring-up workarounds.
+      Disable this when moving to a no-MEAN KWS model so the patch code
+      stays out of the image and out of the mainline code path.
 
 config RIVER_KWS_TENSOR_ARENA_KB
     int "Wake-word KWS tensor arena size in KB"

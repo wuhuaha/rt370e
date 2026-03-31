@@ -41,7 +41,13 @@ extern "C" {
 #define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_best"
 #endif
 
+#ifndef CONFIG_RIVER_KWS_MEAN_PATCH_EN
+#define CONFIG_RIVER_KWS_MEAN_PATCH_EN 0
+#endif
+
+#if CONFIG_RIVER_KWS_MEAN_PATCH_EN
 #include "river_voice_kws_mean_patch.h"
+#endif
 
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
@@ -195,12 +201,20 @@ class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
                           tflite::ParseDepthwiseConv2D);
     }
 
+    TfLiteStatus AddMean()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_MEAN, tflite::Register_MEAN(),
+                          tflite::ParseReducer);
+    }
+
+#if CONFIG_RIVER_KWS_MEAN_PATCH_EN
     TfLiteStatus AddPatchedMean()
     {
         return AddBuiltin(tflite::BuiltinOperator_MEAN,
                           river_voice_kws_RegisterPatchedMean(),
                           tflite::ParseReducer);
     }
+#endif
 
     TfLiteStatus AddFullyConnected()
     {
@@ -933,7 +947,11 @@ static river_status_t river_voice_kws_register_ops(
         resolver->AddAdd() != kTfLiteOk ||
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
+#if CONFIG_RIVER_KWS_MEAN_PATCH_EN
         resolver->AddPatchedMean() != kTfLiteOk ||
+#else
+        resolver->AddMean() != kTfLiteOk ||
+#endif
         resolver->AddFullyConnected() != kTfLiteOk ||
         resolver->AddLogistic() != kTfLiteOk) {
         return RIVER_ERR_UNSUPPORTED;

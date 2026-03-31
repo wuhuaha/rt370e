@@ -1672,3 +1672,47 @@
   - no SDK source under `/root/ameba-rtos-1.2` was modified
   - no runtime code or model asset was changed again
   - this step only records hard-won troubleshooting knowledge and sets up the next branch cleanly
+
+## Step 5.34
+- Isolated non-mainline voice code behind explicit build switches so the prep branch stays closer to the upcoming no-`MEAN` product path, with less dead code and fewer debug-only strings in the default image.
+- Updated [Kconfig](/root/ameba-river/Kconfig):
+  - added `CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN`, default `n`
+  - made `CONFIG_RIVER_AUDIO_ECHO_AUTOSTART` and `CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON` depend on the echo-debug switch
+  - added `CONFIG_RIVER_KWS_MEAN_PATCH_EN`, default `n`, for legacy-model-only `MEAN` adaptation code
+- Updated [prj.conf](/root/ameba-river/prj.conf):
+  - explicitly disables board audio echo debug build
+  - explicitly disables the dedicated `WebRTC AECM` experiment build
+  - explicitly disables the temporary KWS `MEAN` patch in this prep branch
+  - keeps comments explaining that this branch is preparing for the incoming no-`MEAN` model rather than preserving the old troubleshooting path
+- Updated [components/river_voice/CMakeLists.txt](/root/ameba-river/components/river_voice/CMakeLists.txt):
+  - builds `river_voice_echo.c` only when `CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN=y`
+  - otherwise builds [components/river_voice/river_voice_echo_stub.c](/root/ameba-river/components/river_voice/river_voice_echo_stub.c) to keep interfaces stable
+  - builds true `WebRTC AECM` experiment sources only when `CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN=y`
+  - keeps only the FFT pieces always compiled because KWS still depends on `real_fft.h` / related code
+  - builds `river_voice_kws_mean_patch.cc` only when `CONFIG_RIVER_KWS_MEAN_PATCH_EN=y`
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - isolates the patched `MEAN` registration behind `CONFIG_RIVER_KWS_MEAN_PATCH_EN`
+  - adds the normal SDK `Register_MEAN()` path as the default resolver behavior
+- Updated [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c) and [components/river_voice/river_voice_frontend.c](/root/ameba-river/components/river_voice/river_voice_frontend.c):
+  - hides echo-only help text, commands, and startup hints when echo debug is compiled out
+  - keeps `river audio probe ...` available in the default build
+- Updated [components/river_voice/river_voice_preproc_fixed_dsb.c](/root/ameba-river/components/river_voice/river_voice_preproc_fixed_dsb.c):
+  - wraps `WebRTC AECM`-only helpers so the lighter default build does not drag experiment-only code through the mainline preproc path
+- Why this step was necessary:
+  - the branch objective has shifted from rescuing the old `MEAN` model to preparing a clean landing zone for a replacement model with no `MEAN` operator
+  - keeping echo debug, temporary `MEAN` adaptation, and dedicated `AECM` experiment code in the default image made the binary larger and the default code path harder to read
+  - the generated configs now prove all three prep-branch gates are off by default:
+    - `# CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN is not set`
+    - `# CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN is not set`
+    - `# CONFIG_RIVER_KWS_MEAN_PATCH_EN is not set`
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - debug / experiment code is not deleted; it is compiled only when explicitly re-enabled
+  - the mainline interfaces stay stable through the echo stub and existing voice abstractions
+- Verified a full local `RTL8730E` build after the isolation changes.
+- Verified the current build no longer compiles `river_voice_kws_mean_patch.cc`.
+- Image sizes after this step changed to:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3556704`
+  - `build_RTL8730E/ota_all.bin` = `3556736`
+- Relative to Step `5.32`, the main app images dropped by `36864` bytes.

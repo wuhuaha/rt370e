@@ -27,6 +27,12 @@
 #define RIVER_INTERACTION_DIAG_ENABLED 0
 #endif
 
+#if defined(CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN)
+#define RIVER_AUDIO_ECHO_DEBUG_ENABLED 1
+#else
+#define RIVER_AUDIO_ECHO_DEBUG_ENABLED 0
+#endif
+
 #define RIVER_ECHO_TEXT_MAX 128
 #define RIVER_XIAOZHI_TEXT_MAX 384
 
@@ -47,10 +53,12 @@ static void river_diag_help(void)
     printf("\triver interaction invoke <intent_name>\n");
 #endif
     printf("\triver playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
+#if RIVER_AUDIO_ECHO_DEBUG_ENABLED
     printf("\triver audio <start|stop|status>\n");
     printf("\triver audio echo <start|stop|status>\n");
-    printf("\triver audio probe <start|stop|status>\n");
     printf("\triver audio diag <on|off|status>\n");
+#endif
+    printf("\triver audio probe <start|stop|status>\n");
     printf("\triver device <light|fan|curtain|socket> <on|off|toggle>\n");
 }
 
@@ -468,10 +476,11 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
     if (strcmp((const char *)argv[0], "audio") == 0) {
         if (argc < 2) {
-            printf("[river][diag] usage: river audio <start|stop|status>\n");
+            printf("[river][diag] usage: river audio probe <start|stop|status>\n");
             return 0;
         }
 
+#if RIVER_AUDIO_ECHO_DEBUG_ENABLED
         if (strcmp((const char *)argv[1], "diag") == 0) {
             if (argc < 3) {
                 printf("[river][diag] usage: river audio diag <on|off|status>\n");
@@ -500,14 +509,18 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             printf("[river][diag] usage: river audio diag <on|off|status>\n");
             return 0;
         }
+#endif
 
+#if RIVER_AUDIO_ECHO_DEBUG_ENABLED
         if (strcmp((const char *)argv[1], "echo") == 0) {
             if (argc < 3) {
                 printf("[river][diag] usage: river audio echo <start|stop|status>\n");
                 return 0;
             }
             audio_action = (const char *)argv[2];
-        } else if (strcmp((const char *)argv[1], "probe") == 0) {
+        } else
+#endif
+        if (strcmp((const char *)argv[1], "probe") == 0) {
             if (argc < 3) {
                 printf("[river][diag] usage: river audio probe <start|stop|status>\n");
                 return 0;
@@ -534,7 +547,10 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
             printf("[river][diag] usage: river audio probe <start|stop|status>\n");
             return 0;
-        } else {
+        }
+
+#if RIVER_AUDIO_ECHO_DEBUG_ENABLED
+        else {
             audio_action = (const char *)argv[1];
         }
 
@@ -559,6 +575,10 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
         printf("[river][diag] usage: river audio <start|stop|status>\n");
         return 0;
+#else
+        printf("[river][diag] audio echo debug disabled in current build; use: river audio probe <start|stop|status>\n");
+        return 0;
+#endif
     }
 
     river_diag_help();

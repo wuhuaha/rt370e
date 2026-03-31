@@ -15,6 +15,10 @@
 #define CONFIG_RIVER_VOICE_CAPABILITY_KWS 0
 #endif
 
+#ifndef CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN
+#define CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN 0
+#endif
+
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.frontend"
 
@@ -52,7 +56,9 @@ river_status_t river_voice_frontend_init(void)
         RIVER_LOGI("current board path uses AMIC1 + AMIC3 dual mic with software fixed delay-and-sum beamforming");
         RIVER_LOGI("pure vad validation path: capture -> fixed_dsb -> silero -> stream/buffer bridge -> runtime logs");
     }
+#if CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN
     RIVER_LOGI("board audio echo test: river audio start | river audio stop | river audio status");
+#endif
     return RIVER_OK;
 }
 
