@@ -283,15 +283,24 @@ static void *river_voice_kws_mean_patch_init(TfLiteContext *context,
                                              const char *buffer,
                                              size_t length)
 {
+    constexpr size_t kOpDataAlignment =
+        alignof(river_voice_kws_mean_patch_op_data);
     river_voice_kws_mean_patch_op_data *patch_data;
+    void *raw_allocation;
     const TfLiteReducerParams *params;
+    uintptr_t aligned_address;
 
     (void)length;
-    patch_data = static_cast<river_voice_kws_mean_patch_op_data *>(
-        context->AllocatePersistentBuffer(context, sizeof(*patch_data)));
-    if (patch_data == NULL) {
+    raw_allocation = context->AllocatePersistentBuffer(
+        context, sizeof(*patch_data) + kOpDataAlignment - 1U);
+    if (raw_allocation == NULL) {
         return NULL;
     }
+    aligned_address =
+        (reinterpret_cast<uintptr_t>(raw_allocation) + kOpDataAlignment - 1U) &
+        ~(uintptr_t)(kOpDataAlignment - 1U);
+    patch_data = reinterpret_cast<river_voice_kws_mean_patch_op_data *>(
+        aligned_address);
     memset(patch_data, 0, sizeof(*patch_data));
     params = reinterpret_cast<const TfLiteReducerParams *>(buffer);
     patch_data->keep_dims = params != NULL ? params->keep_dims : false;

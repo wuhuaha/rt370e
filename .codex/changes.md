@@ -1608,3 +1608,25 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
   - `build_RTL8730E/ota_all.bin` = `3601792`
+
+## Step 5.31
+- Fixed the next KWS runtime crash after Step `5.30`: patched `MEAN` op-data is now returned to TFLM on an explicitly aligned address.
+- Updated [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):
+  - changed `river_voice_kws_mean_patch_init()` to over-allocate by `alignof(river_voice_kws_mean_patch_op_data) - 1`
+  - manually aligned the returned `user_data` pointer before storing the patched `OpDataReduce`
+  - kept the patched `MEAN` logic otherwise unchanged
+- Why this step was necessary:
+  - the March 31, 2026 board log showed the previous `unsupported reduce pattern` failure was gone, but the first real KWS inference still crashed with:
+    - `Data abort with Data Fault Status Register 0x00000221`
+    - fault PC `0x6035f448`
+  - symbolication mapped the fault to [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):194, where the patched int8 `MEAN` path loads `output_scale`
+  - the board register dump showed `R11 = 0x6067b663`, and disassembly proved `R11` is the patched `node->user_data` pointer, so the crash was caused by a VFP float load from an unaligned op-data address
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model asset was changed again
+  - the change is scoped to the project-side patched `MEAN` init path and directly addresses the observed unaligned `user_data` root cause
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step remained:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
+  - `build_RTL8730E/ota_all.bin` = `3601792`
