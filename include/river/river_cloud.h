@@ -51,10 +51,15 @@ typedef struct {
 
 typedef void (*river_cloud_asr_result_handler_t)(const river_cloud_asr_result_t *result,
                                                  void *user_data);
+typedef void (*river_cloud_state_sync_handler_t)(const char *reason,
+                                                 void *user_data);
 
 river_status_t river_cloud_adapter_init(void);
 river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_handler_t handler,
                                                       void *user_data);
+river_status_t river_cloud_adapter_set_state_sync_handler(
+    river_cloud_state_sync_handler_t handler,
+    void *user_data);
 river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config_t *config);
 void river_cloud_adapter_notify_network_ready(void);
 void river_cloud_adapter_notify_network_lost(void);

@@ -64,6 +64,8 @@ typedef struct {
     bool xiaozhi_enabled;
     river_cloud_asr_result_handler_t result_handler;
     void *result_handler_user;
+    river_cloud_state_sync_handler_t state_sync_handler;
+    void *state_sync_handler_user;
     const river_cloud_asr_provider_ops_t *provider;
     river_cloud_asr_audio_desc_t audio_desc;
     uint8_t *pre_roll_buffer;
@@ -156,6 +158,7 @@ void river_cloud_log_time_ready_once(void);
 void river_cloud_log_wake_admission_deferred_once(river_status_t status);
 void river_cloud_reset_wake_admission_deferred_state(void);
 void river_cloud_pre_roll_reset(void);
+void river_cloud_request_state_sync(const char *reason);
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,

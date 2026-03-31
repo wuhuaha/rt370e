@@ -617,6 +617,13 @@ static void river_cloud_notify_result(const river_cloud_asr_result_t *result,
     }
 }
 
+void river_cloud_request_state_sync(const char *reason)
+{
+    if (g_river_cloud.state_sync_handler != NULL) {
+        g_river_cloud.state_sync_handler(reason, g_river_cloud.state_sync_handler_user);
+    }
+}
+
 static const char *river_cloud_split_asr_provider_name(void)
 {
     if (g_river_cloud.provider == NULL) {
@@ -1380,6 +1387,15 @@ river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_han
     return RIVER_OK;
 }
 
+river_status_t river_cloud_adapter_set_state_sync_handler(
+    river_cloud_state_sync_handler_t handler,
+    void *user_data)
+{
+    g_river_cloud.state_sync_handler = handler;
+    g_river_cloud.state_sync_handler_user = user_data;
+    return RIVER_OK;
+}
+
 river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config_t *config)
 {
 #if !RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
@@ -1476,6 +1492,7 @@ void river_cloud_adapter_notify_network_lost(void)
         river_cloud_xiaozhi_reset_playback_flags();
         river_xiaozhi_close_session();
         g_river_cloud.xiaozhi_session_id[0] = '\0';
+        river_cloud_request_state_sync("network_lost");
         return;
     }
 #endif

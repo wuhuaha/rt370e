@@ -74,6 +74,7 @@ void river_cloud_xiaozhi_window_close(const char *reason)
     g_river_cloud.xiaozhi_session_id[0] = '\0';
     RIVER_LOGI("xiaozhi conversation window closed: reason=%s",
                reason != NULL ? reason : "-");
+    river_cloud_request_state_sync(reason != NULL ? reason : "window_closed");
 }
 
 void river_cloud_xiaozhi_window_abort_local(const char *reason)
@@ -94,6 +95,7 @@ void river_cloud_xiaozhi_window_abort_local(const char *reason)
         RIVER_LOGW("xiaozhi conversation window aborted: reason=%s",
                    reason != NULL ? reason : "-");
     }
+    river_cloud_request_state_sync(reason != NULL ? reason : "window_aborted");
 }
 
 void river_cloud_xiaozhi_copy_session_id_from_transport(void)

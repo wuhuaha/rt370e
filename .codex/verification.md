@@ -3197,3 +3197,68 @@ Pass signals:
 Interpretation:
 - if the early Wi-Fi-adjacent crash disappears and wake still works, this step confirms the runtime `input(0)` polling path was the real remaining KWS instability
 - if wake degrades again but crash is gone, the next step should search for a safer non-`input(0)` method to validate cached tensor buffers
+
+## Step 5.41
+Rebuild after restoring interaction-state sync when the xiaozhi follow-up window closes:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Runtime repro for this step:
+```text
+1. Wait until Wi-Fi and SNTP are ready
+2. Clearly say: 小欧管家
+3. Let xiaozhi enter ASR/TTS and finish one full reply
+4. Wait for the follow-up window to expire without rebooting
+5. After the timeout, clearly say: 小欧管家 again
+```
+
+Primary pass criteria:
+- when the follow-up window times out, the interaction state must explicitly return to wake monitoring:
+  - `xiaozhi conversation window closed: reason=followup_timeout`
+  - `interaction_state: follow_up -> wake_monitoring reason=followup_timeout`
+- the second wake works without reset:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued text=小欧管家`
+
+Secondary checks:
+- KWS should no longer stay stuck in the old stale state after the first turn:
+  - avoid repeated `kws status: ... ready=no ...` after the follow-up window is already closed
+- abnormal local teardown should also re-sync back to a sane idle/wake state:
+  - `interaction_state: ... -> wake_monitoring reason=transport_closed`
+  - or `interaction_state: ... -> wake_monitoring reason=network_lost`
+
+Interpretation:
+- if the timeout now produces `follow_up -> wake_monitoring` and the second wake works, the bug was the missing post-window state sync rather than a new KWS scoring regression
+- if the timeout closes the cloud window but no interaction-state transition appears, the remaining issue is still in runtime state propagation, not in wakeword detection itself
+
+Observed local result on `2026-03-31`:
+- pass:
+  - local `RTL8730E` build succeeded
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`

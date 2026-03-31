@@ -1901,3 +1901,41 @@
 - Next board verification target:
   - confirm the early `Data abort` after Wi-Fi connect no longer appears
   - confirm wake still works after removing the unsafe runtime rebind
+
+## Step 5.41
+- Fixed a follow-up window state-sync gap that could leave the board unable to wake again after the first completed xiaozhi turn.
+- Updated [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h):
+  - added a lightweight cloud state-sync callback registration API
+- Updated [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h):
+  - stored the state-sync callback in cloud runtime context
+  - exposed an internal helper so xiaozhi session paths can request a state recompute without depending on `river_core`
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - implemented the new state-sync callback registration
+  - added `river_cloud_request_state_sync(...)`
+  - requested a state recompute on the direct `network_lost` teardown path
+- Updated [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c):
+  - requested a state recompute after `river_cloud_xiaozhi_window_close(...)`
+  - requested a state recompute after `river_cloud_xiaozhi_window_abort_local(...)`
+- Updated [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c):
+  - wired the cloud state-sync callback to `river_session_coordinator_sync_interaction_state(...)` through a local wrapper
+- Root-cause summary:
+  - the user serial log showed `xiaozhi conversation window closed: reason=followup_timeout`, but there was no matching `interaction_state: follow_up -> wake_monitoring`
+  - KWS detection is only allowed when `interaction_state == wake_monitoring`, so after the first turn the board could remain in a stale post-wake state and keep reporting `ready=no`
+  - VAD still seeing later speech in that condition explains the observed symptom: capture stayed alive, but the second wakeword was ignored because the interaction state never re-armed KWS
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - `river_cloud` still does not directly depend on `river_core`; it only emits a generic "recompute state now" callback
+  - the fix covers both normal follow-up timeout close and abnormal local-abort teardown paths that can otherwise leave the same stale state behind
+- Verified locally:
+  - full `RTL8730E` build succeeds
+  - image sizes remain unchanged:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Next board verification target:
+  - after xiaozhi reply playback drains and the window times out, confirm:
+    - `xiaozhi conversation window closed: reason=followup_timeout`
+    - `interaction_state: follow_up -> wake_monitoring reason=followup_timeout`
+  - then trigger a second wake without rebooting and confirm:
+    - `wakeword hit: text=小欧管家`
+    - `wakeword queued text=小欧管家`
