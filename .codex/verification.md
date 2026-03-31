@@ -3051,3 +3051,62 @@ Current bench notes from this turn:
 Interpretation:
 - this step specifically targets the `asr_session_closed` immediate-reopen stall seen in the user log, not the already-addressed follow-up timeout teardown path
 - if overflow still reproduces after this step on a DNS-working network, the next debug target should be the residual websocket ready/recycle queue state across xiaozhi stream rollover
+
+## Step 5.38
+Rebuild after hardening the no-`MEAN` KWS runtime input binding:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects, capture a fresh boot:
+```text
+AT+RST
+```
+
+Boot-time pass signals:
+- no crash signature appears:
+  - `Data abort with Data Fault Status Register`
+- KWS init still reports the expected no-`MEAN` model contract:
+  - `kws quant: in_src=schema scale_u6=34970 zp=-3 out_src=schema scale_u6=3906 zp=-128`
+  - `kws input shape: src=schema dims=[1,40,98,1] layout=mels_frames`
+  - `kws output shape: src=schema dims=[1,1,1,1] values=1`
+- the old stale-binding symptom does not reappear:
+  - `kws tensor data drift: runtime_input=...`
+
+Wakeword regression check:
+```text
+1. Wait until Wi-Fi and SNTP are ready
+2. Clearly say: 小欧管家
+3. Repeat 3-5 times if needed
+```
+
+Pass signals during the wake test:
+- the score is no longer pinned at the old failure plateau:
+  - `score_pm=140 gate_best_pm=140 ...` repeating for every gate cycle
+- no sustained KWS queue saturation:
+  - `queue=40/40` with fast-growing `dropped=...`
+- at least one successful wake path appears:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued`
+
+Interpretation:
+- if the stale-binding warning disappears and scores recover, this step fixed the runtime input binding issue without reintroducing the post-`Invoke()` crash
+- if boot is stable but scores are still pinned low, the next debug target is model-input content correctness rather than tensor binding lifetime

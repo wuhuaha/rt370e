@@ -54,6 +54,7 @@ extern "C" {
 #endif
 
 #include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
@@ -846,6 +847,65 @@ static bool river_voice_kws_tensor_bytes_sufficient(size_t bytes_field,
            bytes_field >= element_count;
 }
 
+static void *river_voice_kws_tensor_data_ptr(TfLiteTensor *tensor,
+                                             TfLiteType effective_type)
+{
+    if (tensor == NULL) {
+        return NULL;
+    }
+
+    switch (effective_type) {
+    case kTfLiteUInt8:
+        return (void *)tflite::GetTensorData<uint8_t>(tensor);
+    case kTfLiteInt8:
+        return (void *)tflite::GetTensorData<int8_t>(tensor);
+    case kTfLiteFloat32:
+        return (void *)tflite::GetTensorData<float>(tensor);
+    default:
+        return NULL;
+    }
+}
+
+static river_status_t river_voice_kws_sync_runtime_tensors(
+    river_voice_kws_context_t *context)
+{
+    TfLiteTensor *runtime_input_tensor;
+    void *runtime_input_data;
+    bool binding_changed;
+
+    if (context == NULL || context->interpreter == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    runtime_input_tensor = context->interpreter->input(0);
+    runtime_input_data = river_voice_kws_tensor_data_ptr(runtime_input_tensor,
+                                                         context->effective_input_type);
+    if (runtime_input_tensor == NULL || runtime_input_data == NULL) {
+        RIVER_LOGE("kws runtime input tensor invalid: input_tensor=%p input_data=%p effective_in=%s",
+                   (void *)runtime_input_tensor,
+                   runtime_input_data,
+                   river_voice_kws_tensor_type_name(context->effective_input_type));
+        return RIVER_ERR_IO;
+    }
+
+    binding_changed =
+        (context->input_tensor != NULL &&
+         (runtime_input_tensor != context->input_tensor ||
+          runtime_input_data != context->input_tensor_data));
+    if (binding_changed && !context->tensor_data_drift_logged) {
+        context->tensor_data_drift_logged = true;
+        RIVER_LOGW("kws input tensor binding changed: runtime_input_tensor=%p cached_input_tensor=%p runtime_input=%p cached_input=%p; resync runtime input",
+                   (void *)runtime_input_tensor,
+                   (void *)context->input_tensor,
+                   runtime_input_data,
+                   context->input_tensor_data);
+    }
+
+    context->input_tensor = runtime_input_tensor;
+    context->input_tensor_data = runtime_input_data;
+    return RIVER_OK;
+}
+
 static void *river_voice_kws_align_ptr(void *ptr, size_t alignment)
 {
     uintptr_t address;
@@ -1278,7 +1338,8 @@ static river_status_t river_voice_kws_compute_mel_frame(
     return RIVER_OK;
 }
 
-static void river_voice_kws_fill_input_tensor(river_voice_kws_context_t *context)
+static river_status_t river_voice_kws_fill_input_tensor(
+    river_voice_kws_context_t *context)
 {
     uint32_t frame_index;
     uint32_t mel_index;
@@ -1287,17 +1348,8 @@ static void river_voice_kws_fill_input_tensor(river_voice_kws_context_t *context
     int8_t *dst_i8 = NULL;
     float *dst_f32 = NULL;
 
-    if (!context->tensor_data_drift_logged &&
-        context->input_tensor != NULL &&
-        context->output_tensor != NULL &&
-        (context->input_tensor->data.data != context->input_tensor_data ||
-         context->output_tensor->data.data != context->output_tensor_data)) {
-        context->tensor_data_drift_logged = true;
-        RIVER_LOGW("kws tensor data drift: runtime_input=%p cached_input=%p runtime_output=%p cached_output=%p; use cached",
-                   (void *)context->input_tensor->data.data,
-                   context->input_tensor_data,
-                   (void *)context->output_tensor->data.data,
-                   context->output_tensor_data);
+    if (river_voice_kws_sync_runtime_tensors(context) != RIVER_OK) {
+        return RIVER_ERR_IO;
     }
 
     if (context->effective_input_type == kTfLiteUInt8) {
@@ -1384,6 +1436,8 @@ static void river_voice_kws_fill_input_tensor(river_voice_kws_context_t *context
             }
         }
     }
+
+    return RIVER_OK;
 }
 
 static river_status_t river_voice_kws_run_inference(
@@ -1391,7 +1445,9 @@ static river_status_t river_voice_kws_run_inference(
 {
     float score;
 
-    river_voice_kws_fill_input_tensor(context);
+    if (river_voice_kws_fill_input_tensor(context) != RIVER_OK) {
+        return RIVER_ERR_IO;
+    }
     if (context->interpreter->Invoke() != kTfLiteOk) {
         return RIVER_ERR_IO;
     }
@@ -1999,8 +2055,12 @@ extern "C" river_status_t river_voice_kws_init(void)
     output_bytes_min =
         output_elements *
         river_voice_kws_tensor_storage_bytes(g_river_voice_kws->effective_output_type);
-    input_tensor_data = (const void *)g_river_voice_kws->input_tensor->data.data;
-    output_tensor_data = (const void *)g_river_voice_kws->output_tensor->data.data;
+    input_tensor_data =
+        river_voice_kws_tensor_data_ptr(g_river_voice_kws->input_tensor,
+                                        g_river_voice_kws->effective_input_type);
+    output_tensor_data =
+        river_voice_kws_tensor_data_ptr(g_river_voice_kws->output_tensor,
+                                        g_river_voice_kws->effective_output_type);
     if (input_tensor_data == NULL || output_tensor_data == NULL) {
         RIVER_LOGE("kws tensor data invalid: input_data=%p output_data=%p input_bytes=%lu output_bytes=%lu",
                    input_tensor_data,

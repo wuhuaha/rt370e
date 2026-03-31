@@ -1822,3 +1822,29 @@
 - Verification blockers on the current bench:
   - after reboot, the board associated to `ORVIBO`, but `xiaozhi bootstrap` hit `gethostbyname` failure on that network, so the exact online wakeword/follow-up path could not be re-run end-to-end
   - an additional auto-enter-download-mode timeout prevented immediately reflashing the second refinement from the current shell session
+
+## Step 5.38
+- Hardened the no-`MEAN` KWS runtime tensor binding on the input side to keep the current prep branch in a checkpointable usable state before the next serial round.
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added a typed tensor-data accessor based on `tensorflow/lite/kernels/internal/tensor_ctypes.h`
+  - replaced direct reads of `tensor->data.data` with typed pointer resolution for init-time input/output data capture
+  - added a narrow runtime resync path that refreshes only `interpreter->input(0)` and its backing buffer before filling the KWS input tensor
+  - changed input fill to return status so inference exits cleanly if runtime input binding is invalid
+- Root-cause summary for this step:
+  - failing field logs showed `kws tensor data drift: runtime_input=0x25262627 ...`, which means the cached view of the runtime input binding could become stale or nonsensical after init
+  - a broader attempt that also refreshed runtime tensors after `Invoke()` caused a CA32 data abort in this SDK, so this step intentionally limits resync to the pre-inference input side only
+  - the output binding remains cached on purpose because the safer goal here is to eliminate obvious stale-input writes without reintroducing the post-`Invoke()` crash
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no KWS model contract was changed; this is runtime binding hardening only
+  - the change is isolated to the no-`MEAN` KWS path and leaves the already-isolated non-mainline voice code untouched
+- Verified locally:
+  - full `RTL8730E` build succeeds
+  - image sizes remain unchanged:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Board verification is deferred to the next user-driven serial session:
+  - confirm no new data abort
+  - confirm the old `kws tensor data drift` warning no longer appears
+  - confirm wakeword score is no longer pinned at the previously observed `140 pm` failure mode
