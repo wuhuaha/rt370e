@@ -2740,3 +2740,49 @@ Fail interpretation:
 - if a new `Data abort` still appears, capture the new fault PC/LR and registers; do not assume it is the same unaligned `user_data` issue unless the fault PC is still `0x6035f448`
 - if `kws gate open` is stable and there is no crash but still no `wakeword hit`, operator bring-up is no longer the blocker; the next issue is score / threshold / wake-path behavior
 - if `kws tensor data drift: ...` still appears after the crash is gone, treat it as a separate interpreter-state issue worth fixing next even if wakeword can already run through
+
+## Step 5.32
+Rebuild after switching patched KWS `MEAN` runtime back to SDK `EvalMeanHelper(...)` while keeping project-local reducer-param caching:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images change to:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3593568`
+  - `build_RTL8730E/ota_all.bin 3593600`
+
+Flash and monitor on board:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 tools/river_flash.py -p /dev/ttyUSB0 --log-level debug
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Board-side check:
+- let the board boot fully, connect Wi-Fi, and complete SNTP sync
+- say the wakeword a few times until runtime reaches `kws gate open`
+- keep watching the first real KWS inference window after gate open
+
+Pass signals:
+- these old patched-eval crash signatures no longer appear:
+  - `Data abort with Data Fault Status Register 0x00000221`
+  - `Address of Instruction causing Data abort 0x6035f474`
+  - `Previous Mode's LR is 0x6035e1ec`
+- KWS now survives the first real `MEAN` invoke instead of faulting right after `kws gate open`
+- ideal forward progress is:
+  - `kws gate open`
+  - `wakeword hit`
+  - `wakeword queued`
+  - `xiaozhi connecting`
+
+Fail interpretation:
+- if a new `Data abort` still appears, capture the new fault PC/LR and registers; do not assume it is the same `MEAN` eval-loop fault unless the new PC maps back into the patched `MEAN`
+- if `kws worker process failed: status=-6` returns without a hard fault, capture the exact new `Node MEAN ...` message; that means reducer-metadata repair worked but runtime still disagrees with the upstream helper on some detail
+- if `kws gate open` becomes stable and there is no crash but still no `wakeword hit`, operator bring-up is no longer the blocker; the next issue is score / threshold / wake-path behavior

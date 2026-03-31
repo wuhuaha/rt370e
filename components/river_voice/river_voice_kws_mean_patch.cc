@@ -1,283 +1,17 @@
 #include "river_voice_kws_mean_patch.h"
 
-#include <math.h>
-#include <new>
-#include <limits>
 #include <stdint.h>
+#include <string.h>
 
-#include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/reduce.h"
-#include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/micro_utils.h"
 
 namespace {
 
 struct river_voice_kws_mean_patch_op_data {
     tflite::OpDataReduce reduce;
-    bool keep_dims;
+    TfLiteReducerParams params;
 };
-
-template <typename T>
-static T river_voice_kws_mean_patch_clamp(int32_t value)
-{
-    if (value < (int32_t)std::numeric_limits<T>::min()) {
-        value = (int32_t)std::numeric_limits<T>::min();
-    } else if (value > (int32_t)std::numeric_limits<T>::max()) {
-        value = (int32_t)std::numeric_limits<T>::max();
-    }
-    return (T)value;
-}
-
-static bool river_voice_kws_mean_patch_resolve_axes(const int *axis_data,
-                                                    int axis_count,
-                                                    int rank,
-                                                    int *axes_out,
-                                                    int *axes_len_out)
-{
-    int axis_index;
-    int out_len = 0;
-
-    if (axes_len_out != NULL) {
-        *axes_len_out = 0;
-    }
-    if (axis_data == NULL || axes_out == NULL || rank <= 0 || axis_count <= 0) {
-        return false;
-    }
-    if (axis_count > 2) {
-        return false;
-    }
-
-    for (axis_index = 0; axis_index < axis_count; ++axis_index) {
-        int axis = axis_data[axis_index];
-        int dedupe_index;
-        bool duplicate = false;
-
-        if (axis < 0) {
-            axis += rank;
-        }
-        if (axis < 0 || axis >= rank) {
-            return false;
-        }
-        for (dedupe_index = 0; dedupe_index < out_len; ++dedupe_index) {
-            if (axes_out[dedupe_index] == axis) {
-                duplicate = true;
-                break;
-            }
-        }
-        if (!duplicate) {
-            axes_out[out_len++] = axis;
-        }
-    }
-
-    if (out_len == 2 && axes_out[0] > axes_out[1]) {
-        int tmp = axes_out[0];
-        axes_out[0] = axes_out[1];
-        axes_out[1] = tmp;
-    }
-    if (axes_len_out != NULL) {
-        *axes_len_out = out_len;
-    }
-    return out_len > 0;
-}
-
-template <typename T>
-static T river_voice_kws_mean_patch_quantize(int32_t centered_sum,
-                                             int32_t count,
-                                             float input_scale,
-                                             int output_zero_point,
-                                             float output_scale)
-{
-    float mean_real;
-    int32_t quantized;
-
-    if (count <= 0 || output_scale <= 0.0f) {
-        return (T)output_zero_point;
-    }
-
-    mean_real = ((float)centered_sum * input_scale) / (float)count;
-    quantized = (int32_t)lroundf(mean_real / output_scale) + output_zero_point;
-    return river_voice_kws_mean_patch_clamp<T>(quantized);
-}
-
-template <typename T>
-static TfLiteStatus river_voice_kws_mean_patch_eval_quantized(
-    TfLiteContext *context,
-    TfLiteNode *node)
-{
-    const TfLiteEvalTensor *input;
-    const TfLiteEvalTensor *axis;
-    TfLiteEvalTensor *output;
-    const river_voice_kws_mean_patch_op_data *patch_data;
-    const tflite::OpDataReduce *op_data;
-    bool keep_dims;
-    const T *input_data;
-    T *output_data;
-    int axes[2];
-    int axes_len = 0;
-    int axis0;
-    int axis1;
-    int n;
-    int h;
-    int w;
-    int c;
-    int b;
-    int hi;
-    int wi;
-    int ci;
-    int32_t centered_sum;
-
-    input = tflite::micro::GetEvalInput(context, node, 0);
-    axis = tflite::micro::GetEvalInput(context, node, 1);
-    output = tflite::micro::GetEvalOutput(context, node, 0);
-    patch_data = static_cast<const river_voice_kws_mean_patch_op_data *>(
-        node->user_data);
-    op_data = patch_data != NULL ? &patch_data->reduce : NULL;
-    keep_dims = patch_data != NULL ? patch_data->keep_dims : false;
-
-    TF_LITE_ENSURE(context, input != NULL);
-    TF_LITE_ENSURE(context, axis != NULL);
-    TF_LITE_ENSURE(context, output != NULL);
-    TF_LITE_ENSURE(context, patch_data != NULL);
-    TF_LITE_ENSURE(context, op_data != NULL);
-    TF_LITE_ENSURE_EQ(context, axis->type, kTfLiteInt32);
-    TF_LITE_ENSURE_EQ(context, input->dims->size, 4);
-
-    input_data = tflite::micro::GetTensorData<T>(input);
-    output_data = tflite::micro::GetTensorData<T>(output);
-    TF_LITE_ENSURE(context, input_data != NULL);
-    TF_LITE_ENSURE(context, output_data != NULL);
-
-    TF_LITE_ENSURE(
-        context,
-        river_voice_kws_mean_patch_resolve_axes(
-            tflite::micro::GetTensorData<int>(axis),
-            tflite::ElementCount(*axis->dims), input->dims->size, axes,
-            &axes_len));
-
-    n = input->dims->data[0];
-    h = input->dims->data[1];
-    w = input->dims->data[2];
-    c = input->dims->data[3];
-    axis0 = axes[0];
-    axis1 = axes_len > 1 ? axes[1] : -1;
-
-    if (axes_len == 1 && axis0 == 2) {
-        if (output->dims->size == 4) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[2], 1);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
-        } else if (output->dims->size == 3) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], h);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[2], c);
-        } else {
-            MicroPrintf("river kws mean patch axis=2 unsupported output rank=%d",
-                        output->dims->size);
-            return kTfLiteError;
-        }
-        for (b = 0; b < n; ++b) {
-            for (hi = 0; hi < h; ++hi) {
-                for (ci = 0; ci < c; ++ci) {
-                    centered_sum = 0;
-                    for (wi = 0; wi < w; ++wi) {
-                        const int input_offset =
-                            (((b * h) + hi) * w + wi) * c + ci;
-                        centered_sum +=
-                            (int32_t)input_data[input_offset] -
-                            op_data->input_zp;
-                    }
-                    output_data[(b * h + hi) * c + ci] =
-                        river_voice_kws_mean_patch_quantize<T>(
-                            centered_sum, w, op_data->input_scale,
-                            op_data->output_zp, op_data->output_scale);
-                }
-            }
-        }
-        return kTfLiteOk;
-    }
-
-    if (axes_len == 1 && axis0 == 1) {
-        if (output->dims->size == 4) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[2], w);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
-        } else if (output->dims->size == 3) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], w);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[2], c);
-        } else {
-            MicroPrintf("river kws mean patch axis=1 unsupported output rank=%d",
-                        output->dims->size);
-            return kTfLiteError;
-        }
-        for (b = 0; b < n; ++b) {
-            for (wi = 0; wi < w; ++wi) {
-                for (ci = 0; ci < c; ++ci) {
-                    centered_sum = 0;
-                    for (hi = 0; hi < h; ++hi) {
-                        const int input_offset =
-                            (((b * h) + hi) * w + wi) * c + ci;
-                        centered_sum +=
-                            (int32_t)input_data[input_offset] -
-                            op_data->input_zp;
-                    }
-                    output_data[(b * w + wi) * c + ci] =
-                        river_voice_kws_mean_patch_quantize<T>(
-                            centered_sum, h, op_data->input_scale,
-                            op_data->output_zp, op_data->output_scale);
-                }
-            }
-        }
-        return kTfLiteOk;
-    }
-
-    if (axes_len == 2 && axis0 == 1 && axis1 == 2) {
-        const int count = h * w;
-
-        if (output->dims->size == 4) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], 1);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[2], 1);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[3], c);
-        } else if (output->dims->size == 2) {
-            TF_LITE_ENSURE_EQ(context, output->dims->data[0], n);
-            TF_LITE_ENSURE_EQ(context, output->dims->data[1], c);
-        } else {
-            MicroPrintf(
-                "river kws mean patch axes=1,2 unsupported output rank=%d",
-                output->dims->size);
-            return kTfLiteError;
-        }
-
-        for (b = 0; b < n; ++b) {
-            for (ci = 0; ci < c; ++ci) {
-                centered_sum = 0;
-                for (hi = 0; hi < h; ++hi) {
-                    for (wi = 0; wi < w; ++wi) {
-                        const int input_offset =
-                            (((b * h) + hi) * w + wi) * c + ci;
-                        centered_sum +=
-                            (int32_t)input_data[input_offset] -
-                            op_data->input_zp;
-                    }
-                }
-                output_data[b * c + ci] = river_voice_kws_mean_patch_quantize<T>(
-                    centered_sum, count, op_data->input_scale,
-                    op_data->output_zp, op_data->output_scale);
-            }
-        }
-        return kTfLiteOk;
-    }
-
-    MicroPrintf(
-        "river kws mean patch got unsupported reduce pattern axes_len=%d axis0=%d axis1=%d keep_dims=%d in_rank=%d out_rank=%d",
-        axes_len, axis0, axis1, keep_dims ? 1 : 0, input->dims->size,
-        output->dims->size);
-    return kTfLiteError;
-}
 
 static void *river_voice_kws_mean_patch_init(TfLiteContext *context,
                                              const char *buffer,
@@ -296,14 +30,18 @@ static void *river_voice_kws_mean_patch_init(TfLiteContext *context,
     if (raw_allocation == NULL) {
         return NULL;
     }
+
     aligned_address =
         (reinterpret_cast<uintptr_t>(raw_allocation) + kOpDataAlignment - 1U) &
         ~(uintptr_t)(kOpDataAlignment - 1U);
     patch_data = reinterpret_cast<river_voice_kws_mean_patch_op_data *>(
         aligned_address);
     memset(patch_data, 0, sizeof(*patch_data));
+
     params = reinterpret_cast<const TfLiteReducerParams *>(buffer);
-    patch_data->keep_dims = params != NULL ? params->keep_dims : false;
+    if (params != NULL) {
+        patch_data->params = *params;
+    }
     return patch_data;
 }
 
@@ -323,24 +61,21 @@ static TfLiteStatus river_voice_kws_mean_patch_prepare(TfLiteContext *context,
 static TfLiteStatus river_voice_kws_mean_patch_eval(TfLiteContext *context,
                                                     TfLiteNode *node)
 {
-    const TfLiteEvalTensor *input;
+    river_voice_kws_mean_patch_op_data *patch_data;
+    void *saved_builtin_data;
+    TfLiteStatus status;
 
     TF_LITE_ENSURE(context, context != NULL);
     TF_LITE_ENSURE(context, node != NULL);
-    input = tflite::micro::GetEvalInput(context, node, 0);
-    TF_LITE_ENSURE(context, input != NULL);
+    patch_data =
+        static_cast<river_voice_kws_mean_patch_op_data *>(node->user_data);
+    TF_LITE_ENSURE(context, patch_data != NULL);
 
-    switch (input->type) {
-    case kTfLiteInt8:
-        return river_voice_kws_mean_patch_eval_quantized<int8_t>(context,
-                                                                 node);
-    case kTfLiteInt16:
-        return river_voice_kws_mean_patch_eval_quantized<int16_t>(context,
-                                                                  node);
-    default:
-        MicroPrintf("river kws mean patch only supports int8/int16");
-        return kTfLiteError;
-    }
+    saved_builtin_data = node->builtin_data;
+    node->builtin_data = &patch_data->params;
+    status = tflite::EvalMeanHelper(context, node, &patch_data->reduce);
+    node->builtin_data = saved_builtin_data;
+    return status;
 }
 
 }  // namespace

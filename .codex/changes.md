@@ -1630,3 +1630,28 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3601760`
   - `build_RTL8730E/ota_all.bin` = `3601792`
+
+## Step 5.32
+- Replaced the project-side patched `MEAN` eval loop with the SDK's own `tflite::EvalMeanHelper(...)`, while still keeping the project-local fix for missing reducer params.
+- Updated [components/river_voice/river_voice_kws_mean_patch.cc](/root/ameba-river/components/river_voice/river_voice_kws_mean_patch.cc):
+  - removed the project-side int8/int16 `MEAN` math loop
+  - kept the explicitly aligned patched op-data allocation from Step `5.31`
+  - expanded patched op-data from `OpDataReduce + keep_dims` to `OpDataReduce + TfLiteReducerParams`
+  - cached the full reducer params during `init`
+  - temporarily reattached cached `TfLiteReducerParams` to `node->builtin_data` during `eval`
+  - delegated runtime execution to SDK `tflite::EvalMeanHelper(...)`
+- Why this step was necessary:
+  - the latest March 31 board logs proved the old `unsupported reduce pattern` issue was gone, but real KWS inference still crashed inside the project-side eval path:
+    - `Data abort with Data Fault Status Register 0x00000221`
+    - fault PC moved to the patched `MEAN` eval body (`0x6035f474`)
+    - register dumps still showed `node->user_data` corruption symptoms during `MEAN`
+  - model inspection also showed the live `MEAN` topology is standard and already supported by the SDK reduce kernel, so keeping a custom math loop was unnecessary risk
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model asset was changed again
+  - the project-side patch now only repairs reducer metadata lifetime/alignment and leaves actual `MEAN` execution to the upstream kernel
+- Verified a full local `RTL8730E` build after the fix.
+- Image sizes after this step changed to:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
+  - `build_RTL8730E/ota_all.bin` = `3593600`
