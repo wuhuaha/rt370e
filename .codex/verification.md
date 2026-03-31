@@ -3138,3 +3138,62 @@ Observed result on `2026-03-31` from user serial log:
 Result classification:
 - `Step 5.38` is board-verified as passed for the intended KWS / session-stability objective
 - next serial/debug step should target playback underrun recovery rather than KWS wake correctness
+
+## Step 5.40
+Rebuild after removing unsafe runtime `interpreter->input(0)` polling from the KWS worker:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Primary pass criterion for this step:
+- after Wi-Fi association, the old early crash must not appear:
+  - `Data abort with Data Fault Status Register 0x00001210`
+  - `Address of Instruction causing Data abort 0x60354ab8`
+  - `GetTensorData<float>(TfLiteTensor*)`
+
+Boot-time pass signals:
+- normal KWS init still appears:
+  - `kws quant: in_src=schema scale_u6=34970 zp=-3 out_src=schema scale_u6=3906 zp=-128`
+  - `kws input shape: src=schema dims=[1,40,98,1] layout=mels_frames`
+  - `kws output shape: src=schema dims=[1,1,1,1] values=1`
+- Wi-Fi still associates and gets IP without crashing
+
+Wake regression check:
+```text
+1. Wait for Wi-Fi and SNTP ready
+2. Clearly say: 小欧管家
+3. Repeat 2-3 times if needed
+```
+
+Pass signals:
+- wake is still alive after removing runtime rebind:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued`
+- no new crash appears before or after wake
+
+Interpretation:
+- if the early Wi-Fi-adjacent crash disappears and wake still works, this step confirms the runtime `input(0)` polling path was the real remaining KWS instability
+- if wake degrades again but crash is gone, the next step should search for a safer non-`input(0)` method to validate cached tensor buffers

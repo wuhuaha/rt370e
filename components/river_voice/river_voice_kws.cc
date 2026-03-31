@@ -866,46 +866,6 @@ static void *river_voice_kws_tensor_data_ptr(TfLiteTensor *tensor,
     }
 }
 
-static river_status_t river_voice_kws_sync_runtime_tensors(
-    river_voice_kws_context_t *context)
-{
-    TfLiteTensor *runtime_input_tensor;
-    void *runtime_input_data;
-    bool binding_changed;
-
-    if (context == NULL || context->interpreter == NULL) {
-        return RIVER_ERR_ARG;
-    }
-
-    runtime_input_tensor = context->interpreter->input(0);
-    runtime_input_data = river_voice_kws_tensor_data_ptr(runtime_input_tensor,
-                                                         context->effective_input_type);
-    if (runtime_input_tensor == NULL || runtime_input_data == NULL) {
-        RIVER_LOGE("kws runtime input tensor invalid: input_tensor=%p input_data=%p effective_in=%s",
-                   (void *)runtime_input_tensor,
-                   runtime_input_data,
-                   river_voice_kws_tensor_type_name(context->effective_input_type));
-        return RIVER_ERR_IO;
-    }
-
-    binding_changed =
-        (context->input_tensor != NULL &&
-         (runtime_input_tensor != context->input_tensor ||
-          runtime_input_data != context->input_tensor_data));
-    if (binding_changed && !context->tensor_data_drift_logged) {
-        context->tensor_data_drift_logged = true;
-        RIVER_LOGW("kws input tensor binding changed: runtime_input_tensor=%p cached_input_tensor=%p runtime_input=%p cached_input=%p; resync runtime input",
-                   (void *)runtime_input_tensor,
-                   (void *)context->input_tensor,
-                   runtime_input_data,
-                   context->input_tensor_data);
-    }
-
-    context->input_tensor = runtime_input_tensor;
-    context->input_tensor_data = runtime_input_data;
-    return RIVER_OK;
-}
-
 static void *river_voice_kws_align_ptr(void *ptr, size_t alignment)
 {
     uintptr_t address;
@@ -1348,8 +1308,8 @@ static river_status_t river_voice_kws_fill_input_tensor(
     int8_t *dst_i8 = NULL;
     float *dst_f32 = NULL;
 
-    if (river_voice_kws_sync_runtime_tensors(context) != RIVER_OK) {
-        return RIVER_ERR_IO;
+    if (context == NULL || context->input_tensor_data == NULL) {
+        return RIVER_ERR_ARG;
     }
 
     if (context->effective_input_type == kTfLiteUInt8) {

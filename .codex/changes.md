@@ -1873,3 +1873,31 @@
 - Conclusion of this step:
   - current branch is now board-proven as `KWS wake + xiaozhi session + follow-up reopen` usable
   - the next debug target is playback buffer / write scheduling under TTS, not KWS model migration, tensor binding, or xiaozhi follow-up reopen correctness
+
+## Step 5.40
+- Fixed a newly exposed intermittent CA32 crash in the no-`MEAN` KWS prep branch by removing runtime re-fetch of `interpreter->input(0)` from the KWS worker path.
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - stopped calling `river_voice_kws_sync_runtime_tensors()` during every inference input fill
+  - kept the init-time typed tensor-data resolution, but made runtime inference use only the already-cached `input_tensor_data`
+  - reduced `river_voice_kws_fill_input_tensor()` to a simple cached-pointer validity check
+- Root-cause summary:
+  - the new user crash log hit `0x60354ab8`, which resolves to `tflite::GetTensorData<float>(TfLiteTensor*)`
+  - call chain:
+    - `river_voice_kws_task()`
+    - `river_voice_kws_sync_runtime_tensors()`
+    - `interpreter->input(0)` / `GetTensorData<float>()`
+  - the fault happened before wake, right after Wi-Fi association, proving the remaining unstable path was the runtime KWS worker polling `input(0)`, not follow-up reopen, TTS, or cloud control
+  - this confirms the Ameba/TFLM port does not safely support repeated runtime `input(0)` access from the worker thread
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no model contract or thresholds were changed
+  - the change only removes the unsafe runtime rebind path; init-time tensor discovery remains intact
+- Verified locally:
+  - full `RTL8730E` build succeeds
+  - image sizes remain unchanged:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Next board verification target:
+  - confirm the early `Data abort` after Wi-Fi connect no longer appears
+  - confirm wake still works after removing the unsafe runtime rebind
