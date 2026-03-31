@@ -56,6 +56,9 @@ typedef struct {
     uint32_t interrupt_count;
     uint32_t flush_count;
     uint32_t duck_count;
+    uint32_t track_create_count;
+    uint32_t track_reuse_count;
+    uint32_t track_destroy_count;
     uint32_t write_ok;
     uint32_t write_fail;
     uint32_t ref_write_ok;

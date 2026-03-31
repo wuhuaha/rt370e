@@ -1939,3 +1939,46 @@
   - then trigger a second wake without rebooting and confirm:
     - `wakeword hit: text=小欧管家`
     - `wakeword queued text=小欧管家`
+
+## Step 5.42
+- Updated [plan.md](/root/ameba-river/plan.md) so the branch plan matches the current real priority:
+  - the wake rearm regression is already fixed and verified
+  - the current top issue is repeated playback causing heap collapse and intermittent `underrun`
+  - the immediate next step is now explicitly `AudioTrack` reuse plus playback heap instrumentation
+- Updated [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h):
+  - added playback stats counters for track lifecycle:
+    - `track_create_count`
+    - `track_reuse_count`
+    - `track_destroy_count`
+- Updated [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c):
+  - added a cached prepared-track state so compatible playback sessions can reuse an existing `AudioTrack`
+  - changed normal `stop` / `interrupt` handling to stop and flush the active stream while keeping the compatible track object alive for the next playback start
+  - kept destructive release for incompatible reconfiguration or failed restart/init/start paths
+  - added playback heap snapshots around start and stop:
+    - `playback_start_prepare`
+    - `playback_start_new`
+    - `playback_start_reuse`
+    - `playback_stop_prepare`
+    - `playback_stop_cached`
+  - extended playback logs so board logs now show whether a start used reuse:
+    - `reuse=yes|no`
+  - extended `river_playback_service_dump_status()` to expose track lifecycle counters as `track=create/reuse/destroy`
+- Root-cause / design summary for this step:
+  - recent user logs showed wake rearm was already fixed, but repeated xiaozhi turns drove `heap_free` from about `79KB` down to about `8KB`
+  - the most suspicious local lifecycle was `river_playback_service_start_stream()`, which recreated and destroyed `AudioTrack` for every TTS turn
+  - this step intentionally avoids changing SDK code or weakening admission / KWS gates; it only narrows the playback lifecycle and improves diagnostics
+- Why this is the minimal change:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - playback reuse is limited to config-compatible starts; incompatible or failed paths still destroy and recreate the track cleanly
+  - the new heap snapshots make it possible to validate or falsify the playback-leak hypothesis directly from serial logs
+- Verified locally:
+  - full `RTL8730E` build succeeds
+  - output images remain unchanged:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Next board verification target:
+  - trigger at least `3` consecutive xiaozhi wake -> ASR -> TTS -> follow-up-timeout cycles
+  - confirm later TTS starts show `reuse=yes`
+  - compare playback snapshots before and after each turn to verify `heap_free` no longer collapses across turns
+  - confirm whether `underrun` frequency decreases or at least correlates with low-heap snapshots

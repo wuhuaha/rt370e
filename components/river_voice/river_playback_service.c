@@ -12,6 +12,7 @@
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
 #include "river/river_reference_service.h"
+#include "river/river_runtime_stats.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.playback"
@@ -20,8 +21,10 @@ typedef struct {
     bool initialized;
     bool ref_owned;
     bool track_started;
+    bool track_ready;
     rtos_mutex_t lock;
     struct AudioTrack *track;
+    AudioTrackConfig prepared_track_config;
     river_playback_stream_config_t config;
     river_playback_service_stats_t stats;
     river_playback_service_listener_t listener;
@@ -227,7 +230,15 @@ static void river_playback_service_reset_stream_locked(void)
     river_playback_service_copy_stream_name(NULL);
 }
 
-static void river_playback_service_close_locked(void)
+static void river_playback_service_close_reference_locked(void)
+{
+    if (g_river_playback_service.ref_owned) {
+        river_reference_service_close();
+        g_river_playback_service.ref_owned = false;
+    }
+}
+
+static void river_playback_service_release_track_locked(void)
 {
     if (g_river_playback_service.track != NULL) {
         if (g_river_playback_service.track_started) {
@@ -238,14 +249,119 @@ static void river_playback_service_close_locked(void)
         }
         AudioTrack_Destroy(g_river_playback_service.track);
         g_river_playback_service.track = NULL;
+        g_river_playback_service.stats.track_destroy_count++;
     }
 
-    if (g_river_playback_service.ref_owned) {
-        river_reference_service_close();
-        g_river_playback_service.ref_owned = false;
+    g_river_playback_service.track_ready = false;
+    memset(&g_river_playback_service.prepared_track_config,
+           0,
+           sizeof(g_river_playback_service.prepared_track_config));
+}
+
+static void river_playback_service_close_locked(bool release_track)
+{
+    if (g_river_playback_service.track != NULL && g_river_playback_service.track_started) {
+        AudioTrack_Pause(g_river_playback_service.track);
+        AudioTrack_Flush(g_river_playback_service.track);
+        AudioTrack_Stop(g_river_playback_service.track);
+        g_river_playback_service.track_started = false;
+    }
+
+    river_playback_service_close_reference_locked();
+    if (release_track) {
+        river_playback_service_release_track_locked();
     }
 
     river_playback_service_reset_stream_locked();
+}
+
+static river_status_t river_playback_service_ensure_track_handle_locked(void)
+{
+    if (g_river_playback_service.track != NULL) {
+        return RIVER_OK;
+    }
+
+    g_river_playback_service.track = AudioTrack_Create();
+    if (g_river_playback_service.track == NULL) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    g_river_playback_service.stats.track_create_count++;
+    return RIVER_OK;
+}
+
+static bool river_playback_service_track_compatible_locked(uint32_t category_type,
+                                                           const river_playback_stream_config_t *config,
+                                                           size_t required_track_buffer_bytes)
+{
+    const AudioTrackConfig *prepared;
+
+    if (config == NULL || g_river_playback_service.track == NULL ||
+        !g_river_playback_service.track_ready) {
+        return false;
+    }
+
+    prepared = &g_river_playback_service.prepared_track_config;
+    if (prepared->category_type != category_type ||
+        prepared->sample_rate != config->sample_rate ||
+        prepared->channel_count != config->playback_channels ||
+        prepared->format != AUDIO_FORMAT_PCM_16_BIT) {
+        return false;
+    }
+
+    return prepared->buffer_bytes >= required_track_buffer_bytes;
+}
+
+static river_status_t river_playback_service_prepare_track_locked(
+    const river_playback_stream_config_t *config,
+    uint32_t category_type,
+    size_t required_track_buffer_bytes,
+    bool *reused_out)
+{
+    AudioTrackConfig track_config;
+    river_status_t status;
+
+    if (config == NULL || reused_out == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    *reused_out = false;
+    status = river_playback_service_ensure_track_handle_locked();
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    if (river_playback_service_track_compatible_locked(category_type,
+                                                       config,
+                                                       required_track_buffer_bytes)) {
+        *reused_out = true;
+        g_river_playback_service.stats.track_reuse_count++;
+        return RIVER_OK;
+    }
+
+    if (g_river_playback_service.track_ready) {
+        river_playback_service_release_track_locked();
+        status = river_playback_service_ensure_track_handle_locked();
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+
+    memset(&track_config, 0, sizeof(track_config));
+    track_config.category_type = category_type;
+    track_config.sample_rate = config->sample_rate;
+    track_config.format = AUDIO_FORMAT_PCM_16_BIT;
+    track_config.channel_count = config->playback_channels;
+    track_config.buffer_bytes = (uint32_t)required_track_buffer_bytes;
+
+    if (AudioTrack_Init(g_river_playback_service.track, &track_config, AUDIO_OUTPUT_FLAG_NONE) != 0) {
+        river_playback_service_release_track_locked();
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    g_river_playback_service.track_ready = true;
+    g_river_playback_service.prepared_track_config = track_config;
+    return RIVER_OK;
 }
 
 static river_status_t river_playback_service_stop_locked(bool interrupted, const char *reason)
@@ -254,6 +370,7 @@ static river_status_t river_playback_service_stop_locked(bool interrupted, const
         return RIVER_OK;
     }
 
+    river_runtime_stats_snapshot("playback_stop_prepare");
     river_playback_service_record_control_locked(interrupted ? "interrupt" : "stop", reason);
     RIVER_LOGI("playback %s: stream=%s epoch=%lu",
                interrupted ? "interrupt" : "stop",
@@ -265,12 +382,13 @@ static river_status_t river_playback_service_stop_locked(bool interrupted, const
     river_playback_service_advance_epoch_locked(reason != NULL ?
                                                     reason :
                                                     (interrupted ? "interrupt" : "stop"));
-    river_playback_service_close_locked();
+    river_playback_service_close_locked(false);
     g_river_playback_service.stats.stop_count++;
     if (interrupted) {
         g_river_playback_service.stats.interrupt_count++;
     }
     river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
+    river_runtime_stats_snapshot("playback_stop_cached");
     return RIVER_OK;
 }
 
@@ -293,7 +411,7 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
         AudioTrack_Stop(g_river_playback_service.track);
         if (AudioTrack_Start(g_river_playback_service.track) != 0) {
             river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-            river_playback_service_close_locked();
+            river_playback_service_close_locked(true);
             river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
             RIVER_LOGE("playback flush restart failed");
             return RIVER_ERR_UNSUPPORTED;
@@ -413,12 +531,13 @@ river_status_t river_playback_service_register_listener(river_playback_service_l
 
 river_status_t river_playback_service_start_stream(const river_playback_stream_config_t *config)
 {
-    AudioTrackConfig track_config;
     size_t min_buffer_bytes;
     size_t track_buffer_bytes;
     size_t desired_buffer_bytes;
+    size_t active_track_buffer_bytes;
     uint32_t category_type;
     river_status_t status;
+    bool reused_track;
 
     if (config == NULL || config->sample_rate == 0U || config->frame_ms == 0U ||
         config->playback_channels == 0U || config->bits_per_sample != 16U ||
@@ -440,6 +559,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         return RIVER_ERR_BUSY;
     }
 
+    river_runtime_stats_snapshot("playback_start_prepare");
     river_playback_service_record_control_locked("start", "start_stream");
     river_playback_service_advance_epoch_locked("start_stream");
     river_playback_service_set_state_locked(RIVER_PLAYBACK_PREPARING);
@@ -457,7 +577,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         ref_config.history_ms = config->reference_history_ms;
         if (river_reference_service_open(&ref_config) != RIVER_OK) {
             river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-            river_playback_service_close_locked();
+            river_playback_service_close_locked(false);
             river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
             rtos_mutex_give(g_river_playback_service.lock);
             RIVER_LOGE("playback ref open failed");
@@ -466,14 +586,14 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         g_river_playback_service.ref_owned = true;
     }
 
-    g_river_playback_service.track = AudioTrack_Create();
-    if (g_river_playback_service.track == NULL) {
+    status = river_playback_service_ensure_track_handle_locked();
+    if (status != RIVER_OK) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-        river_playback_service_close_locked();
+        river_playback_service_close_locked(false);
         river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
         rtos_mutex_give(g_river_playback_service.lock);
         RIVER_LOGE("AudioTrack_Create failed");
-        return RIVER_ERR_UNSUPPORTED;
+        return status;
     }
 
     min_buffer_bytes = AudioTrack_GetMinBufferBytes(g_river_playback_service.track,
@@ -487,7 +607,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
                                                          &desired_buffer_bytes);
     if (status != RIVER_OK) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-        river_playback_service_close_locked();
+        river_playback_service_close_locked(false);
         river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
         rtos_mutex_give(g_river_playback_service.lock);
         RIVER_LOGE("playback buffer compute failed: min=%luB frame=%luB frames=%lu",
@@ -497,32 +617,33 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         return status;
     }
 
-    memset(&track_config, 0, sizeof(track_config));
-    track_config.category_type = category_type;
-    track_config.sample_rate = config->sample_rate;
-    track_config.format = AUDIO_FORMAT_PCM_16_BIT;
-    track_config.channel_count = config->playback_channels;
-    track_config.buffer_bytes = (uint32_t)track_buffer_bytes;
-
     g_river_playback_service.config = *config;
     g_river_playback_service.stats.priority = config->priority;
     g_river_playback_service.stats.reference_export = config->reference_export;
     river_playback_service_copy_stream_name(config->stream_name);
 
-    if (AudioTrack_Init(g_river_playback_service.track, &track_config, AUDIO_OUTPUT_FLAG_NONE) != 0) {
+    status = river_playback_service_prepare_track_locked(config,
+                                                         category_type,
+                                                         track_buffer_bytes,
+                                                         &reused_track);
+    if (status != RIVER_OK) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-        river_playback_service_close_locked();
+        river_playback_service_close_locked(true);
         river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
         rtos_mutex_give(g_river_playback_service.lock);
-        RIVER_LOGE("AudioTrack_Init failed");
-        return RIVER_ERR_UNSUPPORTED;
+        RIVER_LOGE("AudioTrack_%s failed",
+                   reused_track ? "Reuse" : "Init");
+        return status;
     }
 
     river_playback_service_apply_volume_locked();
-    AudioTrack_SetStartThresholdBytes(g_river_playback_service.track, (int32_t)track_buffer_bytes);
+    active_track_buffer_bytes =
+        (size_t)g_river_playback_service.prepared_track_config.buffer_bytes;
+    AudioTrack_SetStartThresholdBytes(g_river_playback_service.track,
+                                      (int32_t)track_buffer_bytes);
     if (AudioTrack_Start(g_river_playback_service.track) != 0) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-        river_playback_service_close_locked();
+        river_playback_service_close_locked(true);
         river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
         rtos_mutex_give(g_river_playback_service.lock);
         RIVER_LOGE("AudioTrack_Start failed");
@@ -530,10 +651,10 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
     }
 
     g_river_playback_service.track_started = true;
-    g_river_playback_service.stats.track_buffer_bytes = track_buffer_bytes;
+    g_river_playback_service.stats.track_buffer_bytes = active_track_buffer_bytes;
     g_river_playback_service.stats.start_count++;
     river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
-    RIVER_LOGI("playback start: stream=%s rate=%luHz frame=%lums frame_bytes=%luB min=%luB target=%luB track=%luB ref=%s",
+    RIVER_LOGI("playback start: stream=%s rate=%luHz frame=%lums frame_bytes=%luB min=%luB target=%luB track=%luB ref=%s reuse=%s",
                g_river_playback_service.stats.stream_name[0] != '\0' ?
                    g_river_playback_service.stats.stream_name :
                    "-",
@@ -542,8 +663,11 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
                (unsigned long)config->playback_frame_bytes,
                (unsigned long)min_buffer_bytes,
                (unsigned long)desired_buffer_bytes,
-               (unsigned long)track_buffer_bytes,
-               config->reference_export ? "yes" : "no");
+               (unsigned long)active_track_buffer_bytes,
+               config->reference_export ? "yes" : "no",
+               reused_track ? "yes" : "no");
+    river_runtime_stats_snapshot(reused_track ? "playback_start_reuse" :
+                                                "playback_start_new");
 
     rtos_mutex_give(g_river_playback_service.lock);
     return RIVER_OK;
@@ -754,7 +878,7 @@ void river_playback_service_dump_status(void)
     river_playback_service_stats_t stats;
 
     river_playback_service_get_stats(&stats);
-    RIVER_LOGI("playback_service=%s stream=%s prio=%lu ref=%s duck=%s/%.2f epoch=%lu epoch_adv=%lu writes=%lu/%lu ref_writes=%lu/%lu starts=%lu stops=%lu interrupts=%lu flushes=%lu ducks=%lu buf=%luB ctrl=%s ctrl_reason=%s epoch_reason=%s int_reason=%s",
+    RIVER_LOGI("playback_service=%s stream=%s prio=%lu ref=%s duck=%s/%.2f epoch=%lu epoch_adv=%lu writes=%lu/%lu ref_writes=%lu/%lu starts=%lu stops=%lu interrupts=%lu flushes=%lu ducks=%lu track=%lu/%lu/%lu buf=%luB ctrl=%s ctrl_reason=%s epoch_reason=%s int_reason=%s",
                river_playback_service_state_name(stats.state),
                stats.stream_name[0] != '\0' ? stats.stream_name : "-",
                (unsigned long)stats.priority,
@@ -772,6 +896,9 @@ void river_playback_service_dump_status(void)
                (unsigned long)stats.interrupt_count,
                (unsigned long)stats.flush_count,
                (unsigned long)stats.duck_count,
+               (unsigned long)stats.track_create_count,
+               (unsigned long)stats.track_reuse_count,
+               (unsigned long)stats.track_destroy_count,
                (unsigned long)stats.track_buffer_bytes,
                stats.last_control[0] != '\0' ? stats.last_control : "-",
                stats.last_control_reason[0] != '\0' ? stats.last_control_reason : "-",

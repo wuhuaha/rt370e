@@ -3262,3 +3262,70 @@ Observed local result on `2026-03-31`:
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.42
+Rebuild after switching playback to reuse a compatible cached `AudioTrack` and adding playback heap snapshots:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Runtime repro for this step:
+```text
+1. Wait until Wi-Fi and SNTP are ready
+2. Clearly say: 小欧管家
+3. Let xiaozhi finish one full ASR + TTS turn
+4. Wait for follow-up timeout and rearm
+5. Repeat steps 2-4 at least 3 times without rebooting
+```
+
+Primary pass criteria:
+- repeated playback starts should begin reusing the cached track:
+  - `playback start: ... reuse=yes`
+- the playback-service dump or related logs should show reuse counters increasing:
+  - `track=create/reuse/destroy`
+- playback heap snapshots should no longer show the earlier cliff-like drop across turns:
+  - `snapshot reason=playback_start_prepare ...`
+  - `snapshot reason=playback_start_reuse ...`
+  - `snapshot reason=playback_stop_cached ...`
+
+Secondary checks:
+- wake rearm must remain intact after this playback change:
+  - `interaction_state: follow_up -> wake_monitoring reason=followup_timeout`
+- watch whether `underrun` becomes less frequent after the first turn
+- if `reuse=no` keeps appearing for every turn, record the full `playback start: ...` line because that means runtime config is not as stable as expected
+
+Interpretation:
+- if later turns show `reuse=yes` and heap stays roughly stable, the main leak/regression was likely repeated playback-object lifecycle churn
+- if `reuse=yes` appears but heap still keeps collapsing, the retained allocation is probably outside the `AudioTrack` object itself and the next step should focus on cloud/TTS path buffers
+- if `reuse=yes` appears and `underrun` remains frequent, this step improved lifetime stability but not pacing, so the next step should focus on ring depth / write cadence rather than heap retention
+
+Observed local result on `2026-03-31`:
+- pass:
+  - local `RTL8730E` build succeeded
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
