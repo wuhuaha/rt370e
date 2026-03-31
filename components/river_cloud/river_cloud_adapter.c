@@ -83,6 +83,7 @@ static void river_cloud_xiaozhi_pump_task(void *arg)
     (void)arg;
 
     for (;;) {
+        /* Timeout-driven window teardown may touch transport state; keep it here. */
         river_cloud_xiaozhi_check_window_timeout();
         if (river_cloud_xiaozhi_pump_active()) {
             if (river_xiaozhi_session_open()) {
@@ -1763,7 +1764,11 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
     }
 
     river_cloud_xiaozhi_check_pending_playback_stop();
-    river_cloud_xiaozhi_check_window_timeout();
+    /*
+     * Follow-up window timeout can cascade into websocket/session teardown.
+     * Keep that off the real-time capture path; the dedicated xiaozhi pump
+     * task already polls timeout state continuously and owns transport work.
+     */
     river_cloud_log_time_ready_once();
 
     if (!g_river_cloud.stream_active &&

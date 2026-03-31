@@ -2929,3 +2929,68 @@ Pass signals from the rebooted board log:
 Interpretation:
 - this step validates migration readiness of the no-`MEAN` model on the current board/runtime baseline
 - if wakeword accuracy is still weak, that is now a model-quality / threshold problem rather than a `MEAN` operator bring-up blocker
+
+## Step 5.36
+Rebuild after moving xiaozhi follow-up timeout teardown off the real-time capture path:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully on branch `prep/kws-no-mean-model`
+- output images remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+Flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects, run:
+```text
+river status
+river xiaozhi bootstrap
+river xiaozhi connect
+river xiaozhi listen start
+river xiaozhi listen stop
+river xiaozhi disconnect
+```
+
+Wait at least `10-12` seconds after `river xiaozhi disconnect`, then run:
+```text
+river status
+```
+
+Pass signals from the observed serial session:
+- `river status` before xiaozhi commands shows:
+  - `interaction_state=wake_monitoring`
+  - `capture_service=running ... queue=0/100 ... dropped=0`
+- `river xiaozhi bootstrap` completes and logs:
+  - `xiaozhi ota bootstrap ok: ... token_set=yes ...`
+- `river xiaozhi connect` completes and logs:
+  - `xiaozhi connecting: url=wss://api.tenclass.net/xiaozhi/v1/ ...`
+  - `Connected to websocket server`
+  - `server hello: sid=...`
+- after `river xiaozhi listen start`, `river xiaozhi listen stop`, and `river xiaozhi disconnect`, no repeated overflow warning appears during the idle wait:
+  - `capture frame ring overflow: dropped=...`
+- the final `river status` still shows:
+  - `capture_service=running ... queue=0/100 ... dropped=0`
+  - `xiaozhi runtime ... session=closed ... window=no`
+
+Optional exact user-path regression check:
+- Say the wake phrase `小欧管家`
+- Let the board enter xiaozhi streaming, then stop speaking and allow the `follow_up` window to expire naturally
+- During and after the timeout, confirm that the old failure signature does not appear:
+  - `capture frame ring overflow: dropped=...`
+
+Interpretation:
+- this step validates that timeout-driven xiaozhi teardown no longer blocks the capture consumer thread
+- if the optional真人语音 path still reproduces overflow, re-open investigation specifically around the wakeword-opened follow-up window path rather than the general xiaozhi transport lifecycle

@@ -1765,3 +1765,29 @@
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
   - `build_RTL8730E/ota_all.bin` = `3560832`
 - Relative to Step `5.34`, the main app images increased by `4096` bytes because of the new embedded model and its required op set, while the default build still keeps legacy KWS compatibility code compiled out.
+
+## Step 5.36
+- Fixed the post-session capture overflow on the no-`MEAN` KWS prep branch by moving follow-up timeout teardown fully out of the real-time capture path.
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - kept `river_cloud_xiaozhi_check_window_timeout()` owned by the dedicated `river_xz_pump` task
+  - removed the same timeout check from `river_cloud_xiaozhi_stream_push_frame()`, which is called synchronously from `river_vad_probe`
+  - documented why timeout-driven websocket/session teardown must not run in the capture hot path
+- Root-cause summary:
+  - user logs showed `capture frame ring overflow` growing at roughly one frame per `16 ms`, which matches `river_vad_probe` fully stalling rather than merely slowing down
+  - the overflow started shortly after `asr_session_closed -> follow_up`, aligning with the follow-up timeout window rather than with KWS or Wi-Fi bring-up
+  - the xiaozhi timeout path can close the websocket/session, and that transport work is not acceptable inside the frame-by-frame capture consumer path
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no protocol behavior was changed; only timeout-teardown ownership moved back to the existing pump task that already polls xiaozhi state
+  - the real-time audio path keeps its existing logic and simply stops performing potentially blocking timeout teardown inline
+- Verified a full local `RTL8730E` build after the change.
+- Verified board flash and serial runtime after the fix:
+  - booted and stayed in the normal `wake_monitoring` state
+  - `river xiaozhi bootstrap` completed and populated the xiaozhi runtime config
+  - `river xiaozhi connect` completed and reached `server hello: sid=...`
+  - after `river xiaozhi listen start`, `river xiaozhi listen stop`, and `river xiaozhi disconnect`, the board remained healthy with no repeated `capture frame ring overflow`
+  - `river status` still reported `capture_service=running ... queue=0/100 ... dropped=0`
+- Image sizes after this step remain:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+  - `build_RTL8730E/ota_all.bin` = `3560832`
