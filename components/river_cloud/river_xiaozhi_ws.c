@@ -48,6 +48,10 @@
 #define RIVER_XIAOZHI_HTTP_USER_AGENT      "ameba-river/xiaozhi"
 #define RIVER_XIAOZHI_OTA_RETRY_MIN_MS     5000U
 #define RIVER_XIAOZHI_OTA_RETRY_MAX_MS     30000U
+#define RIVER_XIAOZHI_WS_RECV_TIMEOUT_MS   10000U
+#define RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS   200U
+#define RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS 15000U
+#define RIVER_XIAOZHI_WS_SEND_BLOCK_MS     200U
 
 typedef struct {
     uint16_t version;
@@ -1906,6 +1910,15 @@ river_status_t river_xiaozhi_open_session(void)
         return RIVER_ERR_BUSY;
     }
 
+    /*
+     * Bound websocket enqueue/send latency so a drained-but-not-fully-flushed
+     * previous ASR stream cannot pin the real-time capture path behind the
+     * transport mutex when follow-up speech tries to re-open listening.
+     */
+    ws_setsockopt_timeout(RIVER_XIAOZHI_WS_RECV_TIMEOUT_MS,
+                          RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS,
+                          RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS);
+    ws_set_senddata_block_time(RIVER_XIAOZHI_WS_SEND_BLOCK_MS);
     ws_multisend_opts(g_river_xiaozhi.wsclient, 1);
     RIVER_LOGI("xiaozhi connecting: url=%s protocol=%u device_id=%s client_id=%s",
                g_river_xiaozhi.url,

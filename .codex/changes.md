@@ -1791,3 +1791,34 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
   - `build_RTL8730E/ota_all.bin` = `3560832`
+
+## Step 5.37
+- Tightened the xiaozhi follow-up reopen path after a more precise root-cause pass on the persistent overflow log.
+- Updated [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c):
+  - added explicit websocket timeout policy for the xiaozhi transport:
+    - receive timeout `10000 ms`
+    - send timeout `200 ms`
+    - connect timeout `15000 ms`
+    - send queue block time `200 ms`
+  - applied these settings before `ws_connect_url()`
+  - rationale: SDK websocket defaults leave `send_block_time=30000 ms` and no socket send timeout, which is unacceptable when reopen control frames share the same transport as buffered audio
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - added a fast `RIVER_ERR_BUSY` guard while `xiaozhi_listen_stop_pending` is still true
+  - this serializes `listen stop` completion and the next `listen start`, so follow-up speech cannot re-enter the reopen path while the previous stream is still draining
+- Refined root-cause summary:
+  - the failing user log does not match follow-up timeout expiry; it stalls about `1.6 s` after renewed speech, exactly when the `100`-frame capture ring fills
+  - that means `river_vad_probe` stops consuming immediately after post-session speech begins
+  - the most credible blocking point is synchronous reopen work (`listen start`) colliding with residual xiaozhi websocket send backlog from the just-closed stream
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - the transport contract did not change; only timeout bounds and stop/start serialization were added around the existing xiaozhi session flow
+  - the real-time path now prefers bounded `BUSY` backpressure over unbounded blocking
+- Verified:
+  - full local `RTL8730E` build still succeeds
+  - image sizes remain unchanged:
+    - `build_RTL8730E/km4_boot_all.bin` = `51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin` = `3560800`
+    - `build_RTL8730E/ota_all.bin` = `3560832`
+- Verification blockers on the current bench:
+  - after reboot, the board associated to `ORVIBO`, but `xiaozhi bootstrap` hit `gethostbyname` failure on that network, so the exact online wakeword/follow-up path could not be re-run end-to-end
+  - an additional auto-enter-download-mode timeout prevented immediately reflashing the second refinement from the current shell session

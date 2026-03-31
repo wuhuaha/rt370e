@@ -1786,6 +1786,10 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         return RIVER_OK;
     }
 
+    if (!g_river_cloud.stream_active && g_river_cloud.xiaozhi_listen_stop_pending) {
+        return RIVER_ERR_BUSY;
+    }
+
     if (!g_river_cloud.stream_active) {
         uint32_t pre_roll_frames_before_open;
         uint32_t read_index;

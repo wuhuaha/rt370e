@@ -2994,3 +2994,60 @@ Optional exact user-path regression check:
 Interpretation:
 - this step validates that timeout-driven xiaozhi teardown no longer blocks the capture consumer thread
 - if the optional真人语音 path still reproduces overflow, re-open investigation specifically around the wakeword-opened follow-up window path rather than the general xiaozhi transport lifecycle
+
+## Step 5.37
+Rebuild after bounding xiaozhi websocket send latency and serializing `listen stop -> listen start` handoff:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- image sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+
+Preferred board verification on a network where `xiaozhi bootstrap` can resolve DNS:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects, perform the exact user path:
+```text
+1. Say: 小欧管家
+2. Wait for:
+   - wakeword hit
+   - asr provider=xiaozhi_realtime session started
+3. Stop speaking and let the session close naturally
+4. During follow_up, speak again within a few seconds
+```
+
+Pass signals:
+- the board may log transient backpressure such as:
+  - `speech detected but cloud stream backpressured/deferred: ... status=-4`
+- but it must not enter the old fatal symptom:
+  - `capture frame ring overflow: dropped=...`
+- expected good-path logs include either:
+  - a new `asr provider=xiaozhi_realtime session started sid=...`
+  - or bounded `BUSY` backpressure followed by recovery on later speech frames
+
+Current bench notes from this turn:
+- local build passed
+- on the current `ORVIBO` network, `river xiaozhi bootstrap` failed with:
+  - `[HTTPC] ERROR: gethostbyname`
+  - `xiaozhi ota bootstrap failed`
+- because of that DNS failure, the exact online wakeword/follow-up regression path was not re-run end-to-end in this turn
+- if flashing from the current shell fails with `Enter download mode fail: ErrType.DEV_TIMEOUT`, re-enter download mode manually or from the shell and retry:
+  - `reboot uartburn`
+  - then rerun `python3 tools/river_flash.py -p /dev/ttyUSB0`
+
+Interpretation:
+- this step specifically targets the `asr_session_closed` immediate-reopen stall seen in the user log, not the already-addressed follow-up timeout teardown path
+- if overflow still reproduces after this step on a DNS-working network, the next debug target should be the residual websocket ready/recycle queue state across xiaozhi stream rollover
