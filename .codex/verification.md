@@ -3396,3 +3396,30 @@ Observed local result on `2026-03-31`:
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.44
+Verify the refactor-branch kickoff state:
+```bash
+cd /root/ameba-river
+git branch --show-current
+git log --oneline -1
+git stash list --max-count=1
+git status --short
+```
+
+Expected result:
+- current branch is `refactor`
+- the latest commit is the refactor-branch kickoff commit for this step
+- the latest stash entry preserves the pre-branch local workspace:
+  - `stash@{0}: On kws-no-mean-model: pre-refactor-branch-worktree-backup-20260331`
+- working tree is clean after the kickoff commit
+
+Interpretation:
+- if the branch is `refactor` and the stash entry still exists, the old local workspace is safely preserved and the new branch can stay clean for structural work
+- if `git status --short` is not clean, stop before the first refactor slice and identify whether the dirt is new work or an accidentally restored local file
+
+Observed local result on `2026-03-31`:
+- pass:
+  - stash backup was created before branching
+  - current branch switched to `refactor`
+  - this step intentionally changed only planning/docs state, not runtime code

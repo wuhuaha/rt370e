@@ -2015,3 +2015,32 @@
   - confirm gate transitions no longer leave the queue pinned at `40/40` with fast-growing drop counters
   - confirm `kws gate rearm cleared stale queue: ...` appears when backlog has to be drained
   - then re-check whether wake hits recover or whether the next blocker is now the front-end audio amplitude / clipping path
+
+## Step 5.44
+- Saved the pre-refactor local workspace into git stash instead of committing user-owned files:
+  - `stash@{0}: On kws-no-mean-model: pre-refactor-branch-worktree-backup-20260331`
+  - this preserves local `TIPS.md` / `.env` changes without mixing them into the refactor history
+- Created and switched to a new branch from the current fix baseline:
+  - source branch: `prep/kws-no-mean-model`
+  - source commit: `31bf4dd`
+  - new branch: `refactor`
+- Updated [plan.md](/root/ameba-river/plan.md) for the new branch:
+  - changed the branch marker to `refactor`
+  - made the branch objective explicit: behavior-preserving cleanup and refactor before more feature churn
+  - promoted `Boundary Cleanup` to in-progress on this branch
+  - added a dedicated refactor track with the first slicing priority:
+    - `components/river_cloud/river_cloud_adapter.c`
+    - `components/river_core/river_app.c`
+    - `components/river_voice/river_voice_kws.cc`
+  - changed the immediate next step from runtime bug validation to the first refactor slice on `river_cloud_adapter.c`
+- Why this is the right branch kickoff:
+  - the repository already has several runtime fixes landed, but the remaining work is increasingly constrained by large-file coupling rather than by a single missing feature
+  - creating a dedicated `refactor` branch keeps structural cleanup separate from the hotfix line
+  - stashing `TIPS.md` / `.env` avoids polluting branch history with user-owned review material or environment-local state
+- Scope of this step:
+  - no runtime code path changed
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - this step is only the branch/bootstrap and refactor-plan handoff
+- Next implementation target on `refactor`:
+  - first inspect and split `components/river_cloud/river_cloud_adapter.c`
+  - move provider/session glue toward smaller implementation units while keeping the external `river_cloud` contract stable
