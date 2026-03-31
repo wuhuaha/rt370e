@@ -1848,3 +1848,28 @@
   - confirm no new data abort
   - confirm the old `kws tensor data drift` warning no longer appears
   - confirm wakeword score is no longer pinned at the previously observed `140 pm` failure mode
+
+## Step 5.39
+- Closed the board-verification loop for the recent no-`MEAN` KWS runtime hardening and reclassified the remaining bench issue away from KWS.
+- Verified from user-provided serial logs on the tagged prep branch:
+  - boot is stable with no CA32 `Data abort`
+  - KWS metadata is correct at runtime:
+    - `kws quant: ... zp=-3 ... zp=-128`
+    - `kws input shape: ... dims=[1,40,98,1]`
+    - `kws output shape: ... dims=[1,1,1,1]`
+    - `model=54104B variant=bc_resnet_epoch1_debug`
+  - the old stale-binding symptom is gone:
+    - no `kws tensor data drift`
+  - the old no-wake failure is gone:
+    - `wakeword hit: text=小欧管家 score_pm=265 q15=8704`
+  - the previous follow-up/open-path stall is also gone:
+    - no `capture frame ring overflow`
+    - no KWS queue saturation / fast-growing drop counters
+    - follow-up and barge-in reopened ASR successfully multiple times
+    - conversation window closed cleanly on `followup_timeout`
+- Remaining issue after this verification:
+  - TTS playback still shows intermittent `underrun`
+  - one observed `xiaozhi playback write failed: mono=960B stereo=1920B` pushed the interaction state through `error_recovering`, although the system recovered automatically
+- Conclusion of this step:
+  - current branch is now board-proven as `KWS wake + xiaozhi session + follow-up reopen` usable
+  - the next debug target is playback buffer / write scheduling under TTS, not KWS model migration, tensor binding, or xiaozhi follow-up reopen correctness

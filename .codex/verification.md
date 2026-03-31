@@ -3110,3 +3110,31 @@ Pass signals during the wake test:
 Interpretation:
 - if the stale-binding warning disappears and scores recover, this step fixed the runtime input binding issue without reintroducing the post-`Invoke()` crash
 - if boot is stable but scores are still pinned low, the next debug target is model-input content correctness rather than tensor binding lifetime
+
+Observed result on `2026-03-31` from user serial log:
+- pass:
+  - no `Data abort`
+  - `kws quant: in_src=schema scale_u6=34970 zp=-3 out_src=schema scale_u6=3906 zp=-128`
+  - `kws input shape: src=schema dims=[1,40,98,1] layout=mels_frames`
+  - `kws output shape: src=schema dims=[1,1,1,1] values=1`
+  - no `kws tensor data drift`
+  - wakeword recovered to a valid hit:
+    - `wakeword hit: text=小欧管家 score_pm=265 q15=8704`
+  - no KWS queue blow-up:
+    - first hit path showed `queue=0/40 peak=0 dropped=0`
+  - no capture-path regression:
+    - no `capture frame ring overflow`
+  - xiaozhi path was usable end-to-end:
+    - websocket connected
+    - `asr provider=xiaozhi_realtime session started`
+    - multiple follow-up / barge-in reopen cycles succeeded
+    - `xiaozhi conversation window closed: reason=followup_timeout`
+- residual issue:
+  - TTS playback still logged intermittent `underrun`
+  - one playback cycle logged:
+    - `xiaozhi playback write failed: mono=960B stereo=1920B`
+    - interaction briefly entered `error_recovering` and then recovered
+
+Result classification:
+- `Step 5.38` is board-verified as passed for the intended KWS / session-stability objective
+- next serial/debug step should target playback underrun recovery rather than KWS wake correctness
