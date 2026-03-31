@@ -1655,3 +1655,20 @@
   - `build_RTL8730E/km4_boot_all.bin` = `51872`
   - `build_RTL8730E/km0_km4_ca32_app.bin` = `3593568`
   - `build_RTL8730E/ota_all.bin` = `3593600`
+
+## Step 5.33
+- Captured the full `KWS MEAN` bring-up pitfalls, confirmed facts, and next-step decision in a standalone project document instead of leaving them fragmented across monitor logs and commit history.
+- Added [doc/KWS_MEAN_OPERATOR_POSTMORTEM_ZH.md](/root/ameba-river/doc/KWS_MEAN_OPERATOR_POSTMORTEM_ZH.md):
+  - summarizes the observed failure sequence from `params != NULL was not true` to the final SDK-side `QuantizedMeanOrSum(...)` data abort
+  - separates confirmed facts from high-confidence inference
+  - records why the team should stop spending the main effort on old-model `MEAN` repair
+  - documents the integration stance for the upcoming no-`MEAN` model
+- Updated [doc/README.md](/root/ameba-river/doc/README.md):
+  - indexed the new `KWS MEAN` postmortem so it remains discoverable as part of migration / review material
+- Why this step was necessary:
+  - the March 31 board logs proved the current patched / SDK-delegated `MEAN` path still dies inside upstream quantized reduce scratch handling, so the important next action is to preserve the lessons and switch strategy before integrating the next model
+  - without one consolidated document, the exact traps are easy to repeat when the no-`MEAN` model lands
+- Why this is the minimal fix:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no runtime code or model asset was changed again
+  - this step only records hard-won troubleshooting knowledge and sets up the next branch cleanly

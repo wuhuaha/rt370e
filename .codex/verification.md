@@ -2786,3 +2786,34 @@ Fail interpretation:
 - if a new `Data abort` still appears, capture the new fault PC/LR and registers; do not assume it is the same `MEAN` eval-loop fault unless the new PC maps back into the patched `MEAN`
 - if `kws worker process failed: status=-6` returns without a hard fault, capture the exact new `Node MEAN ...` message; that means reducer-metadata repair worked but runtime still disagrees with the upstream helper on some detail
 - if `kws gate open` becomes stable and there is no crash but still no `wakeword hit`, operator bring-up is no longer the blocker; the next issue is score / threshold / wake-path behavior
+
+## Step 5.33
+Documentation / prep check for switching to a no-`MEAN` KWS model:
+```bash
+cd /root/ameba-river
+git branch --show-current
+test -f doc/KWS_MEAN_OPERATOR_POSTMORTEM_ZH.md
+sed -n '1,80p' doc/KWS_MEAN_OPERATOR_POSTMORTEM_ZH.md
+test ! -d build_RTL8730E/build && echo "build dir cleaned"
+git status --short --branch
+```
+
+Expected result:
+- current branch is the dedicated no-`MEAN` preparation branch created after this step
+- `doc/KWS_MEAN_OPERATOR_POSTMORTEM_ZH.md` exists and begins with the postmortem summary
+- `build_RTL8730E/build` no longer exists, so the large intermediate build directory has been cleaned
+- worktree is clean except the user-owned untracked paths:
+  - `.env`
+  - `tools/kws/`
+
+When the new model is ready, use a clean rebuild from this branch:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+First board-side check for the new model:
+- confirm boot, Wi-Fi, and SNTP still complete
+- confirm the first `kws gate open` no longer produces any `Node MEAN ...` log
+- if a crash still happens, capture the new fault PC/LR before assuming it is related to the old `MEAN` issue
