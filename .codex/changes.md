@@ -2044,3 +2044,46 @@
 - Next implementation target on `refactor`:
   - first inspect and split `components/river_cloud/river_cloud_adapter.c`
   - move provider/session glue toward smaller implementation units while keeping the external `river_cloud` contract stable
+
+## Step 5.45
+- Updated [plan.md](/root/ameba-river/plan.md) to switch the active branch theme from generic refactor-first to performance-first:
+  - the current top priority is now explicit KWS realtime throughput and queue-backlog control
+  - the immediate next step is no longer cloud-structure slicing, but KWS worker wakeup and pre-roll burst mitigation
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - raised the KWS worker priority from `4` to `5` so the consumer is less likely to be starved by same-priority producer-side work
+  - replaced the old idle poll delay path with event-driven wakeup using a worker semaphore
+  - drained the worker signal when KWS is disarmed so stale wakeups do not keep the worker spinning on an empty queue
+  - kept signaling on both PCM enqueue and RESET enqueue so the worker can react immediately without waiting for a periodic poll
+  - changed pre-roll replay on gate-open from "flush everything" to "keep only the most recent limited window and flush that"
+  - capped the gate-open pre-roll burst with:
+    - `RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES = 8`
+  - added a new log when older pre-roll history is intentionally trimmed:
+    - `kws pre-roll trim: dropped=%lu keep=%u/%u`
+  - extended boot/profile logs so runtime now shows:
+    - worker wake model = `event`
+    - worker wait budget
+    - pre-roll flush cap
+- Root-cause / performance summary:
+  - user logs showed `queue=40/40` saturation, fast-growing drop counters, and `river_kws` CPU rising sharply before reliable wake returned
+  - after the previous control-item fix, the next clear bottlenecks were:
+    - gate-open pre-roll being flushed as a burst into the KWS queue
+    - the KWS worker still relying on an empty-queue poll/sleep loop instead of prompt event wakeup
+    - producer and consumer operating at the same task priority
+  - this combination is a classic realtime backlog amplifier: burst enqueue reduces headroom, equal-priority scheduling delays catch-up, and polling adds avoidable latency under light load
+- Why this is the right first performance slice:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no wakeword model, thresholds, or feature extraction math were changed
+  - the step only changes scheduling, wakeup behavior, and backlog policy in the hottest local queue
+  - this directly targets realtime latency and queue occupancy before broader cloud/playback optimization
+- Expected effect:
+  - lower queue occupancy immediately after gate-open
+  - fewer long-lived `queue=40/40` plateaus
+  - less idle CPU waste from the KWS worker
+  - better probability that fresh speech frames are processed before they become stale backlog
+- Next board verification target:
+  - confirm the boot/profile logs show:
+    - `kws worker: ... wake=event ... pre_roll_flush=8`
+    - `kws backend: ... pre_roll_flush=8 ...`
+  - confirm `kws gate open` is no longer followed by near-immediate queue saturation
+  - confirm `kws pre-roll trim: ...` appears when gate-open would otherwise replay too much backlog
+  - re-check whether wake reliability improves under repeated short speech bursts

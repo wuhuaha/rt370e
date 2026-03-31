@@ -3423,3 +3423,62 @@ Observed local result on `2026-03-31`:
   - stash backup was created before branching
   - current branch switched to `refactor`
   - this step intentionally changed only planning/docs state, not runtime code
+
+## Step 5.45
+Rebuild after switching KWS worker wakeup to event-driven mode and capping gate-open pre-roll flush:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain valid
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Runtime repro for this step:
+```text
+1. Let the board boot and wait until Wi-Fi and SNTP are ready
+2. Speak around the board in several short bursts with short pauses, so VAD repeatedly opens/closes KWS gating
+3. Watch the first `kws backend` and `kws worker` profile logs after boot
+4. Then trigger at least 2 wake attempts with 小欧管家
+```
+
+Primary pass criteria:
+- boot logs expose the new realtime policy:
+  - `kws backend: ... pre_roll_flush=8 ...`
+  - `kws worker: priority=5 ... wake=event wait_ms=100 pre_roll_flush=8`
+- when pre-roll backlog is larger than the allowed replay cap, the trim log appears:
+  - `kws pre-roll trim: dropped=... keep=8/...`
+- queue saturation is materially reduced versus the earlier failure logs:
+  - avoid repeated long-lived `kws status: ... queue=40/40 ... dropped=...`
+  - avoid `kws gate open` immediately being followed by a near-full queue unless there is clearly abnormal load
+
+Secondary checks:
+- `river.stats` CPU snapshots should show `river_kws` no longer dominating as aggressively under no-wake short-burst speech
+- wake detection should remain alive:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued text=小欧管家`
+- if queue occupancy is improved but wake still remains weak, record nearby `score_pm`, `cap_peak`, and `afe_peak` lines; that would shift the next bottleneck from realtime scheduling to front-end audio / model quality
+
+Interpretation:
+- if the new worker/profile logs appear and queue plateaus shrink, this step improved the KWS realtime path even before any model changes
+- if the queue still pegs at `40/40`, the next suspect is not simple polling overhead anymore, but remaining producer burst size or insufficient consumer compute budget
+- if wake quality regresses while queue occupancy improves, the pre-roll flush cap may be too aggressive and should be tuned rather than reverted wholesale
+
+Observed local result on `2026-03-31`:
+- pending board verification

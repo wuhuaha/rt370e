@@ -1,4 +1,4 @@
-# Runtime Stabilization And Refactor Plan
+# Runtime Performance Optimization Plan
 
 Date: 2026-03-31
 Branch: `refactor`
@@ -7,16 +7,16 @@ Branch: `refactor`
 
 当前已从 `prep/kws-no-mean-model` 切出 `refactor` 分支。
 
-这个分支的首要目标不是继续叠加新功能，而是在保住当前板端基线的前提下，对现有代码做一次可回归的整理和重构。
+这个分支的首要目标不是继续叠加新功能，而是在保住当前板端基线的前提下，优先优化实时链路的性能、时延和过载行为。
 
 当前原则：
 
-- 先整理边界，再继续加复杂度
-- 先拆热点大文件，再讨论进一步抽象
+- 先压掉实时瓶颈，再继续做结构整理
+- 先减少积压和无效工作，再讨论更抽象的公共层
 - 每一刀都保持可编译、可回滚、可板端验证
 - 不把“重构”做成行为变化和问题定位同时发生的混合提交
 
-运行时问题仍然存在，但接下来会尽量通过更清晰的模块边界去承接后续修复，而不是继续把补丁堆进现有耦合点。
+运行时问题仍然存在，但当前最需要优先处理的是队列堆积、调度唤醒方式和 burst 型 backlog 对实时性的破坏。
 
 已经完成并验证的事项：
 
@@ -32,11 +32,11 @@ Branch: `refactor`
 
 当前优先级顺序：
 
-1. 模块边界与大文件拆分
-2. session / interaction / cloud 契约收口
-3. `KWS` / playback / `xiaozhi` 热路径内聚化，减少跨层直接依赖
+1. `KWS` 实时链路吞吐与队列退化策略
+2. 音频热路径的调度与唤醒模型
+3. `xiaozhi` 上下行与播放链路的 backlog 控制
 4. 在不改变当前行为的前提下保留已有运行时修复
-5. 后续再继续收紧热路径内存预算和播放稳定性
+5. 在性能基线稳定后继续做模块边界整理
 
 ## Current Baseline
 
@@ -51,22 +51,21 @@ Branch: `refactor`
 
 当前需要继续收口的不是“功能有没有”，而是“同一条链路能否连续多轮稳定运行”。
 
-从用户日志看，当前最可疑的热点是：
+从用户日志和当前实现看，当前最可疑的热点是：
 
 - `components/river_voice/river_voice_kws.cc`
-  - `input_ring` 原来以 `SPSC` 模式初始化，但生产者拥塞路径里也会主动 `read` 旧项做淘汰
-  - 这会破坏 ring 的使用契约，并直接解释为什么 `RESET` 控制项会在满队列时被挤掉
+  - gate open 时会把 pre-roll 一次性灌入 `input_ring`
+  - worker 目前仍有“队列空则轮询等待”的路径
+  - 当前最需要先优化这里的 burst/backlog 行为和 worker 调度响应
 - `components/river_cloud/river_cloud_adapter.c`
-  - 仍然承接了过多 provider/session 状态胶水
-  - 是这次整理中最适合先下刀的跨层耦合热点
+  - `xiaozhi` 上下行 ring 已经有 drop-oldest 行为，但后续仍要检查高水位降级是否足够激进
 - `components/river_voice/river_playback_service.c`
-  - 每次 `TTS` 都重新 `AudioTrack_Create -> Init -> Start -> Destroy`
-  - 播放生命周期仍需要后续整理，但这一步先不改行为
+  - 播放生命周期和 drain/flush 语义仍需要后续优化，但这一步先不改行为
 
 ## Guardrails
 
 - 不修改 `/root/ameba-rtos-1.2`
-- 重构提交默认以“结构整理”为目标，不混入新的行为变更
+- 当前阶段允许为实时性做行为级优化，但每一步都必须缩在单一热点内
 - 每一步只解决一个明确问题
 - 每一步都更新：
   - `.codex/changes.md`
@@ -74,25 +73,25 @@ Branch: `refactor`
 - 每一步都单独提交
 - 不为了“看起来更抽象”牺牲板端可验证性
 
-## Refactor Track
+## Optimization Track
 
-本分支的整理目标：
+本分支的优化目标：
 
-- 把 `river_core`、`river_voice`、`river_cloud` 的对外边界先钉牢
-- 逐步拆掉承载过多职责的大文件
-- 保持 `xiaozhi`、`KWS`、`VAD`、播放链路的现有行为不变
+- 在语音主链过载时优先保住“最新数据”和“关键控制语义”
+- 避免 backlog 把系统拖进高延迟、高 CPU、低可用性的恶化闭环
+- 在性能基线稳定后，再继续做边界清理和大文件拆分
 
 第一轮切片优先级：
 
-1. `components/river_cloud/river_cloud_adapter.c`
-2. `components/river_core/river_app.c`
-3. `components/river_voice/river_voice_kws.cc`
+1. `components/river_voice/river_voice_kws.cc`
+2. `components/river_cloud/river_cloud_adapter.c`
+3. `components/river_voice/river_playback_service.c`
 
 每一轮切片要求：
 
-- 先移动职责，再考虑更抽象的公共层
-- 先把 provider-specific 逻辑收回 provider 文件，再精简 adapter
-- 先保持日志和外部接口稳定，再讨论内部重命名
+- 先消除 burst/backlog 引起的实时性崩坏
+- 先让 consumer 的唤醒与调度优先于 backlog 继续扩大
+- 先保日志和外部接口稳定，再继续更深层的结构整理
 
 ## Execution Phases
 
@@ -114,8 +113,9 @@ Status: in progress
 
 目标：
 
-- 修复 `KWS` 输入队列在 gate 开关和 reset 重置时的控制项丢失
+- 优化 `KWS` 输入链路的实时性，而不只是修补控制项丢失
 - 避免 `queue=40/40` 长时间钉死后把 worker 拖成高 CPU 忙转
+- 让 gate open 的 pre-roll 回放不再制造瞬时洪峰
 
 范围：
 
@@ -125,6 +125,7 @@ Status: in progress
 
 - 不再出现 `kws queue dropped control item: type=1`
 - gate rearm 时旧 PCM backlog 会被主动清掉，而不是把新的 `RESET` 控制项挤掉
+- gate open 后队列占用不再因为 pre-roll flush 立刻冲到接近满队列
 - `kws status` 不再长时间停留在 `queue=40/40` 且 `dropped` 快速增长
 - 板端重新出现稳定唤醒，或至少先证明控制路径已经恢复正常
 
@@ -182,14 +183,18 @@ Status: in progress
 
 ## Immediate Next Step
 
-下一步先做 `refactor` 分支的第一刀：
+下一步先做性能优化第一刀：
 
-1. 先梳理 `river_cloud_adapter.c` 当前承担的职责边界
-2. 把 provider/session 相关胶水从 adapter 里拆到更小的实现单元
-3. 保持 `river_cloud.h` 对外接口和当前日志语义稳定
-4. 每拆一刀都保证本地构建通过，再继续下一刀
+1. 让 `KWS` worker 从轮询空转改成事件驱动唤醒
+2. 提高 `KWS` consumer 相对 producer 的调度优先级
+3. 把 gate open 的 pre-roll flush 从“一次灌满”改成“只补最近且有限的几帧”
+4. 用板端日志验证：
+   - `queue=40/40` 是否显著减少
+   - `river_kws` CPU 占比是否下降
+   - `kws gate open` 后的排队峰值是否回落
+   - 唤醒链路是否保持可用
 
 原因：
 
-- 当前分支已经切到专门的重构轨道，目标应从“继续叠补丁”转成“先把结构理顺”
-- `river_cloud_adapter.c` 是当前跨层耦合最明显的热点，最适合作为第一刀
+- 当前最明确的瓶颈不是结构抽象，而是 `KWS` 热路径存在 backlog 洪峰和不必要的 worker 空转
+- 先把实时吞吐压稳，后续对 `cloud` / `playback` 的优化和结构整理才有清晰基线
