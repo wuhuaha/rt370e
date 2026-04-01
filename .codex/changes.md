@@ -2153,3 +2153,45 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.48
+- Updated [plan.md](/root/ameba-river/plan.md):
+  - recorded the new playback-stability sub-goal: when `xiaozhi` is about to reconnect under heap pressure, idle playback cache must yield to the connect path
+- Updated [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h):
+  - added `river_playback_service_release_idle_track_cache()` as a narrow playback-service contract for reclaiming cached `AudioTrack` resources only when playback is already idle
+- Updated [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c):
+  - implemented `river_playback_service_release_idle_track_cache()`
+  - the helper only releases the cached track when all of the following are true:
+    - playback service is initialized
+    - state is `RIVER_PLAYBACK_IDLE`
+    - a cached `AudioTrack` still exists
+    - no track is started and no reference export is owned
+  - this keeps the hot-path behavior unchanged while letting higher-priority flows reclaim memory from noncritical cache
+- Updated [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c):
+  - added a low-heap preconnect guard for `river_xiaozhi_open_session()`
+  - before OTA bootstrap / websocket connect, if free heap is below `64KB`, the connect path now tries to release idle playback cache first
+  - if reclaim happens, logs now expose the exact heap change:
+    - `xiaozhi preconnect reclaimed idle playback cache: heap_free=...->... threshold=65536`
+- Root-cause / realtime summary:
+  - the user-provided failure log showed `playback_stop_cached` left the system around `60KB` free, then the next wake-driven `xiaozhi` connect from `river_wake_evt` fell to `704B` free and died on a `640B` allocation
+  - that is the wrong priority order for a realtime assistant:
+    - a reusable playback cache is optional
+    - the next session open is critical
+  - this step explicitly flips that priority under memory pressure so optional playback reuse cannot block the next dialogue session
+- Expected effect:
+  - repeated wake -> TTS -> follow-up timeout -> wake cycles should no longer fail in `river_wake_evt` just because an idle playback cache is still occupying heap
+  - the failure cascade:
+    - `Malloc failed. Core:[CA32], Task:[river_wake_evt], ...`
+    - followed by transport instability such as `WIFI TRX IPC 4 timeout`
+    should be materially less likely or disappear in the reproduced scenario
+  - when reclaim happens, the next TTS may recreate its `AudioTrack` instead of reusing it; this is an intentional tradeoff in favor of availability
+- Scope / guardrails:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - websocket protocol, queue sizing, and ASR/TTS business logic were not changed in this step
+  - the change only affects low-heap admission behavior before a fresh `xiaozhi` session open
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`

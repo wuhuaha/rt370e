@@ -96,6 +96,7 @@ uint32_t river_playback_service_epoch(void);
 const char *river_playback_service_state_name(river_playback_state_t state);
 bool river_playback_service_state_active(river_playback_state_t state);
 bool river_playback_service_active(void);
+bool river_playback_service_release_idle_track_cache(void);
 bool river_playback_service_reference_enabled(void);
 bool river_playback_service_ducked(void);
 void river_playback_service_get_stats(river_playback_service_stats_t *stats);

@@ -3549,6 +3549,60 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
 
+## Step 5.48
+Rebuild after adding low-heap playback-cache reclaim ahead of XiaoZhi reconnect:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain valid
+
+User-driven flash and serial verification for the reported reconnect failure:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Suggested reproduction flow after monitor connects:
+```text
+1. Let the board boot and connect Wi-Fi
+2. Wake the device and complete one XiaoZhi round so TTS playback starts and stops once
+3. Wait until the conversation window closes with `followup_timeout`
+4. Wake the device again and watch the logs from the new `xiaozhi connecting` attempt
+```
+
+Primary pass criteria:
+- the reconnect path must no longer fail with:
+  - `Malloc failed. Core:[CA32], Task:[river_wake_evt], [free heap size: ...] [xWantedSize:640]`
+- the same reconnect should no longer cascade into:
+  - `WIFI TRX IPC 4 timeout`
+- under the low-heap reproduction, the monitor should now show a preconnect reclaim log before session open:
+  - `xiaozhi preconnect reclaimed idle playback cache: heap_free=...->... threshold=65536`
+
+Secondary checks:
+- if free heap is already above the reclaim threshold, the reclaim log may not appear; that is acceptable as long as the reconnect still succeeds
+- after reclaim, the next TTS playback may log `reuse=no`; that is acceptable because this step intentionally prefers reconnect availability over keeping an idle playback cache warm
+
+Interpretation:
+- if the reclaim log appears and the reconnect succeeds, this step fixed the priority inversion between cached playback memory and the next cloud-session open
+- if the reclaim log appears but allocation failure still happens, the next suspect is websocket / TLS buffer sizing rather than idle playback cache
+- if no reclaim log appears and the same failure repeats, capture the surrounding heap snapshots and full `xiaozhi connecting` block; the remaining pressure is likely coming from another retained resource
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending
+
 ## Step 5.47
 Rebuild after isolating the SNTP time-wait gate behind the Iflytek backend macro:
 ```bash

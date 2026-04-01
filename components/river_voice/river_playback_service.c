@@ -529,6 +529,30 @@ river_status_t river_playback_service_register_listener(river_playback_service_l
     return RIVER_OK;
 }
 
+bool river_playback_service_release_idle_track_cache(void)
+{
+    bool released = false;
+
+    if (!g_river_playback_service.initialized || g_river_playback_service.lock == NULL) {
+        return false;
+    }
+
+    if (rtos_mutex_take(g_river_playback_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+        return false;
+    }
+
+    if (g_river_playback_service.stats.state == RIVER_PLAYBACK_IDLE &&
+        g_river_playback_service.track != NULL &&
+        !g_river_playback_service.track_started &&
+        !g_river_playback_service.ref_owned) {
+        river_playback_service_release_track_locked();
+        released = true;
+    }
+
+    rtos_mutex_give(g_river_playback_service.lock);
+    return released;
+}
+
 river_status_t river_playback_service_start_stream(const river_playback_stream_config_t *config)
 {
     size_t min_buffer_bytes;

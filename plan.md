@@ -138,6 +138,7 @@ Status: next
 
 - 收紧 `TTS` 播放生命周期，优先消除重复播放引起的堆下坠
 - 给播放起停补上明确的堆快照，便于直接从日志判断资源是否回收
+- 在网络建连前允许主动回收“空闲但可复用”的播放缓存，避免非关键缓存挤压 `xiaozhi` 的 TLS/WS 建连峰值
 
 范围：
 
@@ -150,6 +151,7 @@ Status: next
 - 串口日志能看到播放启动是 `reuse=yes` 还是新建
 - 多轮对话后 `heap_free` 不再像当前这样持续塌陷
 - `underrun` 频率下降，或至少可和堆变化直接关联
+- 当会话打开前自由堆跌破阈值时，系统会优先释放 idle playback cache，而不是让 `river_wake_evt` 在建连路径里继续撞堆失败
 
 ### Phase 3: XiaoZhi Hot Path Memory Budget
 

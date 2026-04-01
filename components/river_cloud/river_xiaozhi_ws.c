@@ -14,6 +14,7 @@
 #include "websocket/wsclient_api.h"
 
 #include "river/river_log.h"
+#include "river/river_playback_service.h"
 #include "river/river_wifi_station.h"
 #include "river/river_xiaozhi_credentials.h"
 #include "river/river_xiaozhi_ws.h"
@@ -52,6 +53,7 @@
 #define RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS   200U
 #define RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS 15000U
 #define RIVER_XIAOZHI_WS_SEND_BLOCK_MS     200U
+#define RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD (64U * 1024U)
 
 typedef struct {
     uint16_t version;
@@ -176,6 +178,27 @@ static void river_xiaozhi_set_last_error(const char *error_text)
     river_xiaozhi_copy_string(g_river_xiaozhi.last_error,
                               sizeof(g_river_xiaozhi.last_error),
                               error_text);
+}
+
+static void river_xiaozhi_reclaim_heap_before_connect(void)
+{
+    uint32_t heap_free_before;
+    uint32_t heap_free_after;
+
+    heap_free_before = rtos_mem_get_free_heap_size();
+    if (heap_free_before >= RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD) {
+        return;
+    }
+
+    if (!river_playback_service_release_idle_track_cache()) {
+        return;
+    }
+
+    heap_free_after = rtos_mem_get_free_heap_size();
+    RIVER_LOGW("xiaozhi preconnect reclaimed idle playback cache: heap_free=%lu->%lu threshold=%lu",
+               (unsigned long)heap_free_before,
+               (unsigned long)heap_free_after,
+               (unsigned long)RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD);
 }
 
 static bool river_xiaozhi_extract_six_digit_code(const char *text,
@@ -1827,6 +1850,7 @@ river_status_t river_xiaozhi_open_session(void)
         river_xiaozhi_set_last_error("wifi_not_connected");
         return RIVER_ERR_BUSY;
     }
+    river_xiaozhi_reclaim_heap_before_connect();
     if (g_river_xiaozhi.ota_url[0] != '\0') {
         status = river_xiaozhi_bootstrap();
         if (status != RIVER_OK && g_river_xiaozhi.url[0] == '\0') {
