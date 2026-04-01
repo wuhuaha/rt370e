@@ -2433,3 +2433,38 @@
     - after reflashing the status-path patch, `river status` on `2026-04-01 13:02:18` printed `river.voice.kws] kws status: ...`
     - no `AllocateTensors failed` line appeared in the int8-cal board runs
     - runtime stayed at `tasks=17`, matching an active KWS task rather than the earlier float32 fallback case
+
+## Step 5.55
+- Replaced the previous calibrated-int8 model identity with the algorithm team's final production deployment configuration from `/root/kws-training-pro/models/bc_resnet_iteration3/DEPLOYMENT_REPORT_V3_FINAL.md`.
+- Updated [prj.conf](/root/ameba-river/prj.conf):
+  - changed `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` from the temporary permissive `8192` to `19660`
+  - this matches the report's factory-default balanced threshold of `0.6`
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the runtime model variant string from `bc_resnet_v3_production_int8_cal` to `bc_resnet_v3_production_final`
+  - raised the gate fallback floor from `350 pm` to `400 pm` so fallback admission is not weaker than the report's documented high-sensitivity operating point
+- Regenerated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - re-embedded the model from `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite`
+  - upstream `final_v2` and `final` artifacts are byte-identical:
+    - SHA-256 `4e7f368f67f9ba7ad98e1b037c1e447f3228dca43305a03e8b5cf46a533523d6`
+    - size `54104` bytes
+- Deployment intent:
+  - keep the board on the algorithm team's final production model contract
+  - align the firmware threshold with the report's recommended factory default instead of the earlier low validation threshold
+  - preserve explicit runtime observability through the production-final variant string
+- Local and board-side verification snapshot:
+  - deployment report confirmed the same tensor contract as the final production drop:
+    - input `int8`, scale `0.01790468`, zero-point `-7`
+    - output `int8`, scale `0.00390625`, zero-point `-128`
+  - rebuild passed after the production-final embed
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
+  - binary verification passed:
+    - `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_final`
+    - no `bc_resnet_v3_production_int8_cal` string remained in the image
+  - board flash passed on `/dev/ttyUSB0` at `1500000` baud on `2026-04-01 14:10`
+  - post-flash monitor still reproduces the existing SDK-side issue:
+    - connection succeeds
+    - command-list discovery times out with `Failed to get cmd list: Get cmd list expired`
+    - this did not block rebuild or flash, but it limited same-turn runtime command verification

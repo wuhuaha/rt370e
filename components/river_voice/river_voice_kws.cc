@@ -38,7 +38,7 @@ extern "C" {
 #include "generated/river_wake_word_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_len
-#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_production_int8_cal"
+#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_production_final"
 #endif
 
 #ifndef CONFIG_RIVER_KWS_MEAN_PATCH_EN
@@ -134,7 +134,9 @@ extern "C" {
 #define RIVER_KWS_TASK_PRIORITY 5U
 #define RIVER_KWS_TASK_WAIT_MS 100U
 #define RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES 8U
-#define RIVER_KWS_GATE_FALLBACK_THRESHOLD_PM 350U
+/* V3 final docs recommend 0.4 as the high-sensitivity operating point. Keep
+ * gate fallback no weaker than that documented floor. */
+#define RIVER_KWS_GATE_FALLBACK_THRESHOLD_PM 400U
 #define RIVER_KWS_GATE_FALLBACK_MIN_MS 700U
 #define RIVER_KWS_GATE_FALLBACK_MAX_MS 2500U
 #define RIVER_KWS_GATE_FALLBACK_MIN_INFER 4U

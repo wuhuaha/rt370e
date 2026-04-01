@@ -4085,3 +4085,67 @@ Observed result on `2026-04-01`:
   - `tasks=17`
   - Wi-Fi connected on `2026-04-01 13:02:13.836`
 - no `AllocateTensors failed` line appeared in the int8-cal board runs
+
+## Step 5.55
+Embed, build, flash, and verify the production-final deployment state from the algorithm team's `final_v2` artifact:
+```bash
+cd /root/ameba-river
+sha256sum \
+  /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final.tflite \
+  /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite
+python3 tools/kws/embed_tflite_model.py \
+  --input /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite \
+  --header components/river_voice/generated/river_wake_word_model_data.h \
+  --symbol kws_model
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg 'bc_resnet_v3_production_final|bc_resnet_v3_production_int8_cal'
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected pre-build result:
+- `bc_resnet_v3_production_final.tflite` and `bc_resnet_v3_production_final_v2.tflite` have the same SHA-256
+- the deployment report remains the source of truth for:
+  - balanced threshold `0.6`
+  - input quantization `scale=0.01790468 zp=-7`
+  - output quantization `scale=0.00390625 zp=-128`
+
+Expected build result:
+- build completes successfully
+- `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_final`
+- `strings build_RTL8730E/km0_km4_ca32_app.bin` does not contain `bc_resnet_v3_production_int8_cal`
+- image sizes stay on the normal int8 footprint
+
+Expected board result after flash:
+- flash completes successfully on `/dev/ttyUSB0`
+- the board resets normally after download
+
+Optional follow-up monitor check:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected monitor behavior:
+- serial connection succeeds
+- if the existing SDK monitor issue is still present, it may print:
+  - `Failed to get cmd list: Get cmd list expired`
+- this monitor limitation does not invalidate the flash result
+
+Observed result on `2026-04-01`:
+- upstream artifact equivalence confirmed:
+  - both files hashed to `4e7f368f67f9ba7ad98e1b037c1e447f3228dca43305a03e8b5cf46a533523d6`
+  - both files were `54104` bytes
+- build passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- binary string verification passed:
+  - `bc_resnet_v3_production_final`
+- flash passed on `/dev/ttyUSB0`
+- post-flash monitor behavior matched the known issue:
+  - serial connection succeeded
+  - SDK monitor then printed `Failed to get cmd list: Get cmd list expired`
