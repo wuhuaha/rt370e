@@ -4149,3 +4149,79 @@ Observed result on `2026-04-01`:
 - post-flash monitor behavior matched the known issue:
   - serial connection succeeded
   - SDK monitor then printed `Failed to get cmd list: Get cmd list expired`
+
+## Step 5.56 Verification
+Forced deployment target:
+- `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite`
+- `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite.meta.json`
+
+Upstream export facts to preserve with the deployment:
+- model size `54104`
+- MD5 `0cd2c03ec46888ff0506a9e41ab7a33f`
+- SHA-256 `19fa4dca80ff4355b9de6da242789aabb16abed63820b2a3bd00a4c979a70a0b`
+- exporter parity summary:
+  - `pt_vs_tflite mean_abs=0.054256`
+  - threshold `0.4` agreement `114/128`
+  - threshold `0.6` agreement `121/128`
+  - threshold `0.8` agreement `123/128`
+
+Build and image verification commands:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg 'bc_resnet_v3_production_final_v2|bc_resnet_v3_production_final'
+```
+
+Expected build result:
+- build completes successfully
+- the application image contains `bc_resnet_v3_production_final_v2`
+- image sizes remain on the normal int8 footprint
+
+Observed build result on `2026-04-01`:
+- build passed
+- image sizes:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- binary string verification passed:
+  - `bc_resnet_v3_production_final_v2`
+
+WSL device reattach commands used before flashing:
+```bash
+usbipd.exe list
+usbipd.exe attach --wsl --busid 3-4
+```
+
+Observed device result:
+- host listed the board as `3-4 067b:23a3 Prolific PL2303GC USB Serial COM Port (COM3) Shared`
+- after attach, `/dev/ttyUSB0` reappeared inside WSL
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected flash result:
+- flashing completes successfully
+- tool reports `Finished PASS`
+- device resets after download
+
+Observed flash result on `2026-04-01 15:20`:
+- flash passed on `/dev/ttyUSB0`
+- `km4_boot_all.bin` and `km0_km4_ca32_app.bin` both downloaded successfully
+- tool reported `Finished PASS`
+- flash tool issued `Reset device without DTR/RTS`
+
+Optional serial confirmation command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed monitor result on `2026-04-01`:
+- serial connection to `/dev/ttyUSB0` succeeded
+- this turn did not capture a fresh boot banner because the monitor attached after the reset window

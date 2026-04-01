@@ -2468,3 +2468,38 @@
     - connection succeeds
     - command-list discovery times out with `Failed to get cmd list: Get cmd list expired`
     - this did not block rebuild or flash, but it limited same-turn runtime command verification
+
+## Step 5.56
+- Forced deployment of the current upstream export result from `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite` per user instruction, even though the exporter's parity gate reported mismatches.
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the runtime model variant string from `bc_resnet_v3_production_final` to `bc_resnet_v3_production_final_v2`
+- Regenerated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - re-embedded the current export artifact from `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite`
+  - embedded artifact properties at deployment time:
+    - size `54104` bytes
+    - MD5 `0cd2c03ec46888ff0506a9e41ab7a33f`
+    - SHA-256 `19fa4dca80ff4355b9de6da242789aabb16abed63820b2a3bd00a4c979a70a0b`
+- Recorded upstream export caveat explicitly for deployment traceability:
+  - exporter wrote `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite.meta.json`
+  - parity gate failed after writing the model:
+    - `pt_vs_tflite mean_abs=0.054256`
+    - agreement `114/128` at threshold `0.4`
+    - agreement `121/128` at threshold `0.6`
+    - agreement `123/128` at threshold `0.8`
+  - threshold derivation emitted by the exporter:
+    - `0.4 -> raw_ge=-25 raw_nearest=-26`
+    - `0.6 -> raw_ge=26 raw_nearest=26`
+    - `0.8 -> raw_ge=77 raw_nearest=77`
+- Rebuilt and reflashed the Ameba image set with the forced-export model:
+  - build completed successfully with unchanged image sizes:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
+  - binary verification passed:
+    - `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_final_v2`
+  - board flash passed on `2026-04-01 15:20` after reattaching the USB serial adapter into WSL
+- Deployment notes:
+  - initial flash attempt failed only because `/dev/ttyUSB0` was absent from WSL
+  - host-side USB/IP inspection found the board on `BUSID 3-4` as `Prolific PL2303GC USB Serial COM Port (COM3)`
+  - after `usbipd.exe attach --wsl --busid 3-4`, `/dev/ttyUSB0` reappeared and flash completed with `Finished PASS`
+  - post-flash serial connection succeeded, but this turn did not capture a fresh boot banner because the monitor attached after the reset window
