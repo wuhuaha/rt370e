@@ -3771,3 +3771,60 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
+
+## Step 5.51
+Rebuild after centralizing XiaoZhi local runtime cleanup and playback/session helper ownership:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- no new compile or link errors appear in `river_cloud_adapter` or `river_cloud_xiaozhi_session`
+- output images remain valid
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Let the board boot and connect Wi-Fi
+2. Trigger one normal wakeword -> ASR -> TTS round
+3. Let the dialogue close naturally, or briefly cut network to force `network_lost`
+4. After teardown, inspect the next `river` status dump or wait for the next relevant runtime log
+```
+
+Expected log behavior:
+- normal path should still show:
+  - `xiaozhi playback start: ...`
+  - `tts ... state=start`
+  - `tts ... state=stop`
+- on transport teardown, cleanup should still begin from the same cause log:
+  - `xiaozhi transport closed: ...`
+  - or `network_lost`
+- after cleanup, runtime status should no longer keep stale conversation metadata:
+  - `sid=-`
+  - `pending_text=-`
+  - window inactive
+- this step should not add extra duplicate cleanup logs for the same teardown cause
+
+Pass criteria:
+- wakeword / ASR / TTS baseline still works
+- `transport_closed`, `network_lost`, and audio-close paths do not regress into stuck `follow_up` / stale `sid`
+- playback start/stop behavior remains unchanged from the user-visible perspective
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending

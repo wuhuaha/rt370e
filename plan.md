@@ -197,6 +197,29 @@ Status: in progress
 - session phase 与公开 `interaction_state` 的映射关系固定下来，后续 follow-up 重构不再从零开始整理状态来源
 - 本步不改变现有唤醒 / ASR / TTS 主行为，只先整理控制面所有权
 
+### Phase 4.2: XiaoZhi Runtime Ownership
+
+Status: in progress
+
+目标：
+
+- 把 `xiaozhi` 本地运行态的 field-by-field 清理从 adapter 收口到 session 子模块
+- 让 adapter 更接近 `xiaozhi-esp32` 的事件驱动写法，只表达“为什么重置/开始/停止”，不再展开“逐字段怎么改”
+- 为下一刀 `listen_start / listen_stop / follow_up rearm` 契约继续缩小可变状态面
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_cloud/river_cloud_internal.h`
+
+成功标准：
+
+- `transport_closed`、`network_lost`、`asr_audio_close` 不再各自手写一套 `xiaozhi` 清理序列
+- `tts start/stop` 与 playback 起停标志改走共享 helper
+- `pending_text`、`sid`、downlink reset、transport reset 的所有权集中到 session 子模块
+- 本步仍不改协议和热路径时序，只整理本地运行态所有权
+
 ### Phase 5: Boundary Cleanup
 
 Status: in progress
@@ -214,17 +237,24 @@ Status: in progress
 2. 运行时 `interaction_state` 迁移改为经由 coordinator 统一映射和落盘
 3. `wakeword` 准入开始使用 coordinator 内部 phase 作为控制面来源
 
-下一步进入结构重构第二刀：
+结构重构第二刀已经完成：
 
-1. 继续把 `wake_confirmed / follow_up / speaking / barge_in_listening` 的切换契约从“被动同步”收紧成更明确的控制流
-2. 收口 `follow_up window`、`listen_stop_pending`、`playback drain` 的职责边界
-3. 在不改协议层的前提下，减少 `xiaozhi` 会话窗口和本地交互状态之间的竞态
+1. `xiaozhi` playback stop arm/reset、pending text clear、transport reset 已迁移到 session helper
+2. `transport_closed`、`network_lost`、`asr_audio_close` 已复用同一组本地运行态清理入口
+3. adapter 侧开始只表达 transport / playback 事件原因，不再展开多处 field-by-field reset
+
+下一步进入结构重构第三刀：
+
+1. 继续把 `listen_start / listen_stop / follow_up rearm` 收到 session 子模块统一编排
+2. 继续减少 adapter 对 `xiaozhi_listening`、`listen_stop_pending`、`open_speech_frames` 的直接操作
+3. 把 `follow_up` 会话窗口与 `asr_session_start` 的重入条件进一步显式化，减少“被动同步”风格
 4. 板端重点观察：
    - `interaction_state` 是否仍出现异常跳变
    - `followup_timeout` 是否只在真正空闲时发生
+   - `transport_closed` / `network_lost` 后 `sid`、`pending_text`、window 状态是否一次性清干净
    - `wakeword ignored` / `wake_confirmed` / `asr_session_started` 的顺序是否更稳定
 
 原因：
 
 - 仅靠继续优化 `KWS` 热路径，已经无法解释最近暴露出的 session / follow-up 竞态
-- 先把控制面收口，后续性能优化才能明确区分“热路径背压”与“状态机契约错误”
+- 现在控制面已经开始成形，下一步应该继续压缩 `xiaozhi` 侧剩余的直接状态写入面

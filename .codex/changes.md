@@ -2265,3 +2265,48 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.51
+- Updated [plan.md](/root/ameba-river/plan.md):
+  - added a dedicated `Phase 4.2: XiaoZhi Runtime Ownership`
+  - recorded that the next structural step is to pull `listen_start / listen_stop / follow_up rearm` behind the session module as well
+- Updated [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h):
+  - declared shared `xiaozhi` runtime helper APIs for:
+    - pending-text reset
+    - playback stop arm/cancel/reset
+    - downlink reset
+    - transport-local runtime reset
+- Updated [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c):
+  - moved `xiaozhi` local runtime ownership further into the session submodule
+  - added shared helpers:
+    - `river_cloud_xiaozhi_clear_pending_text()`
+    - `river_cloud_xiaozhi_cancel_playback_stop()`
+    - `river_cloud_xiaozhi_mark_playback_started()`
+    - `river_cloud_xiaozhi_arm_playback_stop()`
+    - `river_cloud_xiaozhi_reset_playback_state()`
+    - `river_cloud_xiaozhi_reset_downlink_state()`
+    - `river_cloud_xiaozhi_reset_transport_state()`
+  - reused the new pending-text helper from `river_cloud_xiaozhi_open_session_and_listen()`
+  - added a brief ownership comment so future cleanup stays anchored in this file
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - removed duplicated adapter-local helpers for playback/downlink reset
+  - switched playback start / write-fail / stop-deadline handling to session-owned helpers
+  - switched `tts start` / `tts stop` handling to session-owned playback helpers
+  - switched `transport_closed`, `network_lost`, and `river_cloud_asr_audio_close()` to the shared `river_cloud_xiaozhi_reset_transport_state(...)` cleanup path
+  - kept behavior-specific choices explicit:
+    - `transport_closed` still emits `session_closed`
+    - `network_lost` and `audio_close` still do not synthesize that event
+- Structural intent / why this matters:
+  - this step keeps the protocol and hot path unchanged
+  - it reduces the number of places that manually manipulate the same `xiaozhi` runtime bits
+  - it follows the same general lesson seen in `xiaozhi-esp32`: event handlers should describe causes, while state ownership should stay centralized
+- Expected effect:
+  - transport-loss and audio-close cleanup paths are less likely to drift out of sync over time
+  - future refactors around `listen_stop_pending` and follow-up rearm now have one helper surface to extend instead of several copied reset blocks
+  - runtime status after teardown should be more consistently cleared in one pass
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
