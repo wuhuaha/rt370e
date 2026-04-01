@@ -3715,3 +3715,59 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
+
+## Step 5.50
+Rebuild after introducing coordinator-owned session phases and centralized interaction-state mapping:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- no new compile or link errors appear in `river_session_coordinator`
+- output images remain valid
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Let the board boot to `wake_monitoring`
+2. Trigger one normal wakeword -> ASR -> TTS round
+3. Let TTS finish and observe follow-up entry / exit
+4. Trigger a second wakeword after follow-up timeout
+```
+
+Expected log behavior:
+- normal path should still show a stable order such as:
+  - `interaction_state: booting -> wake_monitoring`
+  - `wakeword queued ...`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+  - `interaction_state: wake_confirmed -> asr_streaming`
+  - later `follow_up` or `speaking` transitions as before
+- wakeword rejection logs should now report coordinator phase:
+  - `wakeword ignored: session_phase=...`
+- if an unexpected runtime jump happens, a new warning may appear:
+  - `session phase transition outside preferred contract: ...`
+  this should be treated as a control-plane contract clue, not as a harmless cosmetic log
+
+Pass criteria:
+- wakeword / ASR / TTS baseline still works
+- interaction-state logs still advance through the expected user-visible phases
+- no obvious regression such as getting stuck in `wake_confirmed` or missing `wake_monitoring` after timeout
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending

@@ -2220,3 +2220,48 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.50
+- Updated [plan.md](/root/ameba-river/plan.md):
+  - added a dedicated structural-refactor track for session state ownership
+  - recorded that the next cleanup focus is `follow_up / listening / speaking` contract tightening rather than another blind hot-path tweak
+- Updated [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c):
+  - introduced an internal `river_session_phase_t` state machine for:
+    - `booting`
+    - `wake_monitoring`
+    - `wake_confirmed`
+    - `asr_streaming`
+    - `follow_up`
+    - `speaking`
+    - `barge_in_listening`
+    - `error_recovering`
+  - added a dedicated coordinator `state_lock` so runtime session flags and phase transitions stop being open-coded writes spread across callbacks
+  - centralized runtime `interaction_state` writes behind one helper:
+    - `river_session_apply_phase_locked()`
+    - public `interaction_state` is now derived from coordinator phase, instead of each callback directly calling `river_interaction_state_set(...)`
+  - made `river_session_coordinator_sync_interaction_state()` compute a target phase from current runtime facts:
+    - playback active
+    - ASR session active
+    - cloud conversation window active
+  - added transition validation / warning logs inside the coordinator so future session-contract cleanup can see illegal or surprising jumps immediately
+  - updated wakeword admission to check the coordinator-owned phase instead of re-reading external interaction state
+  - updated barge-in TTS interruption gating to also read coordinator phase, so both state writes and critical state reads now stay within the same control-plane owner
+  - updated wakeword success, ASR session start/close, ASR error, and playback error paths to transition through the coordinator phase machine
+- Structural intent / why this matters:
+  - this step does not yet redesign the XiaoZhi follow-up contract
+  - it first fixes the control-plane shape so the project has a single runtime owner for interaction-state transitions
+  - that mirrors the stronger device-state ownership seen in `xiaozhi-esp32`, without yet rewriting transport or audio behavior
+- Expected effect:
+  - future `follow_up` and `barge_in` work now has one place to tighten state transitions instead of auditing multiple callbacks again
+  - wakeword admission and runtime state sync now share the same coordinator-owned phase source, reducing hidden divergence between “what logs say” and “what callbacks think the state is”
+  - if the system still exhibits odd state jumps, new warning logs from the phase machine should make them easier to isolate
+- Scope / guardrails:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no audio thresholds, queue sizes, or XiaoZhi wire protocol behavior changed in this step
+  - this is a control-plane refactor only; behavior is intended to remain functionally equivalent
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`

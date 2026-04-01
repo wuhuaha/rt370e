@@ -175,6 +175,28 @@ Status: planned
 - 收口 `time_ready` / `utc_ready` / session admission 契约
 - 避免把“短时条件未就绪”和“真实失败”混在一起
 
+### Phase 4.1: Session State Ownership
+
+Status: in progress
+
+目标：
+
+- 把运行时 `interaction_state` 的写入点收口到 `river_session_coordinator`
+- 在 coordinator 内部引入带迁移约束的 session phase，避免交互状态继续散落在多个回调里直接改写
+- 为下一刀 `follow_up / listening / speaking` 契约重构先建立单一控制面
+
+范围：
+
+- `components/river_core/river_session_coordinator.c`
+- 必要时配套更新 `components/river_core/river_app.c`
+
+成功标准：
+
+- 运行时 `interaction_state` 不再由多个回调直接写入
+- `wakeword` 准入改为基于 coordinator 内部 phase 判定，而不是依赖外部状态读取
+- session phase 与公开 `interaction_state` 的映射关系固定下来，后续 follow-up 重构不再从零开始整理状态来源
+- 本步不改变现有唤醒 / ASR / TTS 主行为，只先整理控制面所有权
+
 ### Phase 5: Boundary Cleanup
 
 Status: in progress
@@ -188,22 +210,21 @@ Status: in progress
 
 上一刀已经完成：
 
-1. `KWS` worker 从轮询空转改成事件驱动唤醒
-2. 提高 `KWS` consumer 相对 producer 的调度优先级
-3. 把 gate open 的 pre-roll flush 从“一次灌满”改成“只补最近且有限的几帧”
+1. 在 `river_session_coordinator` 内部加入 session phase 机
+2. 运行时 `interaction_state` 迁移改为经由 coordinator 统一映射和落盘
+3. `wakeword` 准入开始使用 coordinator 内部 phase 作为控制面来源
 
-下一步进入性能优化第二刀：
+下一步进入结构重构第二刀：
 
-1. 把 `RESET` 从 `PCM` 队列里解耦，改成独立 pending 信号，让 worker 在处理新帧前优先执行 reset
-2. 给 `KWS` 输入队列加高水位裁剪策略，在 backlog 逼近满队列时主动丢弃最旧 `PCM`
-3. 当前队列策略以 `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=40` 为基线，先按 `30 -> 13` 做高水位回落
-4. 用板端日志验证：
-   - `kws worker` / `kws backend` 已显示 `trim=30->13`
-   - 过载时出现 `kws input trim: dropped=...`
-   - `kws status` 中 `trim_ops` / `trim_drop` 增长，但 `queue=40/40` 不再长时间钉死
-   - 唤醒链路是否保持可用
+1. 继续把 `wake_confirmed / follow_up / speaking / barge_in_listening` 的切换契约从“被动同步”收紧成更明确的控制流
+2. 收口 `follow_up window`、`listen_stop_pending`、`playback drain` 的职责边界
+3. 在不改协议层的前提下，减少 `xiaozhi` 会话窗口和本地交互状态之间的竞态
+4. 板端重点观察：
+   - `interaction_state` 是否仍出现异常跳变
+   - `followup_timeout` 是否只在真正空闲时发生
+   - `wakeword ignored` / `wake_confirmed` / `asr_session_started` 的顺序是否更稳定
 
 原因：
 
-- 当前最明确的瓶颈不是结构抽象，而是 `KWS` 热路径仍会在过载时把旧数据堆成 backlog
-- 只有先把“reset 优先级”和“旧帧主动淘汰”做对，后续对 `cloud` / `playback` 的优化和结构整理才有清晰基线
+- 仅靠继续优化 `KWS` 热路径，已经无法解释最近暴露出的 session / follow-up 竞态
+- 先把控制面收口，后续性能优化才能明确区分“热路径背压”与“状态机契约错误”
