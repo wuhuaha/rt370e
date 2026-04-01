@@ -3828,3 +3828,52 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
+
+## Step 5.52
+Rebuild after boosting speaker playback loudness for TTS paths:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- no new compile or link errors appear in `river_playback_service`, `river_cloud_adapter`, or `river_tts_iflytek_ws`
+- output images remain valid
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Let the board boot and connect Wi-Fi
+2. Trigger one XiaoZhi wakeword -> ASR -> TTS round
+3. Listen for the TTS loudness change on the same board / speaker position used before
+4. If using Iflytek TTS in another build path, trigger one playback round there as well
+```
+
+Expected log behavior:
+- playback start should still succeed normally
+- XiaoZhi playback log now exposes the configured software gain:
+  - `xiaozhi playback start: ... gain=2/1`
+- no new playback write errors or playback-start failures should appear
+
+Pass criteria:
+- TTS is audibly louder than the previous build
+- no severe distortion, repeated underrun, or playback start failure is introduced
+- user-visible playback flow remains the same aside from loudness
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending

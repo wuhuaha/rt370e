@@ -2310,3 +2310,33 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.52
+- Updated [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c):
+  - included `audio_control.h` in the playback service path
+  - added `river_playback_service_prepare_output_locked()` so each playback stream start now explicitly:
+    - un-mutes playback
+    - un-mutes the amplifier
+    - sets hardware playback volume to `1.0 / 1.0`
+  - kept this in the shared playback service so all speaker-bound playback streams benefit, not only one backend
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - added a XiaoZhi playback saturation helper
+  - changed downlink mono->stereo expansion to apply a `2x` software PCM gain before writing to `AudioTrack`
+  - extended the playback-start log to expose the active `gain=2/1`
+- Updated [components/river_cloud/river_tts_iflytek_ws.c](/root/ameba-river/components/river_cloud/river_tts_iflytek_ws.c):
+  - raised `iflytek_tts` stream volume from `0.85` to `1.00`
+- Behavioral intent:
+  - the previous XiaoZhi path had already reached `AudioTrack_SetVolume(..., 1.0, 1.0)`, so further loudness increase required changes below or alongside the track-volume layer
+  - this step therefore boosts loudness in two places:
+    - hardware playback volume
+    - XiaoZhi PCM amplitude, with int16 saturation to avoid wraparound
+- Expected effect:
+  - XiaoZhi TTS should be noticeably louder on the board, not just slightly louder
+  - Iflytek TTS also stops leaving `15%` of stream-side volume unused
+  - clipping risk is bounded by saturation rather than integer overflow
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`

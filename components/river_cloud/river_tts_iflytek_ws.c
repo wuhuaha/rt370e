@@ -512,8 +512,8 @@ static river_status_t river_tts_prepare_playback(void)
     config.bits_per_sample = 16U;
     config.playback_frame_bytes = RIVER_IFLYTEK_TTS_STEREO_FRAME_BYTES;
     config.buffer_frame_count = RIVER_IFLYTEK_TTS_PLAYBACK_BUFFER_FRAMES;
-    config.volume_left = 0.85f;
-    config.volume_right = 0.85f;
+    config.volume_left = 1.00f;
+    config.volume_right = 1.00f;
     config.reference_export = true;
     config.reference_channels = 1U;
     config.reference_frame_bytes = RIVER_IFLYTEK_TTS_MONO_FRAME_BYTES;

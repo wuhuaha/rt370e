@@ -28,6 +28,9 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.cloud"
 
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_NUM 2
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_DEN 1
+
 river_cloud_context_t g_river_cloud;
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
@@ -42,6 +45,17 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
 #endif
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
+static int16_t river_cloud_xiaozhi_sat16(int32_t value)
+{
+    if (value > 32767) {
+        return 32767;
+    }
+    if (value < -32768) {
+        return -32768;
+    }
+    return (int16_t)value;
+}
+
 static bool river_cloud_xiaozhi_pump_active(void)
 {
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
@@ -102,12 +116,16 @@ static void river_cloud_xiaozhi_downlink_expand_stereo(const uint8_t *mono_frame
     size_t sample_count;
     size_t index;
     const int16_t *mono;
+    int16_t sample;
 
     mono = (const int16_t *)mono_frame;
     sample_count = mono_bytes / sizeof(int16_t);
     for (index = 0U; index < sample_count; ++index) {
-        g_river_cloud.xiaozhi_downlink_stereo[index * 2U] = mono[index];
-        g_river_cloud.xiaozhi_downlink_stereo[(index * 2U) + 1U] = mono[index];
+        sample = river_cloud_xiaozhi_sat16(
+            ((int32_t)mono[index] * (int32_t)RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_NUM) /
+            (int32_t)RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_DEN);
+        g_river_cloud.xiaozhi_downlink_stereo[index * 2U] = sample;
+        g_river_cloud.xiaozhi_downlink_stereo[(index * 2U) + 1U] = sample;
     }
 }
 
@@ -777,12 +795,14 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
         }
     }
 
-    RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu mode=%s",
+    RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu mode=%s gain=%d/%d",
                (unsigned long)sample_rate,
                (unsigned long)frame_duration_ms,
                (unsigned long)mono_bytes,
                (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring),
-               mode);
+               mode,
+               RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_NUM,
+               RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_DEN);
     river_cloud_xiaozhi_mark_playback_started();
     return RIVER_OK;
 }

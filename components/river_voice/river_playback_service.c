@@ -7,6 +7,7 @@
 #include "basic_types.h"
 #include "os_wrapper.h"
 
+#include "audio/audio_control.h"
 #include "audio/audio_track.h"
 
 #include "river/river_log.h"
@@ -16,6 +17,8 @@
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.playback"
+
+#define RIVER_PLAYBACK_SERVICE_HW_VOLUME 1.0f
 
 typedef struct {
     bool initialized;
@@ -217,6 +220,14 @@ static void river_playback_service_apply_volume_locked(void)
         right *= g_river_playback_service.stats.duck_gain;
     }
     AudioTrack_SetVolume(g_river_playback_service.track, left, right);
+}
+
+static void river_playback_service_prepare_output_locked(void)
+{
+    AudioControl_SetPlaybackMute(false);
+    AudioControl_SetAmplifierMute(false);
+    AudioControl_SetHardwareVolume(RIVER_PLAYBACK_SERVICE_HW_VOLUME,
+                                   RIVER_PLAYBACK_SERVICE_HW_VOLUME);
 }
 
 static void river_playback_service_reset_stream_locked(void)
@@ -450,6 +461,7 @@ static river_status_t river_playback_service_set_duck_locked(bool enabled, float
     g_river_playback_service.stats.ducked = enabled;
     g_river_playback_service.stats.duck_gain = gain;
     g_river_playback_service.stats.duck_count++;
+    river_playback_service_prepare_output_locked();
     river_playback_service_apply_volume_locked();
     RIVER_LOGI("playback duck: stream=%s enabled=%s gain=%.2f epoch=%lu",
                g_river_playback_service.stats.stream_name[0] != '\0' ?
