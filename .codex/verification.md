@@ -3934,3 +3934,79 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
+
+## Step 5.53
+Export, embed, build, and flash the float32 BC-ResNet baseline:
+```bash
+cd /root/ameba-river
+/root/kws-training-pro/.venv-training/bin/python tools/kws/export_bc_resnet_tflite.py \
+  --checkpoint /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_best.pth \
+  --output /tmp/bc_resnet_v3_production_fp32.tflite \
+  --quantization float32
+python3 tools/kws/embed_tflite_model.py \
+  --input /tmp/bc_resnet_v3_production_fp32.tflite \
+  --header components/river_voice/generated/river_wake_word_model_data.h \
+  --symbol kws_model
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg 'bc_resnet_v3_production_fp32|bc_resnet_v3_production'
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected export result:
+- `/tmp/bc_resnet_v3_production_fp32.tflite` is created
+- exporter reports:
+  - `mode=float32`
+  - `input_dtype=float32`
+  - `output_dtype=float32`
+  - zero quantization on input/output
+
+Expected build result:
+- build completes successfully
+- no new compile or link errors appear in `river_voice_kws` or the generated model header
+- `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_fp32`
+
+Expected board result after flash:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Reconnect monitor before or during reset so the boot log is captured.
+2. Confirm the boot-time KWS profile line shows:
+   - variant=bc_resnet_v3_production_fp32
+   - model=77848B
+3. Confirm the tensor-io log shows float32 runtime/model/effective types:
+   - runtime_in=float32 runtime_out=float32
+   - model_in=float32 model_out=float32
+   - effective_in=float32 effective_out=float32
+4. Run `river status` once the shell is ready and confirm the board is alive after flash.
+5. Speak the wake word and compare whether KWS scores still collapse near the old fixed `62pm` value.
+```
+
+Pass criteria:
+- float32 model exports and embeds successfully
+- firmware rebuilds with the float32 header in place
+- flash completes successfully
+- boot log identifies the float32 variant
+- board remains responsive after flash
+
+Observed result on `2026-04-01`:
+- float32 export passed:
+  - `wrote=/tmp/bc_resnet_v3_production_fp32.tflite bytes=77848 mode=float32`
+  - `input_dtype=float32`
+  - `output_dtype=float32`
+- build passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3585376`
+  - `build_RTL8730E/ota_all.bin 3585408`
+- binary string verification passed:
+  - `bc_resnet_v3_production_fp32`
+- flash passed on `/dev/ttyUSB0`
+- post-flash monitor command `river status` succeeded and showed the board running normally
+- boot-time `kws backend` / tensor-io lines were not captured in this run because monitor attached after reset

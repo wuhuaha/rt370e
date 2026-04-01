@@ -2365,3 +2365,37 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.53
+- Added repo-owned KWS export tooling so model deployment can be fixed without editing `/root/kws-training-pro`:
+  - [tools/kws/export_bc_resnet_tflite.py](/root/ameba-river/tools/kws/export_bc_resnet_tflite.py)
+    - exports `BC-ResNet` checkpoints to `float32` or `int8` TFLite
+    - keeps the current board-compatible operator set
+    - uses board-aligned frontend features from `river_kws_features.py` for `int8` representative calibration instead of random Gaussian tensors
+  - [tools/kws/embed_tflite_model.py](/root/ameba-river/tools/kws/embed_tflite_model.py)
+    - converts a `.tflite` into the existing `#pragma once` + `static const` header format used by the firmware
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the default embedded-model variant string from `bc_resnet_v3_production` to `bc_resnet_v3_production_fp32`
+  - this makes serial-side runtime identification explicit for the current board validation step
+- Regenerated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - embedded a freshly exported float32 model from `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_best.pth`
+  - embedded model length is now `77848` bytes
+- Fix intent:
+  - the current board failure strongly points to bad `int8` post-training calibration, not to the frontend path or wake phrase
+  - this step therefore establishes a clean float32 on-board baseline first, while also landing a repo-owned calibrated `int8` export path for the next iteration
+- Local and board-side verification snapshot:
+  - float32 export passed:
+    - `/tmp/bc_resnet_v3_production_fp32.tflite 77848`
+    - input/output dtype: `float32`
+  - full `RTL8730E` rebuild passed after embedding the float32 model
+  - output images became:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3585376`
+    - `build_RTL8730E/ota_all.bin 3585408`
+  - binary verification passed:
+    - `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_fp32`
+  - board flash passed on `/dev/ttyUSB0` at `1500000` baud using project flash wrapper
+  - post-flash serial command verification passed:
+    - `river status` returned normal runtime status from the flashed board
+  - remaining gap:
+    - this run attached monitor after the reset window, so the boot-time `kws backend: ... variant=bc_resnet_v3_production_fp32` line was not captured in the same turn
