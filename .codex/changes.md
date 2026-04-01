@@ -2537,3 +2537,38 @@
 - Diagnostic conclusion from this step:
   - current training-side feature extractor and board-faithful feature replay are close enough that frontend drift is not the primary explanation for the on-board repeated `0.375/raw=-32` behavior
   - the larger residual is still on the exported TFLite side rather than on the frontend side
+
+## Step 5.58
+- Added explicit board-side KWS inference diagnostics so repeated-confidence cases can be localized to a concrete stage instead of guessing from `score_pm` alone.
+- Updated [Kconfig](/root/ameba-river/Kconfig):
+  - added `CONFIG_RIVER_KWS_DIAG_VERBOSE_EN`
+  - added `CONFIG_RIVER_KWS_DIAG_LOG_EVERY_INFER`
+- Updated [prj.conf](/root/ameba-river/prj.conf):
+  - enabled `CONFIG_RIVER_KWS_DIAG_VERBOSE_EN=y` for the current board-debug phase
+  - kept `CONFIG_RIVER_KWS_DIAG_LOG_EVERY_INFER` disabled so log volume stays manageable unless a full per-inference dump is explicitly needed
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added a pre-quantized feature hash over the normalized `40x98` feature window
+  - added a quantized input tensor hash over the exact tensor bytes passed to TFLM
+  - captured raw output scalar before score clamping:
+    - `int8/uint8` models log the actual raw tensor value
+    - `float32` models log the raw output in `milli`
+  - tracked repeated-value streaks for:
+    - raw output
+    - pre-quantized feature hash
+    - quantized input hash
+  - added `kws diag: ...` logs that emit on:
+    - the first few inferences
+    - high-confidence frames
+    - repeated-pattern streak milestones
+  - extended `kws status: ...` to expose the last inference snapshot using explicit `last_*` labels so gate-reset idle states do not look like current inference values
+- Live board observation from the new diagnostics on `2026-04-01 16:13:22`:
+  - `kws diag: infer=2 gate=open out_type=int8 raw=52 score=0.703125 q15=23039 same=[raw:2 feat:1 input:1] feat_hash=0x94fb99dc input_hash=0x3cab68fc ...`
+  - immediately followed by:
+    - `wakeword hit: text=小欧管家 score_pm=703 q15=23039`
+- Diagnostic conclusion from this step:
+  - `same=[raw:2 feat:1 input:1]` means the current inference and the previous inference did **not** reuse the same features or the same quantized input tensor, but they **did** produce the same raw model output
+  - that rules out a simple “frontend没变 / tensor没更新 / 阈值设错” explanation for this captured case
+  - the repeated confidence is now much more likely to come from model/output-side collapse or overly coarse output behavior under nearby input windows
+- Residual runtime note from the same live session:
+  - right after the wake-path handoff, CA32 logged `Malloc failed. Core:[CA32], Task:[river_wake_evt], [free heap size: 1280] [xWantedSize:1408]`
+  - this is separate from the KWS raw-repeat diagnosis, but it is worth tracking because it can destabilize post-wake behavior

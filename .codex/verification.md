@@ -4268,3 +4268,96 @@ Observed result on `2026-04-01`:
 Interpretation:
 - current training frontend and board-faithful host replay frontend are close enough that frontend drift is not the primary explanation for the on-board repeated `0.375/raw=-32`
 - the remaining discrepancy is more likely in exported-model behavior or board runtime tensor/output handling than in frontend feature extraction
+
+## Step 5.58 Verification
+Build command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully with the new KWS diagnostic fields compiled in
+- image size grows slightly versus the previous deployment because of the extra state and log strings
+
+Observed build result on `2026-04-01`:
+- build passed twice during this step:
+  - once for the initial diagnostic implementation
+  - once more for the `last_*` status-label cleanup
+- final image sizes were:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3564896`
+  - `build_RTL8730E/ota_all.bin 3564928`
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected flash result:
+- flashing completes successfully
+- tool reports `Finished PASS`
+
+Observed flash result on `2026-04-01`:
+- initial retries were needed because the serial download path was unstable:
+  - one attempt failed at `80%` on `km0_km4_ca32_app.bin` with `b'\\xe2'`
+  - two later attempts failed to enter download mode with `ErrType.SYS_PROTO`
+- the board was then forced back into ROM download mode from the serial side, after which the final flash passed:
+  - final successful flash completed at `2026-04-01 16:19:54`
+  - tool reported `Finished PASS`
+
+Live monitor command used for diagnosis:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected live-diagnostic behavior:
+- `river status` prints new last-inference snapshot fields:
+  - `last_raw=...`
+  - `same=[r:... f:... i:...]`
+  - `last_feat_hash=...`
+  - `last_input_hash=...`
+- active speech should eventually produce `kws diag: ...` with:
+  - `raw=...`
+  - `same=[raw:... feat:... input:...]`
+  - `feat_hash=...`
+  - `input_hash=...`
+
+Observed live result on `2026-04-01`:
+- `river status` on the first diagnostic flash already showed the new snapshot fields in the KWS status line
+- a live speech-triggered inference produced:
+```text
+2026-04-01 16:13:22.243 [0000235007][I][river.voice.kws] kws diag: infer=2 gate=open out_type=int8 raw=52 score=0.703125 q15=23039 same=[raw:2 feat:1 input:1] feat_hash=0x94fb99dc input_hash=0x3cab68fc max_db_milli=23274 feat[min_milli=-2162 max_milli=2404 mean_milli=516] input[min=-128 max=127 mean_milli=21 probes=80,116,-5,-13]
+```
+- the same window immediately triggered:
+```text
+2026-04-01 16:13:22.244 [0000235009][I][river.voice.kws] wakeword hit: text=小欧管家 score_pm=703 q15=23039 triggers=2 cooldown_ms=1800 mode=threshold
+```
+- the same session also exposed a separate post-wake heap warning:
+```text
+2026-04-01 16:13:22.437 Malloc failed. Core:[CA32], Task:[river_wake_evt], [free heap size: 1280] [xWantedSize:1408]
+```
+
+Interpretation:
+- `same=[raw:2 feat:1 input:1]` is the key result from this step
+- it means:
+  - current and previous inference had different pre-quantized feature hashes
+  - current and previous inference had different quantized input tensor hashes
+  - but current and previous inference still returned the same raw output scalar `52`
+- for this captured case, repeated confidence is therefore not explained by:
+  - stale frontend features
+  - stale tensor writes
+  - threshold-only configuration
+- the remaining likely causes are concentrated on the model/output side:
+  - output collapse onto a few repeated raw bins
+  - model discrimination weakness under adjacent windows
+  - export/runtime behavior that keeps many nearby windows on the same output bucket
+
+Note on final deployed image:
+- the final reflashed image in this step only renamed the status-line snapshot labels from `raw/feat_hash/input_hash` to `last_raw/last_feat_hash/last_input_hash`
+- the diagnostic logic and inference-side evidence above still apply to the final flashed code

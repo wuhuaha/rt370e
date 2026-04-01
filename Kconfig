@@ -303,6 +303,25 @@ config RIVER_KWS_INPUT_QUEUE_FRAMES
     default 64
     depends on RIVER_VOICE_CAPABILITY_KWS
 
+config RIVER_KWS_DIAG_VERBOSE_EN
+    bool "Wake-word KWS detailed diagnostic logs"
+    default n
+    depends on RIVER_VOICE_CAPABILITY_KWS
+    help
+      Emit extra per-inference or repeated-pattern diagnostic logs that
+      expose pre-quant feature hash, quantized input hash, raw model
+      output, and repeated-value streaks for board-side KWS triage.
+
+config RIVER_KWS_DIAG_LOG_EVERY_INFER
+    bool "Wake-word KWS log every inference"
+    default n
+    depends on RIVER_KWS_DIAG_VERBOSE_EN
+    depends on RIVER_VOICE_CAPABILITY_KWS
+    help
+      Force a detailed KWS diagnostic line on every inference. Keep this
+      disabled for normal debug runs unless the repeated-pattern logs are
+      still insufficient.
+
 config RIVER_VAD_PROBE_DIAG_WINDOW_MS
     int "Pure VAD probe diagnostic window in milliseconds"
     range 16 1000

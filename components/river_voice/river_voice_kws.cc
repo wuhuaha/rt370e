@@ -92,6 +92,14 @@ extern "C" {
 #define CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES 64
 #endif
 
+#ifndef CONFIG_RIVER_KWS_DIAG_VERBOSE_EN
+#define CONFIG_RIVER_KWS_DIAG_VERBOSE_EN 0
+#endif
+
+#ifndef CONFIG_RIVER_KWS_DIAG_LOG_EVERY_INFER
+#define CONFIG_RIVER_KWS_DIAG_LOG_EVERY_INFER 0
+#endif
+
 #define RIVER_KWS_SAMPLE_RATE_HZ 16000U
 #define RIVER_KWS_WINDOW_SAMPLES 512U
 #define RIVER_KWS_HOP_SAMPLES 160U
@@ -134,6 +142,7 @@ extern "C" {
 #define RIVER_KWS_TASK_PRIORITY 5U
 #define RIVER_KWS_TASK_WAIT_MS 100U
 #define RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES 8U
+#define RIVER_KWS_DIAG_PROBE_COUNT 4U
 /* V3 final docs recommend 0.4 as the high-sensitivity operating point. Keep
  * gate fallback no weaker than that documented floor. */
 #define RIVER_KWS_GATE_FALLBACK_THRESHOLD_PM 400U
@@ -323,6 +332,23 @@ typedef struct {
     uint64_t cooldown_until_ms;
     uint64_t last_status_log_ms;
     float last_score;
+    float last_feature_min;
+    float last_feature_max;
+    float last_feature_mean;
+    float last_feature_max_db;
+    uint32_t last_feature_hash;
+    bool last_feature_hash_valid;
+    uint32_t same_feature_hash_streak;
+    int32_t last_raw_output_scalar;
+    bool last_raw_output_valid;
+    uint32_t same_raw_output_streak;
+    uint32_t last_input_hash;
+    bool last_input_hash_valid;
+    uint32_t same_input_hash_streak;
+    int32_t last_input_value_min;
+    int32_t last_input_value_max;
+    int32_t last_input_value_mean_milli;
+    int32_t last_input_probe_values[RIVER_KWS_DIAG_PROBE_COUNT];
     float mel_band_norm[RIVER_KWS_MEL_BINS];
     uint16_t mel_start_bin[RIVER_KWS_MEL_BINS];
     uint16_t mel_center_bin[RIVER_KWS_MEL_BINS];
@@ -429,6 +455,55 @@ static inline int16_t river_voice_kws_clamp_i16(int32_t value)
 static inline int32_t river_voice_kws_round_to_i32(float value)
 {
     return (int32_t)(value >= 0.0f ? (value + 0.5f) : (value - 0.5f));
+}
+
+static inline bool river_voice_kws_diag_verbose_enabled(void)
+{
+    return CONFIG_RIVER_KWS_DIAG_VERBOSE_EN != 0;
+}
+
+static inline bool river_voice_kws_diag_log_every_infer_enabled(void)
+{
+    return CONFIG_RIVER_KWS_DIAG_LOG_EVERY_INFER != 0;
+}
+
+static inline bool river_voice_kws_diag_should_log_streak(uint32_t streak)
+{
+    return streak > 0U &&
+           (streak <= 4U || (streak & (streak - 1U)) == 0U);
+}
+
+static uint32_t river_voice_kws_fnv1a32(const uint8_t *data, size_t bytes)
+{
+    size_t index;
+    uint32_t hash = 2166136261UL;
+
+    if (data == NULL) {
+        return 0U;
+    }
+
+    for (index = 0U; index < bytes; ++index) {
+        hash ^= (uint32_t)data[index];
+        hash *= 16777619UL;
+    }
+    return hash;
+}
+
+static uint32_t river_voice_kws_fnv1a32_update(uint32_t hash,
+                                               const uint8_t *data,
+                                               size_t bytes)
+{
+    size_t index;
+
+    if (data == NULL) {
+        return hash;
+    }
+
+    for (index = 0U; index < bytes; ++index) {
+        hash ^= (uint32_t)data[index];
+        hash *= 16777619UL;
+    }
+    return hash;
 }
 
 static const char *river_voice_kws_tensor_type_name(TfLiteType type)
@@ -951,6 +1026,164 @@ static inline uint32_t river_voice_kws_confidence_to_permille(uint32_t confidenc
     return (uint32_t)((confidence_q15 * 1000U) / 32767U);
 }
 
+static void river_voice_kws_capture_input_diag(river_voice_kws_context_t *context)
+{
+    static const uint32_t kProbeIndices[RIVER_KWS_DIAG_PROBE_COUNT] = {
+        0U,
+        39U,
+        RIVER_KWS_EXPECTED_INPUT_VALUES / 2U,
+        RIVER_KWS_EXPECTED_INPUT_VALUES - 1U
+    };
+    size_t storage_bytes;
+    size_t total_bytes;
+    uint32_t hash;
+    uint32_t index;
+    int32_t value_min = INT_MAX;
+    int32_t value_max = INT_MIN;
+    int64_t value_sum = 0;
+
+    if (context == NULL || context->input_tensor_data == NULL) {
+        return;
+    }
+
+    storage_bytes =
+        river_voice_kws_tensor_storage_bytes(context->effective_input_type);
+    if (storage_bytes == 0U) {
+        return;
+    }
+
+    total_bytes = (size_t)RIVER_KWS_EXPECTED_INPUT_VALUES * storage_bytes;
+    hash = river_voice_kws_fnv1a32((const uint8_t *)context->input_tensor_data,
+                                   total_bytes);
+    if (context->last_input_hash_valid && context->last_input_hash == hash) {
+        context->same_input_hash_streak++;
+    } else {
+        context->same_input_hash_streak = 1U;
+    }
+    context->last_input_hash = hash;
+    context->last_input_hash_valid = true;
+
+    if (context->effective_input_type == kTfLiteUInt8) {
+        const uint8_t *src = (const uint8_t *)context->input_tensor_data;
+
+        for (index = 0U; index < RIVER_KWS_EXPECTED_INPUT_VALUES; ++index) {
+            int32_t value = (int32_t)src[index];
+
+            if (value < value_min) {
+                value_min = value;
+            }
+            if (value > value_max) {
+                value_max = value;
+            }
+            value_sum += value;
+        }
+        for (index = 0U; index < RIVER_KWS_DIAG_PROBE_COUNT; ++index) {
+            context->last_input_probe_values[index] =
+                (int32_t)src[kProbeIndices[index]];
+        }
+    } else if (context->effective_input_type == kTfLiteInt8) {
+        const int8_t *src = (const int8_t *)context->input_tensor_data;
+
+        for (index = 0U; index < RIVER_KWS_EXPECTED_INPUT_VALUES; ++index) {
+            int32_t value = (int32_t)src[index];
+
+            if (value < value_min) {
+                value_min = value;
+            }
+            if (value > value_max) {
+                value_max = value;
+            }
+            value_sum += value;
+        }
+        for (index = 0U; index < RIVER_KWS_DIAG_PROBE_COUNT; ++index) {
+            context->last_input_probe_values[index] =
+                (int32_t)src[kProbeIndices[index]];
+        }
+    } else if (context->effective_input_type == kTfLiteFloat32) {
+        const float *src = (const float *)context->input_tensor_data;
+
+        for (index = 0U; index < RIVER_KWS_EXPECTED_INPUT_VALUES; ++index) {
+            int32_t milli =
+                river_voice_kws_round_to_i32(src[index] * 1000.0f);
+
+            if (milli < value_min) {
+                value_min = milli;
+            }
+            if (milli > value_max) {
+                value_max = milli;
+            }
+            value_sum += milli;
+        }
+        for (index = 0U; index < RIVER_KWS_DIAG_PROBE_COUNT; ++index) {
+            context->last_input_probe_values[index] =
+                river_voice_kws_round_to_i32(
+                    src[kProbeIndices[index]] * 1000.0f);
+        }
+    } else {
+        return;
+    }
+
+    context->last_input_value_min = value_min;
+    context->last_input_value_max = value_max;
+    context->last_input_value_mean_milli =
+        (int32_t)(value_sum / (int64_t)RIVER_KWS_EXPECTED_INPUT_VALUES);
+}
+
+static void river_voice_kws_log_inference_diag(river_voice_kws_context_t *context)
+{
+    bool should_log = false;
+
+    if (!river_voice_kws_diag_verbose_enabled() || context == NULL) {
+        return;
+    }
+
+    if (river_voice_kws_diag_log_every_infer_enabled()) {
+        should_log = true;
+    } else if (context->inference_count <= 4U ||
+               context->last_confidence_q15 >=
+                   river_voice_kws_gate_fallback_threshold_q15() ||
+               river_voice_kws_diag_should_log_streak(
+                   context->same_feature_hash_streak) ||
+               river_voice_kws_diag_should_log_streak(
+                   context->same_raw_output_streak) ||
+               river_voice_kws_diag_should_log_streak(
+                   context->same_input_hash_streak)) {
+        should_log = true;
+    }
+
+    if (!should_log) {
+        return;
+    }
+
+    RIVER_LOGI("kws diag: infer=%lu gate=%s out_type=%s raw=%ld score=%.6f q15=%lu same=[raw:%lu feat:%lu input:%lu] feat_hash=0x%08lx input_hash=0x%08lx max_db_milli=%ld feat[min_milli=%ld max_milli=%ld mean_milli=%ld] input[min=%ld max=%ld mean_milli=%ld probes=%ld,%ld,%ld,%ld]",
+               (unsigned long)context->inference_count,
+               context->gate_open ? "open" : "closed",
+               river_voice_kws_tensor_type_name(context->effective_output_type),
+               (long)context->last_raw_output_scalar,
+               (double)context->last_score,
+               (unsigned long)context->last_confidence_q15,
+               (unsigned long)context->same_raw_output_streak,
+               (unsigned long)context->same_feature_hash_streak,
+               (unsigned long)context->same_input_hash_streak,
+               (unsigned long)context->last_feature_hash,
+               (unsigned long)context->last_input_hash,
+               (long)river_voice_kws_round_to_i32(
+                   context->last_feature_max_db * 1000.0f),
+               (long)river_voice_kws_round_to_i32(
+                   context->last_feature_min * 1000.0f),
+               (long)river_voice_kws_round_to_i32(
+                   context->last_feature_max * 1000.0f),
+               (long)river_voice_kws_round_to_i32(
+                   context->last_feature_mean * 1000.0f),
+               (long)context->last_input_value_min,
+               (long)context->last_input_value_max,
+               (long)context->last_input_value_mean_milli,
+               (long)context->last_input_probe_values[0],
+               (long)context->last_input_probe_values[1],
+               (long)context->last_input_probe_values[2],
+               (long)context->last_input_probe_values[3]);
+}
+
 static uint64_t river_voice_kws_gate_elapsed_ms(const river_voice_kws_context_t *context,
                                                 uint64_t now_ms)
 {
@@ -1386,7 +1619,11 @@ static river_status_t river_voice_kws_fill_input_tensor(
 {
     uint32_t frame_index;
     uint32_t mel_index;
+    uint32_t feature_hash = 2166136261UL;
     float max_db = -1.0e9f;
+    float feature_min = 1.0e9f;
+    float feature_max = -1.0e9f;
+    double feature_sum = 0.0;
     uint8_t *dst_u8 = NULL;
     int8_t *dst_i8 = NULL;
     float *dst_f32 = NULL;
@@ -1422,6 +1659,7 @@ static river_status_t river_voice_kws_fill_input_tensor(
                 float relative_db =
                     context->log_mel_history[history_index][mel_index] - max_db;
                 float normalized;
+                int32_t normalized_milli;
                 int quantized;
 
                 if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
@@ -1432,6 +1670,19 @@ static river_status_t river_voice_kws_fill_input_tensor(
                 }
                 normalized =
                     (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                if (normalized < feature_min) {
+                    feature_min = normalized;
+                }
+                if (normalized > feature_max) {
+                    feature_max = normalized;
+                }
+                feature_sum += (double)normalized;
+                normalized_milli =
+                    river_voice_kws_round_to_i32(normalized * 1000.0f);
+                feature_hash = river_voice_kws_fnv1a32_update(
+                    feature_hash,
+                    (const uint8_t *)&normalized_milli,
+                    sizeof(normalized_milli));
                 if (dst_u8 != NULL) {
                     quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
                                 context->input_zero_point;
@@ -1455,6 +1706,7 @@ static river_status_t river_voice_kws_fill_input_tensor(
                 float relative_db =
                     context->log_mel_history[history_index][mel_index] - max_db;
                 float normalized;
+                int32_t normalized_milli;
                 int quantized;
 
                 if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
@@ -1465,6 +1717,19 @@ static river_status_t river_voice_kws_fill_input_tensor(
                 }
                 normalized =
                     (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                if (normalized < feature_min) {
+                    feature_min = normalized;
+                }
+                if (normalized > feature_max) {
+                    feature_max = normalized;
+                }
+                feature_sum += (double)normalized;
+                normalized_milli =
+                    river_voice_kws_round_to_i32(normalized * 1000.0f);
+                feature_hash = river_voice_kws_fnv1a32_update(
+                    feature_hash,
+                    (const uint8_t *)&normalized_milli,
+                    sizeof(normalized_milli));
                 if (dst_u8 != NULL) {
                     quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
                                 context->input_zero_point;
@@ -1480,6 +1745,21 @@ static river_status_t river_voice_kws_fill_input_tensor(
         }
     }
 
+    context->last_feature_max_db = max_db;
+    context->last_feature_min = feature_min;
+    context->last_feature_max = feature_max;
+    context->last_feature_mean =
+        (float)(feature_sum / (double)RIVER_KWS_EXPECTED_INPUT_VALUES);
+    if (context->last_feature_hash_valid &&
+        context->last_feature_hash == feature_hash) {
+        context->same_feature_hash_streak++;
+    } else {
+        context->same_feature_hash_streak = 1U;
+    }
+    context->last_feature_hash = feature_hash;
+    context->last_feature_hash_valid = true;
+    river_voice_kws_capture_input_diag(context);
+
     return RIVER_OK;
 }
 
@@ -1487,6 +1767,7 @@ static river_status_t river_voice_kws_run_inference(
     river_voice_kws_context_t *context)
 {
     float score;
+    int32_t raw_scalar = 0;
 
     if (river_voice_kws_fill_input_tensor(context) != RIVER_OK) {
         return RIVER_ERR_IO;
@@ -1498,18 +1779,21 @@ static river_status_t river_voice_kws_run_inference(
     if (context->effective_output_type == kTfLiteUInt8) {
         const uint8_t *output_u8 = (const uint8_t *)context->output_tensor_data;
 
+        raw_scalar = (int32_t)output_u8[0];
         score = ((float)output_u8[0] -
                  (float)context->output_zero_point) *
                 context->output_scale;
     } else if (context->effective_output_type == kTfLiteInt8) {
         const int8_t *output_i8 = (const int8_t *)context->output_tensor_data;
 
+        raw_scalar = (int32_t)output_i8[0];
         score = ((float)output_i8[0] -
                  (float)context->output_zero_point) *
                 context->output_scale;
     } else {
         const float *output_f32 = (const float *)context->output_tensor_data;
 
+        raw_scalar = river_voice_kws_round_to_i32(output_f32[0] * 1000.0f);
         score = output_f32[0];
     }
     if (score < 0.0f) {
@@ -1523,9 +1807,19 @@ static river_status_t river_voice_kws_run_inference(
         (uint32_t)river_voice_kws_round_to_i32(score * 32767.0f);
     context->inference_count++;
     context->gate_inference_count++;
+    if (context->last_raw_output_valid &&
+        context->last_raw_output_scalar == raw_scalar) {
+        context->same_raw_output_streak++;
+    } else {
+        context->same_raw_output_streak = 1U;
+    }
+    context->last_raw_output_scalar = raw_scalar;
+    context->last_raw_output_valid = true;
     if (context->last_confidence_q15 > context->gate_best_confidence_q15) {
         context->gate_best_confidence_q15 = context->last_confidence_q15;
     }
+
+    river_voice_kws_log_inference_diag(context);
 
     if (context->last_confidence_q15 >= river_voice_kws_score_threshold_q15()) {
         context->hit_streak++;
@@ -1614,7 +1908,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
     pre_roll_count = river_audio_frame_ring_count(&context->pre_roll_ring);
     pre_roll_peak = river_audio_frame_ring_peak_count(&context->pre_roll_ring);
 
-    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu trim_ops=%lu trim_drop=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu",
+    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu trim_ops=%lu trim_drop=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu last_raw=%ld same=[r:%lu f:%lu i:%lu] last_feat_hash=0x%08lx last_input_hash=0x%08lx",
                context->gate_open ? "open" : "closed",
                context->window_ready ? "yes" : "no",
                (unsigned long)score_permille,
@@ -1641,7 +1935,13 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
                (unsigned long)pre_roll_peak,
                (unsigned long)context->pre_roll_ring_dropped,
                (unsigned long)context->gate_open_count,
-               (unsigned long)context->gate_close_count);
+               (unsigned long)context->gate_close_count,
+               (long)context->last_raw_output_scalar,
+               (unsigned long)context->same_raw_output_streak,
+               (unsigned long)context->same_feature_hash_streak,
+               (unsigned long)context->same_input_hash_streak,
+               (unsigned long)context->last_feature_hash,
+               (unsigned long)context->last_input_hash);
 }
 
 static river_status_t river_voice_kws_process_samples(
