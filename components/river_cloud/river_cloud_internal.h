@@ -15,6 +15,12 @@
 #include "river/river_xiaozhi_ws.h"
 #include "river_asr_provider_internal.h"
 
+#if RIVER_CLOUD_BACKEND_IFLYTEK_ENABLED
+#define RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED 1
+#else
+#define RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED 0
+#endif
+
 #define RIVER_CLOUD_DEFAULT_SNTP_SERVER      "pool.ntp.org"
 #define RIVER_CLOUD_SNTP_UPDATE_INTERVAL_MS  (60U * 60U * 1000U)
 #define RIVER_CLOUD_TIME_READY_EPOCH_MIN     1700000000UL

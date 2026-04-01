@@ -3548,3 +3548,62 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
+
+## Step 5.47
+Rebuild after isolating the SNTP time-wait gate behind the Iflytek backend macro:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain valid
+
+User-driven flash and serial verification for the default XiaoZhi-only build:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Primary runtime check:
+```text
+1. Let the board boot
+2. Wait until Wi-Fi becomes connected
+3. Before `sntp ready: utc=...` appears, try wakeword + XiaoZhi interaction
+```
+
+Pass criteria for the XiaoZhi-only build:
+- wake/business admission is no longer blocked by SNTP readiness
+- logs may still show:
+  - `sntp kick: network ready; request immediate sync`
+  - later `sntp ready: utc=...`
+- but wake should already be allowed before that final SNTP-ready line
+- specifically, avoid the old behavior where business is deferred only because `time_ready=no`
+
+Regression check for Iflytek split builds:
+```text
+1. Switch build config to `CONFIG_RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT=y`
+2. Rebuild/flash again
+3. Confirm Iflytek ASR/TTS paths still require time-ready before use
+```
+
+Expected Iflytek behavior:
+- the UTC/time-ready wait remains intact for auth/signature-sensitive Iflytek flows
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending

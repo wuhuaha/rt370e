@@ -325,6 +325,15 @@ static bool river_cloud_system_time_ready(void)
     return river_cloud_system_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
 }
 
+static bool river_cloud_business_time_ready(void)
+{
+#if RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED
+    return river_cloud_system_time_ready();
+#else
+    return true;
+#endif
+}
+
 static uint32_t river_cloud_estimated_utc_seconds(void)
 {
     uint32_t sec;
@@ -445,7 +454,11 @@ bool river_cloud_time_ready(void)
 
 bool river_cloud_wake_admission_time_ready(void)
 {
+#if !RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED
+    return true;
+#else
     return river_cloud_estimated_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
+#endif
 }
 
 void river_cloud_start_sntp_if_needed(void)
@@ -1240,7 +1253,7 @@ static river_status_t river_cloud_stream_open_and_flush(void)
 
     river_cloud_start_sntp_if_needed();
     river_cloud_seed_time_from_build_if_needed();
-    if (!river_cloud_time_ready()) {
+    if (!river_cloud_business_time_ready()) {
         snprintf(g_river_cloud.last_error,
                  sizeof(g_river_cloud.last_error),
                  "%s",
@@ -1517,7 +1530,7 @@ river_status_t river_cloud_adapter_submit_text(const char *text)
     if (!river_wifi_station_is_connected()) {
         return RIVER_ERR_BUSY;
     }
-    if (!river_cloud_time_ready()) {
+    if (!river_cloud_business_time_ready()) {
         return RIVER_ERR_BUSY;
     }
 

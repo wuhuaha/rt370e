@@ -232,7 +232,8 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
         return RIVER_ERR_BUSY;
     }
     river_cloud_reset_wake_admission_deferred_state();
-    if (!river_cloud_time_ready() &&
+    if (RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED &&
+        !river_cloud_time_ready() &&
         g_river_cloud.time_seeded_from_build &&
         !g_river_cloud.wake_admission_estimate_announced) {
         g_river_cloud.wake_admission_estimate_announced = true;

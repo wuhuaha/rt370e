@@ -2124,3 +2124,32 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.47
+- Updated [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h):
+  - added compile-time macro `RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED`
+  - the macro is derived from `RIVER_CLOUD_BACKEND_IFLYTEK_ENABLED`, so only builds that include the Iflytek split ASR/TTS path keep the strict time-ready gate
+- Updated [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - split "system time is actually ready" from "the current build must wait for time before business may proceed"
+  - added `river_cloud_business_time_ready()`
+  - changed generic cloud business gates to use the new compile-time policy:
+    - stream-open path waits for UTC only when Iflytek backend is compiled in
+    - direct TTS submit path waits for UTC only when Iflytek backend is compiled in
+  - kept SNTP start/kick behavior unchanged so XiaoZhi-only builds still sync time opportunistically, but are no longer blocked on it
+- Updated [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c):
+  - wake admission still kicks/seeds SNTP, but it no longer blocks on time when Iflytek ASR/TTS is absent
+  - the "build-seeded utc estimate" log is now only emitted when a build actually requires time gating
+- Behavior summary:
+  - `CONFIG_RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME=y` and `CONFIG_RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT=n`:
+    - wake/business admission no longer waits for `sntp ready`
+  - `CONFIG_RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT=y`:
+    - original UTC/time-ready gate remains intact for Iflytek auth/signature flows
+- Scope / guardrails:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - SNTP init/kick was not removed; only the business-side wait gate was isolated
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
