@@ -3482,3 +3482,69 @@ Interpretation:
 
 Observed local result on `2026-03-31`:
 - pending board verification
+
+## Step 5.46
+Rebuild after separating KWS reset semantics from queued PCM and adding high-water backlog trim:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain valid
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+After monitor connects:
+```text
+AT+RST
+```
+
+Runtime repro for this step:
+```text
+1. Let the board boot and wait until Wi-Fi and SNTP are ready
+2. Speak in repeated short bursts so VAD opens/closes KWS gating under mild overload
+3. Watch the first `kws worker` and `kws backend` profile logs after boot
+4. Then continue speaking long enough to provoke backlog growth, and finally retry at least 2 wake attempts with 小欧管家
+```
+
+Primary pass criteria:
+- boot/profile logs expose the new overload policy:
+  - `kws worker: ... trim=30->13`
+  - `kws backend: ... trim=30->13`
+- when the KWS queue approaches saturation, the new trim log appears:
+  - `kws input trim: dropped=... queue=...->... target=13`
+- periodic status logs now show trim counters:
+  - `kws status: ... trim_ops=... trim_drop=...`
+- queue saturation recovery is materially better than the earlier failure logs:
+  - avoid long-lived plateaus where many consecutive status lines stay at `queue=40/40`
+  - if `queue=40/40` appears briefly, it should fall back quickly rather than remain pinned while `dropped` keeps climbing
+
+Secondary checks:
+- `kws gate rearm cleared stale queue: pcm=...` may appear when a new speech gate reopens while stale PCM is still queued; this is acceptable and should no longer depend on a queued RESET control item
+- `river.stats` CPU snapshots should show `river_kws` spending less time dominating the system under no-wake burst speech
+- wake detection must remain alive:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued text=小欧管家`
+
+Interpretation:
+- if trim logs/counters appear and `queue=40/40` plateaus shrink, this step improved realtime overload behavior even if wake quality still needs separate tuning
+- if trim fires continuously and the queue still cannot recover, the next bottleneck is likely consumer compute budget rather than queue policy
+- if queue health improves but wake quality regresses, the trim target may be too aggressive and should be tuned rather than reverting reset decoupling
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending

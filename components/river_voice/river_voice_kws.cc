@@ -285,8 +285,7 @@ class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
 };
 
 typedef enum {
-    RIVER_KWS_QUEUE_ITEM_PCM = 0U,
-    RIVER_KWS_QUEUE_ITEM_RESET = 1U
+    RIVER_KWS_QUEUE_ITEM_PCM = 0U
 } river_voice_kws_queue_item_type_t;
 
 typedef enum {
@@ -362,6 +361,7 @@ typedef struct {
     bool task_running;
     bool task_stop_requested;
     bool input_ready_created;
+    bool reset_pending;
     rtos_task_t task;
     rtos_sema_t input_ready;
     river_audio_frame_ring_t pre_roll_ring;
@@ -377,6 +377,9 @@ typedef struct {
     uint8_t pre_roll_drop_frame[RIVER_KWS_INPUT_FRAME_BYTES];
     river_audio_frame_ring_t input_ring;
     uint32_t input_ring_dropped;
+    uint32_t input_trim_count;
+    uint32_t input_trimmed_frames;
+    uint64_t last_input_trim_log_ms;
     uint8_t input_ring_storage[sizeof(river_voice_kws_queue_item_t) *
                                CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES];
     river_voice_kws_queue_item_t input_task_item;
@@ -1141,6 +1144,56 @@ static void river_voice_kws_signal_worker(
     (void)rtos_sema_give(context->input_ready);
 }
 
+static uint32_t river_voice_kws_input_trim_high_water_frames(void)
+{
+    uint32_t high_water =
+        ((uint32_t)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES * 3U) / 4U;
+
+    if (high_water == 0U) {
+        high_water = 1U;
+    }
+    return high_water;
+}
+
+static uint32_t river_voice_kws_input_trim_target_frames(void)
+{
+    uint32_t target = (uint32_t)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES / 3U;
+    uint32_t high_water = river_voice_kws_input_trim_high_water_frames();
+
+    if (target >= high_water) {
+        target = (high_water > 0U) ? (high_water - 1U) : 0U;
+    }
+    return target;
+}
+
+static void river_voice_kws_log_input_trim(
+    river_voice_kws_context_t *context,
+    uint32_t queue_before_trim,
+    uint32_t queue_after_trim,
+    uint32_t dropped,
+    uint32_t target_frames)
+{
+    uint64_t now_ms;
+
+    if (context == NULL || dropped == 0U) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (context->last_input_trim_log_ms != 0U &&
+        (now_ms - context->last_input_trim_log_ms) <
+            (uint64_t)CONFIG_RIVER_KWS_LOG_PERIOD_MS) {
+        return;
+    }
+
+    context->last_input_trim_log_ms = now_ms;
+    RIVER_LOGW("kws input trim: dropped=%lu queue=%lu->%lu target=%lu",
+               (unsigned long)dropped,
+               (unsigned long)queue_before_trim,
+               (unsigned long)queue_after_trim,
+               (unsigned long)target_frames);
+}
+
 static void river_voice_kws_disarm(river_voice_kws_context_t *context,
                                    bool clear_pre_roll)
 {
@@ -1150,6 +1203,7 @@ static void river_voice_kws_disarm(river_voice_kws_context_t *context,
 
     context->gate_open = false;
     context->gate_triggered = false;
+    context->reset_pending = false;
     river_voice_kws_reset_frontend(context);
     if (context->input_ring.initialized) {
         river_audio_frame_ring_reset(&context->input_ring);
@@ -1558,7 +1612,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
     pre_roll_count = river_audio_frame_ring_count(&context->pre_roll_ring);
     pre_roll_peak = river_audio_frame_ring_peak_count(&context->pre_roll_ring);
 
-    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu",
+    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu trim_ops=%lu trim_drop=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu",
                context->gate_open ? "open" : "closed",
                context->window_ready ? "yes" : "no",
                (unsigned long)score_permille,
@@ -1578,6 +1632,8 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
                (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
                (unsigned long)queue_peak,
                (unsigned long)context->input_ring_dropped,
+               (unsigned long)context->input_trim_count,
+               (unsigned long)context->input_trimmed_frames,
                (unsigned long)pre_roll_count,
                (unsigned int)RIVER_KWS_PRE_ROLL_FRAMES,
                (unsigned long)pre_roll_peak,
@@ -1632,30 +1688,70 @@ static river_status_t river_voice_kws_process_samples(
 }
 
 static uint32_t river_voice_kws_clear_input_queue(
-    river_voice_kws_context_t *context,
-    uint32_t *control_items_cleared)
+    river_voice_kws_context_t *context)
 {
     uint32_t pcm_items_cleared = 0U;
 
-    if (control_items_cleared != NULL) {
-        *control_items_cleared = 0U;
-    }
     if (context == NULL || !context->input_ring.initialized) {
         return 0U;
     }
 
-    while (river_audio_frame_ring_read(&context->input_ring,
-                                       reinterpret_cast<uint8_t *>(&context->input_drop_item)) ==
-           RIVER_OK) {
-        if (context->input_drop_item.type == RIVER_KWS_QUEUE_ITEM_PCM) {
-            context->input_ring_dropped++;
-            pcm_items_cleared++;
-        } else if (control_items_cleared != NULL) {
-            (*control_items_cleared)++;
-        }
+    pcm_items_cleared = river_audio_frame_ring_count(&context->input_ring);
+    if (pcm_items_cleared > 0U) {
+        river_audio_frame_ring_reset(&context->input_ring);
+        context->input_ring_dropped += pcm_items_cleared;
     }
 
     return pcm_items_cleared;
+}
+
+static river_status_t river_voice_kws_trim_input_backlog(
+    river_voice_kws_context_t *context)
+{
+    river_status_t status;
+    uint32_t queue_count;
+    uint32_t queue_before_trim;
+    uint32_t target_frames;
+    uint32_t dropped = 0U;
+
+    if (context == NULL || !context->input_ring.initialized) {
+        return RIVER_ERR_ARG;
+    }
+
+    queue_count = river_audio_frame_ring_count(&context->input_ring);
+    if (queue_count < river_voice_kws_input_trim_high_water_frames()) {
+        return RIVER_OK;
+    }
+
+    queue_before_trim = queue_count;
+    target_frames = river_voice_kws_input_trim_target_frames();
+    while (queue_count > target_frames) {
+        status = river_audio_frame_ring_read(
+            &context->input_ring,
+            reinterpret_cast<uint8_t *>(&context->input_drop_item));
+        if (status == RIVER_ERR_NOT_FOUND) {
+            break;
+        }
+        if (status != RIVER_OK) {
+            return status;
+        }
+        queue_count--;
+        dropped++;
+        context->input_ring_dropped++;
+    }
+
+    if (dropped == 0U) {
+        return RIVER_OK;
+    }
+
+    context->input_trim_count++;
+    context->input_trimmed_frames += dropped;
+    river_voice_kws_log_input_trim(context,
+                                   queue_before_trim,
+                                   queue_count,
+                                   dropped,
+                                   target_frames);
+    return RIVER_OK;
 }
 
 static river_status_t river_voice_kws_enqueue_pcm(
@@ -1673,6 +1769,10 @@ static river_status_t river_voice_kws_enqueue_pcm(
     memset(&item, 0, sizeof(item));
     item.type = RIVER_KWS_QUEUE_ITEM_PCM;
     memcpy(item.pcm, data, bytes);
+    status = river_voice_kws_trim_input_backlog(context);
+    if (status != RIVER_OK) {
+        return status;
+    }
     status = river_audio_frame_ring_write(
         &context->input_ring,
         reinterpret_cast<const uint8_t *>(&item));
@@ -1689,18 +1789,7 @@ static river_status_t river_voice_kws_enqueue_pcm(
         RIVER_OK) {
         return RIVER_ERR_BUSY;
     }
-
-    if (context->input_drop_item.type != RIVER_KWS_QUEUE_ITEM_PCM) {
-        status = river_audio_frame_ring_write(
-            &context->input_ring,
-            reinterpret_cast<const uint8_t *>(&context->input_drop_item));
-        if (status != RIVER_OK) {
-            return status;
-        }
-        context->input_ring_dropped++;
-        river_voice_kws_signal_worker(context);
-        return RIVER_OK;
-    }
+    context->input_ring_dropped++;
 
     status = river_audio_frame_ring_write(
         &context->input_ring,
@@ -1709,7 +1798,6 @@ static river_status_t river_voice_kws_enqueue_pcm(
         return status;
     }
 
-    context->input_ring_dropped++;
     river_voice_kws_signal_worker(context);
     return RIVER_OK;
 }
@@ -1717,31 +1805,19 @@ static river_status_t river_voice_kws_enqueue_pcm(
 static river_status_t river_voice_kws_enqueue_reset(
     river_voice_kws_context_t *context)
 {
-    river_voice_kws_queue_item_t item;
-    river_status_t status;
-    uint32_t cleared_control_items = 0U;
     uint32_t cleared_pcm_items;
 
     if (context == NULL) {
         return RIVER_ERR_ARG;
     }
 
-    cleared_pcm_items =
-        river_voice_kws_clear_input_queue(context, &cleared_control_items);
-    memset(&item, 0, sizeof(item));
-    item.type = RIVER_KWS_QUEUE_ITEM_RESET;
-    status = river_audio_frame_ring_write(
-        &context->input_ring,
-        reinterpret_cast<const uint8_t *>(&item));
-    if (status != RIVER_OK) {
-        return status;
-    }
+    cleared_pcm_items = river_voice_kws_clear_input_queue(context);
+    context->reset_pending = true;
     river_voice_kws_signal_worker(context);
 
-    if (cleared_pcm_items > 0U || cleared_control_items > 0U) {
-        RIVER_LOGI("kws gate rearm cleared stale queue: pcm=%lu ctrl=%lu",
-                   (unsigned long)cleared_pcm_items,
-                   (unsigned long)cleared_control_items);
+    if (cleared_pcm_items > 0U) {
+        RIVER_LOGI("kws gate rearm cleared stale queue: pcm=%lu",
+                   (unsigned long)cleared_pcm_items);
     }
     return RIVER_OK;
 }
@@ -1857,11 +1933,19 @@ static void river_voice_kws_task(void *arg)
         bool did_work = false;
 
         if (context->task_stop_requested &&
+            !context->reset_pending &&
             river_audio_frame_ring_count(&context->input_ring) == 0U) {
             break;
         }
 
         while (true) {
+            if (context->reset_pending) {
+                context->reset_pending = false;
+                river_voice_kws_reset_frontend(context);
+                did_work = true;
+                continue;
+            }
+
             status = river_audio_frame_ring_read(
                 &context->input_ring,
                 reinterpret_cast<uint8_t *>(&context->input_task_item));
@@ -1869,10 +1953,6 @@ static void river_voice_kws_task(void *arg)
                 break;
             }
             did_work = true;
-            if (context->input_task_item.type == RIVER_KWS_QUEUE_ITEM_RESET) {
-                river_voice_kws_reset_frontend(context);
-                continue;
-            }
             if (context->input_task_item.type != RIVER_KWS_QUEUE_ITEM_PCM) {
                 RIVER_LOGW("kws worker unknown item: type=%lu",
                            (unsigned long)context->input_task_item.type);
@@ -1892,6 +1972,7 @@ static void river_voice_kws_task(void *arg)
             RIVER_LOGW("kws worker ring read failed: status=%d", (int)status);
         }
         if (context->task_stop_requested &&
+            !context->reset_pending &&
             river_audio_frame_ring_count(&context->input_ring) == 0U) {
             break;
         }
@@ -2276,13 +2357,15 @@ extern "C" river_status_t river_voice_kws_init(void)
                (void *)g_river_voice_kws->fft_input,
                (void *)g_river_voice_kws->fft_output,
                (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
-    RIVER_LOGI("kws worker: priority=%u stack=%uB queue=%u frame=%uB wake=event wait_ms=%u pre_roll_flush=%u",
+    RIVER_LOGI("kws worker: priority=%u stack=%uB queue=%u frame=%uB wake=event wait_ms=%u pre_roll_flush=%u trim=%u->%u",
                (unsigned int)RIVER_KWS_TASK_PRIORITY,
                (unsigned int)RIVER_KWS_TASK_STACK,
                (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
                (unsigned int)RIVER_KWS_INPUT_FRAME_BYTES,
                (unsigned int)RIVER_KWS_TASK_WAIT_MS,
-               (unsigned int)RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES);
+               (unsigned int)RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES,
+               (unsigned int)river_voice_kws_input_trim_high_water_frames(),
+               (unsigned int)river_voice_kws_input_trim_target_frames());
     return RIVER_OK;
 
 fail:
@@ -2453,7 +2536,7 @@ extern "C" void river_voice_kws_dump_profile(void)
             (unsigned long)g_river_voice_kws->input_shape[3] :
             1UL;
 
-    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u",
+    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u trim=%u->%u",
                input_dim1,
                input_dim2,
                input_dim3,
@@ -2466,7 +2549,9 @@ extern "C" void river_voice_kws_dump_profile(void)
                (unsigned int)CONFIG_RIVER_KWS_COOLDOWN_MS,
                (unsigned int)CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS,
                (unsigned int)RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES,
-               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES);
+               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+               (unsigned int)river_voice_kws_input_trim_high_water_frames(),
+               (unsigned int)river_voice_kws_input_trim_target_frames());
     RIVER_LOGI("kws frontend: source=fixed_dsb_mono feature=log_mel bins=40 frames=98 norm=global(mean_milli=%ld,std_milli=%lu) wake_text=%s",
                (long)mean_milli,
                (unsigned long)std_milli,

@@ -1,6 +1,6 @@
 # Runtime Performance Optimization Plan
 
-Date: 2026-03-31
+Date: 2026-04-01
 Branch: `refactor`
 
 ## Current Objective
@@ -26,9 +26,9 @@ Branch: `refactor`
 当前最高优先级问题：
 
 - `KWS` 队列频繁卡在 `queue=40/40`
-- 日志出现 `kws queue dropped control item: type=1`
+- 在事件驱动 wakeup 和 pre-roll 限流之后，陈旧 `PCM` backlog 仍会持续挤占实时预算
 - `river_kws` CPU 占用异常偏高，且唤醒分数长期卡在 `234 pm` 左右，无法触发阈值
-- 这些现象说明当前先要修掉 gate/reset 控制项在拥塞时丢失的问题，再继续看播放与堆水位
+- 这些现象说明当前要继续把 `KWS` 过载行为做得更激进，优先保住最新语音和 reset 语义，再继续看播放与堆水位
 
 当前优先级顺序：
 
@@ -123,9 +123,10 @@ Status: in progress
 
 成功标准：
 
-- 不再出现 `kws queue dropped control item: type=1`
-- gate rearm 时旧 PCM backlog 会被主动清掉，而不是把新的 `RESET` 控制项挤掉
+- gate rearm 时 reset 语义不再依赖共享 `PCM` 队列里的控制项
+- 旧 PCM backlog 会被主动清掉，而不是继续和 reset/新语音争抢队列
 - gate open 后队列占用不再因为 pre-roll flush 立刻冲到接近满队列
+- 当输入队列逼近高水位时，系统会主动裁掉最旧 PCM，避免长时间钉死在 `queue=40/40`
 - `kws status` 不再长时间停留在 `queue=40/40` 且 `dropped` 快速增长
 - 板端重新出现稳定唤醒，或至少先证明控制路径已经恢复正常
 
@@ -183,18 +184,24 @@ Status: in progress
 
 ## Immediate Next Step
 
-下一步先做性能优化第一刀：
+上一刀已经完成：
 
-1. 让 `KWS` worker 从轮询空转改成事件驱动唤醒
+1. `KWS` worker 从轮询空转改成事件驱动唤醒
 2. 提高 `KWS` consumer 相对 producer 的调度优先级
 3. 把 gate open 的 pre-roll flush 从“一次灌满”改成“只补最近且有限的几帧”
+
+下一步进入性能优化第二刀：
+
+1. 把 `RESET` 从 `PCM` 队列里解耦，改成独立 pending 信号，让 worker 在处理新帧前优先执行 reset
+2. 给 `KWS` 输入队列加高水位裁剪策略，在 backlog 逼近满队列时主动丢弃最旧 `PCM`
+3. 当前队列策略以 `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=40` 为基线，先按 `30 -> 13` 做高水位回落
 4. 用板端日志验证：
-   - `queue=40/40` 是否显著减少
-   - `river_kws` CPU 占比是否下降
-   - `kws gate open` 后的排队峰值是否回落
+   - `kws worker` / `kws backend` 已显示 `trim=30->13`
+   - 过载时出现 `kws input trim: dropped=...`
+   - `kws status` 中 `trim_ops` / `trim_drop` 增长，但 `queue=40/40` 不再长时间钉死
    - 唤醒链路是否保持可用
 
 原因：
 
-- 当前最明确的瓶颈不是结构抽象，而是 `KWS` 热路径存在 backlog 洪峰和不必要的 worker 空转
-- 先把实时吞吐压稳，后续对 `cloud` / `playback` 的优化和结构整理才有清晰基线
+- 当前最明确的瓶颈不是结构抽象，而是 `KWS` 热路径仍会在过载时把旧数据堆成 backlog
+- 只有先把“reset 优先级”和“旧帧主动淘汰”做对，后续对 `cloud` / `playback` 的优化和结构整理才有清晰基线

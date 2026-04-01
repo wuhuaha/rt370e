@@ -2087,3 +2087,40 @@
   - confirm `kws gate open` is no longer followed by near-immediate queue saturation
   - confirm `kws pre-roll trim: ...` appears when gate-open would otherwise replay too much backlog
   - re-check whether wake reliability improves under repeated short speech bursts
+
+## Step 5.46
+- Updated [plan.md](/root/ameba-river/plan.md) for the second KWS performance slice:
+  - the event-driven worker / pre-roll-cap step is now treated as the completed first cut
+  - the active focus is now separating reset semantics from queued PCM backlog and adding proactive overload trimming
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - removed `RESET` as a queued KWS input item and replaced it with a dedicated `reset_pending` signal
+  - changed the worker loop so pending reset is consumed before reading more queued PCM, which gives reset semantics priority over backlog
+  - changed gate rearm queue clearing from item-by-item drain to queue-count + reset, which is cheaper and avoids spending extra CPU clearing stale PCM
+  - added proactive PCM backlog trimming:
+    - when the input queue reaches the high-water mark, the oldest PCM is dropped until the queue falls back to a lower target
+    - with the current `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=40`, the runtime trim policy is `30 -> 13`
+  - kept the existing single-frame overflow fallback, but removed the old control-item preservation branch because control and PCM no longer share the queue
+  - added new observability for overload control:
+    - `kws input trim: dropped=... queue=...->... target=...`
+    - `kws status: ... trim_ops=... trim_drop=...`
+    - `kws worker: ... trim=30->13`
+    - `kws backend: ... trim=30->13`
+- Root-cause / performance summary:
+  - after Step 5.45, the worker wakeup path was better, but user logs still showed `queue=40/40` plateaus, high `river_kws` CPU, and stale PCM backlog dominating the queue
+  - as long as reset shared the same queue with PCM, aggressive trimming risked damaging control ordering
+  - separating reset semantics makes it safe to trim old PCM harder, which is the correct realtime tradeoff for this stage
+- Expected effect:
+  - reset is no longer blocked behind queued PCM backlog
+  - the queue can recover from saturation faster instead of remaining pinned at `40/40`
+  - consumer time is spent more on fresh speech frames and less on stale backlog
+  - logs can now distinguish generic drop growth from intentional high-water trim behavior
+- Scope / guardrails:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no KWS model, thresholds, or feature-extraction math changed in this step
+  - this slice stays strictly inside the KWS hot path and overload policy
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
