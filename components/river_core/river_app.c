@@ -10,6 +10,7 @@
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
 #include "river/river_voice_capture.h"
+#include "river/river_voice_kws.h"
 #include "river/river_voice_profile.h"
 #include "river/river_wifi_station.h"
 
@@ -129,6 +130,7 @@ void river_app_print_status(void)
     river_voice_capture_dump_status();
     river_reference_service_dump_status();
     river_voice_echo_dump_status();
+    river_voice_kws_dump_status();
     river_voice_vad_probe_dump_status();
     river_wifi_station_dump_status();
     river_cloud_adapter_dump_status();

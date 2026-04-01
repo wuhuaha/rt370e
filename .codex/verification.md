@@ -4010,3 +4010,78 @@ Observed result on `2026-04-01`:
 - flash passed on `/dev/ttyUSB0`
 - post-flash monitor command `river status` succeeded and showed the board running normally
 - boot-time `kws backend` / tensor-io lines were not captured in this run because monitor attached after reset
+
+## Step 5.54
+Export, embed, build, flash, and verify the calibrated int8 BC-ResNet deployment:
+```bash
+cd /root/ameba-river
+/root/kws-training-pro/.venv-training/bin/python tools/kws/export_bc_resnet_tflite.py \
+  --checkpoint /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_best.pth \
+  --output /tmp/bc_resnet_v3_production_int8_cal.tflite \
+  --quantization int8
+python3 tools/kws/embed_tflite_model.py \
+  --input /tmp/bc_resnet_v3_production_int8_cal.tflite \
+  --header components/river_voice/generated/river_wake_word_model_data.h \
+  --symbol kws_model
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg 'bc_resnet_v3_production_int8_cal|bc_resnet_v3_production_fp32'
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected export result:
+- `/tmp/bc_resnet_v3_production_int8_cal.tflite` is created
+- exporter reports:
+  - `mode=int8`
+  - `representative_samples=256`
+  - nontrivial input quantization derived from real representative features, not random tensors
+
+Expected build result:
+- build completes successfully
+- `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_int8_cal`
+- image sizes stay on the normal int8 footprint, not the larger float32 footprint
+
+Expected board result after flash:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Confirm the board no longer prints `kws AllocateTensors failed`.
+2. Confirm KWS activity is visible either through live `kws gate open/close` logs or through `river status`.
+3. Run `river status` and confirm it prints a `river.voice.kws] kws status:` line after the diagnostic hook is added.
+4. Confirm the board still reaches Wi-Fi connected state and remains responsive.
+```
+
+Pass criteria:
+- int8-cal model exports and embeds successfully
+- firmware rebuilds and flashes successfully
+- board no longer falls back out of KWS initialization
+- `river status` or live logs show KWS is active on-device
+
+Observed result on `2026-04-01`:
+- calibrated int8 export passed:
+  - `wrote=/tmp/bc_resnet_v3_production_int8_cal.tflite bytes=54104 mode=int8`
+  - `representative_samples=256`
+  - `input_quant=(0.017904678359627724, -7)`
+  - `output_quant=(0.00390625, -128)`
+- build passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- binary string verification passed:
+  - `bc_resnet_v3_production_int8_cal`
+- flash passed on `/dev/ttyUSB0`
+- first int8-cal runtime verification passed before the status-path reflashing:
+  - live monitor showed `kws gate open` and `kws gate close`
+- after reflashing the status-path patch, `river status` printed:
+  - `2026-04-01 13:02:18.667 [0000013723][I][river.voice.kws] kws status: gate=closed ready=no ... opens=1 closes=1`
+- same `river status` run also showed:
+  - `tasks=17`
+  - Wi-Fi connected on `2026-04-01 13:02:13.836`
+- no `AllocateTensors failed` line appeared in the int8-cal board runs

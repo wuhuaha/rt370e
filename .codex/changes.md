@@ -2399,3 +2399,37 @@
     - `river status` returned normal runtime status from the flashed board
   - remaining gap:
     - this run attached monitor after the reset window, so the boot-time `kws backend: ... variant=bc_resnet_v3_production_fp32` line was not captured in the same turn
+
+## Step 5.54
+- Switched the embedded wake-word model from the failed float32 baseline to a calibrated int8 deployment:
+  - regenerated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h)
+  - the embedded model now comes from `/tmp/bc_resnet_v3_production_int8_cal.tflite`
+  - exported model size is `54104` bytes
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the runtime variant string from `bc_resnet_v3_production_fp32` to `bc_resnet_v3_production_int8_cal`
+  - keeps serial-side model identification explicit after the int8 swap
+- Updated [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c):
+  - included `river_voice_kws_dump_status()` in `river_app_print_status()`
+  - `river status` now exposes a direct KWS runtime line instead of forcing boot-log timing or incidental speech logs
+- Fix intent:
+  - the float32 board attempt failed at boot on `2026-04-01 12:48:29` with `kws AllocateTensors failed: arena=192KB model=77848B`
+  - the immediate goal of this step was therefore to return to a board-fit model while preserving deterministic runtime observability
+- Local and board-side verification snapshot:
+  - corrected int8 export passed with representative calibration from real feature manifests:
+    - `/tmp/bc_resnet_v3_production_int8_cal.tflite 54104`
+    - exporter reported `representative_samples=256`
+    - input quantization changed to approximately `scale=0.0179046784 zp=-7`
+    - output quantization remained `scale=0.00390625 zp=-128`
+  - rebuild passed after the int8 embed and status-path change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
+  - binary verification passed:
+    - `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production_int8_cal`
+  - board flash passed on `/dev/ttyUSB0` at `1500000` baud
+  - live runtime verification passed:
+    - ambient speech produced `kws gate open` / `kws gate close` logs before the status-path patch was reflashed
+    - after reflashing the status-path patch, `river status` on `2026-04-01 13:02:18` printed `river.voice.kws] kws status: ...`
+    - no `AllocateTensors failed` line appeared in the int8-cal board runs
+    - runtime stayed at `tasks=17`, matching an active KWS task rather than the earlier float32 fallback case
