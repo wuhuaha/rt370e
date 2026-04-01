@@ -2195,3 +2195,28 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
+
+## Step 5.49
+- Updated [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c):
+  - re-armed the XiaoZhi follow-up conversation window inside `river_cloud_xiaozhi_open_session_and_listen()`
+  - each fresh listen / ASR round now refreshes the window to `RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS`
+  - added an inline comment documenting the exact failure mode this prevents:
+    - the shorter post-TTS tail timer could expire while the user had already started the next utterance, so the websocket closed immediately after that ASR round finished
+- Root-cause / session-contract summary:
+  - after `tts stop`, the current code intentionally shortens the window to `RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS`
+  - if follow-up speech starts near the end of that shorter window, ASR can reopen and run normally, but the old deadline remains in force
+  - then once that ASR round ends, `followup_timeout` fires almost immediately and closes the websocket even though the user just engaged a valid next turn
+  - refreshing the window on listen/asr start fixes that contract mismatch without weakening the post-TTS idle close behavior
+- Expected effect:
+  - in logs like the user-provided case, a second `asr provider=xiaozhi_realtime session started sid=...` during follow-up should no longer be followed almost immediately by websocket close just because the prior post-TTS deadline had already expired
+  - the websocket should remain open long enough for the second round to receive normal `stt/llm/tts` traffic, unless a real transport/server issue occurs
+- Scope / guardrails:
+  - no SDK source under `/root/ameba-rtos-1.2` was modified
+  - no ASR/VAD thresholds, playback parameters, or transport buffer sizes changed in this step
+  - only the follow-up window timing contract was adjusted
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`

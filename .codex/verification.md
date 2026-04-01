@@ -3549,6 +3549,60 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
 
+## Step 5.49
+Rebuild after re-arming the follow-up window on XiaoZhi listen / ASR start:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully
+- output images remain valid
+
+User-driven flash and serial verification for the reported follow-up premature close:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Suggested reproduction flow after monitor connects:
+```text
+1. Let the board boot and connect Wi-Fi
+2. Wake the device and complete one normal XiaoZhi round with TTS playback
+3. Wait until TTS finishes and the interaction enters `follow_up`
+4. Near the end of that follow-up period, speak again to trigger a second `asr session started`
+5. Watch whether the websocket still closes immediately after the second ASR round ends
+```
+
+Primary pass criteria:
+- after a follow-up `asr provider=xiaozhi_realtime session started sid=...`, the websocket should not be closed almost immediately just because the earlier post-TTS tail timer had already expired
+- in the previously failing scenario, the second follow-up round should now have enough time to receive normal downstream events such as:
+  - `stt sid=...`
+  - `llm sid=...`
+  - `tts sid=... state=sentence_start`
+
+Secondary checks:
+- normal post-TTS idle close should still work when the user does not start another turn:
+  - `xiaozhi conversation window closed: reason=followup_timeout`
+- the change should not alter first-turn wake admission or the earlier SNTP gate behavior
+
+Interpretation:
+- if the second follow-up round now survives long enough to receive downstream text/tts, the issue was a local window-contract bug rather than a server-side early disconnect
+- if the second round still closes immediately and no new `stt/llm/tts` arrives, capture the exact logs after the second `session started`; at that point the next suspect becomes transport/server behavior rather than local timeout state
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- board verification still pending
+
 ## Step 5.48
 Rebuild after adding low-heap playback-cache reclaim ahead of XiaoZhi reconnect:
 ```bash

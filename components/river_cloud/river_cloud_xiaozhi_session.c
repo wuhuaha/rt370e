@@ -206,6 +206,14 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
         }
         g_river_cloud.xiaozhi_listening = true;
     }
+    /*
+     * A fresh follow-up listen/asr round must re-arm the conversation window.
+     * Otherwise the shorter post-TTS tail timer can expire while the user has
+     * already started the next utterance, causing the websocket to close
+     * immediately after this ASR round finishes.
+     */
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                     "asr_session_start");
     g_river_cloud.xiaozhi_pending_text_valid = false;
     g_river_cloud.xiaozhi_pending_text_finalized = false;
     g_river_cloud.xiaozhi_pending_text[0] = '\0';
