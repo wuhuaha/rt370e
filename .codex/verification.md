@@ -3549,6 +3549,63 @@ Observed local result on `2026-04-01`:
   - `build_RTL8730E/ota_all.bin 3560832`
 - board verification still pending
 
+## Step 5.53
+Rebuild after switching the default baseline KWS asset to `bc_resnet_v3_production.tflite`:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg -n "bc_resnet_v3_production|bc_resnet_epoch1_debug"
+```
+
+Expected build result:
+- build completes successfully
+- no new KWS compile or link error is introduced
+- app image still contains `bc_resnet_v3_production`
+- app image no longer contains `bc_resnet_epoch1_debug`
+
+User-driven flash and serial verification:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Primary runtime checks:
+```text
+1. Let the board boot through Wi-Fi connect and SNTP ready
+2. Confirm KWS boot log prints:
+   - variant=bc_resnet_v3_production
+   - input shape dims=[1,40,98,1]
+3. Confirm quant log now reflects the new schema-driven input quantization:
+   - scale_u6 around 37329
+   - zp=-6
+4. Test several wake attempts with the normal wake phrase and compare recall against the previous build
+```
+
+Expected log behavior:
+- `kws backend: ... model=54104B variant=bc_resnet_v3_production ...`
+- `kws quant: in_src=schema scale_u6=37329 zp=-6 ...`
+- no `MEAN`-related boot failure or unsupported-op log appears
+
+Pass criteria:
+- boot completes normally
+- KWS init and runtime inference continue to work with the new model payload
+- the board logs the new variant and quantization parameters instead of the old epoch1 debug values
+
+Observed local result on `2026-04-01`:
+- local rebuild passed
+- output images:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+  - `build_RTL8730E/ota_all.bin 3560832`
+- binary string check:
+  - contains `bc_resnet_v3_production`
+  - does not contain `bc_resnet_epoch1_debug`
+- board verification pending
+
 ## Step 5.49
 Rebuild after re-arming the follow-up window on XiaoZhi listen / ASR start:
 ```bash

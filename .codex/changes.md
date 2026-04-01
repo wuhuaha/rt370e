@@ -2125,6 +2125,31 @@
     - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
     - `build_RTL8730E/ota_all.bin 3560832`
 
+## Step 5.53
+- Switched the default baseline KWS asset from `bc_resnet_epoch1_debug.tflite` to `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production.tflite`.
+- Updated [components/river_voice/generated/river_wake_word_model_data.h](/root/ameba-river/components/river_voice/generated/river_wake_word_model_data.h):
+  - regenerated the embedded `kws_model` payload from `bc_resnet_v3_production.tflite`
+  - kept the exported symbol names `kws_model` / `kws_model_len`
+  - embedded model size remains `54104` bytes
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed the default runtime variant name from `bc_resnet_epoch1_debug` to `bc_resnet_v3_production`
+- Deployment notes adopted from `/root/kws-training-pro/models/bc_resnet_iteration3/DEPLOYMENT_REPORT_FINAL.md`:
+  - input shape remains `[1, 40, 98, 1]`
+  - output shape remains `[1, 1, 1, 1]`
+  - whitelist ops remain `PAD, CONV_2D, DEPTHWISE_CONV_2D, ADD, AVERAGE_POOL_2D, LOGISTIC`
+  - no `MEAN` op is reintroduced, so the current mainline resolver stays valid
+- Why this step is intentionally narrow:
+  - the new production model keeps the same size and operator envelope as the current baseline, so this change can stay focused on model payload replacement rather than reopening runtime compatibility work
+  - schema-driven quant parsing in the existing runtime will pick up the new input quantization automatically at boot
+- Local verification snapshot:
+  - full `RTL8730E` rebuild passed after this change
+  - output images remained:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3560800`
+    - `build_RTL8730E/ota_all.bin 3560832`
+  - `strings build_RTL8730E/km0_km4_ca32_app.bin` contains `bc_resnet_v3_production`
+  - `strings build_RTL8730E/km0_km4_ca32_app.bin` no longer contains `bc_resnet_epoch1_debug`
+
 ## Step 5.47
 - Updated [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h):
   - added compile-time macro `RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED`

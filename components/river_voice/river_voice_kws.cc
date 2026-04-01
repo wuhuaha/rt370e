@@ -38,7 +38,7 @@ extern "C" {
 #include "generated/river_wake_word_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_len
-#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_epoch1_debug"
+#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_production"
 #endif
 
 #ifndef CONFIG_RIVER_KWS_MEAN_PATCH_EN
