@@ -2503,3 +2503,37 @@
   - host-side USB/IP inspection found the board on `BUSID 3-4` as `Prolific PL2303GC USB Serial COM Port (COM3)`
   - after `usbipd.exe attach --wsl --busid 3-4`, `/dev/ttyUSB0` reappeared and flash completed with `Finished PASS`
   - post-flash serial connection succeeded, but this turn did not capture a fresh boot banner because the monitor attached after the reset window
+
+## Step 5.57
+- Added [tools/kws/compare_triplet_kws.py](/root/ameba-river/tools/kws/compare_triplet_kws.py) to do offline triage on real `rtl8730e-board` WAVs:
+  - loads the production checkpoint with the exporter's internal `TorchExportBCResNet`
+  - runs the exported `bc_resnet_v3_production_final_v2.tflite`
+  - compares the current training-side Python frontend against a board-faithful host replay path
+- The new board-faithful host replay path intentionally mirrors current board C behavior more closely than `river_kws_features.py`:
+  - applies the same Hann formula as [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+  - rounds the windowed samples back to `int16` before FFT, matching `river_voice_kws_capture_window()`
+  - uses the same WebRTC fixed-point FFT implementation from `third_party/webrtc_aecm/aecm/{real_fft.c,complex_fft.c,signal_processing_library.cc}`
+  - replays the same mel-band weighting and normalization contract as the board path
+- Real-board WAV triage used three recorded samples from `/root/kws-dataset-pro-blueprint/data/augmented_final`:
+  - positive wake word:
+    - `device_recordings___positive___positive__pos_neutral_mid_001__小欧管家__take001__rtl8730e-board__rec-1774343625242-44fbbee1.wav`
+  - hard negative near-homophone:
+    - `device_recordings___negative___hard_negative__hn_shang_jia_001__小欧商家__take001__rtl8730e-board__rec-1774403309113-d87271e2.wav`
+  - verifier-style context negative containing the wake phrase:
+    - `device_recordings___negative___verifier_negative__vn_context_005__这是谁家的小欧管家__take001__rtl8730e-board__rec-1774401769981-9199eabe.wav`
+- Observed comparison results:
+  - positive wake word:
+    - training-vs-board feature diff `mean_abs=0.002765`, `max_abs=0.026696`
+    - PT score `0.828093` vs board-faithful PT score `0.827219`
+    - TFLite score `0.843750 (raw=88)` vs board-faithful TFLite `0.855469 (raw=91)`
+  - hard negative `小欧商家`:
+    - training-vs-board feature diff `mean_abs=0.001837`, `max_abs=0.019436`
+    - PT score `0.001380` vs board-faithful PT score `0.001369`
+    - TFLite score `0.007812 (raw=-126)` vs board-faithful TFLite `0.015625 (raw=-124)`
+  - context negative `这是谁家的小欧管家`:
+    - training-vs-board feature diff `mean_abs=0.000637`, `max_abs=0.012912`
+    - PT score `0.413958` vs board-faithful PT score `0.413964`
+    - TFLite score `0.425781 (raw=-19)` vs board-faithful TFLite `0.414062 (raw=-22)`
+- Diagnostic conclusion from this step:
+  - current training-side feature extractor and board-faithful feature replay are close enough that frontend drift is not the primary explanation for the on-board repeated `0.375/raw=-32` behavior
+  - the larger residual is still on the exported TFLite side rather than on the frontend side

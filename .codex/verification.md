@@ -4225,3 +4225,46 @@ python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
 Observed monitor result on `2026-04-01`:
 - serial connection to `/dev/ttyUSB0` succeeded
 - this turn did not capture a fresh boot banner because the monitor attached after the reset window
+
+## Step 5.57 Verification
+Offline triplet comparison target samples:
+- `/root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___positive___positive__pos_neutral_mid_001__小欧管家__take001__rtl8730e-board__rec-1774343625242-44fbbee1.wav`
+- `/root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___negative___hard_negative__hn_shang_jia_001__小欧商家__take001__rtl8730e-board__rec-1774403309113-d87271e2.wav`
+- `/root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___negative___verifier_negative__vn_context_005__这是谁家的小欧管家__take001__rtl8730e-board__rec-1774401769981-9199eabe.wav`
+
+Comparison command:
+```bash
+cd /root/ameba-river
+python3 tools/kws/compare_triplet_kws.py \
+  --checkpoint /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_best.pth \
+  --tflite /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_production_final_v2.tflite \
+  --wav /root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___positive___positive__pos_neutral_mid_001__小欧管家__take001__rtl8730e-board__rec-1774343625242-44fbbee1.wav \
+  --wav /root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___negative___hard_negative__hn_shang_jia_001__小欧商家__take001__rtl8730e-board__rec-1774403309113-d87271e2.wav \
+  --wav /root/kws-dataset-pro-blueprint/data/augmented_final/device_recordings___negative___verifier_negative__vn_context_005__这是谁家的小欧管家__take001__rtl8730e-board__rec-1774401769981-9199eabe.wav
+```
+
+Expected result:
+- the script prints one report per WAV with:
+  - training-frontend feature stats
+  - board-faithful host-replay feature stats
+  - PT score on both feature paths
+  - TFLite score on both feature paths
+- if frontend drift is the dominant issue, feature diffs or PT score diffs should be obviously large on the board-faithful path
+
+Observed result on `2026-04-01`:
+- positive wake word `小欧管家`:
+  - feature diff `mean_abs=0.002765`, `max_abs=0.026696`
+  - PT `0.828093` vs board-faithful PT `0.827219`
+  - TFLite `0.843750 (raw=88)` vs board-faithful TFLite `0.855469 (raw=91)`
+- hard negative `小欧商家`:
+  - feature diff `mean_abs=0.001837`, `max_abs=0.019436`
+  - PT `0.001380` vs board-faithful PT `0.001369`
+  - TFLite `0.007812 (raw=-126)` vs board-faithful TFLite `0.015625 (raw=-124)`
+- context negative `这是谁家的小欧管家`:
+  - feature diff `mean_abs=0.000637`, `max_abs=0.012912`
+  - PT `0.413958` vs board-faithful PT `0.413964`
+  - TFLite `0.425781 (raw=-19)` vs board-faithful TFLite `0.414062 (raw=-22)`
+
+Interpretation:
+- current training frontend and board-faithful host replay frontend are close enough that frontend drift is not the primary explanation for the on-board repeated `0.375/raw=-32`
+- the remaining discrepancy is more likely in exported-model behavior or board runtime tensor/output handling than in frontend feature extraction
