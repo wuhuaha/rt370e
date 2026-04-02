@@ -2653,3 +2653,17 @@
     - training-side
     - host TFLite replay
     - exact board tensor dump
+
+## Step 5.61
+- Reduced the board-side station credentials to a single configured AP as requested.
+- Updated [include/river/river_wifi_credentials.h](/root/ameba-river/include/river/river_wifi_credentials.h):
+  - primary SSID changed from `WLL2G` to `river`
+  - primary password changed to `wobuzhidao`
+  - secondary SSID/password cleared to empty strings
+- Why clearing the secondary entry is enough:
+  - [components/river_cloud/river_wifi_station.c](/root/ameba-river/components/river_cloud/river_wifi_station.c) already ignores empty SSIDs in `river_wifi_station_add_credential()`
+  - so this change collapses the runtime credential set from `2` entries to `1` without touching the station state machine
+- Expected runtime effect after flashing:
+  - boot log changes from `autoconnect init: ap_count=2 primary=...` to `ap_count=1 primary=river`
+  - scan/connect rotation no longer falls back to `ORVIBO`
+  - all reconnect attempts stay pinned to the single configured SSID `river`

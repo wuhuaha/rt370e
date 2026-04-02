@@ -4521,3 +4521,49 @@ Expected post-debug behavior:
 - status should return to:
   - `local_only=no`
   - `wake_handoff=normal` unless a fresh dump snapshot is still pending/ready
+
+## Step 5.61 Verification
+Build command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully after the Wi‑Fi credential update
+- only project-side station credentials change; connection state machine code stays untouched
+
+Observed build result on `2026-04-02`:
+- build passed
+- final image sizes were unchanged:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3568992`
+  - `build_RTL8730E/ota_all.bin 3569024`
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot-time Wi‑Fi logs after flash:
+```text
+[river.wifi] autoconnect init: ap_count=1 primary=river retry_ms=5000
+```
+
+Expected connect-cycle logs after Wi‑Fi starts:
+```text
+[river.wifi] connect attempt=1 ap_count=1 next_index=0 current=river
+```
+
+Expected behavioral change:
+- the board no longer scans/rotates into the previous fallback SSIDs
+- there should be no later logs mentioning:
+  - `WLL2G`
+  - `ORVIBO`
+- only the single configured AP `river` should appear in:
+  - boot-time autoconnect status
+  - retry logs
+  - successful connect logs
