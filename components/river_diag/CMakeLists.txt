@@ -17,6 +17,7 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_diag_cmd.c
+    river_diag_tcp_client.c
 )
 
 ameba_list_append(private_includes

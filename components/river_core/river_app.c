@@ -1,6 +1,7 @@
 /* 应用编排入口：按依赖顺序拉起 Wi-Fi、云端、语音和交互子系统。 */
 #include "river/river_app.h"
 #include "river/river_cloud.h"
+#include "river/river_diag.h"
 #include "river/river_interaction_state.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
@@ -65,6 +66,9 @@ river_status_t river_app_boot(void)
     }
     if (river_interaction_diag_init() != RIVER_OK) {
         return RIVER_ERR_NO_MEMORY;
+    }
+    if (river_diag_init() != RIVER_OK) {
+        RIVER_LOGW("diag transport init failed");
     }
 
 #ifdef CONFIG_RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
@@ -136,4 +140,5 @@ void river_app_print_status(void)
     river_cloud_adapter_dump_status();
     river_online_control_dump_status();
     river_interaction_diag_dump_status();
+    river_diag_dump_status();
 }

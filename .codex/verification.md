@@ -4567,3 +4567,71 @@ Expected behavioral change:
   - boot-time autoconnect status
   - retry logs
   - successful connect logs
+
+## Step 5.62 Verification
+Host-side prep:
+```bash
+cd /root/ameba-river
+python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 8765
+```
+
+Expected host-side startup:
+```text
+[host] listening on 0.0.0.0:8765; type `river status` or `river kws status` and press Enter
+```
+
+Build command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Observed build result on `2026-04-02`:
+- build passed
+- final image sizes were:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3573376`
+  - `build_RTL8730E/ota_all.bin 3573408`
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected board boot / connect sequence after flash:
+```text
+[river.wifi] connected ssid=river ip=...
+[river.diag.tcp] tcpdiag init: host=192.168.3.5 port=8765 retry_ms=1000
+[river.diag.tcp] tcpdiag connected: host=192.168.3.5 port=8765
+```
+
+Expected host-side connection message:
+```text
+[host] board connected from <board-ip>:<ephemeral-port>
+```
+
+Interactive runtime checks from the host terminal running `river_tcp_debug_server.py`:
+```text
+river tcpdiag status
+river status
+river kws status
+river kws debug local on
+river kws debug local off
+```
+
+Expected behavior:
+- typed commands are forwarded from host stdin to the board over TCP
+- board responses that use `RIVER_LOG*` are printed back in the same host terminal
+- `river tcpdiag status` reports:
+  - configured host `192.168.3.5`
+  - configured port `8765`
+  - current connection state
+  - rx/tx counters
+- after board reset or host restart, the connection can be re-established automatically without reconnecting serial monitor
+
+Current limitation to keep in mind during validation:
+- only project logs emitted through `river_log` are mirrored to the host
+- raw SDK `printf` text and shell usage strings that bypass `river_log` may still appear only on serial

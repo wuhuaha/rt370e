@@ -2667,3 +2667,49 @@
   - boot log changes from `autoconnect init: ap_count=2 primary=...` to `ap_count=1 primary=river`
   - scan/connect rotation no longer falls back to `ORVIBO`
   - all reconnect attempts stay pinned to the single configured SSID `river`
+
+## Step 5.62
+- Added a project-side TCP debug transport so the board no longer has to depend on unstable serial input/output for the current KWS investigation.
+- Added [include/river/river_diag.h](/root/ameba-river/include/river/river_diag.h):
+  - public `river_diag_init()`
+  - public `river_diag_execute_command_line()`
+  - public `river_diag_dump_status()`
+- Refactored [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c):
+  - split the existing `river` monitor handler into a reusable dispatcher
+  - added line-based command execution for non-serial callers
+  - added `river tcpdiag status`
+  - kept serial `river ...` behavior unchanged
+- Added [components/river_diag/river_diag_tcp_client.c](/root/ameba-river/components/river_diag/river_diag_tcp_client.c):
+  - background TCP client task started from app boot
+  - waits for `river_wifi_station_is_connected()`
+  - connects to host `192.168.3.5:8765`
+  - reuses `river_log_set_secondary_sink(...)` to mirror project `RIVER_LOG*` lines over TCP
+  - receives `\\n`-terminated commands from the host and executes them through the same `river ...` dispatcher used by the serial shell
+  - reconnects automatically after disconnect or Wi‑Fi loss
+  - exposes transport counters through `river tcpdiag status` and the regular `river status` dump
+- Updated [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c):
+  - boot now initializes the TCP diag transport without failing the whole app if transport init alone fails
+  - app-wide status dump now includes TCP diag state
+- Updated [Kconfig](/root/ameba-river/Kconfig) and [prj.conf](/root/ameba-river/prj.conf):
+  - added `CONFIG_RIVER_DIAG_TCP_CLIENT_EN`
+  - added host/port/retry config
+  - enabled the TCP client for the current debug build with:
+    - host `192.168.3.5`
+    - port `8765`
+    - retry `1000 ms`
+- Added [tools/diag/river_tcp_debug_server.py](/root/ameba-river/tools/diag/river_tcp_debug_server.py):
+  - single-client TCP server for the host
+  - prints board-side log lines to stdout
+  - forwards typed stdin lines like `river kws status` back to the board
+  - supports reconnect after board reset/reflash
+- Current scope/limitation of this step:
+  - mirrored output covers the project-side `RIVER_LOG*` path
+  - raw SDK `printf`/shell usage text that bypasses `river_log` is still serial-only unless those call sites are later migrated
+- Local verification on `2026-04-02`:
+  - `python3 -m py_compile tools/diag/river_tcp_debug_server.py` passed
+  - `python3 tools/diag/river_tcp_debug_server.py --help` passed
+  - full `RTL8730E` build passed
+  - final image sizes were:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3573376`
+    - `build_RTL8730E/ota_all.bin 3573408`
