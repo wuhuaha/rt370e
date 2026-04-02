@@ -12,12 +12,25 @@
 extern "C" {
 #endif
 
+typedef enum {
+    RIVER_VOICE_KWS_TENSOR_DUMP_FEATURE_F32 = 0,
+    RIVER_VOICE_KWS_TENSOR_DUMP_INPUT_RAW = 1,
+    RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW = 2
+} river_voice_kws_tensor_dump_buffer_t;
+
 river_status_t river_voice_kws_init(void);
 bool river_voice_kws_active(void);
 river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                                             size_t bytes,
                                             bool vad_valid,
                                             bool is_speech);
+river_status_t river_voice_kws_request_tensor_dump_next(void);
+void river_voice_kws_cancel_tensor_dump(void);
+void river_voice_kws_clear_tensor_dump(void);
+void river_voice_kws_dump_tensor_meta(void);
+river_status_t river_voice_kws_dump_tensor_chunk(
+    river_voice_kws_tensor_dump_buffer_t buffer,
+    uint32_t chunk_index);
 void river_voice_kws_dump_profile(void);
 void river_voice_kws_dump_status(void);
 

@@ -2572,3 +2572,46 @@
 - Residual runtime note from the same live session:
   - right after the wake-path handoff, CA32 logged `Malloc failed. Core:[CA32], Task:[river_wake_evt], [free heap size: 1280] [xWantedSize:1408]`
   - this is separate from the KWS raw-repeat diagnosis, but it is worth tracking because it can destabilize post-wake behavior
+
+## Step 5.59
+- Reworked the board-side exact-tensor dump path from an unsolicited UART log burst into a pull-style snapshot transport, because the previous stream-based approach was not robust enough for this board/adapter combination.
+- The immediate trigger for this step was a fresh raw serial capture after reset:
+  - `/tmp/tty_capture.bin` contained `2092` bytes of `0x00`
+  - that means the serial path can reach a bad “readable but only zero bytes” state even without `pyserial` monitor framing, so continuing to depend on hundreds of unsolicited dump lines would remain fragile
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added an in-RAM KWS dump snapshot that captures, for the next armed inference only:
+    - exact float32 feature tensor
+    - exact raw input tensor bytes passed to TFLM
+    - exact raw output tensor bytes returned by TFLM
+    - snapshot-specific hashes, raw output scalar, score, q15, and inference sequence
+  - replaced the old `dump next` behavior so it now only arms snapshot capture and logs a compact `kws tensor dump captured: ...` summary when the snapshot is ready
+  - kept the existing `begin/meta/chunk` log format for host compatibility, but now emits those lines only on explicit query
+  - extended KWS dump status with:
+    - `armed=yes/no`
+    - `ready=yes/no`
+    - `capture_seq`
+    - `capture_infer`
+    - per-buffer chunk counts
+- Updated [include/river/river_voice_kws.h](/root/ameba-river/include/river/river_voice_kws.h):
+  - added public dump-buffer enum values for `feat_f32`, `input_raw`, and `output_raw`
+  - added APIs to:
+    - clear a cached snapshot
+    - print snapshot metadata
+    - print one selected chunk by label and index
+- Updated [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c):
+  - extended monitor commands to:
+    - `river kws dump next`
+    - `river kws dump off`
+    - `river kws dump clear`
+    - `river kws dump status`
+    - `river kws dump meta`
+    - `river kws dump chunk <feat_f32|input_raw|output_raw> <index>`
+  - added argument validation so invalid chunk labels or indices fail immediately instead of silently producing unusable output
+- Kept [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py) compatible by preserving the same `kws tensor dump begin/meta/chunk` line grammar; the only behavioral change is that logs are now pulled in smaller operator-controlled steps instead of dumped all at once.
+- Local verification on `2026-04-02`:
+  - full `RTL8730E` build passed
+  - final image sizes were:
+    - `build_RTL8730E/km4_boot_all.bin 51872`
+    - `build_RTL8730E/km0_km4_ca32_app.bin 3568992`
+    - `build_RTL8730E/ota_all.bin 3569024`
+  - board flash passed with `Finished PASS` at `2026-04-02 09:48:52`

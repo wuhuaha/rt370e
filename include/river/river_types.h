@@ -11,7 +11,8 @@ typedef enum {
     RIVER_ERR_UNSUPPORTED = -3,
     RIVER_ERR_BUSY = -4,
     RIVER_ERR_NO_MEMORY = -5,
-    RIVER_ERR_IO = -6
+    RIVER_ERR_IO = -6,
+    RIVER_ERR_INVALID_STATE = -7
 } river_status_t;
 
 #endif

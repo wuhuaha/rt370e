@@ -4361,3 +4361,75 @@ Interpretation:
 Note on final deployed image:
 - the final reflashed image in this step only renamed the status-line snapshot labels from `raw/feat_hash/input_hash` to `last_raw/last_feat_hash/last_input_hash`
 - the diagnostic logic and inference-side evidence above still apply to the final flashed code
+
+## Step 5.59 Verification
+Build command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully with the new pull-style KWS dump commands compiled in
+- image size increases modestly because the board now retains an exact-tensor snapshot in RAM and exposes new diag command strings
+
+Observed build result on `2026-04-02`:
+- build passed
+- final image sizes were:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3568992`
+  - `build_RTL8730E/ota_all.bin 3569024`
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected flash result:
+- flashing completes successfully
+- tool reports `Finished PASS`
+
+Observed flash result on `2026-04-02`:
+- flash passed on the first attempt for this step
+- tool reported:
+  - `km4_boot_all.bin download done: 51KB / 461.0ms / 906.0Kbps`
+  - `km0_km4_ca32_app.bin download done: 3486KB / 32186.0ms / 887.0Kbps`
+  - `Finished PASS`
+
+Next live board check for the user:
+```text
+river kws dump clear
+river kws dump next
+```
+
+Expected live behavior after `river kws dump next`:
+- the board does not print hundreds of dump lines immediately anymore
+- after the next KWS inference window is captured, it should print a compact line similar to:
+  - `kws tensor dump captured: seq=... infer=... feat_chunks=... input_chunks=... output_chunks=...`
+
+Then query the cached snapshot:
+```text
+river kws dump meta
+river kws dump chunk output_raw 1
+river kws dump chunk input_raw 1
+```
+
+Expected live behavior for the pull-style dump:
+- `river kws dump meta` prints:
+  - one `kws tensor dump begin: ...` line
+  - one `kws tensor dump meta: ...` line
+  - one `kws tensor dump snapshot: seq=... infer=... chunks=[...]` line
+- `river kws dump chunk output_raw 1` prints exactly one `output_raw` chunk line
+- `river kws dump chunk input_raw 1` prints exactly one `input_raw` chunk line
+- invalid requests such as `river kws dump chunk input_raw 99999` should fail with a clear range error instead of emitting partial garbage
+
+Current diagnostic interpretation:
+- this step does not yet prove where the constant-confidence bug lives
+- it makes the next verification reliable enough to answer that question by comparing:
+  - board-captured feature tensor
+  - board-captured raw input tensor
+  - board-captured raw output tensor
+  with host replay, one chunk at a time

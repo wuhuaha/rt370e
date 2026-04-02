@@ -1,5 +1,6 @@
 /* 串口诊断命令入口：集中暴露状态查询、音频测试和云端调试命令。 */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ameba_soc.h"
@@ -13,6 +14,7 @@
 #include "river/river_playback_service.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
+#include "river/river_voice_kws.h"
 
 #ifdef CONFIG_RIVER_DIAG_CMD_EN
 #if defined(CONFIG_RIVER_CLOUD_TEXT_DEBUG_EN)
@@ -39,6 +41,7 @@
 static void river_diag_help(void)
 {
     printf("\triver status\n");
+    printf("\triver kws <status|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
 #if RIVER_CLOUD_TEXT_DEBUG_ENABLED
     printf("\triver echo <text>\n");
     printf("\triver tts <text>\n");
@@ -96,6 +99,24 @@ static void river_diag_join_args(u16 argc, u8 *argv[], u16 start, char *out_text
     }
 }
 
+static bool river_diag_parse_u32_arg(const char *text, uint32_t *value_out)
+{
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (text == NULL || value_out == NULL || text[0] == '\0') {
+        return false;
+    }
+
+    parsed = strtoul(text, &end, 10);
+    if (end == text || end == NULL || *end != '\0') {
+        return false;
+    }
+
+    *value_out = (uint32_t)parsed;
+    return true;
+}
+
 static u32 river_diag_cmd(u16 argc, u8 *argv[])
 {
 #if RIVER_CLOUD_TEXT_DEBUG_ENABLED || RIVER_INTERACTION_DIAG_ENABLED
@@ -115,6 +136,91 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
     if (strcmp((const char *)argv[0], "status") == 0) {
         river_app_print_status();
         river_runtime_stats_snapshot("diag_status");
+        return 0;
+    }
+
+    if (strcmp((const char *)argv[0], "kws") == 0) {
+        if (argc < 2) {
+            printf("[river][diag] usage: river kws <status|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "status") == 0) {
+            river_voice_kws_dump_status();
+            return 0;
+        }
+
+        if (strcmp((const char *)argv[1], "dump") == 0) {
+            river_voice_kws_tensor_dump_buffer_t dump_buffer;
+            uint32_t chunk_index;
+
+            if (argc < 3) {
+                printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>\n");
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "next") == 0) {
+                if (river_voice_kws_request_tensor_dump_next() != RIVER_OK) {
+                    printf("[river][diag] kws dump arm failed\n");
+                }
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "off") == 0) {
+                river_voice_kws_cancel_tensor_dump();
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "clear") == 0) {
+                river_voice_kws_clear_tensor_dump();
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "status") == 0) {
+                river_voice_kws_dump_status();
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "meta") == 0) {
+                river_voice_kws_dump_tensor_meta();
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "chunk") == 0) {
+                if (argc < 5) {
+                    printf("[river][diag] usage: river kws dump chunk <feat_f32|input_raw|output_raw> <index>\n");
+                    return 0;
+                }
+
+                if (strcmp((const char *)argv[3], "feat_f32") == 0) {
+                    dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_FEATURE_F32;
+                } else if (strcmp((const char *)argv[3], "input_raw") == 0) {
+                    dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_INPUT_RAW;
+                } else if (strcmp((const char *)argv[3], "output_raw") == 0) {
+                    dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW;
+                } else {
+                    printf("[river][diag] dump label must be feat_f32, input_raw, or output_raw\n");
+                    return 0;
+                }
+
+                if (!river_diag_parse_u32_arg((const char *)argv[4], &chunk_index) ||
+                    chunk_index == 0U) {
+                    printf("[river][diag] dump chunk index must be a positive integer\n");
+                    return 0;
+                }
+
+                if (river_voice_kws_dump_tensor_chunk(dump_buffer, chunk_index) !=
+                    RIVER_OK) {
+                    printf("[river][diag] kws dump chunk failed\n");
+                }
+                return 0;
+            }
+
+            printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>\n");
+            return 0;
+        }
+
+        printf("[river][diag] usage: river kws <status|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
         return 0;
     }
 
