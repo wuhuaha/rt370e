@@ -4631,3 +4631,26 @@ Expected result:
   - multiple debug methods with individual exit mechanisms
   - actual serial-debugging pitfalls seen in this project
 - `git diff --check` reports no patch-format errors
+
+## Step 5.64 Verification
+This is a documentation-only step.
+
+Review commands:
+```bash
+cd /root/ameba-river
+sed -n '1,320p' doc/KWS_FP32_DEPLOYMENT_GATES_ZH.md
+git diff --check
+```
+
+Expected result:
+- the new document exists and is readable
+- it clearly separates:
+  - compatibility hard gates
+  - memory/arena gates
+  - algorithm-side delivery requirements
+  - first-board-bring-up acceptance gates
+- it contains explicit direct-deploy thresholds for the current full profile:
+  - recommended `KWS arena <= 224KB`
+  - direct-deploy upper bound `KWS arena <= 256KB`
+- it states that `.tflite` size is only a secondary screen and `AllocateTensors()` arena is the primary gate
+- `git diff --check` reports no patch-format errors

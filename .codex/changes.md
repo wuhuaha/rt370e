@@ -2698,3 +2698,36 @@
 - The intent of this step is process control rather than code change:
   - future KWS diagnosis should follow the staged checklist
   - transport, cloud handoff, and experimental branches should no longer be mixed into the main false-trigger investigation path
+
+## Step 5.64
+- Added a dedicated FP32 wake-word deployment gate document for the current full product profile:
+  - [doc/KWS_FP32_DEPLOYMENT_GATES_ZH.md](/root/ameba-river/doc/KWS_FP32_DEPLOYMENT_GATES_ZH.md)
+- The document turns the previous qualitative conclusion into a concrete deployment contract for the algorithm/export side:
+  - hard compatibility gates:
+    - pure `FP32`, no hybrid
+    - single-probability output
+    - supported input shapes only
+    - current resolver op whitelist only
+  - memory gates derived from the current board baseline:
+    - current mainline `KWS arena = 192KB`
+    - current mainline `Silero VAD arena = 192KB`
+    - recent full-profile runtime baseline:
+      - `boot_ready heap_free ≈ 185216B`
+      - `wifi_connected heap_free ≈ 132736B`
+    - recommended direct-deploy FP32 KWS arena target:
+      - `<= 224KB`
+    - direct-deploy upper bound on the current full profile:
+      - `<= 256KB`
+    - beyond that, the model should no longer be treated as “swap-and-flash directly usable” on this branch
+- The new document also distinguishes between:
+  - secondary screening by `.tflite` file size
+  - primary acceptance by actual `AllocateTensors()` arena demand
+- It further defines the algorithm-side delivery package required for a one-shot board bring-up:
+  - model/export provenance
+  - IO shape/type summary
+  - operator summary
+  - threshold derivation
+  - arena evidence
+- Purpose of this step:
+  - prevent future FP32 discussions from collapsing into “file size looks small enough”
+  - give the training/export side a clear, board-derived target before producing the next model
