@@ -4680,3 +4680,32 @@ Expected result:
   - `__psram_heap_buffer_*` heap derivation
   - historical `heap_free` runtime numbers
 - `git diff --check` reports no patch-format errors
+
+## Step 5.66 Verification
+This is a documentation-only step.
+
+Review commands:
+```bash
+cd /root/ameba-river
+sed -n '1,320p' doc/RTL8730E_MEMORY_LAYOUT_OPTIONS_ZH.md
+git diff --check
+```
+
+Expected result:
+- the new document exists and is readable
+- it clearly states the recommendation:
+  - memory-layout adjustment is strategically worthwhile
+  - but should not be the first reaction to the current model-quality issue
+- it contains a comparison table covering multiple layout strategies
+- it explicitly compares at least:
+  - no-layout-change trim path
+  - conservative expansion
+  - `aivoice`-style expansion
+  - aggressive near-64MB expansion
+- it includes verification focus and rollback conditions for each path
+- it ties the recommendation back to current project evidence:
+  - physical `64MB` vs current `8MB` layout window
+  - current `4MB` CA32 carveout
+  - CA32 heap derivation from linker tail
+  - KM4 heap-extend presence in the SDK
+- `git diff --check` reports no patch-format errors

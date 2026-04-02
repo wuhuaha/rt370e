@@ -2755,3 +2755,31 @@
 - Purpose of this step:
   - stop future discussions from mixing “physical memory size” with “current application free heap”
   - provide a single reference that can be reused in KWS/FP32 deployment reviews
+
+## Step 5.66
+- Added a dedicated RTL8730E memory-layout options document:
+  - [doc/RTL8730E_MEMORY_LAYOUT_OPTIONS_ZH.md](/root/ameba-river/doc/RTL8730E_MEMORY_LAYOUT_OPTIONS_ZH.md)
+- This document consolidates the recent layout-adjustment discussion into one project-owned reference and answers:
+  - whether the current branch should consider enlarging CA32-visible DRAM
+  - why the answer is “yes, but not as the first response to the current FP32 model issue”
+- The new document ties the recommendation back to current platform facts:
+  - physical DRAM detection reaches `0x64000000`
+  - current layout still caps `PSRAM_END` at `0x60800000`
+  - current CA32 non-secure carveout is only `4MB`
+  - CA32 heap is derived from the tail of that carveout
+  - KM4 still has an explicit PSRAM heap-extend concept in the SDK
+- It also adds a concrete option comparison table, including:
+  - no-layout-change / module-trim validation path
+  - in-window reshuffle path
+  - conservative expansion path
+  - `aivoice`-style expansion path
+  - aggressive near-64MB expansion path
+- For each path the document records:
+  - expected benefit
+  - platform risk level
+  - recommended usage stage
+  - verification focus
+  - stop/rollback conditions
+- Purpose of this step:
+  - separate short-term model diagnosis from mid-term platform-capacity planning
+  - provide a reusable decision document before any SDK-level memory-layout work is started
