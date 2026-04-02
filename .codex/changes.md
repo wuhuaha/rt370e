@@ -2817,3 +2817,26 @@
   - `build_RTL8730E/build/project_hp/image/km4_image2_all.bin` `371K`
   - `build_RTL8730E/build/project_ap/image/ap_image_all.bin` `3.0M`
   - `build_RTL8730E/km0_km4_ca32_app.bin` `3.5M`
+
+## Step 5.68
+- The first FP32 boot attempt exposed the next concrete limit after the memory expansion work:
+  - boot failed before KWS runtime came up
+  - CA32 reported `Malloc failed ... xWantedSize:786560`
+  - this corresponds to the first large FP32 tensor-arena allocation attempt at `768KB`
+- Treated that log as evidence that:
+  - the platform no longer fails at the old `100~200KB` heap scale
+  - but `768KB` is too aggressive for the current early-boot DRAM allocation window once allocator overhead is included
+- Adjusted the FP32 experiment profile from `768KB` down to `688KB` so the board still gets a large FP32 arena while leaving explicit headroom for:
+  - KWS queue backing storage
+  - KWS pre-roll storage
+  - KWS worker task creation
+- Added finer-grained KWS init allocation logs so the next boot can distinguish these phases directly:
+  - overall init plan before the arena allocation
+  - post-FFT / pre-arena state
+  - explicit `tensor arena alloc failed` log if the large block still cannot be reserved
+  - post-arena state
+  - runtime-buffer reservation summary
+  - queue-storage / signal / task creation checkpoints
+- Purpose of this step:
+  - move from “one coarse malloc fail” to a staged boot-time memory trace
+  - get the FP32 profile to boot so CPU latency can be judged from real `kws perf` logs rather than guessed from static model size

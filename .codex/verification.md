@@ -4754,3 +4754,44 @@ Observed build result on `2026-04-02`:
   - `build_RTL8730E/build/project_hp/image/km4_image2_all.bin` `371K`
   - `build_RTL8730E/build/project_ap/image/ap_image_all.bin` `3.0M`
   - `build_RTL8730E/km0_km4_ca32_app.bin` `3.5M`
+
+## Step 5.68 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot/runtime emphasis:
+- the earlier `xWantedSize:786560` boot-time failure should disappear
+- KWS init should now print a staged allocation trace, including lines similar to:
+  - `kws init plan: ... arena=688KB ...`
+  - `kws init stage: fft_ready ...`
+  - `kws init stage: arena_ready ...`
+  - `kws init runtime buffers: ...`
+  - `kws init stage: queue_storage_ready ...`
+  - `kws init stage: signal_ready ...`
+  - `kws init stage: task_ready ...`
+- after successful KWS bring-up, the existing FP32 runtime logs from Step 5.67 should still appear:
+  - `kws tensor io ... effective_in=float32 effective_out=float32`
+  - `kws alloc ... arena_used=... arena_slack=...`
+  - `kws perf: infer_us[last=... avg=... max=...] ...`
+
+Observed result from the first `768KB` boot attempt on `2026-04-02`:
+- boot reached the voice stack and then failed before KWS runtime was ready
+- the decisive line was:
+  - `Malloc failed. Core:[CA32], Task:[NoTsk], [free heap size: 771904] [xWantedSize:786560]`
+- conclusion:
+  - the board is no longer limited to the earlier sub-`256KB` KWS budget
+  - but `768KB` is too aggressive for the current early-boot DRAM allocation window
+
+Observed build result for the reduced-arena retry on `2026-04-02`:
+- full `RTL8730E` rebuild passed after reducing `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` to `688`
+- this retry also includes the new staged KWS init allocation logs

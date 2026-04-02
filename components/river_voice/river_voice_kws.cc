@@ -2800,6 +2800,12 @@ extern "C" river_status_t river_voice_kws_init(void)
     }
     memset(g_river_voice_kws, 0, sizeof(*g_river_voice_kws));
     g_river_voice_kws->init_heap_before_bytes = rtos_mem_get_free_heap_size();
+    RIVER_LOGI("kws init plan: heap_free=%lu ctx=%luB arena=%uKB model=%luB align=%u",
+               (unsigned long)g_river_voice_kws->init_heap_before_bytes,
+               (unsigned long)sizeof(*g_river_voice_kws),
+               (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
+               (unsigned long)RIVER_KWS_MODEL_DATA_LEN,
+               (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
 
     g_river_voice_kws->real_fft = WebRtcSpl_CreateRealFFT(9);
     if (g_river_voice_kws->real_fft == NULL) {
@@ -2813,6 +2819,8 @@ extern "C" river_status_t river_voice_kws_init(void)
 
     river_voice_kws_prepare_hann_window(g_river_voice_kws);
     river_voice_kws_prepare_mel_bands(g_river_voice_kws);
+    RIVER_LOGI("kws init stage: fft_ready heap_free=%lu",
+               (unsigned long)rtos_mem_get_free_heap_size());
 
     g_river_voice_kws->tensor_arena =
         (uint8_t *)river_voice_kws_alloc_aligned(RIVER_KWS_TENSOR_ARENA_BYTES,
@@ -2820,6 +2828,9 @@ extern "C" river_status_t river_voice_kws_init(void)
                                                  &g_river_voice_kws->tensor_arena_from_heap_types,
                                                  &g_river_voice_kws->tensor_arena_allocation);
     if (g_river_voice_kws->tensor_arena == NULL) {
+        RIVER_LOGE("kws tensor arena alloc failed: arena=%uKB heap_free=%lu",
+                   (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
+                   (unsigned long)rtos_mem_get_free_heap_size());
         WebRtcSpl_FreeRealFFT(g_river_voice_kws->real_fft);
         river_voice_kws_free_allocation(g_river_voice_kws_allocation,
                                         g_river_voice_kws_allocation_from_heap_types);
@@ -2828,6 +2839,8 @@ extern "C" river_status_t river_voice_kws_init(void)
         g_river_voice_kws = NULL;
         return RIVER_ERR_NO_MEMORY;
     }
+    RIVER_LOGI("kws init stage: arena_ready heap_free=%lu",
+               (unsigned long)rtos_mem_get_free_heap_size());
 
     g_river_voice_kws->model = tflite::GetModel(RIVER_KWS_MODEL_DATA);
     if (g_river_voice_kws->model == NULL ||
@@ -3012,6 +3025,13 @@ extern "C" river_status_t river_voice_kws_init(void)
     g_river_voice_kws->input_ring_storage_bytes =
         sizeof(river_voice_kws_queue_item_t) *
         (size_t)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES;
+    RIVER_LOGI("kws init runtime buffers: heap_free=%lu pre=%luB queue=%luB dump_lazy=%luB stack=%uB",
+               (unsigned long)rtos_mem_get_free_heap_size(),
+               (unsigned long)g_river_voice_kws->pre_roll_ring_storage_bytes,
+               (unsigned long)g_river_voice_kws->input_ring_storage_bytes,
+               (unsigned long)river_voice_kws_tensor_dump_reserved_bytes(
+                   g_river_voice_kws),
+               (unsigned int)RIVER_KWS_TASK_STACK);
     if (!river_voice_kws_tensor_bytes_sufficient(g_river_voice_kws->input_tensor->bytes,
                                                  input_elements,
                                                  g_river_voice_kws->effective_input_type) ||
@@ -3074,6 +3094,8 @@ extern "C" river_status_t river_voice_kws_init(void)
                    (int)status);
         goto fail;
     }
+    RIVER_LOGI("kws init stage: queue_storage_ready heap_free=%lu",
+               (unsigned long)rtos_mem_get_free_heap_size());
 
     status = river_audio_frame_ring_init_with_storage_ex(
         &g_river_voice_kws->pre_roll_ring,
@@ -3111,6 +3133,8 @@ extern "C" river_status_t river_voice_kws_init(void)
         goto fail;
     }
     g_river_voice_kws->input_ready_created = true;
+    RIVER_LOGI("kws init stage: signal_ready heap_free=%lu",
+               (unsigned long)rtos_mem_get_free_heap_size());
 
     if (rtos_task_create(&g_river_voice_kws->task,
                          "river_kws",
@@ -3123,6 +3147,8 @@ extern "C" river_status_t river_voice_kws_init(void)
         goto fail;
     }
     g_river_voice_kws->task_running = true;
+    RIVER_LOGI("kws init stage: task_ready heap_free=%lu",
+               (unsigned long)rtos_mem_get_free_heap_size());
     g_river_voice_kws->init_heap_after_bytes = rtos_mem_get_free_heap_size();
     g_river_voice_kws->init_heap_min_bytes =
         rtos_mem_get_minimum_ever_free_heap_size();
