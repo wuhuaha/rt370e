@@ -4709,3 +4709,48 @@ Expected result:
   - CA32 heap derivation from linker tail
   - KM4 heap-extend presence in the SDK
 - `git diff --check` reports no patch-format errors
+
+## Step 5.67 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot/runtime checks from monitor:
+```text
+river kws status
+```
+
+Expected boot/runtime emphasis:
+- boot must still complete with the full product image enabled
+- KWS init logs should now identify the FP32 experiment profile and show a much larger arena budget:
+  - `model=bc_resnet_v3_fp32_experimental`
+  - `threshold_q15=17096`
+  - `queue=64`
+  - `arena=768KB`
+- `kws tensor io` should report `effective_in=float32` and `effective_out=float32`
+- `kws alloc` should report nonzero `arena_used` and `arena_slack`
+- `kws memory plan` should report init-time heap before/after plus queue/pre-roll/dump reservation bytes
+- periodic `kws perf` logs should appear and include:
+  - `infer_us[last=... avg=... max=...]`
+  - `warn=... alert=...`
+  - current/min/init heap
+  - queue policy and arena usage
+- `river.stats` snapshots should now include `kws:<...>B` in `stack_free=[...]`
+
+Observed build result on `2026-04-02`:
+- full `RTL8730E` build passed
+- resulting images were:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin` `51K`
+  - `build_RTL8730E/build/project_lp/image/km0_image2_all.bin` `92K`
+  - `build_RTL8730E/build/project_hp/image/km4_image2_all.bin` `371K`
+  - `build_RTL8730E/build/project_ap/image/ap_image_all.bin` `3.0M`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` `3.5M`

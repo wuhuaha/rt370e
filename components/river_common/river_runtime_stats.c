@@ -197,6 +197,7 @@ void river_runtime_stats_snapshot(const char *reason)
         const TaskStatus_t *vad_task;
         const TaskStatus_t *cap_task;
         const TaskStatus_t *echo_task;
+        const TaskStatus_t *kws_task;
 
         if (!g_river_runtime_stats_lock_ready ||
             rtos_mutex_take(g_river_runtime_stats_lock, RTOS_MAX_TIMEOUT) != 0) {
@@ -227,8 +228,9 @@ void river_runtime_stats_snapshot(const char *reason)
         vad_task = river_runtime_find_task(tasks, task_count, "river_vad_probe");
         cap_task = river_runtime_find_task(tasks, task_count, "river_cap_drv");
         echo_task = river_runtime_find_task(tasks, task_count, "river_audio_echo");
+        kws_task = river_runtime_find_task(tasks, task_count, "river_kws");
 
-        RIVER_LOGI("snapshot reason=%s heap_free=%lu heap_min=%lu tasks=%lu cpu_top=[%s] stack_free=[vad:%luB,cap:%luB,echo:%luB]",
+        RIVER_LOGI("snapshot reason=%s heap_free=%lu heap_min=%lu tasks=%lu cpu_top=[%s] stack_free=[vad:%luB,cap:%luB,echo:%luB,kws:%luB]",
                    snapshot_reason,
                    (unsigned long)heap_free,
                    (unsigned long)heap_min,
@@ -239,7 +241,9 @@ void river_runtime_stats_snapshot(const char *reason)
                    (unsigned long)(cap_task != NULL ?
                        river_runtime_stack_bytes(cap_task->usStackHighWaterMark) : 0U),
                    (unsigned long)(echo_task != NULL ?
-                       river_runtime_stack_bytes(echo_task->usStackHighWaterMark) : 0U));
+                       river_runtime_stack_bytes(echo_task->usStackHighWaterMark) : 0U),
+                   (unsigned long)(kws_task != NULL ?
+                       river_runtime_stack_bytes(kws_task->usStackHighWaterMark) : 0U));
         rtos_mutex_give(g_river_runtime_stats_lock);
     }
 }

@@ -225,6 +225,14 @@ config RIVER_KWS_MODEL_VARIANT_BASELINE
     help
       Keep the repository baseline embedded DS-CNN wake-word model.
 
+config RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL
+    bool "BC-ResNet V3 FP32 experimental model"
+    help
+      Use the larger float32 BC-ResNet V3 model exported from
+      /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite.
+      This profile is intended for on-board arena/CPU bring-up and should
+      be validated with board-recording-derived thresholds before promotion.
+
 config RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL
     bool "Round6 targeted student experimental model"
     help
@@ -257,7 +265,7 @@ config RIVER_KWS_MEAN_PATCH_EN
 
 config RIVER_KWS_TENSOR_ARENA_KB
     int "Wake-word KWS tensor arena size in KB"
-    range 32 512
+    range 32 2048
     default 160
     depends on RIVER_VOICE_CAPABILITY_KWS
 

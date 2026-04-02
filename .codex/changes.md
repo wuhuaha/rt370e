@@ -2783,3 +2783,37 @@
 - Purpose of this step:
   - separate short-term model diagnosis from mid-term platform-capacity planning
   - provide a reusable decision document before any SDK-level memory-layout work is started
+
+## Step 5.67
+- Switched the board KWS experiment profile from the int8 baseline model to the pure-FP32 model:
+  - `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite`
+  - embedded as `components/river_voice/generated/bc_resnet_v3_fp32_model_data.h`
+- Chose the first on-board FP32 deployment threshold from existing board recordings instead of reusing the int8 threshold:
+  - deduped board recordings used for selection: `29` positive, `89` negative
+  - zero-false-positive operating point on that set: `0.5217425823`
+  - deployed threshold: `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=17096`
+- Deliberately removed the most obvious KWS-side allocator pressure before judging CPU viability:
+  - expanded `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` from the old operating range to allow a much larger FP32 arena
+  - set the current experimental arena to `768KB`
+  - increased KWS worker stack to `12KB`
+  - increased KWS input queue depth to `64` frames
+- Refactored KWS runtime memory ownership so the large-but-simple buffers are no longer permanently embedded in the context object:
+  - pre-roll ring backing storage now uses runtime allocation
+  - input queue backing storage now uses runtime allocation
+  - exact-tensor dump buffers now use lazy allocation only when the dump path is armed
+- Added explicit FP32-oriented performance and memory observability:
+  - `kws alloc` now prints `arena_used` and `arena_slack`
+  - `kws memory plan` now prints init-time heap before/after, context size, queue/pre-roll/dump reservation sizes
+  - periodic `kws perf` now prints last/avg/max inference time, slow-infer counters, heap watermark, and queue policy
+  - runtime snapshot logs now include `river_kws` stack free bytes
+  - slow inference warnings now trigger when single inference cost crosses `10ms` and `20ms`
+- Kept the full product image enabled for this first FP32 viability pass:
+  - VAD, XiaoZhi cloud path, and the rest of the shipping runtime are still present
+  - the goal of this step is not “FP32 in a stripped lab image”, but “can FP32 survive in the actual product boot profile after relieving the obvious KWS memory bottleneck”
+- Verified this step with a full local `RTL8730E` build on `2026-04-02`.
+- Observed build artifacts after the successful build:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin` `51K`
+  - `build_RTL8730E/build/project_lp/image/km0_image2_all.bin` `92K`
+  - `build_RTL8730E/build/project_hp/image/km4_image2_all.bin` `371K`
+  - `build_RTL8730E/build/project_ap/image/ap_image_all.bin` `3.0M`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` `3.5M`

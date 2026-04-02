@@ -30,7 +30,12 @@ extern "C" {
 #include "river/river_voice_kws.h"
 }
 
-#if defined(CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL)
+#if defined(CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL)
+#include "generated/bc_resnet_v3_fp32_model_data.h"
+#define RIVER_KWS_MODEL_DATA kws_model_fp32
+#define RIVER_KWS_MODEL_DATA_LEN kws_model_fp32_len
+#define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_fp32_experimental"
+#elif defined(CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL)
 #include "generated/xiaou_student_round6_targeted_int8_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model_round6_targeted
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_round6_targeted_len
@@ -139,7 +144,7 @@ extern "C" {
     ((RIVER_KWS_PRE_ROLL_FRAMES_RAW > 0U) ? \
          RIVER_KWS_PRE_ROLL_FRAMES_RAW : \
          1U)
-#define RIVER_KWS_TASK_STACK (1024U * 8U)
+#define RIVER_KWS_TASK_STACK (1024U * 12U)
 #define RIVER_KWS_TASK_PRIORITY 5U
 #define RIVER_KWS_TASK_WAIT_MS 100U
 #define RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES 8U
@@ -154,6 +159,8 @@ extern "C" {
 #define RIVER_KWS_GATE_FALLBACK_MIN_MS 700U
 #define RIVER_KWS_GATE_FALLBACK_MAX_MS 2500U
 #define RIVER_KWS_GATE_FALLBACK_MIN_INFER 4U
+#define RIVER_KWS_SLOW_INFER_WARN_US 10000ULL
+#define RIVER_KWS_SLOW_INFER_ALERT_US 20000ULL
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.kws"
@@ -319,6 +326,11 @@ typedef struct {
     bool window_ready;
     bool resolver_constructed;
     bool tensor_arena_from_heap_types;
+    bool pre_roll_ring_storage_from_heap_types;
+    bool input_ring_storage_from_heap_types;
+    bool tensor_dump_feature_from_heap_types;
+    bool tensor_dump_input_from_heap_types;
+    bool tensor_dump_output_from_heap_types;
     bool gate_open;
     bool gate_triggered;
     uint32_t mel_frames_seen;
@@ -336,6 +348,16 @@ typedef struct {
     uint64_t gate_started_ms;
     uint64_t cooldown_until_ms;
     uint64_t last_status_log_ms;
+    uint64_t last_infer_us;
+    uint64_t max_infer_us;
+    uint64_t infer_total_us;
+    uint32_t slow_infer_warn_count;
+    uint32_t slow_infer_alert_count;
+    uint32_t arena_used_bytes;
+    uint32_t arena_slack_bytes;
+    uint32_t init_heap_before_bytes;
+    uint32_t init_heap_after_bytes;
+    uint32_t init_heap_min_bytes;
     float last_score;
     float last_feature_min;
     float last_feature_max;
@@ -372,15 +394,20 @@ typedef struct {
     size_t tensor_dump_feature_bytes_captured;
     size_t tensor_dump_input_bytes_captured;
     size_t tensor_dump_output_bytes_captured;
+    size_t tensor_dump_feature_bytes_reserved;
+    size_t tensor_dump_input_bytes_reserved;
+    size_t tensor_dump_output_bytes_reserved;
+    size_t pre_roll_ring_storage_bytes;
+    size_t input_ring_storage_bytes;
     float mel_band_norm[RIVER_KWS_MEL_BINS];
     uint16_t mel_start_bin[RIVER_KWS_MEL_BINS];
     uint16_t mel_center_bin[RIVER_KWS_MEL_BINS];
     uint16_t mel_end_bin[RIVER_KWS_MEL_BINS];
     float hann_window[RIVER_KWS_WINDOW_SAMPLES];
     float log_mel_history[RIVER_KWS_FEATURE_FRAMES][RIVER_KWS_MEL_BINS];
-    float tensor_dump_feature_tensor[RIVER_KWS_EXPECTED_INPUT_VALUES];
-    uint8_t tensor_dump_input_tensor[RIVER_KWS_TENSOR_DUMP_MAX_INPUT_BYTES];
-    uint8_t tensor_dump_output_tensor[RIVER_KWS_TENSOR_DUMP_MAX_OUTPUT_BYTES];
+    float *tensor_dump_feature_tensor;
+    uint8_t *tensor_dump_input_tensor;
+    uint8_t *tensor_dump_output_tensor;
     float power_bins[RIVER_KWS_FFT_BINS];
     int16_t sample_ring[RIVER_KWS_WINDOW_SAMPLES];
     alignas(RIVER_KWS_ALLOCATION_ALIGNMENT)
@@ -391,7 +418,14 @@ typedef struct {
     uint32_t sample_ring_fill_count;
     struct RealFFT *real_fft;
     void *tensor_arena_allocation;
+    void *pre_roll_ring_storage_allocation;
+    void *input_ring_storage_allocation;
+    void *tensor_dump_feature_allocation;
+    void *tensor_dump_input_allocation;
+    void *tensor_dump_output_allocation;
     uint8_t *tensor_arena;
+    uint8_t *pre_roll_ring_storage;
+    uint8_t *input_ring_storage;
     const tflite::Model *model;
     river_voice_kws_op_resolver_t op_resolver;
     alignas(alignof(tflite::MicroInterpreter))
@@ -427,8 +461,6 @@ typedef struct {
     uint32_t pre_roll_flush_count;
     uint32_t pre_roll_trim_count;
     uint32_t pre_roll_trimmed_frames;
-    uint8_t pre_roll_ring_storage[RIVER_KWS_INPUT_FRAME_BYTES *
-                                  RIVER_KWS_PRE_ROLL_FRAMES];
     uint8_t pre_roll_frame[RIVER_KWS_INPUT_FRAME_BYTES];
     uint8_t pre_roll_drop_frame[RIVER_KWS_INPUT_FRAME_BYTES];
     river_audio_frame_ring_t input_ring;
@@ -436,8 +468,6 @@ typedef struct {
     uint32_t input_trim_count;
     uint32_t input_trimmed_frames;
     uint64_t last_input_trim_log_ms;
-    uint8_t input_ring_storage[sizeof(river_voice_kws_queue_item_t) *
-                               CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES];
     river_voice_kws_queue_item_t input_task_item;
     river_voice_kws_queue_item_t input_drop_item;
 } river_voice_kws_context_t;
@@ -1047,6 +1077,103 @@ static void *river_voice_kws_alloc_aligned(size_t bytes,
     return river_voice_kws_align_ptr(raw, alignment);
 }
 
+static void river_voice_kws_free_allocation(void *allocation,
+                                            bool from_heap_types)
+{
+    if (allocation == NULL) {
+        return;
+    }
+    if (from_heap_types) {
+        rtos_heap_types_free(allocation);
+    } else {
+        rtos_mem_free(allocation);
+    }
+}
+
+static river_status_t river_voice_kws_alloc_runtime_buffer(
+    size_t bytes,
+    uint8_t **buffer_out,
+    void **allocation_out,
+    bool *from_heap_types_out)
+{
+    void *aligned;
+
+    if (buffer_out == NULL || allocation_out == NULL || from_heap_types_out == NULL ||
+        bytes == 0U) {
+        return RIVER_ERR_ARG;
+    }
+
+    *buffer_out = NULL;
+    *allocation_out = NULL;
+    *from_heap_types_out = false;
+    aligned = river_voice_kws_alloc_aligned(bytes,
+                                            RIVER_KWS_ALLOCATION_ALIGNMENT,
+                                            from_heap_types_out,
+                                            allocation_out);
+    if (aligned == NULL) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    *buffer_out = (uint8_t *)aligned;
+    return RIVER_OK;
+}
+
+static size_t river_voice_kws_tensor_dump_reserved_bytes(
+    const river_voice_kws_context_t *context)
+{
+    if (context == NULL) {
+        return 0U;
+    }
+
+    return context->tensor_dump_feature_bytes_reserved +
+           context->tensor_dump_input_bytes_reserved +
+           context->tensor_dump_output_bytes_reserved;
+}
+
+static river_status_t river_voice_kws_ensure_tensor_dump_buffers(
+    river_voice_kws_context_t *context)
+{
+    river_status_t status;
+    uint8_t *buffer = NULL;
+
+    if (context == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    if (context->tensor_dump_feature_tensor == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_feature_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_feature_allocation,
+            &context->tensor_dump_feature_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_feature_tensor = (float *)buffer;
+    }
+    if (context->tensor_dump_input_tensor == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_input_bytes_reserved,
+            &context->tensor_dump_input_tensor,
+            &context->tensor_dump_input_allocation,
+            &context->tensor_dump_input_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+    if (context->tensor_dump_output_tensor == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_output_bytes_reserved,
+            &context->tensor_dump_output_tensor,
+            &context->tensor_dump_output_allocation,
+            &context->tensor_dump_output_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+
+    return RIVER_OK;
+}
+
 static inline uint32_t river_voice_kws_score_threshold_q15(void)
 {
     return (uint32_t)CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15;
@@ -1067,6 +1194,45 @@ static inline uint32_t river_voice_kws_gate_fallback_threshold_q15(void)
 static inline uint32_t river_voice_kws_confidence_to_permille(uint32_t confidence_q15)
 {
     return (uint32_t)((confidence_q15 * 1000U) / 32767U);
+}
+
+static void river_voice_kws_log_perf_status(
+    const river_voice_kws_context_t *context)
+{
+    uint32_t heap_free;
+    uint32_t heap_min;
+    uint64_t avg_infer_us;
+
+    if (context == NULL) {
+        return;
+    }
+
+    heap_free = rtos_mem_get_free_heap_size();
+    heap_min = rtos_mem_get_minimum_ever_free_heap_size();
+    avg_infer_us = context->inference_count == 0U ?
+                       0U :
+                       (context->infer_total_us / (uint64_t)context->inference_count);
+
+    RIVER_LOGI("kws perf: infer_us[last=%llu avg=%llu max=%llu warn=%lu alert=%lu] heap[now=%lu min=%lu init=%lu->%lu min_init=%lu] mem[arena=%lu/%uKB slack=%lu ctx=%lu pre=%lu queue=%lu dump=%lu] queue[frames=%u stride=%u]",
+               (unsigned long long)context->last_infer_us,
+               (unsigned long long)avg_infer_us,
+               (unsigned long long)context->max_infer_us,
+               (unsigned long)context->slow_infer_warn_count,
+               (unsigned long)context->slow_infer_alert_count,
+               (unsigned long)heap_free,
+               (unsigned long)heap_min,
+               (unsigned long)context->init_heap_before_bytes,
+               (unsigned long)context->init_heap_after_bytes,
+               (unsigned long)context->init_heap_min_bytes,
+               (unsigned long)context->arena_used_bytes,
+               (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
+               (unsigned long)context->arena_slack_bytes,
+               (unsigned long)sizeof(*context),
+               (unsigned long)context->pre_roll_ring_storage_bytes,
+               (unsigned long)context->input_ring_storage_bytes,
+               (unsigned long)river_voice_kws_tensor_dump_reserved_bytes(context),
+               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+               (unsigned int)CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES);
 }
 
 static void river_voice_kws_capture_input_diag(river_voice_kws_context_t *context)
@@ -1344,20 +1510,23 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
     if (context == NULL || !context->tensor_dump_armed ||
         !context->tensor_dump_feature_valid || context->input_tensor == NULL ||
         context->output_tensor == NULL || context->input_tensor_data == NULL ||
-        context->output_tensor_data == NULL) {
+        context->output_tensor_data == NULL ||
+        context->tensor_dump_feature_tensor == NULL ||
+        context->tensor_dump_input_tensor == NULL ||
+        context->tensor_dump_output_tensor == NULL) {
         return;
     }
 
     input_bytes = context->input_tensor_bytes_resolved;
     output_bytes = context->output_tensor_bytes_resolved;
     if (input_bytes == 0U || output_bytes == 0U ||
-        input_bytes > sizeof(context->tensor_dump_input_tensor) ||
-        output_bytes > sizeof(context->tensor_dump_output_tensor)) {
+        input_bytes > context->tensor_dump_input_bytes_reserved ||
+        output_bytes > context->tensor_dump_output_bytes_reserved) {
         RIVER_LOGE("kws tensor dump aborted: input_bytes=%lu output_bytes=%lu caps=[%lu,%lu]",
                    (unsigned long)input_bytes,
                    (unsigned long)output_bytes,
-                   (unsigned long)sizeof(context->tensor_dump_input_tensor),
-                   (unsigned long)sizeof(context->tensor_dump_output_tensor));
+                   (unsigned long)context->tensor_dump_input_bytes_reserved,
+                   (unsigned long)context->tensor_dump_output_bytes_reserved);
         context->tensor_dump_armed = false;
         context->tensor_dump_feature_valid = false;
         river_voice_kws_tensor_dump_snapshot_reset(context);
@@ -1379,7 +1548,7 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
     context->tensor_dump_capture_confidence_q15 =
         context->last_confidence_q15;
     context->tensor_dump_feature_bytes_captured =
-        sizeof(context->tensor_dump_feature_tensor);
+        context->tensor_dump_feature_bytes_reserved;
     context->tensor_dump_input_bytes_captured = input_bytes;
     context->tensor_dump_output_bytes_captured = output_bytes;
     (void)memcpy(context->tensor_dump_input_tensor,
@@ -1902,7 +2071,8 @@ static river_status_t river_voice_kws_fill_input_tensor(
     } else {
         dst_f32 = (float *)context->input_tensor_data;
     }
-    if (context->tensor_dump_armed) {
+    if (context->tensor_dump_armed &&
+        context->tensor_dump_feature_tensor != NULL) {
         dump_feature_dst = context->tensor_dump_feature_tensor;
         context->tensor_dump_feature_valid = false;
     }
@@ -2044,13 +2214,17 @@ static river_status_t river_voice_kws_run_inference(
 {
     float score;
     int32_t raw_scalar = 0;
+    uint64_t start_us;
+    uint64_t elapsed_us;
 
     if (river_voice_kws_fill_input_tensor(context) != RIVER_OK) {
         return RIVER_ERR_IO;
     }
+    start_us = rtos_time_get_current_system_time_us();
     if (context->interpreter->Invoke() != kTfLiteOk) {
         return RIVER_ERR_IO;
     }
+    elapsed_us = rtos_time_get_current_system_time_us() - start_us;
 
     if (context->effective_output_type == kTfLiteUInt8) {
         const uint8_t *output_u8 = (const uint8_t *)context->output_tensor_data;
@@ -2081,6 +2255,17 @@ static river_status_t river_voice_kws_run_inference(
     context->last_score = score;
     context->last_confidence_q15 =
         (uint32_t)river_voice_kws_round_to_i32(score * 32767.0f);
+    context->last_infer_us = elapsed_us;
+    context->infer_total_us += elapsed_us;
+    if (elapsed_us > context->max_infer_us) {
+        context->max_infer_us = elapsed_us;
+    }
+    if (elapsed_us >= RIVER_KWS_SLOW_INFER_WARN_US) {
+        context->slow_infer_warn_count++;
+    }
+    if (elapsed_us >= RIVER_KWS_SLOW_INFER_ALERT_US) {
+        context->slow_infer_alert_count++;
+    }
     context->inference_count++;
     context->gate_inference_count++;
     if (context->last_raw_output_valid &&
@@ -2097,6 +2282,17 @@ static river_status_t river_voice_kws_run_inference(
 
     river_voice_kws_log_inference_diag(context);
     river_voice_kws_capture_exact_tensors(context);
+
+    if (elapsed_us >= RIVER_KWS_SLOW_INFER_ALERT_US) {
+        RIVER_LOGW("kws infer slow: infer=%lu us=%llu queue=%lu/%u gate=%s score_pm=%lu",
+                   (unsigned long)context->inference_count,
+                   (unsigned long long)elapsed_us,
+                   (unsigned long)river_audio_frame_ring_count(&context->input_ring),
+                   (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+                   context->gate_open ? "open" : "closed",
+                   (unsigned long)river_voice_kws_confidence_to_permille(
+                       context->last_confidence_q15));
+    }
 
     if (context->last_confidence_q15 >= river_voice_kws_score_threshold_q15()) {
         context->hit_streak++;
@@ -2219,6 +2415,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
                (unsigned long)context->same_input_hash_streak,
                (unsigned long)context->last_feature_hash,
                (unsigned long)context->last_input_hash);
+    river_voice_kws_log_perf_status(context);
 }
 
 static river_status_t river_voice_kws_process_samples(
@@ -2602,14 +2799,12 @@ extern "C" river_status_t river_voice_kws_init(void)
         return RIVER_ERR_NO_MEMORY;
     }
     memset(g_river_voice_kws, 0, sizeof(*g_river_voice_kws));
+    g_river_voice_kws->init_heap_before_bytes = rtos_mem_get_free_heap_size();
 
     g_river_voice_kws->real_fft = WebRtcSpl_CreateRealFFT(9);
     if (g_river_voice_kws->real_fft == NULL) {
-        if (g_river_voice_kws_allocation_from_heap_types) {
-            rtos_heap_types_free(g_river_voice_kws_allocation);
-        } else {
-            rtos_mem_free(g_river_voice_kws_allocation);
-        }
+        river_voice_kws_free_allocation(g_river_voice_kws_allocation,
+                                        g_river_voice_kws_allocation_from_heap_types);
         g_river_voice_kws_allocation = NULL;
         g_river_voice_kws_allocation_from_heap_types = false;
         g_river_voice_kws = NULL;
@@ -2626,11 +2821,8 @@ extern "C" river_status_t river_voice_kws_init(void)
                                                  &g_river_voice_kws->tensor_arena_allocation);
     if (g_river_voice_kws->tensor_arena == NULL) {
         WebRtcSpl_FreeRealFFT(g_river_voice_kws->real_fft);
-        if (g_river_voice_kws_allocation_from_heap_types) {
-            rtos_heap_types_free(g_river_voice_kws_allocation);
-        } else {
-            rtos_mem_free(g_river_voice_kws_allocation);
-        }
+        river_voice_kws_free_allocation(g_river_voice_kws_allocation,
+                                        g_river_voice_kws_allocation_from_heap_types);
         g_river_voice_kws_allocation = NULL;
         g_river_voice_kws_allocation_from_heap_types = false;
         g_river_voice_kws = NULL;
@@ -2670,6 +2862,12 @@ extern "C" river_status_t river_voice_kws_init(void)
                    (unsigned long)RIVER_KWS_MODEL_DATA_LEN);
         status = RIVER_ERR_NO_MEMORY;
         goto fail;
+    }
+    g_river_voice_kws->arena_used_bytes =
+        (uint32_t)g_river_voice_kws->interpreter->arena_used_bytes();
+    if (g_river_voice_kws->arena_used_bytes < RIVER_KWS_TENSOR_ARENA_BYTES) {
+        g_river_voice_kws->arena_slack_bytes =
+            RIVER_KWS_TENSOR_ARENA_BYTES - g_river_voice_kws->arena_used_bytes;
     }
 
     g_river_voice_kws->input_tensor = g_river_voice_kws->interpreter->input(0);
@@ -2805,6 +3003,15 @@ extern "C" river_status_t river_voice_kws_init(void)
     g_river_voice_kws->output_tensor_data = (void *)output_tensor_data;
     g_river_voice_kws->input_tensor_bytes_resolved = input_bytes_min;
     g_river_voice_kws->output_tensor_bytes_resolved = output_bytes_min;
+    g_river_voice_kws->tensor_dump_feature_bytes_reserved =
+        (size_t)RIVER_KWS_EXPECTED_INPUT_VALUES * sizeof(float);
+    g_river_voice_kws->tensor_dump_input_bytes_reserved = input_bytes_min;
+    g_river_voice_kws->tensor_dump_output_bytes_reserved = output_bytes_min;
+    g_river_voice_kws->pre_roll_ring_storage_bytes =
+        (size_t)RIVER_KWS_INPUT_FRAME_BYTES * (size_t)RIVER_KWS_PRE_ROLL_FRAMES;
+    g_river_voice_kws->input_ring_storage_bytes =
+        sizeof(river_voice_kws_queue_item_t) *
+        (size_t)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES;
     if (!river_voice_kws_tensor_bytes_sufficient(g_river_voice_kws->input_tensor->bytes,
                                                  input_elements,
                                                  g_river_voice_kws->effective_input_type) ||
@@ -2845,10 +3052,33 @@ extern "C" river_status_t river_voice_kws_init(void)
         goto fail;
     }
 
+    status = river_voice_kws_alloc_runtime_buffer(
+        g_river_voice_kws->pre_roll_ring_storage_bytes,
+        &g_river_voice_kws->pre_roll_ring_storage,
+        &g_river_voice_kws->pre_roll_ring_storage_allocation,
+        &g_river_voice_kws->pre_roll_ring_storage_from_heap_types);
+    if (status != RIVER_OK) {
+        RIVER_LOGE("kws pre-roll storage alloc failed: bytes=%lu status=%d",
+                   (unsigned long)g_river_voice_kws->pre_roll_ring_storage_bytes,
+                   (int)status);
+        goto fail;
+    }
+    status = river_voice_kws_alloc_runtime_buffer(
+        g_river_voice_kws->input_ring_storage_bytes,
+        &g_river_voice_kws->input_ring_storage,
+        &g_river_voice_kws->input_ring_storage_allocation,
+        &g_river_voice_kws->input_ring_storage_from_heap_types);
+    if (status != RIVER_OK) {
+        RIVER_LOGE("kws worker storage alloc failed: bytes=%lu status=%d",
+                   (unsigned long)g_river_voice_kws->input_ring_storage_bytes,
+                   (int)status);
+        goto fail;
+    }
+
     status = river_audio_frame_ring_init_with_storage_ex(
         &g_river_voice_kws->pre_roll_ring,
         g_river_voice_kws->pre_roll_ring_storage,
-        sizeof(g_river_voice_kws->pre_roll_ring_storage),
+        g_river_voice_kws->pre_roll_ring_storage_bytes,
         RIVER_KWS_INPUT_FRAME_BYTES,
         RIVER_KWS_PRE_ROLL_FRAMES,
         RIVER_AUDIO_FRAME_RING_MODE_LOCKED);
@@ -2863,7 +3093,7 @@ extern "C" river_status_t river_voice_kws_init(void)
     status = river_audio_frame_ring_init_with_storage_ex(
         &g_river_voice_kws->input_ring,
         g_river_voice_kws->input_ring_storage,
-        sizeof(g_river_voice_kws->input_ring_storage),
+        g_river_voice_kws->input_ring_storage_bytes,
         sizeof(river_voice_kws_queue_item_t),
         CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
         RIVER_AUDIO_FRAME_RING_MODE_LOCKED);
@@ -2893,6 +3123,9 @@ extern "C" river_status_t river_voice_kws_init(void)
         goto fail;
     }
     g_river_voice_kws->task_running = true;
+    g_river_voice_kws->init_heap_after_bytes = rtos_mem_get_free_heap_size();
+    g_river_voice_kws->init_heap_min_bytes =
+        rtos_mem_get_minimum_ever_free_heap_size();
 
     g_river_voice_kws->initialized = true;
     RIVER_LOGI("kws tensor io: runtime_in=%s runtime_out=%s model_in=%s model_out=%s effective_in=%s effective_out=%s",
@@ -2923,14 +3156,16 @@ extern "C" river_status_t river_voice_kws_init(void)
                (unsigned long)output_shape[2],
                (unsigned long)output_shape[3],
                (unsigned long)output_value_count);
-    RIVER_LOGI("kws alloc: ctx=%p ctx_raw=%p arena=%p arena_raw=%p align=%u input_bytes=%lu output_bytes=%lu",
+    RIVER_LOGI("kws alloc: ctx=%p ctx_raw=%p arena=%p arena_raw=%p align=%u input_bytes=%lu output_bytes=%lu arena_used=%luB arena_slack=%luB",
                (void *)g_river_voice_kws,
                g_river_voice_kws_allocation,
                (void *)g_river_voice_kws->tensor_arena,
                g_river_voice_kws->tensor_arena_allocation,
                (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT,
                (unsigned long)g_river_voice_kws->input_tensor->bytes,
-               (unsigned long)g_river_voice_kws->output_tensor->bytes);
+               (unsigned long)g_river_voice_kws->output_tensor->bytes,
+               (unsigned long)g_river_voice_kws->arena_used_bytes,
+               (unsigned long)g_river_voice_kws->arena_slack_bytes);
     RIVER_LOGI("kws tensor data: input=%p output=%p",
                input_tensor_data,
                output_tensor_data);
@@ -2938,6 +3173,15 @@ extern "C" river_status_t river_voice_kws_init(void)
                (void *)g_river_voice_kws->fft_input,
                (void *)g_river_voice_kws->fft_output,
                (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
+    RIVER_LOGI("kws memory plan: heap_init=%lu->%lu min=%lu ctx=%luB pre=%luB queue=%luB dump=%luB",
+               (unsigned long)g_river_voice_kws->init_heap_before_bytes,
+               (unsigned long)g_river_voice_kws->init_heap_after_bytes,
+               (unsigned long)g_river_voice_kws->init_heap_min_bytes,
+               (unsigned long)sizeof(*g_river_voice_kws),
+               (unsigned long)g_river_voice_kws->pre_roll_ring_storage_bytes,
+               (unsigned long)g_river_voice_kws->input_ring_storage_bytes,
+               (unsigned long)river_voice_kws_tensor_dump_reserved_bytes(
+                   g_river_voice_kws));
     RIVER_LOGI("kws worker: priority=%u stack=%uB queue=%u frame=%uB wake=event wait_ms=%u pre_roll_flush=%u trim=%u->%u",
                (unsigned int)RIVER_KWS_TASK_PRIORITY,
                (unsigned int)RIVER_KWS_TASK_STACK,
@@ -2974,6 +3218,21 @@ fail:
         if (g_river_voice_kws->pre_roll_ring.initialized) {
             river_audio_frame_ring_deinit(&g_river_voice_kws->pre_roll_ring);
         }
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->input_ring_storage_allocation,
+            g_river_voice_kws->input_ring_storage_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->pre_roll_ring_storage_allocation,
+            g_river_voice_kws->pre_roll_ring_storage_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_output_allocation,
+            g_river_voice_kws->tensor_dump_output_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_input_allocation,
+            g_river_voice_kws->tensor_dump_input_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_feature_allocation,
+            g_river_voice_kws->tensor_dump_feature_from_heap_types);
         if (g_river_voice_kws->interpreter != NULL) {
             g_river_voice_kws->interpreter->~MicroInterpreter();
         }
@@ -2981,20 +3240,15 @@ fail:
             g_river_voice_kws->op_resolver.~river_voice_kws_op_resolver_t();
         }
         if (g_river_voice_kws->tensor_arena != NULL) {
-            if (g_river_voice_kws->tensor_arena_from_heap_types) {
-                rtos_heap_types_free(g_river_voice_kws->tensor_arena_allocation);
-            } else {
-                rtos_mem_free(g_river_voice_kws->tensor_arena_allocation);
-            }
+            river_voice_kws_free_allocation(
+                g_river_voice_kws->tensor_arena_allocation,
+                g_river_voice_kws->tensor_arena_from_heap_types);
         }
         if (g_river_voice_kws->real_fft != NULL) {
             WebRtcSpl_FreeRealFFT(g_river_voice_kws->real_fft);
         }
-        if (g_river_voice_kws_allocation_from_heap_types) {
-            rtos_heap_types_free(g_river_voice_kws_allocation);
-        } else {
-            rtos_mem_free(g_river_voice_kws_allocation);
-        }
+        river_voice_kws_free_allocation(g_river_voice_kws_allocation,
+                                        g_river_voice_kws_allocation_from_heap_types);
         g_river_voice_kws_allocation = NULL;
         g_river_voice_kws_allocation_from_heap_types = false;
         g_river_voice_kws = NULL;
@@ -3212,8 +3466,19 @@ extern "C" const char *river_voice_kws_wake_handoff_block_reason(void)
 
 extern "C" river_status_t river_voice_kws_request_tensor_dump_next(void)
 {
+    river_status_t status;
+
     if (g_river_voice_kws == NULL || !g_river_voice_kws->initialized) {
         return RIVER_ERR_INVALID_STATE;
+    }
+
+    status = river_voice_kws_ensure_tensor_dump_buffers(g_river_voice_kws);
+    if (status != RIVER_OK) {
+        RIVER_LOGE("kws tensor dump buffer alloc failed: status=%d reserve=%lu",
+                   (int)status,
+                   (unsigned long)river_voice_kws_tensor_dump_reserved_bytes(
+                       g_river_voice_kws));
+        return status;
     }
 
     g_river_voice_kws->tensor_dump_armed = true;
