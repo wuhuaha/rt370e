@@ -4572,12 +4572,12 @@ Expected behavioral change:
 Host-side prep:
 ```bash
 cd /root/ameba-river
-python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 8765
+python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 18765
 ```
 
 Expected host-side startup:
 ```text
-[host] listening on 0.0.0.0:8765; type `river status` or `river kws status` and press Enter
+[host] listening on 0.0.0.0:18765; type `river status` or `river kws status` and press Enter
 ```
 
 Build command:
@@ -4604,8 +4604,8 @@ python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
 Expected board boot / connect sequence after flash:
 ```text
 [river.wifi] connected ssid=river ip=...
-[river.diag.tcp] tcpdiag init: host=192.168.3.5 port=8765 retry_ms=1000
-[river.diag.tcp] tcpdiag connected: host=192.168.3.5 port=8765
+[river.diag.tcp] tcpdiag init: host=192.168.3.5 port=18765 retry_ms=1000
+[river.diag.tcp] tcpdiag connected: host=192.168.3.5 port=18765
 ```
 
 Expected host-side connection message:
@@ -4627,7 +4627,7 @@ Expected behavior:
 - board responses that use `RIVER_LOG*` are printed back in the same host terminal
 - `river tcpdiag status` reports:
   - configured host `192.168.3.5`
-  - configured port `8765`
+  - configured port `18765`
   - current connection state
   - rx/tx counters
 - after board reset or host restart, the connection can be re-established automatically without reconnecting serial monitor
@@ -4635,3 +4635,61 @@ Expected behavior:
 Current limitation to keep in mind during validation:
 - only project logs emitted through `river_log` are mirrored to the host
 - raw SDK `printf` text and shell usage strings that bypass `river_log` may still appear only on serial
+
+## Step 5.63 Verification
+Conflict check observed on `2026-04-02 11:36`:
+```text
+Windows host port 8765 was already occupied by:
+- PID 21452
+- ProcessName baidupinyin
+```
+
+Current host-side startup command for the live session:
+```bash
+cd /root/ameba-river
+python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 18765
+```
+
+Current expected board-side TCP diag logs after reflashing:
+```text
+[river.diag.tcp] tcpdiag init: host=192.168.3.5 port=18765 retry_ms=1000
+[river.diag.tcp] tcpdiag connected: host=192.168.3.5 port=18765
+```
+
+Host-side reachability checks completed after the port move:
+```bash
+cd /root/ameba-river
+python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 18765
+```
+
+Expected server startup:
+```text
+[host] listening on 0.0.0.0:18765; type `river status` or `river kws status` and press Enter
+```
+
+WSL self-check:
+```bash
+bash -lc "exec 3<>/dev/tcp/192.168.3.5/18765 && echo connected && printf 'river tcpdiag status\n' >&3 && sleep 1 && exec 3>&-"
+```
+
+Observed result:
+```text
+connected
+```
+
+Windows host-stack check:
+```powershell
+Test-NetConnection 192.168.3.5 -Port 18765 | Format-List -Property ComputerName,RemotePort,TcpTestSucceeded
+```
+
+Observed result:
+```text
+ComputerName     : 192.168.3.5
+RemotePort       : 18765
+TcpTestSucceeded : True
+```
+
+Interpretation of this verification:
+- the new WSL-hosted listener is up on `18765`
+- the host stack can reach `192.168.3.5:18765`
+- if the board still does not connect, the next check is board-side connect logs or external inbound filtering rather than another local bind collision

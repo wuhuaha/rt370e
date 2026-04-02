@@ -2713,3 +2713,26 @@
     - `build_RTL8730E/km4_boot_all.bin 51872`
     - `build_RTL8730E/km0_km4_ca32_app.bin 3573376`
     - `build_RTL8730E/ota_all.bin 3573408`
+
+## Step 5.63
+- Moved the current TCP debug session port from `8765` to `18765` for the live host/board bring-up.
+- Reason for this step:
+  - after the first flash attempt on `2026-04-02 11:35`, the host-side TCP server could not bind `0.0.0.0:8765`
+  - a Windows host check showed that `8765` was already occupied by:
+    - process `21452`
+    - `baidupinyin`
+    - path `d:\Program Files (x86)\Baidu\BaiduPinyin\6.1.13.8\BaiduPinyin.exe`
+- To avoid killing a user-space host process, only the current board debug config was changed:
+  - [prj.conf](/root/ameba-river/prj.conf) now sets `CONFIG_RIVER_DIAG_TCP_SERVER_PORT=18765`
+- Scope of this step:
+  - no functional change to the TCP debug transport
+  - no protocol change
+  - only the active board/host port changed for this debug round
+- Host-side follow-up verification after the reflash:
+  - `python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 18765` starts successfully inside WSL
+  - a local TCP loopback to `192.168.3.5:18765` succeeds
+  - Windows-side `Test-NetConnection 192.168.3.5 -Port 18765` returns `TcpTestSucceeded : True`
+- Current conclusion from this step:
+  - the port conflict on `8765` is resolved
+  - the WSL listener is reachable from the host stack on `192.168.3.5:18765`
+  - if the board still does not appear on the host server, the remaining work is board-side connect-path diagnosis or external inbound filtering, not another local bind failure
