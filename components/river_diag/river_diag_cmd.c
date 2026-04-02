@@ -9,7 +9,6 @@
 
 #include "river/river_app.h"
 #include "river/river_cloud.h"
-#include "river/river_diag.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_online_control.h"
 #include "river/river_playback_service.h"
@@ -38,38 +37,10 @@
 
 #define RIVER_ECHO_TEXT_MAX 128
 #define RIVER_XIAOZHI_TEXT_MAX 384
-#define RIVER_DIAG_CMDLINE_MAX 256U
-#define RIVER_DIAG_MAX_ARGS 16U
-
-static bool river_diag_is_space(char ch)
-{
-    return (ch == ' ') || (ch == '\t') || (ch == '\r') || (ch == '\n');
-}
-
-static char *river_diag_trim(char *text)
-{
-    char *end;
-
-    if (text == NULL) {
-        return NULL;
-    }
-
-    while (river_diag_is_space(*text)) {
-        text++;
-    }
-
-    end = text + strlen(text);
-    while ((end > text) && river_diag_is_space(*(end - 1))) {
-        end--;
-    }
-    *end = '\0';
-    return text;
-}
 
 static void river_diag_help(void)
 {
     printf("\triver status\n");
-    printf("\triver tcpdiag status\n");
     printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
 #if RIVER_CLOUD_TEXT_DEBUG_ENABLED
     printf("\triver echo <text>\n");
@@ -146,7 +117,7 @@ static bool river_diag_parse_u32_arg(const char *text, uint32_t *value_out)
     return true;
 }
 
-static u32 river_diag_dispatch(u16 argc, u8 *argv[])
+static u32 river_diag_cmd(u16 argc, u8 *argv[])
 {
 #if RIVER_CLOUD_TEXT_DEBUG_ENABLED || RIVER_INTERACTION_DIAG_ENABLED
     char echo_text[RIVER_ECHO_TEXT_MAX];
@@ -165,16 +136,6 @@ static u32 river_diag_dispatch(u16 argc, u8 *argv[])
     if (strcmp((const char *)argv[0], "status") == 0) {
         river_app_print_status();
         river_runtime_stats_snapshot("diag_status");
-        return 0;
-    }
-
-    if (strcmp((const char *)argv[0], "tcpdiag") == 0) {
-        if ((argc < 2) || (strcmp((const char *)argv[1], "status") == 0)) {
-            river_diag_dump_status();
-            return 0;
-        }
-
-        printf("[river][diag] usage: river tcpdiag status\n");
         return 0;
     }
 
@@ -757,71 +718,8 @@ static u32 river_diag_dispatch(u16 argc, u8 *argv[])
     return 0;
 }
 
-u32 river_diag_execute_command_line(const char *line)
-{
-    char command_line[RIVER_DIAG_CMDLINE_MAX];
-    u8 *argv[RIVER_DIAG_MAX_ARGS];
-    char *cursor;
-    size_t length;
-    u16 argc;
-
-    if (line == NULL) {
-        return 0;
-    }
-
-    length = strnlen(line, sizeof(command_line) - 1U);
-    memcpy(command_line, line, length);
-    command_line[length] = '\0';
-
-    cursor = river_diag_trim(command_line);
-    if ((cursor == NULL) || (cursor[0] == '\0')) {
-        return 0;
-    }
-
-    argc = 0;
-    while ((cursor[0] != '\0') && (argc < RIVER_DIAG_MAX_ARGS)) {
-        argv[argc++] = (u8 *)cursor;
-        while ((cursor[0] != '\0') && !river_diag_is_space(cursor[0])) {
-            cursor++;
-        }
-        if (cursor[0] == '\0') {
-            break;
-        }
-        *cursor++ = '\0';
-        while (river_diag_is_space(cursor[0])) {
-            cursor++;
-        }
-    }
-
-    if (argc == 0U) {
-        return 0;
-    }
-
-    if (strcmp((const char *)argv[0], "river") == 0) {
-        argc--;
-        if (argc == 0U) {
-            river_diag_help();
-            return 0;
-        }
-        return river_diag_dispatch(argc, &argv[1]);
-    }
-
-    return river_diag_dispatch(argc, argv);
-}
-
-static u32 river_diag_cmd(u16 argc, u8 *argv[])
-{
-    return river_diag_dispatch(argc, argv);
-}
-
 CMD_TABLE_DATA_SECTION
 const COMMAND_TABLE river_cmd_table[] = {
     {"river", river_diag_cmd},
 };
-#else
-u32 river_diag_execute_command_line(const char *line)
-{
-    (void)line;
-    return 0;
-}
 #endif

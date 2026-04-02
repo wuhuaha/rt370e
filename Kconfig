@@ -28,31 +28,6 @@ config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
 
-config RIVER_DIAG_TCP_CLIENT_EN
-    bool "Enable TCP debug client"
-    default n
-    help
-      When enabled, the board connects to a host-side TCP server after
-      Wi-Fi comes up, mirrors project logs over that socket, and accepts
-      line-based `river ...` commands back from the host.
-
-config RIVER_DIAG_TCP_SERVER_HOST
-    string "TCP debug server host"
-    default "192.168.3.5"
-    depends on RIVER_DIAG_TCP_CLIENT_EN
-
-config RIVER_DIAG_TCP_SERVER_PORT
-    int "TCP debug server port"
-    range 1 65535
-    default 8765
-    depends on RIVER_DIAG_TCP_CLIENT_EN
-
-config RIVER_DIAG_TCP_RETRY_MS
-    int "TCP debug reconnect interval in milliseconds"
-    range 200 60000
-    default 1000
-    depends on RIVER_DIAG_TCP_CLIENT_EN
-
 config RIVER_AUDIO_ECHO_DEBUG_EN
     bool "Build board audio echo debug path"
     default n

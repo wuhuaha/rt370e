@@ -2669,70 +2669,18 @@
   - all reconnect attempts stay pinned to the single configured SSID `river`
 
 ## Step 5.62
-- Added a project-side TCP debug transport so the board no longer has to depend on unstable serial input/output for the current KWS investigation.
-- Added [include/river/river_diag.h](/root/ameba-river/include/river/river_diag.h):
-  - public `river_diag_init()`
-  - public `river_diag_execute_command_line()`
-  - public `river_diag_dump_status()`
-- Refactored [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c):
-  - split the existing `river` monitor handler into a reusable dispatcher
-  - added line-based command execution for non-serial callers
-  - added `river tcpdiag status`
-  - kept serial `river ...` behavior unchanged
-- Added [components/river_diag/river_diag_tcp_client.c](/root/ameba-river/components/river_diag/river_diag_tcp_client.c):
-  - background TCP client task started from app boot
-  - waits for `river_wifi_station_is_connected()`
-  - connects to host `192.168.3.5:8765`
-  - reuses `river_log_set_secondary_sink(...)` to mirror project `RIVER_LOG*` lines over TCP
-  - receives `\\n`-terminated commands from the host and executes them through the same `river ...` dispatcher used by the serial shell
-  - reconnects automatically after disconnect or Wi‑Fi loss
-  - exposes transport counters through `river tcpdiag status` and the regular `river status` dump
-- Updated [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c):
-  - boot now initializes the TCP diag transport without failing the whole app if transport init alone fails
-  - app-wide status dump now includes TCP diag state
-- Updated [Kconfig](/root/ameba-river/Kconfig) and [prj.conf](/root/ameba-river/prj.conf):
-  - added `CONFIG_RIVER_DIAG_TCP_CLIENT_EN`
-  - added host/port/retry config
-  - enabled the TCP client for the current debug build with:
-    - host `192.168.3.5`
-    - port `8765`
-    - retry `1000 ms`
-- Added [tools/diag/river_tcp_debug_server.py](/root/ameba-river/tools/diag/river_tcp_debug_server.py):
-  - single-client TCP server for the host
-  - prints board-side log lines to stdout
-  - forwards typed stdin lines like `river kws status` back to the board
-  - supports reconnect after board reset/reflash
-- Current scope/limitation of this step:
-  - mirrored output covers the project-side `RIVER_LOG*` path
-  - raw SDK `printf`/shell usage text that bypasses `river_log` is still serial-only unless those call sites are later migrated
-- Local verification on `2026-04-02`:
-  - `python3 -m py_compile tools/diag/river_tcp_debug_server.py` passed
-  - `python3 tools/diag/river_tcp_debug_server.py --help` passed
-  - full `RTL8730E` build passed
-  - final image sizes were:
-    - `build_RTL8730E/km4_boot_all.bin 51872`
-    - `build_RTL8730E/km0_km4_ca32_app.bin 3573376`
-    - `build_RTL8730E/ota_all.bin 3573408`
-
-## Step 5.63
-- Moved the current TCP debug session port from `8765` to `18765` for the live host/board bring-up.
-- Reason for this step:
-  - after the first flash attempt on `2026-04-02 11:35`, the host-side TCP server could not bind `0.0.0.0:8765`
-  - a Windows host check showed that `8765` was already occupied by:
-    - process `21452`
-    - `baidupinyin`
-    - path `d:\Program Files (x86)\Baidu\BaiduPinyin\6.1.13.8\BaiduPinyin.exe`
-- To avoid killing a user-space host process, only the current board debug config was changed:
-  - [prj.conf](/root/ameba-river/prj.conf) now sets `CONFIG_RIVER_DIAG_TCP_SERVER_PORT=18765`
-- Scope of this step:
-  - no functional change to the TCP debug transport
-  - no protocol change
-  - only the active board/host port changed for this debug round
-- Host-side follow-up verification after the reflash:
-  - `python3 tools/diag/river_tcp_debug_server.py --bind 0.0.0.0 --port 18765` starts successfully inside WSL
-  - a local TCP loopback to `192.168.3.5:18765` succeeds
-  - Windows-side `Test-NetConnection 192.168.3.5 -Port 18765` returns `TcpTestSucceeded : True`
-- Current conclusion from this step:
-  - the port conflict on `8765` is resolved
-  - the WSL listener is reachable from the host stack on `192.168.3.5:18765`
-  - if the board still does not appear on the host server, the remaining work is board-side connect-path diagnosis or external inbound filtering, not another local bind failure
+- Reverted the temporary TCP host-debug transport after the board/host bring-up attempt failed to produce a stable, trustworthy debug path.
+- Revert scope:
+  - removed the project-side TCP diag client and host helper
+  - removed the extra `river tcpdiag ...` monitor surface
+  - removed the dedicated TCP diag Kconfig/project config switches
+  - restored the previous app boot path so the project returns to the serial/KWS debug baseline
+- Why this step was taken:
+  - the TCP path added another uncontrolled variable to wakeword debugging
+  - the recent board-side wakeword issue is still a local KWS/feature/inference problem first
+  - continuing to carry the TCP transport would mix infrastructure risk with model/runtime diagnosis
+- The active working baseline after this revert is again:
+  - single-AP Wi-Fi on `river`
+  - local KWS debug mode available
+  - pull-based tensor dump workflow available
+  - no TCP host-debug transport in the firmware
