@@ -2731,3 +2731,27 @@
 - Purpose of this step:
   - prevent future FP32 discussions from collapsing into “file size looks small enough”
   - give the training/export side a clear, board-derived target before producing the next model
+
+## Step 5.65
+- Added a dedicated board-memory explainer document:
+  - [doc/RTL8730E_MEMORY_LAYERING_EXPLAINER_ZH.md](/root/ameba-river/doc/RTL8730E_MEMORY_LAYERING_EXPLAINER_ZH.md)
+- The document consolidates the recent memory-capacity discussion into one project-owned reference and explicitly explains why:
+  - the board can physically have `64MB` DRAM
+  - while the current `CA32` runtime still only reports `100~200KB` of free heap
+- The new document breaks the problem into the concrete layers that matter for model deployment:
+  - physical DRAM capacity
+  - current firmware-visible layout window
+  - `CA32` carveout
+  - static section occupancy
+  - heap registration through `heap_5`
+  - runtime free heap
+  - largest-contiguous-free-block vs total free bytes
+- It also includes a text memory-layer diagram tied back to the current project evidence:
+  - boot log `0x60800000` vs `0x64000000`
+  - `CA32_BL3_DRAM_NS` `4MB` carveout in the SDK layout
+  - CA32 linker-script heap derivation via `__psram_heap_buffer_*`
+  - runtime heap stats from the project
+  - current KWS/VAD `TYPE_DRAM` arena pressure
+- Purpose of this step:
+  - stop future discussions from mixing “physical memory size” with “current application free heap”
+  - provide a single reference that can be reused in KWS/FP32 deployment reviews

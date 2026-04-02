@@ -4654,3 +4654,29 @@ Expected result:
   - direct-deploy upper bound `KWS arena <= 256KB`
 - it states that `.tflite` size is only a secondary screen and `AllocateTensors()` arena is the primary gate
 - `git diff --check` reports no patch-format errors
+
+## Step 5.65 Verification
+This is a documentation-only step.
+
+Review commands:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RTL8730E_MEMORY_LAYERING_EXPLAINER_ZH.md
+git diff --check
+```
+
+Expected result:
+- the new document exists and is readable
+- it clearly explains the distinction between:
+  - physical `64MB` DRAM capacity
+  - current firmware-visible layout window
+  - current `CA32` carveout
+  - static-section occupancy vs runtime heap
+  - total free heap vs largest contiguous free block
+- it contains a text memory-layer diagram
+- it ties the explanation back to current project evidence, including:
+  - boot log `0x60800000` vs `0x64000000`
+  - `CA32_BL3_DRAM_NS` `4MB` carveout
+  - `__psram_heap_buffer_*` heap derivation
+  - historical `heap_free` runtime numbers
+- `git diff --check` reports no patch-format errors
