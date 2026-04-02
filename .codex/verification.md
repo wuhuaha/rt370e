@@ -4610,3 +4610,24 @@ Observed build result on `2026-04-02`:
 Observed flash result on `2026-04-02`:
 - flashing completed successfully
 - tool reported `Finished PASS`
+
+## Step 5.63 Verification
+This is a documentation-only step.
+
+Review commands:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_BOARD_FALSE_WAKE_DEBUG_CHECKLIST_ZH.md
+git diff --check
+```
+
+Expected result:
+- the new document exists and is readable
+- it includes:
+  - current symptom summary
+  - deployment/runtime pitfalls already encountered
+  - prioritized suspicion list
+  - staged analysis plan
+  - multiple debug methods with individual exit mechanisms
+  - actual serial-debugging pitfalls seen in this project
+- `git diff --check` reports no patch-format errors

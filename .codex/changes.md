@@ -2684,3 +2684,17 @@
   - local KWS debug mode available
   - pull-based tensor dump workflow available
   - no TCP host-debug transport in the firmware
+
+## Step 5.63
+- Added a dedicated board-side wakeword false-trigger investigation document:
+  - [doc/KWS_BOARD_FALSE_WAKE_DEBUG_CHECKLIST_ZH.md](/root/ameba-river/doc/KWS_BOARD_FALSE_WAKE_DEBUG_CHECKLIST_ZH.md)
+- This document consolidates the currently scattered evidence into one project-owned reference:
+  - symptom evolution from the early `different input, same output` phase to the later `variable raw/score` phase
+  - deployment issues already encountered on the model/export/runtime path
+  - the current prioritized suspicion list
+  - a staged analysis plan with explicit stop/continue gates
+  - multiple debug methods and their individual exit mechanisms
+  - the serial-debugging pitfalls already observed in practice
+- The intent of this step is process control rather than code change:
+  - future KWS diagnosis should follow the staged checklist
+  - transport, cloud handoff, and experimental branches should no longer be mixed into the main false-trigger investigation path
