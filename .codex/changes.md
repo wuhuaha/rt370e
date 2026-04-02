@@ -2615,3 +2615,41 @@
     - `build_RTL8730E/km0_km4_ca32_app.bin 3568992`
     - `build_RTL8730E/ota_all.bin 3569024`
   - board flash passed with `Finished PASS` at `2026-04-02 09:48:52`
+
+## Step 5.60
+- Added an explicit `no-cloud` KWS debug mode so the current board-side tensor replay workflow can be isolated from XiaoZhi session startup.
+- Trigger for this step:
+  - exact KWS dump capture was already succeeding on the board
+  - but the post-wake handoff immediately entered `river_wake_evt`, hit a CA32 heap failure, and then blocked later `meta/chunk` retrieval:
+    - `Malloc failed. Core:[CA32], Task:[river_wake_evt], [free heap size: 256] [xWantedSize:1408]`
+    - later `IPC Get Semaphore Timeout`
+- Updated [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added runtime `local_debug_mode`
+  - added `river_voice_kws_wake_handoff_block_reason()` so KWS can explicitly tell the session layer why wake handoff must be suppressed
+  - extended `river_voice_kws_dump_status()` with a dedicated debug line:
+    - `local_only=yes/no`
+    - `wake_handoff=blocked/normal`
+    - `reason=local_debug|tensor_dump_ready|-`
+  - kept the previous automatic `tensor_dump_ready` protection, so a captured snapshot still blocks handoff even if the operator forgot to toggle local debug first
+- Updated [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c):
+  - before scheduling wakeword follow-up, it now checks the KWS-side block reason
+  - when blocked, it prints a clear reasoned log:
+    - `wakeword handoff held: reason=local_debug ...`
+    - or `wakeword handoff held: reason=tensor_dump_ready ...`
+  - in this state the wakeword event is still detected and logged, but no XiaoZhi conversation window is opened
+- Updated [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c):
+  - added:
+    - `river kws debug local on`
+    - `river kws debug local off`
+    - `river kws debug local status`
+  - these are intentionally separate from `river xiaozhi disable`:
+    - `xiaozhi disable` mutates runtime cloud config
+    - `kws debug local on` is a focused board-debug guard that preserves the configured backend but suppresses wake-triggered cloud handoff
+- Updated [include/river/river_voice_kws.h](/root/ameba-river/include/river/river_voice_kws.h) with the new KWS debug control/query APIs.
+- Outcome for the current debug phase:
+  - wakeword, feature extraction, TFLM inference, and tensor dump capture still run normally
+  - but the board no longer needs to contact XiaoZhi before `river kws dump meta/chunk ...` can be pulled back
+  - this keeps the three-way comparison workflow stable:
+    - training-side
+    - host TFLite replay
+    - exact board tensor dump

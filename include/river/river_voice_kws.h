@@ -24,6 +24,9 @@ river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                                             size_t bytes,
                                             bool vad_valid,
                                             bool is_speech);
+void river_voice_kws_set_local_debug_mode(bool enabled);
+bool river_voice_kws_local_debug_mode_enabled(void);
+const char *river_voice_kws_wake_handoff_block_reason(void);
 river_status_t river_voice_kws_request_tensor_dump_next(void);
 void river_voice_kws_cancel_tensor_dump(void);
 void river_voice_kws_clear_tensor_dump(void);

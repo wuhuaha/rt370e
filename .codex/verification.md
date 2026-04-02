@@ -4433,3 +4433,91 @@ Current diagnostic interpretation:
   - board-captured raw input tensor
   - board-captured raw output tensor
   with host replay, one chunk at a time
+
+## Step 5.60 Verification
+Build command:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+```
+
+Expected build result:
+- build completes successfully with the new local-only KWS debug command and wake-handoff suppression logic compiled in
+- image size should stay effectively unchanged versus Step `5.59`, because this step only adds a small runtime flag and a few log strings
+
+Observed build result on `2026-04-02`:
+- build passed
+- final image sizes were:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 3568992`
+  - `build_RTL8730E/ota_all.bin 3569024`
+
+Flash command:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected flash result:
+- flashing completes successfully
+- tool reports `Finished PASS`
+
+Current board-debug procedure for exact tensor replay:
+```text
+river kws debug local on
+river kws dump clear
+river kws dump next
+```
+
+Why this sequence exists:
+- `river kws debug local on`
+  - keeps wakeword/KWS active
+  - but suppresses wake-triggered cloud/session handoff
+  - this avoids the CA32 low-heap path from breaking later dump retrieval
+- `river kws dump next`
+  - arms capture of the next exact feature/input/output tensor triplet only
+
+Expected immediate status/logs after enabling local debug:
+```text
+[river.voice.kws] kws debug local_only: enabled=yes note=wakeword_still_runs_cloud_handoff=suppressed
+[river.voice.kws] kws debug status: local_only=yes wake_handoff=blocked reason=local_debug
+```
+
+Expected live behavior after speaking the wakeword:
+- you should still see the normal local KWS evidence:
+  - `kws diag: ...`
+  - `kws tensor dump captured: seq=... infer=...`
+  - `wakeword hit: text=小欧管家 ...`
+- but instead of cloud handoff you should now see:
+  - `wakeword handoff held: reason=local_debug ...`
+  - or `wakeword handoff held: reason=tensor_dump_ready ...`
+- and you should **not** see wake-triggered cloud transport logs such as:
+  - `xiaozhi connecting: ...`
+  - `server hello: ...`
+  - `xiaozhi conversation window opened: ...`
+
+Then pull back the cached snapshot:
+```text
+river kws dump meta
+river kws dump chunk output_raw 1
+river kws dump chunk input_raw 1
+river kws dump chunk feat_f32 1
+```
+
+Expected dump retrieval behavior in local debug mode:
+- `meta` prints the same `begin/meta/snapshot` lines as Step `5.59`
+- `chunk ...` prints the requested chunk lines
+- there should be no concurrent `river_wake_evt` heap/IPC cascade during this retrieval window
+
+After the tensor dump session is complete:
+```text
+river kws debug local off
+```
+
+Expected post-debug behavior:
+- subsequent wakewords can again proceed into normal XiaoZhi/session handoff
+- status should return to:
+  - `local_only=no`
+  - `wake_handoff=normal` unless a fresh dump snapshot is still pending/ready

@@ -357,6 +357,7 @@ typedef struct {
     bool tensor_dump_armed;
     bool tensor_dump_feature_valid;
     bool tensor_dump_snapshot_ready;
+    bool local_debug_mode;
     uint32_t tensor_dump_request_count;
     uint32_t tensor_dump_last_seq;
     uint32_t tensor_dump_last_infer;
@@ -1428,6 +1429,21 @@ static river_status_t river_voice_kws_tensor_dump_buffer_view(
     default:
         return RIVER_ERR_ARG;
     }
+}
+
+static const char *river_voice_kws_wake_handoff_block_reason_locked(
+    const river_voice_kws_context_t *context)
+{
+    if (context == NULL || !context->initialized) {
+        return NULL;
+    }
+    if (context->local_debug_mode) {
+        return "local_debug";
+    }
+    if (context->tensor_dump_snapshot_ready) {
+        return "tensor_dump_ready";
+    }
+    return NULL;
 }
 
 static uint64_t river_voice_kws_gate_elapsed_ms(const river_voice_kws_context_t *context,
@@ -3128,6 +3144,7 @@ extern "C" void river_voice_kws_dump_status(void)
     size_t feat_chunks;
     size_t input_chunks;
     size_t output_chunks;
+    const char *handoff_block_reason;
 
     if (g_river_voice_kws == NULL) {
         RIVER_LOGI("kws status: closed");
@@ -3159,6 +3176,38 @@ extern "C" void river_voice_kws_dump_status(void)
                (unsigned long)feat_chunks,
                (unsigned long)input_chunks,
                (unsigned long)output_chunks);
+    handoff_block_reason =
+        river_voice_kws_wake_handoff_block_reason_locked(g_river_voice_kws);
+    RIVER_LOGI("kws debug status: local_only=%s wake_handoff=%s reason=%s",
+               g_river_voice_kws->local_debug_mode ? "yes" : "no",
+               handoff_block_reason != NULL ? "blocked" : "normal",
+               handoff_block_reason != NULL ? handoff_block_reason : "-");
+}
+
+extern "C" void river_voice_kws_set_local_debug_mode(bool enabled)
+{
+    if (g_river_voice_kws == NULL || !g_river_voice_kws->initialized) {
+        RIVER_LOGI("kws debug local_only: enabled=%s initialized=no",
+                   enabled ? "yes" : "no");
+        return;
+    }
+
+    g_river_voice_kws->local_debug_mode = enabled;
+    RIVER_LOGI("kws debug local_only: enabled=%s note=wakeword_still_runs_cloud_handoff=%s",
+               enabled ? "yes" : "no",
+               enabled ? "suppressed" : "enabled");
+}
+
+extern "C" bool river_voice_kws_local_debug_mode_enabled(void)
+{
+    return g_river_voice_kws != NULL &&
+           g_river_voice_kws->initialized &&
+           g_river_voice_kws->local_debug_mode;
+}
+
+extern "C" const char *river_voice_kws_wake_handoff_block_reason(void)
+{
+    return river_voice_kws_wake_handoff_block_reason_locked(g_river_voice_kws);
 }
 
 extern "C" river_status_t river_voice_kws_request_tensor_dump_next(void)
