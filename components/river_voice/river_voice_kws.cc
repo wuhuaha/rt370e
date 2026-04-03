@@ -1247,24 +1247,25 @@ static inline uint32_t river_voice_kws_confidence_to_permille(uint32_t confidenc
 static void river_voice_kws_reset_peak_window(river_voice_kws_context_t *context)
 {
     uint32_t heap_free;
+    uint32_t queue_count;
+    uint32_t pre_roll_count;
 
     if (context == NULL) {
         return;
     }
 
     heap_free = rtos_mem_get_free_heap_size();
-    context->window_peak_infer_us = context->last_infer_us;
-    context->window_peak_score_q15 = context->last_confidence_q15;
-    context->window_peak_gate_best_confidence_q15 =
-        context->gate_best_confidence_q15;
-    context->window_peak_queue_count =
-        context->input_ring.initialized ?
-            river_audio_frame_ring_count(&context->input_ring) :
-            0U;
-    context->window_peak_pre_roll_count =
-        context->pre_roll_ring.initialized ?
-            river_audio_frame_ring_count(&context->pre_roll_ring) :
-            0U;
+    queue_count = context->input_ring.initialized ?
+                      river_audio_frame_ring_count(&context->input_ring) :
+                      0U;
+    pre_roll_count = context->pre_roll_ring.initialized ?
+                         river_audio_frame_ring_count(&context->pre_roll_ring) :
+                         0U;
+    context->window_peak_infer_us = 0U;
+    context->window_peak_score_q15 = 0U;
+    context->window_peak_gate_best_confidence_q15 = 0U;
+    context->window_peak_queue_count = queue_count;
+    context->window_peak_pre_roll_count = pre_roll_count;
     context->window_heap_low_bytes = heap_free;
 }
 

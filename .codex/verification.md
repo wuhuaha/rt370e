@@ -5044,3 +5044,44 @@ wakeword hit: ...
 Success criterion:
 - successful wake events still show one meaningful `kws peak` line plus `wakeword hit: ...`
 - the former back-to-back `score` then `trigger` duplicate peak pair disappears
+
+## Step 5.75 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after resetting each peak window to a clean score/infer baseline
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Observed flash result on `2026-04-03`:
+- the board image download completed successfully on `/dev/ttyUSB0`
+- the flash tool finished with `PASS`
+
+Expected runtime emphasis:
+- after one successful wake, a later unrelated `kws peak: reason=queue ...` line should no longer report the old wake score as its peak score
+- each `kws peak` line should now reflect only the current window's:
+  - `score_pm`
+  - `gate_best_pm`
+  - `infer_us`
+  - queue/pre-roll/heap peaks
+
+Recommended capture:
+```text
+kws peak: ...
+wakeword hit: ...
+kws peak: reason=queue ...
+```
+
+Success criterion:
+- a later queue-only peak no longer carries forward the previous wake's `score_pm` / `gate_best_pm`
+- the peak window contents are self-consistent across successive gates

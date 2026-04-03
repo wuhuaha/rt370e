@@ -2981,3 +2981,19 @@
   - preserve the new transient diagnostics
   - remove the last obvious duplicate line during successful wake events
 - Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
+
+## Step 5.75
+- The next board log on `2026-04-03 15:06:34` verified that duplicate `reason=trigger` peak logs are gone, but it exposed a remaining statistics bug:
+  - later `kws peak: reason=queue ...` lines could still carry forward the previous window's `score_pm` / `gate_best_pm`
+  - this happened because the next peak window was seeded from the last committed inference instead of starting clean
+- Refined the KWS peak-window reset logic:
+  - after a peak snapshot is committed, the next window now resets:
+    - `infer_us = 0`
+    - `score_q15 = 0`
+    - `gate_best_q15 = 0`
+  - queue depth, pre-roll depth, and heap low-water still restart from the current runtime baseline
+- Goal of this step:
+  - make each `kws peak` line describe only the current window
+  - stop old wake scores from contaminating later queue-only or heap-only peak reports
+- Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
+- Flashed the rebuilt image to `/dev/ttyUSB0` on `2026-04-03`; `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor` finished with `PASS`.
