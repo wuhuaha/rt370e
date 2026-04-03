@@ -4834,3 +4834,42 @@ Interpretation guide:
 
 Observed build result on `2026-04-03`:
 - full `RTL8730E` rebuild passed after adding the new FP32 KWS I/O binding diagnostics
+
+## Step 5.70 Verification
+SDK patch check:
+```bash
+cd /root/ameba-river
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --check
+```
+
+Expected result:
+- prints `applied`
+
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Expected build result:
+- the build completes successfully with `Build done`
+- `ATF`, `CA32`, `KM4`, and `KM0` all rebuild without new layout-related linker or TrustZone errors
+
+Recommended board-side check after flashing:
+```text
+look for:
+- PSRAM or DRAM End in layout is 0x60C00000, but actually is 0x64000000
+- kws init plan: ...
+- boot_ready heap_free=...
+- silero_vad runtime ready: ...
+```
+
+Expected runtime direction:
+- `boot_ready heap_free` should be higher than the pre-patch baseline
+- `kws init` should no longer leave only about `10KB` of free heap
+- the previous `Malloc failed ... xWantedSize:105536` should either disappear or move later, which would confirm that the original blocker was the `CA32` carveout size rather than the KWS model structure itself
+
+Observed result on `2026-04-03`:
+- the conservative SDK memory-layout patch was applied successfully
+- the full local `RTL8730E` rebuild passed after the patch

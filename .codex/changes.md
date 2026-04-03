@@ -2874,3 +2874,20 @@
   - the FP32 flatbuffer is not obviously corrupt at the host-runtime level
   - the next board-side suspect remains TFLM runtime I/O buffer population or wrapper binding, not simple file corruption
 - Verified this step with a full local `RTL8730E` build on `2026-04-03`.
+
+## Step 5.70
+- Implemented a conservative `RTL8730E` SDK memory-layout expansion to increase the current project's `CA32` heap without jumping directly to the larger `aivoice` layout.
+- Added a repository-tracked SDK patch tool:
+  - `tools/sdk/apply_rtl8730e_memory_layout_patch.py`
+- Applied the SDK patch to `/root/ameba-rtos-1.2` with these effective values:
+  - `PSRAM_END`: `0x60800000 -> 0x60C00000`
+  - `CA32_BL3_DRAM_NS`: `0x60300000 ~ 0x60700000 -> 0x60300000 ~ 0x60B00000`
+  - `KM4_DRAM_HEAP_EXT`: `0x60700000 ~ 0x60800000 -> 0x60B00000 ~ 0x60C00000`
+  - `hal_platform.h` `PSRAM_END`: `0x60800000 -> 0x60C00000`
+- Kept this step deliberately conservative so the next board run can answer one question clearly:
+  - whether the current `FP32 KWS + Silero VAD` coexistence failure is primarily caused by the `CA32` carveout being too small
+- Added a dedicated project document that explains the SDK-side edits and why only these files were changed:
+  - `doc/RTL8730E_SDK_MEMORY_LAYOUT_CHANGES_ZH.md`
+- Verified the patched SDK layout with:
+  - `python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --check`
+  - a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully across `ATF + CA32 + KM4 + KM0`
