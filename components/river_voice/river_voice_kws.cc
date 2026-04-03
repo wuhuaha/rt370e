@@ -1349,6 +1349,28 @@ static const char *river_voice_kws_peak_reason(
     return NULL;
 }
 
+static void river_voice_kws_commit_peak_snapshot(
+    river_voice_kws_context_t *context,
+    uint64_t logged_at_ms)
+{
+    if (context == NULL) {
+        return;
+    }
+
+    if (logged_at_ms != 0U) {
+        context->last_peak_log_ms = logged_at_ms;
+    }
+    context->last_peak_log_score_q15 = context->window_peak_score_q15;
+    context->last_peak_log_gate_best_confidence_q15 =
+        context->window_peak_gate_best_confidence_q15;
+    context->last_peak_log_queue_count = context->window_peak_queue_count;
+    context->last_peak_log_pre_roll_count = context->window_peak_pre_roll_count;
+    context->last_peak_log_heap_low_bytes = context->window_heap_low_bytes;
+    context->last_peak_log_trigger_count = context->trigger_count;
+    context->last_peak_log_infer_us = context->window_peak_infer_us;
+    river_voice_kws_reset_peak_window(context);
+}
+
 static void river_voice_kws_maybe_log_peak_status(river_voice_kws_context_t *context,
                                                   const char *force_reason)
 {
@@ -1371,6 +1393,13 @@ static void river_voice_kws_maybe_log_peak_status(river_voice_kws_context_t *con
     }
 
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (force_reason != NULL &&
+        strcmp(force_reason, "trigger") == 0 &&
+        context->last_peak_log_ms != 0U &&
+        (now_ms - context->last_peak_log_ms) < RIVER_KWS_PEAK_LOG_MIN_INTERVAL_MS) {
+        river_voice_kws_commit_peak_snapshot(context, 0U);
+        return;
+    }
     if (force_reason == NULL &&
         context->last_peak_log_ms != 0U &&
         (now_ms - context->last_peak_log_ms) < RIVER_KWS_PEAK_LOG_MIN_INTERVAL_MS) {
@@ -1407,16 +1436,7 @@ static void river_voice_kws_maybe_log_peak_status(river_voice_kws_context_t *con
                (unsigned long)context->window_peak_pre_roll_count,
                (unsigned long)context->window_heap_low_bytes);
 
-    context->last_peak_log_ms = now_ms;
-    context->last_peak_log_score_q15 = context->window_peak_score_q15;
-    context->last_peak_log_gate_best_confidence_q15 =
-        context->window_peak_gate_best_confidence_q15;
-    context->last_peak_log_queue_count = context->window_peak_queue_count;
-    context->last_peak_log_pre_roll_count = context->window_peak_pre_roll_count;
-    context->last_peak_log_heap_low_bytes = context->window_heap_low_bytes;
-    context->last_peak_log_trigger_count = context->trigger_count;
-    context->last_peak_log_infer_us = context->window_peak_infer_us;
-    river_voice_kws_reset_peak_window(context);
+    river_voice_kws_commit_peak_snapshot(context, now_ms);
 }
 
 static void river_voice_kws_maybe_log_slow_infer(river_voice_kws_context_t *context)

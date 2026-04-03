@@ -2963,3 +2963,21 @@
   - keep background logs sparse enough for long serial captures
   - still expose the short-lived queue, latency, and score spikes that explain misses or regressions
 - Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
+
+## Step 5.74
+- The first board run with the new peak logger on `2026-04-03 14:47:54` confirmed the mechanism works:
+  - `kws peak: reason=score ...`
+  - `wakeword hit: ...`
+  - `kws peak: reason=trigger ...`
+- That same log showed the remaining noise issue clearly:
+  - a successful hit could still emit two back-to-back peak lines for the same window
+  - the second `reason=trigger` line did not add materially new runtime data because `wakeword hit:` already marks the trigger
+- Refined `river_voice_kws.cc` so trigger-forced peak logging now deduplicates against a just-printed peak line:
+  - if a peak log was emitted within the minimum peak-log interval, the trigger path now only commits the peak snapshot internally
+  - the separate `wakeword hit:` line remains unchanged
+  - future peak detection still sees the updated trigger/score/infer baseline and does not repeatedly rediscover the same window
+- Added a small internal helper to commit the current peak snapshot so logging and suppressed-trigger bookkeeping share one path.
+- Goal of this step:
+  - preserve the new transient diagnostics
+  - remove the last obvious duplicate line during successful wake events
+- Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.

@@ -5008,3 +5008,39 @@ Interpretation:
   - the next bottleneck is more likely frontend/model score distribution than runtime jitter
 - wake still fires and the new logs stay sparse:
   - this logging step succeeded and can be kept for longer board captures
+
+## Step 5.74 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after suppressing duplicate trigger-side peak logs
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected runtime emphasis:
+- on a successful wake, the log should still contain:
+  - `kws peak: reason=score ...` or another meaningful peak reason
+  - `wakeword hit: ...`
+- but it should no longer immediately follow with another redundant:
+  - `kws peak: reason=trigger ...`
+  when that trigger happens inside the same just-logged peak window
+
+Recommended capture:
+```text
+kws peak: ...
+wakeword hit: ...
+```
+
+Success criterion:
+- successful wake events still show one meaningful `kws peak` line plus `wakeword hit: ...`
+- the former back-to-back `score` then `trigger` duplicate peak pair disappears
