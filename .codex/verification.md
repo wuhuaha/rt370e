@@ -4873,3 +4873,48 @@ Expected runtime direction:
 Observed result on `2026-04-03`:
 - the conservative SDK memory-layout patch was applied successfully
 - the full local `RTL8730E` rebuild passed after the patch
+
+## Step 5.71 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after lowering the KWS threshold and increasing the inference stride
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot/runtime emphasis:
+- the memory-layout expansion evidence should remain visible:
+  - `PSRAM or DRAM End in layout is 0x60C00000, but actually is 0x64000000`
+  - `kws init plan: heap_free=...` should stay in the multi-megabyte range
+  - the old `Malloc failed ... xWantedSize:105536` should stay gone
+- `kws status` should now report the lower smoke-test threshold:
+  - `thresh_pm=48` or `thresh_pm=49`
+- FP32 inference time will likely stay near `177ms`, but queue growth should be materially lower than the earlier `peak=27/64` case because `stride=16`
+- if the end-to-end wake path is fundamentally healthy, repeated wake-word tries may now produce at least one of these logs:
+  - `wakeword hit: text=...`
+  - `wakeword queued text=...`
+  - `interaction_state: wake_monitoring -> ... reason=wakeword_detected`
+
+If no trigger occurs, capture these lines together:
+```text
+kws status: ... thresh_pm=... gate_best_pm=... queue=... peak=...
+kws perf: infer_us[last=... avg=... max=...] ... queue[frames=64 stride=16]
+```
+
+Interpretation:
+- `gate_best_pm` crosses about `49` and a `wakeword hit` appears:
+  - the end-to-end board runtime works, so the next task is to replace this smoke threshold with proper model/frontend tuning
+- `gate_best_pm` stays below about `49`:
+  - the next blocker is model/frontend score distribution on board, not heap layout anymore
+- queue growth is still aggressive even with `stride=16`:
+  - the next blocker is CA32 compute budget / model cost, not threshold alone

@@ -2891,3 +2891,21 @@
 - Verified the patched SDK layout with:
   - `python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --check`
   - a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully across `ATF + CA32 + KM4 + KM0`
+
+## Step 5.71
+- The post-layout-expansion board log on `2026-04-03` shows the current blocker has moved away from memory:
+  - `kws init plan: heap_free=4966336`
+  - `boot_ready heap_free=3817792`
+  - the earlier `Malloc failed ... xWantedSize:105536` no longer appears
+  - FP32 KWS now completes init and produces varying scores, hashes, and tensor diagnostics
+- The same board log exposed two immediate runtime limits instead:
+  - wake scores only peaked around `q15=2157` / `score=0.0658`, far below the prior product threshold `q15=17096`
+  - FP32 inference costs about `177ms`, which let the KWS queue grow to about `27/64` with the earlier `stride=4`
+- Updated the current board smoke-test profile in `prj.conf`:
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=1600`
+  - `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES=16`
+- Kept both values explicitly marked in `prj.conf` as temporary smoke-test settings, not product tuning.
+- Goal of this step:
+  - prove or disprove that the end-to-end wakeword path can fire on board now that the memory ceiling is no longer the blocker
+  - reduce scheduler pressure enough that the current FP32 profile can still be judged meaningfully before changing model or frontend behavior again
+- Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
