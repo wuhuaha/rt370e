@@ -3048,3 +3048,28 @@
 - Current assessment:
   - websocket congestion still exists at the transport level, but it is now surfaced earlier and handled in a controlled way
   - the previous failure amplification path from queue-full -> SDK error spam -> playback error recovery is materially reduced
+
+## Step 5.78
+- Added a new long-horizon resource-constraint document for model research on the current `RTL8730E` board:
+  - `doc/RTL8730E_LONG_TERM_MODEL_CONSTRAINTS_ZH.md`
+- The new document is intentionally written for algorithm pre-research rather than for the current branch's one-off debugging:
+  - separates physical hardware limits from the current project's conservative layout
+  - separates structural platform limits from current software-policy bottlenecks
+  - explains what parts of today's constraints are likely to move if the project later expands the memory layout or changes the runtime profile
+- Captured the current board/resource picture with concrete numbers tied to the present branch:
+  - physical external memory `64MB`
+  - physical NOR flash `32MB`
+  - current visible DRAM/PSRAM layout window `12MB`
+  - current `CA32_BL3_DRAM_NS` carveout `8MB`
+  - current `CA32` heap buffer `0x004DE000` (`5,103,616 bytes`)
+  - current app package size `3,601,760 bytes`
+  - current development flash-profile headroom `2,427,552 bytes`
+  - current sampled runtime `heap_free` / `heap_min` values from the `2026-04-03` board log
+- Added explicit guidance for model planning instead of only restating raw resources:
+  - recommended additional flash budget for a new model
+  - recommended additional runtime working-set budget
+  - compute-budget targets for always-on VAD/KWS and for larger local models
+  - guidance on when a new model should be treated as requiring a larger `CA32` carveout or a dedicated runtime profile
+- Included two long-term engineering judgments that are directly relevant to the algorithm team:
+  - replacing unsupported ops such as `MEAN` is usually preferable to board-side op-porting unless measured accuracy loss is materially unacceptable
+  - `Cortex-A32 + NEON` means future `KleidiAI`-style CPU kernel optimization could help, but it does not remove flash / heap / cache-consistency / concurrency limits by itself

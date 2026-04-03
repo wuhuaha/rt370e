@@ -5195,3 +5195,28 @@ Success criterion:
   - `ws_sendData ... Not get usable buffer`
   - `xiaozhi uplink send failed: status=-6`
   - `xiaozhi playback write failed`
+
+## Step 5.78 Verification
+This is a documentation-only step.
+
+Review commands:
+```bash
+cd /root/ameba-river
+sed -n '1,320p' doc/RTL8730E_LONG_TERM_MODEL_CONSTRAINTS_ZH.md
+git diff --check
+```
+
+Expected result:
+- the new document exists and is readable
+- it clearly distinguishes:
+  - physical hardware limits
+  - current conservative memory/flash layout
+  - current measured runtime usage
+  - recommended long-term model budgets
+- it explicitly states that the current branch's bottlenecks are not automatically long-term physical limits
+- it gives concrete planning guidance for:
+  - flash budget
+  - runtime working-set budget
+  - compute budget
+  - when a larger `CA32` carveout or dedicated profile should be considered
+- `git diff --check` reports no patch-format errors
