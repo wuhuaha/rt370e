@@ -982,6 +982,31 @@ static size_t river_voice_kws_tensor_storage_bytes(TfLiteType type)
     }
 }
 
+static const char *river_voice_kws_allocation_type_name(
+    TfLiteAllocationType type)
+{
+    switch (type) {
+    case kTfLiteMmapRo:
+        return "mmap_ro";
+    case kTfLiteArenaRw:
+        return "arena_rw";
+    case kTfLiteArenaRwPersistent:
+        return "arena_rw_persist";
+    case kTfLiteDynamic:
+        return "dynamic";
+    case kTfLitePersistentRo:
+        return "persistent_ro";
+    case kTfLiteCustom:
+        return "custom";
+    case kTfLiteNonCpu:
+        return "non_cpu";
+    case kTfLiteVariantObject:
+        return "variant";
+    default:
+        return "unknown";
+    }
+}
+
 static bool river_voice_kws_tensor_bytes_sufficient(size_t bytes_field,
                                                     size_t element_count,
                                                     TfLiteType effective_type)
@@ -2897,6 +2922,24 @@ extern "C" river_status_t river_voice_kws_init(void)
         status = RIVER_ERR_UNSUPPORTED;
         goto fail;
     }
+    RIVER_LOGI("kws io binding: preserve_all=%s input_idx=%ld type=%s alloc=%s bytes=%lu raw=%p dims=%p var=%d output_idx=%ld type=%s alloc=%s bytes=%lu raw=%p dims=%p var=%d arena_used=%lu arena_slack=%lu",
+               g_river_voice_kws->interpreter->preserve_all_tensors() ? "yes" : "no",
+               (long)g_river_voice_kws->interpreter->inputs().Get(0),
+               river_voice_kws_tensor_type_name(g_river_voice_kws->input_tensor->type),
+               river_voice_kws_allocation_type_name(g_river_voice_kws->input_tensor->allocation_type),
+               (unsigned long)g_river_voice_kws->input_tensor->bytes,
+               g_river_voice_kws->input_tensor->data.raw,
+               (void *)g_river_voice_kws->input_tensor->dims,
+               g_river_voice_kws->input_tensor->is_variable ? 1 : 0,
+               (long)g_river_voice_kws->interpreter->outputs().Get(0),
+               river_voice_kws_tensor_type_name(g_river_voice_kws->output_tensor->type),
+               river_voice_kws_allocation_type_name(g_river_voice_kws->output_tensor->allocation_type),
+               (unsigned long)g_river_voice_kws->output_tensor->bytes,
+               g_river_voice_kws->output_tensor->data.raw,
+               (void *)g_river_voice_kws->output_tensor->dims,
+               g_river_voice_kws->output_tensor->is_variable ? 1 : 0,
+               (unsigned long)g_river_voice_kws->arena_used_bytes,
+               (unsigned long)g_river_voice_kws->arena_slack_bytes);
     g_river_voice_kws->model_input_type =
         river_voice_kws_model_io_type(g_river_voice_kws->model, true);
     g_river_voice_kws->model_output_type =
@@ -3004,11 +3047,19 @@ extern "C" river_status_t river_voice_kws_init(void)
         river_voice_kws_tensor_data_ptr(g_river_voice_kws->output_tensor,
                                         g_river_voice_kws->effective_output_type);
     if (input_tensor_data == NULL || output_tensor_data == NULL) {
-        RIVER_LOGE("kws tensor data invalid: input_data=%p output_data=%p input_bytes=%lu output_bytes=%lu",
+        RIVER_LOGE("kws tensor data invalid: input_data=%p output_data=%p input_raw=%p output_raw=%p input_alloc=%s output_alloc=%s input_bytes=%lu output_bytes=%lu input_idx=%ld output_idx=%ld arena_used=%lu arena_slack=%lu",
                    input_tensor_data,
                    output_tensor_data,
+                   g_river_voice_kws->input_tensor->data.raw,
+                   g_river_voice_kws->output_tensor->data.raw,
+                   river_voice_kws_allocation_type_name(g_river_voice_kws->input_tensor->allocation_type),
+                   river_voice_kws_allocation_type_name(g_river_voice_kws->output_tensor->allocation_type),
                    (unsigned long)g_river_voice_kws->input_tensor->bytes,
-                   (unsigned long)g_river_voice_kws->output_tensor->bytes);
+                   (unsigned long)g_river_voice_kws->output_tensor->bytes,
+                   (long)g_river_voice_kws->interpreter->inputs().Get(0),
+                   (long)g_river_voice_kws->interpreter->outputs().Get(0),
+                   (unsigned long)g_river_voice_kws->arena_used_bytes,
+                   (unsigned long)g_river_voice_kws->arena_slack_bytes);
         status = RIVER_ERR_UNSUPPORTED;
         goto fail;
     }

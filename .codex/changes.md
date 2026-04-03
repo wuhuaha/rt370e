@@ -2840,3 +2840,37 @@
 - Purpose of this step:
   - move from “one coarse malloc fail” to a staged boot-time memory trace
   - get the FP32 profile to boot so CPU latency can be judged from real `kws perf` logs rather than guessed from static model size
+
+## Step 5.69
+- Narrowed the current FP32 bring-up blocker from generic “tensor binding failed” to a more specific TFLM I/O allocation question.
+- Added a new boot-time `kws io binding` log in [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc) that now prints:
+  - `preserve_all`
+  - runtime input/output tensor indices
+  - runtime input/output tensor types
+  - input/output `allocation_type`
+  - input/output `bytes`
+  - input/output raw data pointers
+  - input/output dims pointers
+  - input/output variable flags
+  - `arena_used` and `arena_slack`
+- Expanded the existing `kws tensor data invalid` failure log so it now preserves the same binding metadata at the exact failure point:
+  - `input_data` / `output_data`
+  - `input_raw` / `output_raw`
+  - `input_alloc` / `output_alloc`
+  - `input_idx` / `output_idx`
+  - `arena_used` / `arena_slack`
+- This makes the next board run able to distinguish at least these cases directly from one log capture:
+  - wrapper exists and arena binding exists
+  - wrapper exists but raw pointer is still null
+  - runtime tensor is marked `dynamic`
+  - failure correlates with an unexpectedly tiny or saturated arena plan
+- In parallel, verified the current FP32 model itself on host:
+  - `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite`
+  - size `77848` bytes
+  - sha256 `a61bdefb5bbc20c406128bb4d7619e7ea1649737672ac453e5335907e8bd0635`
+  - full TF Lite host runtime can allocate it successfully
+  - host runtime reports input `index=0`, output `index=76`, both `float32`
+- Current conclusion after this step:
+  - the FP32 flatbuffer is not obviously corrupt at the host-runtime level
+  - the next board-side suspect remains TFLM runtime I/O buffer population or wrapper binding, not simple file corruption
+- Verified this step with a full local `RTL8730E` build on `2026-04-03`.

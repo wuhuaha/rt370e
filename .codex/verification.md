@@ -4795,3 +4795,42 @@ Observed result from the first `768KB` boot attempt on `2026-04-02`:
 Observed build result for the reduced-arena retry on `2026-04-02`:
 - full `RTL8730E` rebuild passed after reducing `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` to `688`
 - this retry also includes the new staged KWS init allocation logs
+
+## Step 5.69 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot/runtime emphasis:
+- if FP32 KWS still fails during init, the boot log must now include a detailed `kws io binding` line before the failure
+- if the failure persists, the follow-up `kws tensor data invalid` line must now preserve the raw pointer and allocation metadata instead of only printing `input_data/output_data`
+
+Capture these two lines together:
+```text
+kws io binding: preserve_all=... input_idx=... type=... alloc=... bytes=... raw=... dims=... var=... output_idx=... type=... alloc=... bytes=... raw=... dims=... var=... arena_used=... arena_slack=...
+kws tensor data invalid: input_data=... output_data=... input_raw=... output_raw=... input_alloc=... output_alloc=... input_bytes=... output_bytes=... input_idx=... output_idx=... arena_used=... arena_slack=...
+```
+
+Interpretation guide:
+- `alloc=dynamic` on input or output:
+  - next suspect becomes dynamic-tensor semantics or export/runtime incompatibility rather than plain arena exhaustion
+- `alloc=arena_rw` but `raw=NULL`:
+  - next suspect becomes TFLM planner/binding behavior on this model/runtime combination
+- `raw!=NULL` but `input_data/output_data=NULL`:
+  - next suspect becomes project-side typed-pointer resolution rather than allocator failure
+- `arena_used` is unexpectedly tiny:
+  - next suspect becomes planner not committing expected activation buffers
+- `arena_used` is near the configured cap and `arena_slack` is near zero:
+  - next suspect becomes marginal arena sizing or a planner edge case under pressure
+
+Observed build result on `2026-04-03`:
+- full `RTL8730E` rebuild passed after adding the new FP32 KWS I/O binding diagnostics
