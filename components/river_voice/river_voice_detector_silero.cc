@@ -146,6 +146,12 @@ static void river_silero_vad_dump_tensor(const char *prefix,
         }
     }
 
+    const char *name = "(static-memory)";
+
+#ifndef TF_LITE_STATIC_MEMORY
+    name = (tensor != NULL && tensor->name != NULL) ? tensor->name : "(null)";
+#endif
+
     RIVER_LOGD("silero_vad %s[%lu]: ptr=%p type=%d dims=%d [%d,%d,%d] name=%s",
                prefix,
                (unsigned long)index,
@@ -155,7 +161,7 @@ static void river_silero_vad_dump_tensor(const char *prefix,
                dim0,
                dim1,
                dim2,
-               (tensor != NULL && tensor->name != NULL) ? tensor->name : "(null)");
+               name);
     if (tensor != NULL) {
         RIVER_LOGD("silero_vad %s[%lu] data=%p bytes=%lu",
                    prefix,

@@ -3073,3 +3073,14 @@
 - Included two long-term engineering judgments that are directly relevant to the algorithm team:
   - replacing unsupported ops such as `MEAN` is usually preferable to board-side op-porting unless measured accuracy loss is materially unacceptable
   - `Cortex-A32 + NEON` means future `KleidiAI`-style CPU kernel optimization could help, but it does not remove flash / heap / cache-consistency / concurrency limits by itself
+
+## Step 5.79
+- Reviewed the two local `river_voice` changes before bringing the tree back to a clean git state.
+- Kept the defensive tensor-name guard in `components/river_voice/river_voice_detector_silero.cc`:
+  - the dump helper now uses a fallback name when `TF_LITE_STATIC_MEMORY` is enabled
+  - in the current build it is effectively a no-op, but it avoids touching `tensor->name` if a future consistent static-memory build is introduced
+- Rejected and removed the attempted `TF_LITE_STATIC_MEMORY` enable from `components/river_voice/CMakeLists.txt`:
+  - enabling that macro only for `river_voice` is not safe because `TfLiteTensor` / related TFLM structs change layout under the macro
+  - the SDK `tensorflow-microlite` static library was not being switched in lockstep, so keeping the define only in this component would risk an ABI mismatch
+- Verified the cleaned state with a full local `RTL8730E` rebuild on `2026-04-03`; the rebuild completed successfully with `Build done`.
+- Committed the review cleanup as a focused git step, then created branch `agent_server` from the cleaned result for later self-hosted-server debugging.

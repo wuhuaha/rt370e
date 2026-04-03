@@ -5220,3 +5220,40 @@ Expected result:
   - compute budget
   - when a larger `CA32` carveout or dedicated profile should be considered
 - `git diff --check` reports no patch-format errors
+
+## Step 5.79 Verification
+Review commands:
+```bash
+cd /root/ameba-river
+git diff -- components/river_voice/CMakeLists.txt components/river_voice/river_voice_detector_silero.cc
+nl -ba components/river_voice/CMakeLists.txt | sed -n '1,120p'
+nl -ba components/river_voice/river_voice_detector_silero.cc | sed -n '136,176p'
+```
+
+Expected review result:
+- `components/river_voice/CMakeLists.txt` does not locally enable `TF_LITE_STATIC_MEMORY`
+- `components/river_voice/river_voice_detector_silero.cc` keeps the guarded fallback-name logic in the tensor dump helper
+
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after removing the partial `TF_LITE_STATIC_MEMORY` define
+- the build finished with `Build done`
+
+Git state checks:
+```bash
+cd /root/ameba-river
+git status --short --branch
+git log -1 --oneline
+git branch --show-current
+```
+
+Expected result after the step:
+- the review cleanup is recorded in the latest commit
+- the current branch is `agent_server`
+- the worktree is clean
