@@ -5085,3 +5085,56 @@ kws peak: reason=queue ...
 Success criterion:
 - a later queue-only peak no longer carries forward the previous wake's `score_pm` / `gate_best_pm`
 - the peak window contents are self-consistent across successive gates
+
+## Step 5.76 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after adding backup-register reset breadcrumbs
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Observed flash result on `2026-04-03`:
+- the board image download completed successfully on `/dev/ttyUSB0`
+- the flash tool finished with `PASS`
+
+Boot log capture:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed runtime result on `2026-04-03` after a manual monitor `reboot`:
+- boot ROM/loader reported `KM4 BOOT REASON 400: APSYS`
+- app log reported `reset trace previous: boot_reason=0x0400 state=wake_monitoring reason8=network_ uptime_ds=62`
+- app status dump reported `reset_trace=armed state=wake_monitoring reason8=boot_rea uptime_ds=0`
+
+Expected runtime emphasis:
+- when the board later hits another unexpected reboot without a panic, the next boot should print the last interaction phase recorded before reset
+- this should help distinguish whether the reset happened during:
+  - wake monitoring
+  - wake confirmed / ASR
+  - playback / follow-up
+  - error recovery
+
+Recommended capture:
+```text
+[BOOT-I] KM4 BOOT REASON ...
+[river.reset] reset trace previous: ...
+[river.reset] reset_trace=armed ...
+```
+
+Success criterion:
+- next-boot logs consistently include the previous recorded interaction phase
+- manual `reboot` proves the breadcrumb survives at least software/AP-triggered resets

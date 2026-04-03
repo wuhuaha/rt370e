@@ -2997,3 +2997,22 @@
   - stop old wake scores from contaminating later queue-only or heap-only peak reports
 - Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
 - Flashed the rebuilt image to `/dev/ttyUSB0` on `2026-04-03`; `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor` finished with `PASS`.
+
+## Step 5.76
+- Added a lightweight reset breadcrumb in `river_core` using SDK backup registers `BKUP_REG1-3`:
+  - the app now records the latest interaction state and an 8-byte reason prefix on every interaction-state update
+  - the next boot prints the previous recorded state together with `BOOT_Reason()`
+  - this gives a project-side trace for resets that do not emit a panic or exception log
+- Kept the implementation board-oriented and low-risk:
+  - no SDK source changes
+  - only reads/writes backup registers that already survive `system reset` / watchdog-class resets
+  - status dump now includes the currently armed reset trace
+- Board verification on `2026-04-03`:
+  - full local `RTL8730E` rebuild completed with `Build done`
+  - flashed to `/dev/ttyUSB0` and the flash tool finished with `PASS`
+  - after issuing a manual `reboot` from monitor, boot log showed:
+    - `KM4 BOOT REASON 400: APSYS`
+    - `reset trace previous: boot_reason=0x0400 state=wake_monitoring reason8=network_ uptime_ds=62`
+- Outcome of this step:
+  - spontaneous resets can now be correlated with the last interaction phase visible to project code
+  - this is specifically aimed at diagnosing the earlier no-panic reboot after follow-up timeout

@@ -8,6 +8,7 @@
 
 #include "river/river_interaction_state.h"
 #include "river/river_log.h"
+#include "river/river_reset_trace.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.interaction"
@@ -65,6 +66,7 @@ river_status_t river_interaction_state_set(river_interaction_state_t state, cons
                 sizeof(g_river_interaction_state.reason) - 1U);
         g_river_interaction_state.reason[sizeof(g_river_interaction_state.reason) - 1U] = '\0';
     }
+    river_reset_trace_mark(g_river_interaction_state.state, g_river_interaction_state.reason);
 
     rtos_mutex_give(g_river_interaction_state.lock);
     return RIVER_OK;

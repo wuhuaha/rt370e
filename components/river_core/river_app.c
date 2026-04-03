@@ -6,6 +6,7 @@
 #include "river/river_log.h"
 #include "river/river_online_control.h"
 #include "river/river_playback_service.h"
+#include "river/river_reset_trace.h"
 #include "river/river_reference_service.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_voice.h"
@@ -29,6 +30,7 @@ river_status_t river_app_boot(void)
 {
     RIVER_LOGI("ameba-river boot");
     RIVER_LOGI("target=RTL8730E");
+    river_reset_trace_boot_init();
 
     /* 先初始化所有基础服务，再绑定跨模块回调关系。 */
     river_runtime_stats_init();
@@ -126,6 +128,7 @@ void river_app_print_status(void)
     RIVER_LOGI("online_control=disabled");
 #endif
     river_interaction_state_dump_status();
+    river_reset_trace_dump_status();
     river_playback_service_dump_status();
     river_voice_capture_dump_status();
     river_reference_service_dump_status();
