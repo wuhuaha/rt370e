@@ -166,6 +166,8 @@ extern "C" {
 #define RIVER_KWS_GATE_FALLBACK_MIN_INFER 4U
 #define RIVER_KWS_SLOW_INFER_WARN_US 10000ULL
 #define RIVER_KWS_SLOW_INFER_ALERT_US 20000ULL
+#define RIVER_KWS_SLOW_INFER_LOG_DELTA_US 5000ULL
+#define RIVER_KWS_PEAK_LOG_MIN_INTERVAL_MS 500ULL
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.kws"
@@ -353,11 +355,27 @@ typedef struct {
     uint64_t gate_started_ms;
     uint64_t cooldown_until_ms;
     uint64_t last_status_log_ms;
+    uint64_t last_peak_log_ms;
+    uint64_t last_slow_infer_log_ms;
     uint64_t last_infer_us;
     uint64_t max_infer_us;
     uint64_t infer_total_us;
+    uint64_t last_slow_infer_logged_us;
+    uint64_t window_peak_infer_us;
     uint32_t slow_infer_warn_count;
     uint32_t slow_infer_alert_count;
+    uint32_t window_peak_score_q15;
+    uint32_t window_peak_gate_best_confidence_q15;
+    uint32_t window_peak_queue_count;
+    uint32_t window_peak_pre_roll_count;
+    uint32_t window_heap_low_bytes;
+    uint32_t last_peak_log_score_q15;
+    uint32_t last_peak_log_gate_best_confidence_q15;
+    uint32_t last_peak_log_queue_count;
+    uint32_t last_peak_log_pre_roll_count;
+    uint32_t last_peak_log_heap_low_bytes;
+    uint32_t last_peak_log_trigger_count;
+    uint64_t last_peak_log_infer_us;
     uint32_t arena_used_bytes;
     uint32_t arena_slack_bytes;
     uint32_t init_heap_before_bytes;
@@ -1226,6 +1244,210 @@ static inline uint32_t river_voice_kws_confidence_to_permille(uint32_t confidenc
     return (uint32_t)((confidence_q15 * 1000U) / 32767U);
 }
 
+static void river_voice_kws_reset_peak_window(river_voice_kws_context_t *context)
+{
+    uint32_t heap_free;
+
+    if (context == NULL) {
+        return;
+    }
+
+    heap_free = rtos_mem_get_free_heap_size();
+    context->window_peak_infer_us = context->last_infer_us;
+    context->window_peak_score_q15 = context->last_confidence_q15;
+    context->window_peak_gate_best_confidence_q15 =
+        context->gate_best_confidence_q15;
+    context->window_peak_queue_count =
+        context->input_ring.initialized ?
+            river_audio_frame_ring_count(&context->input_ring) :
+            0U;
+    context->window_peak_pre_roll_count =
+        context->pre_roll_ring.initialized ?
+            river_audio_frame_ring_count(&context->pre_roll_ring) :
+            0U;
+    context->window_heap_low_bytes = heap_free;
+}
+
+static void river_voice_kws_update_peak_window(river_voice_kws_context_t *context)
+{
+    uint32_t heap_free;
+    uint32_t queue_count;
+    uint32_t pre_roll_count;
+
+    if (context == NULL) {
+        return;
+    }
+
+    heap_free = rtos_mem_get_free_heap_size();
+    if (context->window_heap_low_bytes == 0U ||
+        heap_free < context->window_heap_low_bytes) {
+        context->window_heap_low_bytes = heap_free;
+    }
+
+    if (context->last_infer_us > context->window_peak_infer_us) {
+        context->window_peak_infer_us = context->last_infer_us;
+    }
+    if (context->last_confidence_q15 > context->window_peak_score_q15) {
+        context->window_peak_score_q15 = context->last_confidence_q15;
+    }
+    if (context->gate_best_confidence_q15 >
+        context->window_peak_gate_best_confidence_q15) {
+        context->window_peak_gate_best_confidence_q15 =
+            context->gate_best_confidence_q15;
+    }
+
+    queue_count = context->input_ring.initialized ?
+                      river_audio_frame_ring_count(&context->input_ring) :
+                      0U;
+    if (queue_count > context->window_peak_queue_count) {
+        context->window_peak_queue_count = queue_count;
+    }
+
+    pre_roll_count = context->pre_roll_ring.initialized ?
+                         river_audio_frame_ring_count(&context->pre_roll_ring) :
+                         0U;
+    if (pre_roll_count > context->window_peak_pre_roll_count) {
+        context->window_peak_pre_roll_count = pre_roll_count;
+    }
+}
+
+static const char *river_voice_kws_peak_reason(
+    const river_voice_kws_context_t *context)
+{
+    if (context == NULL) {
+        return NULL;
+    }
+
+    if (context->trigger_count > context->last_peak_log_trigger_count) {
+        return "trigger";
+    }
+    if (context->window_peak_score_q15 > context->last_peak_log_score_q15) {
+        return "score";
+    }
+    if (context->window_peak_gate_best_confidence_q15 >
+        context->last_peak_log_gate_best_confidence_q15) {
+        return "gate_best";
+    }
+    if (context->window_peak_infer_us >= RIVER_KWS_SLOW_INFER_ALERT_US &&
+        (context->last_peak_log_infer_us == 0U ||
+         context->window_peak_infer_us >=
+             (context->last_peak_log_infer_us +
+              RIVER_KWS_SLOW_INFER_LOG_DELTA_US))) {
+        return "infer";
+    }
+    if (context->window_peak_queue_count > context->last_peak_log_queue_count) {
+        return "queue";
+    }
+    if (context->window_peak_pre_roll_count > context->last_peak_log_pre_roll_count) {
+        return "pre_roll";
+    }
+    if (context->window_heap_low_bytes != 0U &&
+        (context->last_peak_log_heap_low_bytes == 0U ||
+         context->window_heap_low_bytes < context->last_peak_log_heap_low_bytes)) {
+        return "heap";
+    }
+    return NULL;
+}
+
+static void river_voice_kws_maybe_log_peak_status(river_voice_kws_context_t *context,
+                                                  const char *force_reason)
+{
+    uint64_t now_ms;
+    const char *reason;
+    uint32_t score_permille;
+    uint32_t gate_best_permille;
+    uint32_t current_queue_count;
+    uint32_t current_pre_roll_count;
+    uint32_t current_heap_free;
+
+    if (context == NULL) {
+        return;
+    }
+
+    river_voice_kws_update_peak_window(context);
+    reason = force_reason != NULL ? force_reason : river_voice_kws_peak_reason(context);
+    if (reason == NULL) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (force_reason == NULL &&
+        context->last_peak_log_ms != 0U &&
+        (now_ms - context->last_peak_log_ms) < RIVER_KWS_PEAK_LOG_MIN_INTERVAL_MS) {
+        return;
+    }
+
+    current_queue_count = context->input_ring.initialized ?
+                              river_audio_frame_ring_count(&context->input_ring) :
+                              0U;
+    current_pre_roll_count = context->pre_roll_ring.initialized ?
+                                 river_audio_frame_ring_count(&context->pre_roll_ring) :
+                                 0U;
+    current_heap_free = rtos_mem_get_free_heap_size();
+    score_permille =
+        river_voice_kws_confidence_to_permille(context->last_confidence_q15);
+    gate_best_permille =
+        river_voice_kws_confidence_to_permille(
+            context->window_peak_gate_best_confidence_q15);
+
+    RIVER_LOGI("kws peak: reason=%s inst[score_pm=%lu infer_us=%llu queue=%lu/%u pre=%lu/%u heap=%lu] peak[score_pm=%lu gate_best_pm=%lu infer_us=%llu queue=%lu pre=%lu heap_low=%lu]",
+               reason,
+               (unsigned long)score_permille,
+               (unsigned long long)context->last_infer_us,
+               (unsigned long)current_queue_count,
+               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+               (unsigned long)current_pre_roll_count,
+               (unsigned int)RIVER_KWS_PRE_ROLL_FRAMES,
+               (unsigned long)current_heap_free,
+               (unsigned long)river_voice_kws_confidence_to_permille(
+                   context->window_peak_score_q15),
+               (unsigned long)gate_best_permille,
+               (unsigned long long)context->window_peak_infer_us,
+               (unsigned long)context->window_peak_queue_count,
+               (unsigned long)context->window_peak_pre_roll_count,
+               (unsigned long)context->window_heap_low_bytes);
+
+    context->last_peak_log_ms = now_ms;
+    context->last_peak_log_score_q15 = context->window_peak_score_q15;
+    context->last_peak_log_gate_best_confidence_q15 =
+        context->window_peak_gate_best_confidence_q15;
+    context->last_peak_log_queue_count = context->window_peak_queue_count;
+    context->last_peak_log_pre_roll_count = context->window_peak_pre_roll_count;
+    context->last_peak_log_heap_low_bytes = context->window_heap_low_bytes;
+    context->last_peak_log_trigger_count = context->trigger_count;
+    context->last_peak_log_infer_us = context->window_peak_infer_us;
+    river_voice_kws_reset_peak_window(context);
+}
+
+static void river_voice_kws_maybe_log_slow_infer(river_voice_kws_context_t *context)
+{
+    uint64_t now_ms;
+
+    if (context == NULL || context->last_infer_us < RIVER_KWS_SLOW_INFER_ALERT_US) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (context->last_slow_infer_log_ms != 0U &&
+        (now_ms - context->last_slow_infer_log_ms) <
+            (uint64_t)CONFIG_RIVER_KWS_LOG_PERIOD_MS &&
+        context->last_infer_us <=
+            (context->last_slow_infer_logged_us + RIVER_KWS_SLOW_INFER_LOG_DELTA_US)) {
+        return;
+    }
+
+    RIVER_LOGW("kws infer slow: infer=%lu us=%llu queue=%lu/%u gate=%s score_pm=%lu",
+               (unsigned long)context->inference_count,
+               (unsigned long long)context->last_infer_us,
+               (unsigned long)river_audio_frame_ring_count(&context->input_ring),
+               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+               context->gate_open ? "open" : "closed",
+               (unsigned long)river_voice_kws_confidence_to_permille(
+                   context->last_confidence_q15));
+    context->last_slow_infer_log_ms = now_ms;
+    context->last_slow_infer_logged_us = context->last_infer_us;
+}
+
 static void river_voice_kws_log_perf_status(
     const river_voice_kws_context_t *context)
 {
@@ -1243,14 +1465,16 @@ static void river_voice_kws_log_perf_status(
                        0U :
                        (context->infer_total_us / (uint64_t)context->inference_count);
 
-    RIVER_LOGI("kws perf: infer_us[last=%llu avg=%llu max=%llu warn=%lu alert=%lu] heap[now=%lu min=%lu init=%lu->%lu min_init=%lu] mem[arena=%lu/%uKB slack=%lu ctx=%lu pre=%lu queue=%lu dump=%lu] queue[frames=%u stride=%u]",
+    RIVER_LOGI("kws perf: infer_us[last=%llu avg=%llu max=%llu win=%llu warn=%lu alert=%lu] heap[now=%lu min=%lu win_low=%lu init=%lu->%lu min_init=%lu] mem[arena=%lu/%uKB slack=%lu ctx=%lu pre=%lu queue=%lu dump=%lu] queue[frames=%u stride=%u win_peak=%lu] score[win_pm=%lu gate_best_pm=%lu]",
                (unsigned long long)context->last_infer_us,
                (unsigned long long)avg_infer_us,
                (unsigned long long)context->max_infer_us,
+               (unsigned long long)context->window_peak_infer_us,
                (unsigned long)context->slow_infer_warn_count,
                (unsigned long)context->slow_infer_alert_count,
                (unsigned long)heap_free,
                (unsigned long)heap_min,
+               (unsigned long)context->window_heap_low_bytes,
                (unsigned long)context->init_heap_before_bytes,
                (unsigned long)context->init_heap_after_bytes,
                (unsigned long)context->init_heap_min_bytes,
@@ -1262,7 +1486,12 @@ static void river_voice_kws_log_perf_status(
                (unsigned long)context->input_ring_storage_bytes,
                (unsigned long)river_voice_kws_tensor_dump_reserved_bytes(context),
                (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
-               (unsigned int)CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES);
+               (unsigned int)CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES,
+               (unsigned long)context->window_peak_queue_count,
+               (unsigned long)river_voice_kws_confidence_to_permille(
+                   context->window_peak_score_q15),
+               (unsigned long)river_voice_kws_confidence_to_permille(
+                   context->window_peak_gate_best_confidence_q15));
 }
 
 static void river_voice_kws_capture_input_diag(river_voice_kws_context_t *context)
@@ -1966,6 +2195,7 @@ static void river_voice_kws_emit_trigger(river_voice_kws_context_t *context,
                (unsigned long)context->trigger_count,
                (unsigned int)CONFIG_RIVER_KWS_COOLDOWN_MS,
                mode != NULL ? mode : "threshold");
+    river_voice_kws_maybe_log_peak_status(context, "trigger");
 
     memset(&event, 0, sizeof(event));
     event.type = RIVER_VOICE_EVENT_WAKEWORD;
@@ -2310,19 +2540,11 @@ static river_status_t river_voice_kws_run_inference(
         context->gate_best_confidence_q15 = context->last_confidence_q15;
     }
 
+    river_voice_kws_update_peak_window(context);
     river_voice_kws_log_inference_diag(context);
     river_voice_kws_capture_exact_tensors(context);
-
-    if (elapsed_us >= RIVER_KWS_SLOW_INFER_ALERT_US) {
-        RIVER_LOGW("kws infer slow: infer=%lu us=%llu queue=%lu/%u gate=%s score_pm=%lu",
-                   (unsigned long)context->inference_count,
-                   (unsigned long long)elapsed_us,
-                   (unsigned long)river_audio_frame_ring_count(&context->input_ring),
-                   (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
-                   context->gate_open ? "open" : "closed",
-                   (unsigned long)river_voice_kws_confidence_to_permille(
-                       context->last_confidence_q15));
-    }
+    river_voice_kws_maybe_log_slow_infer(context);
+    river_voice_kws_maybe_log_peak_status(context, NULL);
 
     if (context->last_confidence_q15 >= river_voice_kws_score_threshold_q15()) {
         context->hit_streak++;
@@ -2388,6 +2610,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
     uint32_t pre_roll_peak;
     uint32_t gate_best_permille;
 
+    river_voice_kws_update_peak_window(context);
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     if (context->last_status_log_ms != 0U &&
         (now_ms - context->last_status_log_ms) <
@@ -2446,6 +2669,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
                (unsigned long)context->last_feature_hash,
                (unsigned long)context->last_input_hash);
     river_voice_kws_log_perf_status(context);
+    river_voice_kws_reset_peak_window(context);
 }
 
 static river_status_t river_voice_kws_process_samples(

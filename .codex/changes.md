@@ -2930,3 +2930,36 @@
 - Goal of this step:
   - keep queue pressure under control while restoring enough temporal coverage to catch the wake phrase on board
   - test whether the current FP32 model can trigger once gate duration and pre-roll preservation are no longer the dominant bottlenecks
+
+## Step 5.73
+- The subsequent board log on `2026-04-03 13:34:47` already proved the current smoke profile can wake on board:
+  - `wakeword hit: text=小欧家 score_pm=61 q15=2009`
+  - `wakeword queued text=小欧管家 confidence=2009`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+  - `asr provider=xiaozhi_realtime session started`
+- This step does not retune wake behavior again. It reduces serial noise while adding targeted visibility for transient runtime spikes inside `river_voice_kws.cc`.
+- Added a compact peak-window logger for KWS:
+  - new `kws peak:` line reports both instantaneous and window-peak values for:
+    - `score_pm`
+    - `gate_best_pm`
+    - `infer_us`
+    - queue depth
+    - pre-roll depth
+    - heap low-water mark
+  - logs are emitted only when a meaningful new peak appears or on wake trigger
+  - repeated peak logs are rate-limited with a minimum spacing of `500 ms`
+- Replaced per-inference `kws infer slow:` spam with a throttled form:
+  - still requires the existing slow-alert level
+  - repeats only after the configured log interval or when latency worsens by at least `5000 us`
+- Slowed the periodic KWS heartbeat in `prj.conf`:
+  - `CONFIG_RIVER_KWS_LOG_PERIOD_MS: 2000 -> 5000`
+- Expanded periodic `kws perf:` output so each heartbeat also preserves the last window's peak timing and queue context:
+  - `infer_us ... win=...`
+  - `heap ... win_low=...`
+  - `queue ... win_peak=...`
+  - `score[win_pm=... gate_best_pm=...]`
+- Tightened the peak-reason logic so `infer` peaks are based on a real new latency peak, not on whether a previous slow log happened to print.
+- Goal of this step:
+  - keep background logs sparse enough for long serial captures
+  - still expose the short-lived queue, latency, and score spikes that explain misses or regressions
+- Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.

@@ -4957,3 +4957,54 @@ kws pre-roll trim: ...
 kws status: ... gate_best_pm=... thresh_pm=48 ... queue=... peak=...
 kws perf: infer_us[last=... avg=... max=...] ... queue[frames=64 stride=8]
 ```
+
+## Step 5.73 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after adding KWS peak-window logging and log throttling
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot/runtime emphasis:
+- wake behavior should stay on the already-proven smoke profile:
+  - `stride=8`
+  - `thresh_pm=48`
+- periodic KWS heartbeat should slow down to about every `5 s`:
+  - `kws status: ...`
+  - `kws perf: infer_us[last=... avg=... max=... win=...] ...`
+- repeated slow-inference warnings should become much less noisy:
+  - `kws infer slow:` should not print on every inference anymore
+  - another slow log is expected only after a larger latency regression or after the longer heartbeat interval
+- new transient diagnostics should appear only when warranted:
+  - `kws peak: reason=score ...`
+  - `kws peak: reason=infer ...`
+  - `kws peak: reason=queue ...`
+  - `kws peak: reason=trigger ...`
+
+Recommended capture after several wake attempts:
+```text
+kws peak: ...
+kws infer slow: ...
+kws status: ...
+kws perf: ...
+wakeword hit: ...
+```
+
+Interpretation:
+- `kws peak` shows `reason=infer` together with growing `queue` or `heap_low` pressure:
+  - the next bottleneck is still compute budget / runtime scheduling, not wake threshold
+- `kws peak` mostly shows `reason=score` or `gate_best` while latency stays flat:
+  - the next bottleneck is more likely frontend/model score distribution than runtime jitter
+- wake still fires and the new logs stay sparse:
+  - this logging step succeeded and can be kept for longer board captures
