@@ -3016,3 +3016,35 @@
 - Outcome of this step:
   - spontaneous resets can now be correlated with the last interaction phase visible to project code
   - this is specifically aimed at diagnosing the earlier no-panic reboot after follow-up timeout
+
+## Step 5.77
+- Addressed the `xiaozhi` websocket/uplink congestion path inside the project without patching the external SDK tree.
+- Tightened websocket-side backpressure handling in `river_xiaozhi_ws.c`:
+  - increased `RIVER_XIAOZHI_WS_QUEUE_MAX` from `4` to `8`
+  - switched `ws_set_senddata_block_time()` to non-blocking for `xiaozhi`
+  - added queue-watermark checks before `ws_sendBinary()` / `ws_send()`
+  - audio uplink now reserves `2` queue slots so control JSON is less likely to be starved by audio bursts
+  - added throttled diagnostics:
+    - `xiaozhi ws backpressure: kind=... ready=... recycle=... max=...`
+    - `xiaozhi_dump_status()` now prints websocket queue depth / peak / backpressure counters
+- Added `xiaozhi uplink` retreat policy in `river_cloud_adapter.c`:
+  - exponential backoff up to `160 ms` on `RIVER_ERR_BUSY`
+  - trims stale queued uplink PCM down to `6` frames so ASR prefers fresh speech over delayed backlog
+  - rate-limited runtime log:
+    - `xiaozhi uplink backpressure: queued=... busy=... streak=... backoff=... stale_drop=...`
+  - status dump now exposes:
+    - uplink ring overflow drops
+    - stale-drop count from congestion trimming
+    - busy/fail counters
+- Reset the new congestion bookkeeping when a fresh xiaozhi uplink session starts or transport state is torn down.
+- Verified on `2026-04-03`:
+  - full local `RTL8730E` rebuild completed successfully with `Build done`
+  - flashed to `/dev/ttyUSB0`; `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor` finished with `PASS`
+  - live monitor capture after flashing showed:
+    - the new project-side backpressure logs firing
+    - no repeated SDK-side `WSCLIENT ERROR] ws_sendData: ERROR: Not get usable buffer...`
+    - no sampled `xiaozhi playback write failed`
+    - `river.voice.probe ... stream_busy=0` throughout the captured interaction window
+- Current assessment:
+  - websocket congestion still exists at the transport level, but it is now surfaced earlier and handled in a controlled way
+  - the previous failure amplification path from queue-full -> SDK error spam -> playback error recovery is materially reduced

@@ -5138,3 +5138,60 @@ Recommended capture:
 Success criterion:
 - next-boot logs consistently include the previous recorded interaction phase
 - manual `reboot` proves the breadcrumb survives at least software/AP-triggered resets
+
+## Step 5.77 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Observed build result on `2026-04-03`:
+- the full `RTL8730E` rebuild passed after adding websocket queue watermarking and xiaozhi uplink backoff
+- the build finished with `Build done`
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Observed flash result on `2026-04-03`:
+- the board image download completed successfully on `/dev/ttyUSB0`
+- the flash tool finished with `PASS`
+
+Boot/runtime capture:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Recommended runtime emphasis:
+- trigger a few wake + follow-up rounds like the earlier failure case
+- watch specifically for these lines:
+
+```text
+[river.cloud.xiaozhi] xiaozhi ws backpressure: kind=audio ready=... recycle=... max=8 reserve=2
+[river.cloud] xiaozhi uplink backpressure: queued=... busy=... streak=... backoff=... stale_drop=...
+[river.voice.probe] ... stream_busy=...
+```
+
+Observed runtime result on `2026-04-03` after flashing:
+- new project-side backpressure logs appeared as expected, for example:
+  - `xiaozhi ws backpressure: kind=audio ready=6 recycle=0 max=8 reserve=2`
+  - `xiaozhi uplink backpressure: queued=5/64 busy=72 streak=8 backoff=160ms stale_drop=106`
+- the sampled monitor window did not show the old SDK spam:
+  - `WSCLIENT ERROR] ws_sendData: ERROR: Not get usable buffer...`
+- the sampled monitor window did not show:
+  - `xiaozhi playback write failed`
+- `river.voice.probe` continued to report `stream_busy=0` in the captured session
+
+Success criterion:
+- websocket congestion is reported through the new project-side logs instead of repeated SDK queue-full errors
+- `stream_busy` should stay near `0` or materially lower than before during similar speech/playback windows
+- follow-up rounds should avoid the earlier pattern of:
+  - `ws_sendData ... Not get usable buffer`
+  - `xiaozhi uplink send failed: status=-6`
+  - `xiaozhi playback write failed`

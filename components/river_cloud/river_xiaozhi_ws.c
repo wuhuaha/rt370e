@@ -52,7 +52,9 @@
 #define RIVER_XIAOZHI_WS_RECV_TIMEOUT_MS   10000U
 #define RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS   200U
 #define RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS 15000U
-#define RIVER_XIAOZHI_WS_SEND_BLOCK_MS     200U
+#define RIVER_XIAOZHI_WS_SEND_BLOCK_MS     0U
+#define RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE 2U
+#define RIVER_XIAOZHI_WS_QUEUE_LOG_INTERVAL_MS 1000U
 #define RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD (64U * 1024U)
 
 typedef struct {
@@ -108,8 +110,11 @@ typedef struct {
     uint32_t mcp_failures;
     uint32_t activation_timeout_ms;
     uint32_t bootstrap_failures;
+    uint32_t send_backpressure_events;
+    uint32_t send_queue_high_watermark;
     bool activation_code_present;
     uint64_t bootstrap_retry_after_ms;
+    uint64_t last_backpressure_log_ms;
     char url[RIVER_XIAOZHI_URL_MAX];
     char ota_url[RIVER_XIAOZHI_OTA_URL_MAX];
     char token[RIVER_XIAOZHI_TOKEN_MAX];
@@ -178,6 +183,87 @@ static void river_xiaozhi_set_last_error(const char *error_text)
     river_xiaozhi_copy_string(g_river_xiaozhi.last_error,
                               sizeof(g_river_xiaozhi.last_error),
                               error_text);
+}
+
+static void river_xiaozhi_send_queue_snapshot_locked(uint32_t *ready_out,
+                                                     uint32_t *recycle_out,
+                                                     uint32_t *max_out)
+{
+    uint32_t ready = 0U;
+    uint32_t recycle = 0U;
+    uint32_t max = 0U;
+
+    if (g_river_xiaozhi.wsclient != NULL) {
+        if (g_river_xiaozhi.wsclient->ready_send_buf_num > 0) {
+            ready = (uint32_t)g_river_xiaozhi.wsclient->ready_send_buf_num;
+        }
+        if (g_river_xiaozhi.wsclient->recycle_send_buf_num > 0) {
+            recycle = (uint32_t)g_river_xiaozhi.wsclient->recycle_send_buf_num;
+        }
+        if (g_river_xiaozhi.wsclient->max_queue_size > 0) {
+            max = (uint32_t)g_river_xiaozhi.wsclient->max_queue_size;
+        }
+    }
+
+    if (max != 0U) {
+        if (ready > max) {
+            ready = max;
+        }
+        if (recycle > max) {
+            recycle = max;
+        }
+        if (ready > g_river_xiaozhi.send_queue_high_watermark) {
+            g_river_xiaozhi.send_queue_high_watermark = ready;
+        }
+    }
+
+    if (ready_out != NULL) {
+        *ready_out = ready;
+    }
+    if (recycle_out != NULL) {
+        *recycle_out = recycle;
+    }
+    if (max_out != NULL) {
+        *max_out = max;
+    }
+}
+
+static bool river_xiaozhi_send_queue_backpressured_locked(uint32_t reserve_slots,
+                                                          const char *kind)
+{
+    uint32_t ready;
+    uint32_t recycle;
+    uint32_t max;
+    uint64_t now_ms;
+
+    river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max);
+    if (max == 0U) {
+        return false;
+    }
+
+    if (reserve_slots >= max) {
+        reserve_slots = max - 1U;
+    }
+    if ((ready + reserve_slots) < max) {
+        return false;
+    }
+
+    g_river_xiaozhi.send_backpressure_events++;
+    river_xiaozhi_set_last_error("send_queue_busy");
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (g_river_xiaozhi.last_backpressure_log_ms == 0U ||
+        (now_ms - g_river_xiaozhi.last_backpressure_log_ms) >=
+            RIVER_XIAOZHI_WS_QUEUE_LOG_INTERVAL_MS) {
+        g_river_xiaozhi.last_backpressure_log_ms = now_ms;
+        RIVER_LOGW("xiaozhi ws backpressure: kind=%s ready=%lu recycle=%lu max=%lu reserve=%lu",
+                   kind != NULL ? kind : "-",
+                   (unsigned long)ready,
+                   (unsigned long)recycle,
+                   (unsigned long)max,
+                   (unsigned long)reserve_slots);
+    }
+    return true;
 }
 
 static void river_xiaozhi_reclaim_heap_before_connect(void)
@@ -386,6 +472,12 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
     locked = river_xiaozhi_transport_lock();
     if (!locked || g_river_xiaozhi.wsclient == NULL ||
         g_river_xiaozhi.wsclient->readyState != WSC_OPEN) {
+        status = RIVER_ERR_BUSY;
+        goto exit;
+    }
+
+    if (river_xiaozhi_send_queue_backpressured_locked(RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE,
+                                                      "audio")) {
         status = RIVER_ERR_BUSY;
         goto exit;
     }
@@ -978,6 +1070,11 @@ static river_status_t river_xiaozhi_send_json_root(cJSON *root)
     locked = river_xiaozhi_transport_lock();
     if (!locked || g_river_xiaozhi.wsclient == NULL ||
         g_river_xiaozhi.wsclient->readyState != WSC_OPEN) {
+        status = RIVER_ERR_BUSY;
+        goto exit;
+    }
+
+    if (river_xiaozhi_send_queue_backpressured_locked(0U, "json")) {
         status = RIVER_ERR_BUSY;
         goto exit;
     }
@@ -1870,6 +1967,9 @@ river_status_t river_xiaozhi_open_session(void)
     river_xiaozhi_close_context(false);
     g_river_xiaozhi.session_id[0] = '\0';
     g_river_xiaozhi.last_error[0] = '\0';
+    g_river_xiaozhi.send_backpressure_events = 0U;
+    g_river_xiaozhi.send_queue_high_watermark = 0U;
+    g_river_xiaozhi.last_backpressure_log_ms = 0U;
     memset(g_river_xiaozhi.open_base_url, 0, sizeof(g_river_xiaozhi.open_base_url));
     memset(g_river_xiaozhi.open_path, 0, sizeof(g_river_xiaozhi.open_path));
     memset(g_river_xiaozhi.open_header_fields, 0, sizeof(g_river_xiaozhi.open_header_fields));
@@ -1935,9 +2035,9 @@ river_status_t river_xiaozhi_open_session(void)
     }
 
     /*
-     * Bound websocket enqueue/send latency so a drained-but-not-fully-flushed
-     * previous ASR stream cannot pin the real-time capture path behind the
-     * transport mutex when follow-up speech tries to re-open listening.
+     * Keep wsclient enqueue non-blocking here. Once the send queue is near
+     * full, project-side backpressure returns BUSY early so the pump task can
+     * keep polling and draining instead of being pinned behind this mutex.
      */
     ws_setsockopt_timeout(RIVER_XIAOZHI_WS_RECV_TIMEOUT_MS,
                           RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS,
@@ -2092,12 +2192,23 @@ river_status_t river_xiaozhi_send_mcp_payload(const char *payload_json)
 
 void river_xiaozhi_dump_status(void)
 {
+    uint32_t ready = 0U;
+    uint32_t recycle = 0U;
+    uint32_t max = 0U;
+    bool locked = false;
+
     if (!g_river_xiaozhi.initialized) {
         RIVER_LOGI("xiaozhi session=uninitialized");
         return;
     }
 
-    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
+    locked = river_xiaozhi_transport_lock();
+    if (locked) {
+        river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max);
+        river_xiaozhi_transport_unlock(locked);
+    }
+
+    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu q_peak=%lu bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.session_open),
                river_xiaozhi_bool_text(g_river_xiaozhi.server_hello_received),
                river_xiaozhi_bool_text(g_river_xiaozhi.config_ready),
@@ -2121,6 +2232,11 @@ void river_xiaozhi_dump_status(void)
                (unsigned long)g_river_xiaozhi.mcp_requests_rx,
                (unsigned long)g_river_xiaozhi.mcp_responses_tx,
                (unsigned long)g_river_xiaozhi.mcp_failures,
+               (unsigned long)ready,
+               (unsigned long)max,
+               (unsigned long)recycle,
+               (unsigned long)g_river_xiaozhi.send_queue_high_watermark,
+               (unsigned long)g_river_xiaozhi.send_backpressure_events,
                g_river_xiaozhi.activation_code[0] != '\0' ? g_river_xiaozhi.activation_code : "-",
                g_river_xiaozhi.last_type[0] != '\0' ? g_river_xiaozhi.last_type : "-",
                g_river_xiaozhi.last_state[0] != '\0' ? g_river_xiaozhi.last_state : "-",

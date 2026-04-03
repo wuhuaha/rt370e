@@ -37,7 +37,13 @@
  */
 #define RIVER_XIAOZHI_WS_TX_MAX                 1024
 #define RIVER_XIAOZHI_WS_RX_MAX                 12288
-#define RIVER_XIAOZHI_WS_QUEUE_MAX              4
+/*
+ * Keep a little more headroom than the original depth of 4 so short network
+ * jitter does not immediately force the realtime audio path into queue-full
+ * churn. The queue is still intentionally small enough to preserve freshness
+ * instead of hiding sustained congestion for too long.
+ */
+#define RIVER_XIAOZHI_WS_QUEUE_MAX              8
 #define RIVER_XIAOZHI_OPEN_READY_WAIT_MS        10000U
 #define RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC      10U
 

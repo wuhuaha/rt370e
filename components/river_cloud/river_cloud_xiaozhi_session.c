@@ -225,6 +225,7 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     g_river_cloud.xiaozhi_listen_stop_pending = false;
     g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
     g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
     river_audio_frame_ring_reset(&g_river_cloud.xiaozhi_uplink_ring);
     river_cloud_xiaozhi_reset_downlink_state();
     river_cloud_xiaozhi_clear_pending_text();

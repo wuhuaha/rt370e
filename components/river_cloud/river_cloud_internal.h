@@ -54,6 +54,9 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_IDLE_MS    20U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 6U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
 #define RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS    256U
 #define RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES   2U
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
@@ -131,9 +134,14 @@ typedef struct {
     uint32_t xiaozhi_open_speech_frames;
     uint32_t xiaozhi_uplink_timestamp_ms;
     uint32_t xiaozhi_uplink_ring_dropped;
+    uint32_t xiaozhi_uplink_busy_count;
+    uint32_t xiaozhi_uplink_fail_count;
+    uint32_t xiaozhi_uplink_stale_dropped;
+    uint32_t xiaozhi_uplink_busy_streak;
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
+    uint64_t xiaozhi_uplink_last_busy_log_ms;
     size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
     uint8_t xiaozhi_uplink_ring_storage[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX *
