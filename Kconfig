@@ -305,6 +305,12 @@ config RIVER_KWS_VAD_PRE_ROLL_MS
     default 320
     depends on RIVER_VOICE_CAPABILITY_KWS
 
+config RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES
+    int "Wake-word KWS maximum pre-roll frames flushed into the worker"
+    range 1 64
+    default 8
+    depends on RIVER_VOICE_CAPABILITY_KWS
+
 config RIVER_KWS_INPUT_QUEUE_FRAMES
     int "Wake-word KWS worker queue capacity in frames"
     range 8 128

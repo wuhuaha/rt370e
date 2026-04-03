@@ -2909,3 +2909,24 @@
   - prove or disprove that the end-to-end wakeword path can fire on board now that the memory ceiling is no longer the blocker
   - reduce scheduler pressure enough that the current FP32 profile can still be judged meaningfully before changing model or frontend behavior again
 - Verified this step with a full local `RTL8730E` rebuild on `2026-04-03`, which completed successfully with `Build done`.
+
+## Step 5.72
+- The `2026-04-03 12:00:08` board log shows the lower smoke threshold and larger heap are active, but wake still does not trigger:
+  - `threshold_q15=1600`
+  - `thresh_pm=48`
+  - `stride=16`
+  - `kws pre-roll trim: dropped=12 keep=8/20`
+  - observed gate-best scores only reached about `11pm`
+- Treated that log as a timing-coverage problem, not another threshold problem:
+  - `stride=16` reduced queue growth, but it sampled too sparsely on the slow `~178ms` FP32 path
+  - each gate was trimming the configured `320ms` pre-roll from `20` frames down to only `8`, which likely discarded the wake phrase onset
+  - VAD gate hold time remained short for a slow board path that often needs more than one aligned inference per utterance
+- Implemented the next timing-debug profile:
+  - `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES=8`
+  - `CONFIG_RIVER_SILERO_VAD_HANGOVER_FRAMES=18`
+  - added new Kconfig/project config `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES`
+  - set `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES=16` in `prj.conf`
+- Updated `river_voice_kws.cc` so pre-roll flush depth is no longer hard-coded at `8`; it now follows the new project config and still reports the active value in the existing backend/profile logs.
+- Goal of this step:
+  - keep queue pressure under control while restoring enough temporal coverage to catch the wake phrase on board
+  - test whether the current FP32 model can trigger once gate duration and pre-roll preservation are no longer the dominant bottlenecks

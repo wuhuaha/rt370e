@@ -4918,3 +4918,42 @@ Interpretation:
   - the next blocker is model/frontend score distribution on board, not heap layout anymore
 - queue growth is still aggressive even with `stride=16`:
   - the next blocker is CA32 compute budget / model cost, not threshold alone
+
+## Step 5.72 Verification
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected boot/runtime emphasis:
+- the backend line should confirm the new timing profile:
+  - `stride=8`
+  - `pre_roll_flush=16`
+- the Silero init line should confirm the longer gate hold:
+  - `hangover=18`
+- when speaking the wake phrase, pre-roll trimming should reduce or disappear relative to the prior:
+  - old behavior: `kws pre-roll trim: dropped=12 keep=8/20`
+  - new target: either no trim or at most `dropped=4 keep=16/20`
+- queue pressure should remain manageable even though inference cadence increases:
+  - queue peaks materially below saturation
+  - no `kws input trim:` log
+- success criteria for this timing-debug step:
+  - at least one `wakeword hit: text=...`
+  - or, if still no trigger, `gate_best_pm` must move materially above the prior `11pm` ceiling so the next blocker is clearly narrowed to model/frontend score distribution rather than board-side timing
+
+Capture these lines together after several wake-word attempts:
+```text
+kws backend: ... stride=8 ... pre_roll_flush=16 ...
+silero_vad runtime ready: ... hangover=18 ...
+kws pre-roll trim: ...
+kws status: ... gate_best_pm=... thresh_pm=48 ... queue=... peak=...
+kws perf: infer_us[last=... avg=... max=...] ... queue[frames=64 stride=8]
+```
