@@ -4053,6 +4053,9 @@ extern "C" void river_voice_kws_dump_alignment_status(void)
                    "ready" :
                    "empty",
                river_voice_kws_local_debug_mode_enabled() ? "yes" : "no");
+    if (!river_voice_kws_active()) {
+        RIVER_LOGI("kws align hint: local kws runtime is closed; check boot log for `kws init failed ...`, or let `river kws align run` retry lazy init");
+    }
 }
 
 extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
@@ -4065,7 +4068,14 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     uint8_t trailing_silence[RIVER_KWS_INPUT_FRAME_BYTES];
 
     if (context == NULL || !context->initialized) {
-        return RIVER_ERR_INVALID_STATE;
+        RIVER_LOGW("kws align lazy init: current_state=closed");
+        status = river_voice_kws_init();
+        if (status != RIVER_OK) {
+            RIVER_LOGE("kws align lazy init failed: status=%d", (int)status);
+            return status;
+        }
+        context = g_river_voice_kws;
+        RIVER_LOGI("kws align lazy init ok");
     }
     if (RIVER_KWS_ALIGNMENT_FRAME_SAMPLES != RIVER_KWS_INPUT_FRAME_SAMPLES ||
         RIVER_KWS_ALIGNMENT_FRAME_BYTES != RIVER_KWS_INPUT_FRAME_BYTES) {

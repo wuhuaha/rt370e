@@ -3138,3 +3138,21 @@
 - Verified on `2026-04-04`:
   - regenerated the compiled alignment sample header successfully
   - full local `RTL8730E` rebuild completed successfully with `Build done`
+
+## Step 5.82
+- Fixed the immediate board-side usability gap in the new KWS alignment flow: `river kws align run` no longer assumes local KWS was already initialized at boot.
+- Root cause from the `2026-04-04` board log:
+  - `river kws align status` showed `kws=closed probe=stopped interaction=wake_monitoring detection=ready`
+  - so the failure was not the probe/interation guard; it was the closed KWS runtime itself
+- Updated `components/river_voice/river_voice_kws.cc`:
+  - `river_voice_kws_dump_alignment_status()` now prints an explicit hint when the KWS runtime is closed
+  - `river_voice_kws_run_alignment_sample()` now performs lazy `river_voice_kws_init()` before replay when needed
+  - lazy-init success and failure are logged explicitly:
+    - `kws align lazy init: current_state=closed`
+    - `kws align lazy init ok`
+    - `kws align lazy init failed: status=...`
+- Updated `components/river_diag/river_diag_cmd.c`:
+  - `river kws align run` now prints the exact `river_status_t` failure code instead of the previous generic precondition hint
+  - this makes the next board run actionable even if lazy init still fails for a deeper reason such as memory pressure
+- Verified on `2026-04-04`:
+  - full local `RTL8730E` rebuild completed successfully with `Build done`

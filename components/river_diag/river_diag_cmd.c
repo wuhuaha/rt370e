@@ -259,8 +259,11 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             }
 
             if (strcmp((const char *)argv[2], "run") == 0) {
-                if (river_voice_kws_run_alignment_sample(true) != RIVER_OK) {
-                    printf("[river][diag] kws align run failed; ensure `river audio probe stop` and idle wake-monitoring state first\n");
+                river_status_t status =
+                    river_voice_kws_run_alignment_sample(true);
+                if (status != RIVER_OK) {
+                    printf("[river][diag] kws align run failed status=%d; check KWS logs above\n",
+                           (int)status);
                 }
                 return 0;
             }

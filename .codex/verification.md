@@ -5395,3 +5395,46 @@ Expected result:
 
 Note:
 - the replay command intentionally clears the in-memory snapshot after serial emission, so the serial log itself is the artifact to preserve for host-side comparison
+
+## Step 5.82 Verification
+
+Full project rebuild:
+
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Expected result:
+- the full external-project build succeeds
+- final line contains `Build done`
+
+Board-side monitor procedure after flashing the new image:
+
+```text
+river audio probe stop
+river kws align status
+river kws align run
+```
+
+Expected runtime behavior when boot-time KWS did not come up:
+- `river kws align status` prints:
+  - `kws=closed`
+  - `probe=stopped`
+  - `interaction=wake_monitoring`
+  - `kws align hint: local kws runtime is closed; ... let river kws align run retry lazy init`
+- `river kws align run` then prints one of:
+  - success path:
+    - `kws align lazy init: current_state=closed`
+    - `kws align lazy init ok`
+    - followed by the normal replay / dump logs from Step `5.81`
+  - failure path:
+    - `kws align lazy init: current_state=closed`
+    - `kws align lazy init failed: status=...`
+    - `[river][diag] kws align run failed status=...; check KWS logs above`
+
+Failure interpretation:
+- if lazy init succeeds, the original `kws=closed` blocker is fixed and the replay path should proceed normally
+- if lazy init fails with a concrete status code, collect the surrounding KWS init log because the next debugging target is the real KWS init failure, not the align command itself
