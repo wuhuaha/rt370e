@@ -3156,3 +3156,22 @@
   - this makes the next board run actionable even if lazy init still fails for a deeper reason such as memory pressure
 - Verified on `2026-04-04`:
   - full local `RTL8730E` rebuild completed successfully with `Build done`
+
+## Step 5.83
+- Fixed the actual KWS init regression behind the failed `river kws align run` attempts on `2026-04-04`.
+- Root cause was confirmed from the local build artifacts, not guessed:
+  - the SDK `tensorflow-microlite` library is compiled with `-DTF_LITE_STATIC_MEMORY`
+  - `components/river_voice/river_voice_kws.cc` and `components/river_voice/river_voice_detector_silero.cc` were being compiled without that macro
+  - this made board-side `TfLiteTensor` field access ABI-incompatible in those translation units
+  - the resulting symptom matched the board log exactly:
+    - `type=none alloc=unknown raw=0x0 dims=0x0`
+    - `kws tensor data invalid`
+    - `kws align lazy init failed: status=-3`
+- Updated `components/river_voice/CMakeLists.txt`:
+  - added `TF_LITE_STATIC_MEMORY` as a source-level compile definition for:
+    - `river_voice_kws.cc`
+    - `river_voice_detector_silero.cc`
+  - kept the scope narrow so only the TFLM-facing translation units adopt the SDK tensor ABI
+- Verified on `2026-04-04`:
+  - regenerated build metadata and completed a full local `RTL8730E` rebuild with `Build done`
+  - confirmed in `build_RTL8730E/build/compile_commands.json` that both KWS/VAD translation units now compile with `-DTF_LITE_STATIC_MEMORY`

@@ -5438,3 +5438,64 @@ Expected runtime behavior when boot-time KWS did not come up:
 Failure interpretation:
 - if lazy init succeeds, the original `kws=closed` blocker is fixed and the replay path should proceed normally
 - if lazy init fails with a concrete status code, collect the surrounding KWS init log because the next debugging target is the real KWS init failure, not the align command itself
+
+## Step 5.83 Verification
+
+Full project rebuild:
+
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Expected result:
+- the full external-project build succeeds
+- final line contains `Build done`
+
+Optional host-side sanity check after configure/build:
+
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import json
+with open('build_RTL8730E/build/compile_commands.json') as f:
+    data = json.load(f)
+for suffix in [
+    'components/river_voice/river_voice_kws.cc',
+    'components/river_voice/river_voice_detector_silero.cc',
+]:
+    cmd = next(item['command'] for item in data if item['file'].endswith(suffix))
+    print(suffix, 'TF_LITE_STATIC_MEMORY' in cmd)
+PY
+```
+
+Expected result:
+- both lines print `True`
+
+Board-side boot/runtime verification after flashing:
+
+Watch boot log for KWS init:
+- no longer expect:
+  - `kws io binding: ... type=none alloc=unknown raw=0x0 dims=0x0 ...`
+  - `kws tensor data invalid`
+- instead expect valid binding similar to:
+  - `kws io binding: ... type=float32 alloc=arena_rw ... raw=0x... dims=0x...`
+  - followed by normal KWS init stages and `kws status: ... ready=yes ...`
+
+Then run:
+
+```text
+river audio probe stop
+river kws align status
+river kws align run
+```
+
+Expected runtime behavior:
+- if boot-time KWS already initialized successfully:
+  - `river kws align status` should show `kws=ready`
+  - `river kws align run` should proceed directly into replay / tensor dump
+- if boot-time KWS is still closed for some other reason:
+  - `river kws align run` should at least no longer fail with the old invalid-tensor signature
+  - collect the new init logs because the previous ABI-mismatch failure mode should be gone

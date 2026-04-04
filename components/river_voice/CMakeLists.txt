@@ -80,6 +80,15 @@ ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm
 )
 
+# Match the SDK tensorflow-microlite ABI for translation units that directly
+# inspect TfLiteTensor fields.
+set_source_files_properties(
+    river_voice_detector_silero.cc
+    river_voice_kws.cc
+    PROPERTIES
+        COMPILE_DEFINITIONS "TF_LITE_STATIC_MEMORY"
+)
+
 ameba_add_internal_library(river_voice
     p_SOURCES
         ${private_sources}
