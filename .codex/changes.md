@@ -3175,3 +3175,26 @@
 - Verified on `2026-04-04`:
   - regenerated build metadata and completed a full local `RTL8730E` rebuild with `Build done`
   - confirmed in `build_RTL8730E/build/compile_commands.json` that both KWS/VAD translation units now compile with `-DTF_LITE_STATIC_MEMORY`
+
+## Step 5.84
+- Tightened the board-side KWS alignment replay flow so `river kws align run` now keeps the best replay frame instead of dumping the first inference after gate-open.
+- Root cause from the successful `2026-04-04` board replay log:
+  - the replay path was using the generic one-shot `river_voice_kws_request_tensor_dump_next()`
+  - the loop also stopped submitting frames as soon as the first snapshot became ready
+  - this made the dump lock onto the early low-score frame:
+    - `kws align replay captured: ... score=0.002818 q15=92`
+  - while the same replay later reached the actual wake-word peak:
+    - `wakeword hit: ... score_pm=910 q15=29835`
+- Updated `components/river_voice/river_voice_kws.cc`:
+  - added an internal tensor-dump mode split:
+    - `next` keeps existing one-shot behavior for normal `river kws dump next`
+    - `align_best` is used only by alignment replay and overwrites the snapshot when replay score improves
+  - assigned a stable dump sequence when arming so one alignment run keeps one snapshot id even if the best frame is updated multiple times
+  - extended tensor-dump status / capture logs to include the active dump mode for easier serial-side diagnosis
+  - changed `river_voice_kws_run_alignment_sample()` to:
+    - arm `align_best` instead of `next`
+    - submit the full compiled sample plus all configured tail-silence frames
+    - wait for worker idle at the end of replay instead of stopping on the first ready snapshot
+    - fail explicitly if the replay finishes without producing any snapshot
+- Verified on `2026-04-04`:
+  - full local `RTL8730E` rebuild completed successfully with `Build done`

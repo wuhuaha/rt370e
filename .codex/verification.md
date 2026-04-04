@@ -5499,3 +5499,40 @@ Expected runtime behavior:
 - if boot-time KWS is still closed for some other reason:
   - `river kws align run` should at least no longer fail with the old invalid-tensor signature
   - collect the new init logs because the previous ABI-mismatch failure mode should be gone
+
+## Step 5.84 Verification
+
+Full project rebuild:
+
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Expected result:
+- the full external-project build succeeds
+- final line contains `Build done`
+
+Board-side monitor procedure after flashing:
+
+```text
+river audio probe stop
+river kws align run
+```
+
+Expected runtime behavior:
+- the board should now print:
+  - `kws tensor dump armed: mode=align_best`
+  - `kws align replay start: source=compiled_pcm ...`
+  - one or more `kws tensor dump captured: ... mode=align_best ...` lines as replay score improves
+  - final `kws align replay captured: seq=... infer=... score=... q15=...`
+  - the usual full `feat_f32` / `input_raw` / `output_raw` dump stream
+- the final captured score should no longer be the early low-score frame seen before this step
+  - previous bad reference was `score=0.002818 q15=92`
+  - the new captured score should be materially higher and should be close to the replay peak / wake-word hit frame
+
+Manual interpretation:
+- if `kws align replay captured` is now near the peak hit frame, the board-vs-host exact replay artifact is usable
+- if the final captured score is still stuck near the old low-score level, collect the full replay log because the remaining bug would then be in the peak-selection policy rather than in runtime init or ABI setup

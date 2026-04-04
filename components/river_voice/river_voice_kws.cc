@@ -336,6 +336,12 @@ typedef struct {
     uint8_t pcm[RIVER_KWS_INPUT_FRAME_BYTES];
 } river_voice_kws_queue_item_t;
 
+typedef enum {
+    RIVER_VOICE_KWS_TENSOR_DUMP_MODE_OFF = 0U,
+    RIVER_VOICE_KWS_TENSOR_DUMP_MODE_NEXT = 1U,
+    RIVER_VOICE_KWS_TENSOR_DUMP_MODE_ALIGN_BEST = 2U
+} river_voice_kws_tensor_dump_mode_t;
+
 typedef struct {
     bool initialized;
     bool window_ready;
@@ -408,10 +414,12 @@ typedef struct {
     int32_t last_input_value_mean_milli;
     int32_t last_input_probe_values[RIVER_KWS_DIAG_PROBE_COUNT];
     bool tensor_dump_armed;
+    river_voice_kws_tensor_dump_mode_t tensor_dump_mode;
     bool tensor_dump_feature_valid;
     bool tensor_dump_snapshot_ready;
     bool local_debug_mode;
     uint32_t tensor_dump_request_count;
+    uint32_t tensor_dump_active_seq;
     uint32_t tensor_dump_last_seq;
     uint32_t tensor_dump_last_infer;
     uint32_t tensor_dump_capture_seq;
@@ -1756,6 +1764,80 @@ static void river_voice_kws_tensor_dump_snapshot_reset(
     context->tensor_dump_output_bytes_captured = 0U;
 }
 
+static const char *river_voice_kws_tensor_dump_mode_name(
+    river_voice_kws_tensor_dump_mode_t mode)
+{
+    switch (mode) {
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_NEXT:
+        return "next";
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_ALIGN_BEST:
+        return "align_best";
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_OFF:
+    default:
+        return "off";
+    }
+}
+
+static void river_voice_kws_disarm_tensor_dump(
+    river_voice_kws_context_t *context)
+{
+    if (context == NULL) {
+        return;
+    }
+
+    context->tensor_dump_armed = false;
+    context->tensor_dump_mode = RIVER_VOICE_KWS_TENSOR_DUMP_MODE_OFF;
+    context->tensor_dump_feature_valid = false;
+    context->tensor_dump_active_seq = 0U;
+}
+
+static river_status_t river_voice_kws_arm_tensor_dump(
+    river_voice_kws_context_t *context,
+    river_voice_kws_tensor_dump_mode_t mode)
+{
+    river_status_t status;
+
+    if (context == NULL || !context->initialized) {
+        return RIVER_ERR_INVALID_STATE;
+    }
+
+    status = river_voice_kws_ensure_tensor_dump_buffers(context);
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    context->tensor_dump_request_count++;
+    if (context->tensor_dump_request_count == 0U) {
+        context->tensor_dump_request_count = 1U;
+    }
+    context->tensor_dump_active_seq = context->tensor_dump_request_count;
+    context->tensor_dump_mode = mode;
+    context->tensor_dump_armed = true;
+    context->tensor_dump_feature_valid = false;
+    river_voice_kws_tensor_dump_snapshot_reset(context);
+    return RIVER_OK;
+}
+
+static bool river_voice_kws_should_capture_exact_tensors(
+    const river_voice_kws_context_t *context)
+{
+    if (context == NULL || !context->tensor_dump_armed) {
+        return false;
+    }
+
+    switch (context->tensor_dump_mode) {
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_NEXT:
+        return true;
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_ALIGN_BEST:
+        return !context->tensor_dump_snapshot_ready ||
+               context->last_confidence_q15 >
+                   context->tensor_dump_capture_confidence_q15;
+    case RIVER_VOICE_KWS_TENSOR_DUMP_MODE_OFF:
+    default:
+        return false;
+    }
+}
+
 static void river_voice_kws_tensor_dump_log_begin_meta(
     const river_voice_kws_context_t *context)
 {
@@ -1792,6 +1874,7 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
 
 static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *context)
 {
+    river_voice_kws_tensor_dump_mode_t mode;
     uint32_t seq;
     size_t input_bytes;
     size_t output_bytes;
@@ -1805,6 +1888,9 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
         context->tensor_dump_output_tensor == NULL) {
         return;
     }
+    if (!river_voice_kws_should_capture_exact_tensors(context)) {
+        return;
+    }
 
     input_bytes = context->input_tensor_bytes_resolved;
     output_bytes = context->output_tensor_bytes_resolved;
@@ -1816,14 +1902,21 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
                    (unsigned long)output_bytes,
                    (unsigned long)context->tensor_dump_input_bytes_reserved,
                    (unsigned long)context->tensor_dump_output_bytes_reserved);
-        context->tensor_dump_armed = false;
-        context->tensor_dump_feature_valid = false;
+        river_voice_kws_disarm_tensor_dump(context);
         river_voice_kws_tensor_dump_snapshot_reset(context);
         return;
     }
 
-    seq = context->tensor_dump_request_count + 1U;
-    context->tensor_dump_request_count = seq;
+    mode = context->tensor_dump_mode;
+    seq = context->tensor_dump_active_seq;
+    if (seq == 0U) {
+        context->tensor_dump_request_count++;
+        if (context->tensor_dump_request_count == 0U) {
+            context->tensor_dump_request_count = 1U;
+        }
+        seq = context->tensor_dump_request_count;
+        context->tensor_dump_active_seq = seq;
+    }
     context->tensor_dump_last_seq = seq;
     context->tensor_dump_last_infer = context->inference_count;
     context->tensor_dump_capture_seq = seq;
@@ -1847,12 +1940,15 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
                  context->output_tensor_data,
                  output_bytes);
     context->tensor_dump_snapshot_ready = true;
-    context->tensor_dump_armed = false;
     context->tensor_dump_feature_valid = false;
+    if (mode == RIVER_VOICE_KWS_TENSOR_DUMP_MODE_NEXT) {
+        river_voice_kws_disarm_tensor_dump(context);
+    }
 
-    RIVER_LOGI("kws tensor dump captured: seq=%lu infer=%lu feat_chunks=%lu input_chunks=%lu output_chunks=%lu",
+    RIVER_LOGI("kws tensor dump captured: seq=%lu infer=%lu mode=%s feat_chunks=%lu input_chunks=%lu output_chunks=%lu",
                (unsigned long)seq,
                (unsigned long)context->inference_count,
+               river_voice_kws_tensor_dump_mode_name(mode),
                (unsigned long)river_voice_kws_tensor_dump_chunk_count(
                    context->tensor_dump_feature_bytes_captured),
                (unsigned long)river_voice_kws_tensor_dump_chunk_count(
@@ -2145,31 +2241,6 @@ static river_status_t river_voice_kws_wait_for_worker_idle(
 
     start_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     while (!river_voice_kws_worker_idle(context)) {
-        if (((uint64_t)rtos_time_get_current_system_time_ms() - start_ms) >=
-            (uint64_t)timeout_ms) {
-            return RIVER_ERR_BUSY;
-        }
-        rtos_time_delay_ms(RIVER_KWS_ALIGNMENT_POLL_DELAY_MS);
-    }
-
-    return RIVER_OK;
-}
-
-static river_status_t river_voice_kws_wait_for_tensor_dump_snapshot(
-    river_voice_kws_context_t *context,
-    uint32_t timeout_ms)
-{
-    uint64_t start_ms;
-
-    if (context == NULL) {
-        return RIVER_ERR_ARG;
-    }
-
-    start_ms = (uint64_t)rtos_time_get_current_system_time_ms();
-    while (!context->tensor_dump_snapshot_ready) {
-        if (river_voice_kws_worker_idle(context)) {
-            return RIVER_ERR_NOT_FOUND;
-        }
         if (((uint64_t)rtos_time_get_current_system_time_ms() - start_ms) >=
             (uint64_t)timeout_ms) {
             return RIVER_ERR_BUSY;
@@ -3861,8 +3932,10 @@ extern "C" void river_voice_kws_dump_status(void)
                         0U :
                         river_voice_kws_tensor_dump_chunk_count(
                             g_river_voice_kws->tensor_dump_output_bytes_captured);
-    RIVER_LOGI("kws tensor dump status: armed=%s ready=%s last_seq=%lu last_infer=%lu capture_seq=%lu capture_infer=%lu chunks=[feat:%lu input:%lu output:%lu]",
+    RIVER_LOGI("kws tensor dump status: armed=%s mode=%s ready=%s last_seq=%lu last_infer=%lu capture_seq=%lu capture_infer=%lu chunks=[feat:%lu input:%lu output:%lu]",
                g_river_voice_kws->tensor_dump_armed ? "yes" : "no",
+               river_voice_kws_tensor_dump_mode_name(
+                   g_river_voice_kws->tensor_dump_mode),
                g_river_voice_kws->tensor_dump_snapshot_ready ? "yes" : "no",
                (unsigned long)g_river_voice_kws->tensor_dump_last_seq,
                (unsigned long)g_river_voice_kws->tensor_dump_last_infer,
@@ -3913,7 +3986,9 @@ extern "C" river_status_t river_voice_kws_request_tensor_dump_next(void)
         return RIVER_ERR_INVALID_STATE;
     }
 
-    status = river_voice_kws_ensure_tensor_dump_buffers(g_river_voice_kws);
+    status = river_voice_kws_arm_tensor_dump(
+        g_river_voice_kws,
+        RIVER_VOICE_KWS_TENSOR_DUMP_MODE_NEXT);
     if (status != RIVER_OK) {
         RIVER_LOGE("kws tensor dump buffer alloc failed: status=%d reserve=%lu",
                    (int)status,
@@ -3922,10 +3997,9 @@ extern "C" river_status_t river_voice_kws_request_tensor_dump_next(void)
         return status;
     }
 
-    g_river_voice_kws->tensor_dump_armed = true;
-    g_river_voice_kws->tensor_dump_feature_valid = false;
-    river_voice_kws_tensor_dump_snapshot_reset(g_river_voice_kws);
-    RIVER_LOGI("kws tensor dump armed: mode=next");
+    RIVER_LOGI("kws tensor dump armed: mode=%s",
+               river_voice_kws_tensor_dump_mode_name(
+                   g_river_voice_kws->tensor_dump_mode));
     return RIVER_OK;
 }
 
@@ -3936,8 +4010,7 @@ extern "C" void river_voice_kws_cancel_tensor_dump(void)
         return;
     }
 
-    g_river_voice_kws->tensor_dump_armed = false;
-    g_river_voice_kws->tensor_dump_feature_valid = false;
+    river_voice_kws_disarm_tensor_dump(g_river_voice_kws);
     RIVER_LOGI("kws tensor dump armed: mode=off");
 }
 
@@ -3948,8 +4021,7 @@ extern "C" void river_voice_kws_clear_tensor_dump(void)
         return;
     }
 
-    g_river_voice_kws->tensor_dump_armed = false;
-    g_river_voice_kws->tensor_dump_feature_valid = false;
+    river_voice_kws_disarm_tensor_dump(g_river_voice_kws);
     river_voice_kws_tensor_dump_snapshot_reset(g_river_voice_kws);
     RIVER_LOGI("kws tensor dump snapshot cleared");
 }
@@ -4118,17 +4190,21 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
         return status;
     }
 
+    river_voice_kws_disarm_tensor_dump(context);
     river_voice_kws_tensor_dump_snapshot_reset(context);
-    context->tensor_dump_armed = false;
-    context->tensor_dump_feature_valid = false;
     river_voice_kws_set_local_debug_mode(true);
 
     if (emit_dump) {
-        status = river_voice_kws_request_tensor_dump_next();
+        status = river_voice_kws_arm_tensor_dump(
+            context,
+            RIVER_VOICE_KWS_TENSOR_DUMP_MODE_ALIGN_BEST);
         if (status != RIVER_OK) {
             RIVER_LOGE("kws align arm tensor dump failed: status=%d", (int)status);
             goto cleanup;
         }
+        RIVER_LOGI("kws tensor dump armed: mode=%s",
+                   river_voice_kws_tensor_dump_mode_name(
+                       context->tensor_dump_mode));
     }
 
     RIVER_LOGI("kws align replay start: source=compiled_pcm frames=%u emit_dump=%s",
@@ -4153,13 +4229,10 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                        (int)status);
             goto cleanup;
         }
-        if (emit_dump && context->tensor_dump_snapshot_ready) {
-            break;
-        }
         rtos_time_delay_ms(RIVER_KWS_INPUT_FRAME_MS);
     }
 
-    if (status == RIVER_OK && !context->tensor_dump_snapshot_ready) {
+    if (status == RIVER_OK) {
         for (frame_index = 0U;
              frame_index < (uint32_t)RIVER_KWS_ALIGNMENT_TAIL_SILENCE_FRAMES;
              ++frame_index) {
@@ -4173,19 +4246,25 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                            (int)status);
                 goto cleanup;
             }
-            if (emit_dump && context->tensor_dump_snapshot_ready) {
-                break;
-            }
             rtos_time_delay_ms(RIVER_KWS_INPUT_FRAME_MS);
         }
     }
 
+    status = river_voice_kws_wait_for_worker_idle(
+        context,
+        RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS);
+    if (status != RIVER_OK) {
+        RIVER_LOGE("kws align worker idle wait failed: status=%d", (int)status);
+        goto cleanup;
+    }
+
     if (emit_dump) {
-        status = river_voice_kws_wait_for_tensor_dump_snapshot(
-            context,
-            RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS);
-        if (status != RIVER_OK) {
-            RIVER_LOGE("kws align snapshot wait failed: status=%d", (int)status);
+        if (!context->tensor_dump_snapshot_ready) {
+            status = RIVER_ERR_NOT_FOUND;
+            RIVER_LOGE("kws align snapshot missing: infer=%lu gate=%s score=%.6f",
+                       (unsigned long)context->inference_count,
+                       context->gate_open ? "open" : "closed",
+                       (double)context->last_score);
             goto cleanup;
         }
 
@@ -4195,14 +4274,6 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                    (double)context->tensor_dump_capture_score,
                    (unsigned long)context->tensor_dump_capture_confidence_q15);
         river_voice_kws_log_tensor_dump_snapshot(context);
-    } else {
-        status = river_voice_kws_wait_for_worker_idle(
-            context,
-            RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS);
-        if (status != RIVER_OK) {
-            RIVER_LOGE("kws align worker idle wait failed: status=%d", (int)status);
-            goto cleanup;
-        }
     }
 
 cleanup:
@@ -4215,8 +4286,7 @@ cleanup:
     }
     if (emit_dump) {
         river_voice_kws_tensor_dump_snapshot_reset(context);
-        context->tensor_dump_armed = false;
-        context->tensor_dump_feature_valid = false;
+        river_voice_kws_disarm_tensor_dump(context);
     }
     river_voice_kws_set_local_debug_mode(previous_local_debug_mode);
     if (status == RIVER_OK) {
