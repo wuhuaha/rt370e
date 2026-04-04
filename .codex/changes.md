@@ -3198,3 +3198,22 @@
     - fail explicitly if the replay finishes without producing any snapshot
 - Verified on `2026-04-04`:
   - full local `RTL8730E` rebuild completed successfully with `Build done`
+
+## Step 5.85
+- Added an explicit host-side verification procedure for the now-corrected KWS alignment replay artifact.
+- Recorded the key `2026-04-04` board-side success values that host replay must match:
+  - `feat_hash=0x63dd772f`
+  - `input_hash=0x3ec7297e`
+  - `raw=911`
+  - `score=0.910520`
+  - `q15=29835`
+  - `output_raw hex=df17693f`
+- Documented one important operator constraint from the first host replay attempt:
+  - the temporary file `/tmp/kws_align_dump_20260404_140825.log` is not a valid replay artifact
+  - it only contains `feat_f32 chunk=1..179/245`
+  - it contains no `input_raw` or `output_raw`
+  - `tools/kws/replay_board_tensor_dump.py` therefore fails with `dump seq=1 incomplete: feat_f32, input_raw, output_raw`
+- Added a stable capture-and-replay workflow to `.codex/verification.md` so the next run produces one complete monitor log and uses the same FP32 model variant as the board:
+  - capture the entire `river kws align run` UART stream to a file until `kws align replay done: dump=emitted ...`
+  - replay that file with `tools/kws/replay_board_tensor_dump.py`
+  - override the script default model with `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite`, because the board runtime is using `bc_resnet_v3_fp32_experimental`, not the production-final quantized path

@@ -5536,3 +5536,62 @@ Expected runtime behavior:
 Manual interpretation:
 - if `kws align replay captured` is now near the peak hit frame, the board-vs-host exact replay artifact is usable
 - if the final captured score is still stuck near the old low-score level, collect the full replay log because the remaining bug would then be in the peak-selection policy rather than in runtime init or ABI setup
+
+## Step 5.85 Verification
+
+No new firmware build is required for this step if the board is already running the Step `5.84` image.
+
+Full monitor capture for one alignment replay:
+
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000 | tee /tmp/kws_align_full.log
+```
+
+Board-side monitor commands:
+
+```text
+river audio probe stop
+river kws align run
+```
+
+Capture requirements:
+- do not stop the monitor early
+- keep logging until the board prints:
+  - `kws align replay done: dump=emitted ...`
+- the saved log must contain one complete dump sequence:
+  - one `kws tensor dump begin: ...`
+  - one `kws tensor dump meta: ...`
+  - all `feat_f32 chunk=1/245 ... 245/245`
+  - all `input_raw chunk=1/245 ... 245/245`
+  - one `output_raw chunk=1/1 ...`
+
+Host-side exact replay using the board-matching FP32 model:
+
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --model /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite \
+  --log /tmp/kws_align_full.log
+```
+
+Expected replay output:
+- the script should not fail with `dump seq=... incomplete`
+- `board_hash:` should show:
+  - `feature=0x63dd772f`
+  - `input=0x3ec7297e`
+- `host_hash:` should match the same feature/input hashes
+- `board_output:` should show:
+  - `raw=911`
+  - `score=0.910520`
+  - `q15=29835`
+- `host_output:` should be the same board-equivalent score path
+- `output_parity:` should ideally report:
+  - `bytes_equal=yes`
+  - `raw_equal=yes`
+
+Known bad artifact:
+- `/tmp/kws_align_dump_20260404_140825.log` is incomplete and should not be used for this step
+- its first failed replay attempt ended with:
+  - `ValueError: dump seq=1 incomplete: feat_f32, input_raw, output_raw`
