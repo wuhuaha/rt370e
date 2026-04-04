@@ -5785,3 +5785,26 @@ Expected replay result after this fix:
 - `output_parity:` should report:
   - `bytes_equal=yes`
   - `raw_equal=yes`
+
+## Step 5.89 Verification
+
+This is a documentation-only step. No firmware rebuild is required.
+
+Verify that the runtime profiling report exists and includes the expected sections and key metrics:
+
+```bash
+cd /root/ameba-river
+rg -n \
+  "双核平均忙碌率|KWS 预留工作集|平均超预算|echo.*0 B|bc_resnet_v3_fp32_experimental|xiaozhi connecting" \
+  doc/RUNTIME_RESOURCE_PROFILE_2026-04-04_ZH.md
+```
+
+Expected result:
+- the file `doc/RUNTIME_RESOURCE_PROFILE_2026-04-04_ZH.md` exists
+- the grep output includes at least these documented points:
+  - dual-core average busy rate `9.0%`
+  - KWS reserved working set `816.4 KiB`
+  - KWS average over-budget latency `50.764 ms`
+  - `echo` stack free `0 B`
+  - model variant `bc_resnet_v3_fp32_experimental`
+  - cloud reconnect timing around `xiaozhi connecting`

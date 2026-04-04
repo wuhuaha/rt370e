@@ -3302,3 +3302,30 @@
     - `host_hash: ... logged_input=0x3ec7297e effective_input=0x3ec7297e source=input_raw`
     - `quant_parity: diff_bytes=0/15680 first_diff=[]`
     - `output_parity: bytes_equal=yes raw_equal=yes`
+
+## Step 5.89
+- Added a new Chinese runtime profiling document:
+  - `doc/RUNTIME_RESOURCE_PROFILE_2026-04-04_ZH.md`
+- The document consolidates the current local wakeup solution and implementation path using the actual code split:
+  - interaction/window close -> `wake_monitoring`
+  - `fixed_dsb` mono frontend
+  - `silero VAD`
+  - VAD-gated `bc_resnet_v3_fp32_experimental` KWS on TFLite Micro
+  - wakeword queueing into XiaoZhi cloud reconnect
+- Based on the user-provided `2026-04-04 15:42:06.287` to `15:42:20.844` runtime window, the document records:
+  - overall CPU and heap averages / peaks
+  - VAD task CPU and stack margin
+  - KWS inference average / peak latency, queue buildup, pre-roll usage, and memory breakdown
+  - interaction/cloud timing from wake hit to session queueing and websocket connect
+  - stack margins for `vad`, `cap`, `kws`, and the `echo` zero-headroom risk
+- Key quantitative conclusions captured in the document:
+  - dual-core average busy rate in the sample window is about `9.0%`
+  - sampled current free heap is stable around `3.52 MiB`
+  - KWS average inference time is `178.764 ms`, above the `128 ms` stride budget by `50.764 ms` (`+39.7%`)
+  - observed KWS queue peak reaches `32 / 64`
+  - KWS reserved working set is about `816.4 KiB`
+  - `echo` task stack free is `0 B` in both snapshots
+- The document explicitly separates:
+  - firmware-direct counters
+  - values derived from the short sample window
+  so the report does not overclaim long-run averages that are not actually present in the logs.
