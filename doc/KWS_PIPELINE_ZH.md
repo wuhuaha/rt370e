@@ -525,7 +525,7 @@ worker 再调用：
 | 项目 | 当前值 | 含义 |
 | --- | --- | --- |
 | `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` | `688` | TFLM arena 大小 |
-| `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` | `1024` | 主触发阈值，约 `31 pm` |
+| `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` | `384` | 主触发阈值，约 `11 pm` |
 | `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` | `1` | 主阈值命中所需连续帧数 |
 | `CONFIG_RIVER_KWS_COOLDOWN_MS` | `1800` | 命中后冷却时间 |
 | `CONFIG_RIVER_KWS_LOG_PERIOD_MS` | `5000` | 状态日志周期 |
@@ -544,7 +544,7 @@ worker 再调用：
 | mel bins | `40` | log-mel 维度 |
 | feature frames | `98` | 模型时序长度 |
 | fallback threshold floor | `400 pm` | 代码里的整段兜底弱阈值下限 |
-| effective weak threshold | `~31 pm` | 当主阈值低于 floor 时，运行时会夹到 `primary - 1` |
+| effective weak threshold | `~11 pm` | 当主阈值低于 floor 时，运行时会夹到 `primary - 1` |
 | fallback min ms | `700ms` | 整段兜底最短 gate |
 | fallback max ms | `2500ms` | 整段兜底最长 gate |
 | fallback min infer | `4` | 整段兜底至少推理次数 |

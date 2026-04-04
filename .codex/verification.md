@@ -5912,3 +5912,61 @@ Current board-side note from this run:
 - Boot log confirmed both `threshold_q15=1024` and `queue[frames=64 stride=16]`.
 - Voice wake retest is still needed on the physical board because this step is
   meant to improve live timing under speech, not just boot-time configuration.
+
+## Step 5.92 Verification
+
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 460800 -m nor
+```
+
+Board debug monitor:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime evidence after boot / wake testing:
+- The KWS status line shows the lower threshold is active:
+```text
+kws status: ... thresh_pm=11 weak_pm=11 ...
+```
+- The KWS perf line keeps the real-time-oriented stride:
+```text
+kws perf: ... queue[frames=64 stride=16 ...]
+```
+- A valid wake attempt can now cross threshold without the earlier queue-runaway
+  behavior, for example:
+```text
+wakeword hit: text=小欧管家 score_pm=28 ...
+```
+
+Observed board-side result from the supplied runtime log:
+- `stride=16` kept the queue bounded in the sampled windows (`8-10 / 64`, peak
+  `14`) instead of the earlier `40+ / 64` buildup.
+- The lower threshold was active (`thresh_pm=11 weak_pm=11`).
+- Several short attempts still stayed below threshold (`gate_best_pm=4`, `8`),
+  but a later natural wake attempt reached `score_pm=28` and triggered
+  successfully.
+- The device then entered the expected wake flow:
+  - `wakeword queued`
+  - `xiaozhi connecting`
+  - `server hello`
+  - follow-up ASR/TTS exchange
+
+Current flashing note:
+- This step's firmware image was built successfully.
+- Flashing at `1500000` intermittently failed with `b'\\xe2'` during the large
+  app image transfer.
+- The successful deployment for this verification used
+  `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 460800 -m nor`.
+- The board's normal debug monitor baud remains `1500000`.

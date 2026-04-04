@@ -3369,3 +3369,28 @@
   stride value.
 - Rebuilt and reflashed the board, then confirmed from the boot log that the
   live runtime now reports `queue[frames=64 stride=16]`.
+
+## Step 5.92
+- After restoring `stride=16`, the next board logs showed the runtime backlog
+  problem was materially improved:
+  - queue stayed around `8-18 / 64`
+  - no new `kws input trim` storm appeared during the sampled wake attempts
+  - but natural wake attempts still topped out around `gate_best_pm=8` to
+    `gate_best_pm=13`, which remained below the active `31 pm` threshold
+- Lowered `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` from `1024` to `384` so the
+  live threshold moved from about `31 pm` down to about `11 pm` while keeping
+  `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES=16`.
+- Updated `doc/KWS_PIPELINE_ZH.md` again so the documented current config now
+  matches the latest board-tuned values:
+  - threshold `384` (`~11 pm`)
+  - stride `16`
+- The new board log validates that this lower threshold is active and does
+  improve real wake hits:
+  - runtime status shows `thresh_pm=11 weak_pm=11`
+  - a wake attempt reached `score_pm=28` and triggered immediately
+  - the board entered the XiaoZhi wake flow and subsequent cloud/TTS session
+    successfully
+- During this step, firmware flashing at `1500000` intermittently failed with
+  the existing `b'\\xe2'` transfer error on the large image. The successful
+  deployment for this step used a lower flash baud only for programming; the
+  normal debug monitor baud remains unchanged.
