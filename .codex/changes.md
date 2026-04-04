@@ -3217,3 +3217,26 @@
   - capture the entire `river kws align run` UART stream to a file until `kws align replay done: dump=emitted ...`
   - replay that file with `tools/kws/replay_board_tensor_dump.py`
   - override the script default model with `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite`, because the board runtime is using `bc_resnet_v3_fp32_experimental`, not the production-final quantized path
+
+## Step 5.86
+- Ran a board-state diagnostic using the user's required monitor path:
+  - `ameba.py monitor -p /dev/ttyUSB0 -b 1500000`
+- Confirmed the current blocker is no longer the host replay tool or the Step `5.84` board-side peak-frame capture logic.
+- Actual monitor observations on `2026-04-04`:
+  - standard monitor session connects successfully to `/dev/ttyUSB0` at `1500000`
+  - the monitor's initial `AT+LIST` probe times out with `Failed to get cmd list: Get cmd list expired`
+  - when rerun as `-reset -debug`, the same monitor shows only raw `0x00` bytes on RX
+  - after the tool sends both:
+    - `AT+LIST\r\n`
+    - `reboot\r\n`
+    there is still no printable board response, no `BOOT-I`, and no `ROM:[`
+- Additional checks performed against the same board/session:
+  - direct serial writes of:
+    - `\\r`
+    - `river kws align status\\r`
+    - Realtek sync `ESC + \\r\\n`
+  produced no readable monitor output
+- Conclusion from this step:
+  - the board is not currently in a usable interactive monitor state for `river kws align run`
+  - because the RX stream is only `0x00`, no valid tensor dump can be captured, so host-side exact replay cannot proceed yet
+  - this is a board/runtime-state blocker, not a host tooling mismatch

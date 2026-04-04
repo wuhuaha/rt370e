@@ -5595,3 +5595,48 @@ Known bad artifact:
 - `/tmp/kws_align_dump_20260404_140825.log` is incomplete and should not be used for this step
 - its first failed replay attempt ended with:
   - `ValueError: dump seq=1 incomplete: feat_f32, input_raw, output_raw`
+
+## Step 5.86 Verification
+
+Board-state diagnostic using the standard user-confirmed monitor command:
+
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/tools/scripts/monitor.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  -reset \
+  -debug \
+  --log \
+  --log-dir /tmp/kws_monitor_reset
+```
+
+Expected healthy behavior:
+- monitor connects successfully
+- after the built-in `AT+LIST` or `reboot` probe, the board should emit readable text
+- at minimum one of these should appear:
+  - command-list reply
+  - `BOOT-I`
+  - `ROM:[`
+  - normal project boot logs
+
+Observed blocker on `2026-04-04`:
+- monitor connected successfully to `/dev/ttyUSB0` at `1500000`
+- the tool sent:
+  - `AT+LIST\r\n`
+  - `reboot\r\n`
+- RX side returned only repeated `0x00` bytes:
+
+```text
+[Sent Data (Hex)]: 41 54 2B 4C 49 53 54 0D 0A
+[Received Data (Hex)]: 00 00 00 00 ...
+Failed to get cmd list: Get cmd list expired
+[Sent Data (Hex)]: 72 65 62 6F 6F 74 0D 0A
+[Received Data (Hex)]: 00 00 00 00 ...
+```
+
+Interpretation:
+- do not proceed to `river kws align run` or host replay while the board stays in this state
+- first restore the board to a readable text monitor state
+- only after serial output returns to normal text logs should Step `5.85` be retried
