@@ -318,10 +318,26 @@ def main() -> int:
     feature_tensor = np.frombuffer(feature_bytes, dtype="<f4").reshape(record.shape)
     recomputed_feature_hash = decode_feature_hash(feature_tensor)
     recomputed_input_hash = fnv1a32(input_bytes)
+    feature_raw_hash = fnv1a32(feature_bytes)
     requantized_input = quantize_feature_tensor(
         feature_tensor, record.in_type, record.in_scale, record.in_zp
     )
     quant_diff = sum(a != b for a, b in zip(requantized_input, input_bytes))
+
+    effective_input_bytes = input_bytes
+    effective_input_source = "input_raw"
+    if (
+        record.in_type == "float32"
+        and record.input_hash != recomputed_input_hash
+        and record.input_hash == feature_raw_hash
+        and len(feature_bytes) == len(input_bytes)
+    ):
+        # Some board logs carry a corrupted input_raw stream even though the
+        # recorded input_hash still matches the feature tensor's raw float bytes.
+        effective_input_bytes = feature_bytes
+        effective_input_source = "feat_f32_fallback"
+
+    effective_input_hash = fnv1a32(effective_input_bytes)
 
     interpreter = tf.lite.Interpreter(model_path=str(args.model))
     interpreter.allocate_tensors()
@@ -329,7 +345,9 @@ def main() -> int:
     output_details = interpreter.get_output_details()[0]
 
     input_dtype = input_dtype_from_name(record.in_type)
-    input_tensor = np.frombuffer(input_bytes, dtype=input_dtype).reshape(record.shape)
+    input_tensor = np.frombuffer(effective_input_bytes, dtype=input_dtype).reshape(
+        record.shape
+    )
     interpreter.set_tensor(input_details["index"], input_tensor)
     interpreter.invoke()
     host_output = interpreter.get_tensor(output_details["index"])
@@ -349,7 +367,10 @@ def main() -> int:
     )
     print(
         "host_hash:"
-        f" feature=0x{recomputed_feature_hash:08x} input=0x{recomputed_input_hash:08x}"
+        f" feature=0x{recomputed_feature_hash:08x}"
+        f" logged_input=0x{recomputed_input_hash:08x}"
+        f" effective_input=0x{effective_input_hash:08x}"
+        f" source={effective_input_source}"
     )
     print(
         "quant_parity:"
@@ -372,6 +393,11 @@ def main() -> int:
         print("warning: feature hash mismatch", file=sys.stderr)
     if record.input_hash != recomputed_input_hash:
         print("warning: input hash mismatch", file=sys.stderr)
+    if effective_input_source != "input_raw":
+        print(
+            "note: using feature tensor bytes as effective input because they match the board input hash",
+            file=sys.stderr,
+        )
     if host_output_bytes != output_bytes:
         print("warning: host replay output does not match board dump", file=sys.stderr)
 

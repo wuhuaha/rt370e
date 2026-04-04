@@ -5640,3 +5640,62 @@ Interpretation:
 - do not proceed to `river kws align run` or host replay while the board stays in this state
 - first restore the board to a readable text monitor state
 - only after serial output returns to normal text logs should Step `5.85` be retried
+
+## Step 5.87 Verification
+
+Board interactivity check at the confirmed baudrate `1500000`:
+
+```bash
+python3 - <<'PY'
+import time
+import serial
+
+ser = serial.Serial('/dev/ttyUSB0', 1500000, timeout=0.2)
+try:
+    ser.write(b'\r')
+    ser.flush()
+    time.sleep(0.5)
+    print(ser.read(256).decode('utf-8', errors='ignore'))
+    ser.write(b'river kws align status\r')
+    ser.flush()
+    time.sleep(1.0)
+    print(ser.read(4096).decode('utf-8', errors='ignore'))
+finally:
+    ser.close()
+PY
+```
+
+Expected behavior:
+- the first probe returns `#`
+- `river kws align status` returns readable KWS alignment status text
+
+Host replay on the captured live log:
+
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --model /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite \
+  --log /tmp/kws_align_full_20260404_live.log
+```
+
+Expected output on the current live capture:
+- `board_hash:` should show:
+  - `feature=0x63dd772f`
+  - `input=0x3ec7297e`
+- `host_hash:` should show:
+  - `feature=0x63dd772f`
+  - `effective_input=0x3ec7297e`
+  - `source=feat_f32_fallback`
+- `board_output:` should show:
+  - `raw=911`
+  - `score=0.910520`
+  - `q15=29835`
+- `output_parity:` should report:
+  - `bytes_equal=yes`
+  - `raw_equal=yes`
+
+Important interpretation:
+- if the tool reports `source=feat_f32_fallback`, that means:
+  - the emitted `input_raw` bytes in this board log are not self-consistent with `input_hash`
+  - but the raw `feat_f32` bytes are self-consistent with `input_hash`
+  - replay result is still valid because the effective model input is reconstructed from the hash-matching float32 feature tensor

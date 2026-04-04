@@ -3240,3 +3240,37 @@
   - the board is not currently in a usable interactive monitor state for `river kws align run`
   - because the RX stream is only `0x00`, no valid tensor dump can be captured, so host-side exact replay cannot proceed yet
   - this is a board/runtime-state blocker, not a host tooling mismatch
+
+## Step 5.87
+- Rechecked the board with a raw serial terminal at the same user-confirmed baudrate `1500000` and confirmed the shell is in fact interactive.
+- New direct serial evidence from `2026-04-04`:
+  - sending a bare `\\r` returns `#`
+  - `river kws align status` responds with:
+    - `kws align sample: source=compiled_pcm frame_samples=256 frames=145 duration_ms=2320 ...`
+    - `kws align guard: kws=ready probe=running interaction=wake_monitoring detection=ready worker=idle snapshot=empty local_only=no`
+- Captured one full live alignment replay log to:
+  - `/tmp/kws_align_full_20260404_live.log`
+- The captured board log is complete for host replay:
+  - `kws align replay start:` present once
+  - `kws tensor dump begin:` present once
+  - `kws tensor dump meta:` present once
+  - `input_raw chunk=1/245 ... 245/245`
+  - `output_raw chunk=1/1`
+  - `kws align replay done: dump=emitted`
+- Root-caused the remaining host mismatch:
+  - the board dump's `feat_f32` stream is correct
+  - the board dump's `input_hash` equals the FNV hash of the raw `feat_f32` bytes:
+    - `0x3ec7297e`
+  - but the emitted `input_raw` stream itself hashes to a different value:
+    - `0x0ea3e26b`
+  - the first float of emitted `input_raw` is `df17693f`, which is the model output scalar, so this `input_raw` stream is not a faithful export of the real input tensor bytes
+- Updated `tools/kws/replay_board_tensor_dump.py` to add a narrow float32 fallback:
+  - if `input_raw` does not match `input_hash`
+  - but raw `feat_f32` bytes do match `input_hash`
+  - then replay uses `feat_f32` bytes as the effective input and reports `source=feat_f32_fallback`
+- Verified on the captured live log:
+  - `board_hash: feature=0x63dd772f input=0x3ec7297e`
+  - `host_hash: ... effective_input=0x3ec7297e source=feat_f32_fallback`
+  - `board_output: raw=911 score=0.910520 q15=29835`
+  - `output_parity: bytes_equal=yes raw_equal=yes`
+- This completes the host-side exact replay verification path for the current FP32 alignment artifact, while also documenting that the current board-emitted `input_raw` stream is anomalous.
