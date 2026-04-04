@@ -529,7 +529,7 @@ worker 再调用：
 | `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` | `1` | 主阈值命中所需连续帧数 |
 | `CONFIG_RIVER_KWS_COOLDOWN_MS` | `1800` | 命中后冷却时间 |
 | `CONFIG_RIVER_KWS_LOG_PERIOD_MS` | `5000` | 状态日志周期 |
-| `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES` | `8` | 窗准备好后每 8 个 mel 帧推一次 |
+| `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES` | `16` | 窗准备好后每 16 个 mel 帧推一次 |
 | `CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS` | `320` | speech 开始前保留的 pre-roll |
 | `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES` | `16` | gate 打开后最多保留的 pre-roll 帧数 |
 | `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES` | `64` | producer -> KWS worker 队列深度 |

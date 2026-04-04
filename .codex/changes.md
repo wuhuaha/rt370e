@@ -3350,3 +3350,22 @@
   - effective weak threshold behavior under the runtime clamp
 - Rebuilt the firmware, reflashed the board successfully, and confirmed from the
   boot log that the new KWS threshold is live on device.
+
+## Step 5.91
+- Reviewed the new board wake logs after Step 5.90 and found the main blocker was
+  no longer the threshold itself:
+  - the eventual hit reached `score_pm=237`, far above the active `31 pm`
+    threshold
+  - but the FP32 worker stayed around `179-180 ms` per inference while running
+    at stride `8`, so the queue kept growing into the `40+ / 64` range
+  - the board started trimming queued audio (`kws input trim: dropped=27`), and
+    the effective wake hit arrived late, after repeated user retries
+- Retuned the runtime for freshness instead of lowering the threshold further:
+  - changed `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES` from `8` back to `16`
+- Kept the lower threshold from Step 5.90 in place, because the logs show the
+  current misses were dominated by stale inference / backlog rather than by a
+  peak score barely missing the threshold.
+- Updated `doc/KWS_PIPELINE_ZH.md` so the current-config table matches the new
+  stride value.
+- Rebuilt and reflashed the board, then confirmed from the boot log that the
+  live runtime now reports `queue[frames=64 stride=16]`.

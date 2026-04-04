@@ -5858,3 +5858,57 @@ Current board-side note from this run:
 - The `xiaozhi playback start: ... gain=5/2` line was not observed in this run because
   the boot sequence reported `url_set=no token_set=no`, so no cloud TTS playback
   session started during the verification window.
+
+## Step 5.91 Verification
+
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-log check:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Then send:
+```text
+reboot
+```
+
+Expected runtime evidence from the boot log:
+- The KWS backend line still shows the lowered threshold:
+```text
+kws backend: ... threshold_q15=1024 ...
+```
+- The performance line shows the new runtime stride:
+```text
+kws perf: ... queue[frames=64 stride=16 ...]
+```
+
+Target board-side retest after flashing:
+- Repeat the same normal-speed wakeword test that previously produced:
+  - queue growth into the `40+ / 64` range
+  - `kws input trim: dropped=27`
+  - a delayed wake hit only after several tries
+- Expected improvement from this step:
+  - KWS queue grows more slowly
+  - trim frequency drops or disappears on short wake attempts
+  - wake hits, if they happen, should arrive closer to the speaking window
+
+Current board-side note from this run:
+- Build passed.
+- Flash passed.
+- Boot log confirmed both `threshold_q15=1024` and `queue[frames=64 stride=16]`.
+- Voice wake retest is still needed on the physical board because this step is
+  meant to improve live timing under speech, not just boot-time configuration.
