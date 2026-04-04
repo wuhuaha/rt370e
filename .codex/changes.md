@@ -3084,3 +3084,57 @@
   - the SDK `tensorflow-microlite` static library was not being switched in lockstep, so keeping the define only in this component would risk an ABI mismatch
 - Verified the cleaned state with a full local `RTL8730E` rebuild on `2026-04-03`; the rebuild completed successfully with `Build done`.
 - Committed the review cleanup as a focused git step, then created branch `agent_server` from the cleaned result for later self-hosted-server debugging.
+
+## Step 5.80
+- Hardened the algorithm-side KWS evaluation flow in `/root/kws-training-pro` to eliminate train/validation leakage from repeated device-recording augmentations.
+- Added `/root/kws-training-pro/kws_data_split.py`:
+  - derives a stable origin key for each sample
+  - uses `rec-*` recording ids for `device_recordings`
+  - strips augmentation hash suffixes for non-device sources
+  - performs grouped train/val splitting by `source + label + origin`
+  - emits split summaries and asserts zero overlap
+- Replaced `train_v2.py::prepare_data()` random per-sample splitting with grouped no-leakage splitting:
+  - keeps all variants of one original recording on exactly one side
+  - adds explicit `seed` handling and prints grouped split stats
+  - this automatically hardens all training scripts that import `prepare_data` from `train_v2.py`
+- Reworked `validate_final.py` so it no longer sweeps the full `device_recordings` pool:
+  - it now derives a strict grouped holdout from the manifest
+  - prints holdout bucket stats before evaluation
+  - keeps threshold sweep behavior while making the evaluated set leakage-free
+- Verified the new split logic on `device_recordings`:
+  - `train_items=5250`, `val_items=600`
+  - `train_groups=105`, `val_groups=12`
+  - `shared_groups=0`
+
+## Step 5.81
+- Added a board-side KWS alignment replay path that reuses the existing exact tensor dump mechanism but makes the input deterministic.
+- Chose the smallest practical implementation instead of a generic filesystem WAV player:
+  - a single compiled-in mono `16 kHz / PCM16` wake-word sample
+  - generated once from a real board recording
+  - replayed through the same `river_voice_kws_submit_frame()` path used by live audio
+- Added `tools/kws/generate_alignment_sample_header.py`:
+  - converts one mono `16 kHz` WAV into `components/river_voice/generated/river_kws_alignment_sample_data.h`
+  - prepends `20` synthetic silence frames (`320 ms`) so the KWS gate opens with deterministic pre-roll rather than with a tightly trimmed wake-word clip
+- Added new board KWS debug APIs in `include/river/river_voice_kws.h` and `components/river_voice/river_voice_kws.cc`:
+  - `river_voice_kws_dump_alignment_status()`
+  - `river_voice_kws_run_alignment_sample(bool emit_dump)`
+- The new replay path is intentionally guarded so the dump is not polluted by live mic input:
+  - it refuses to run while `river audio probe` is still active
+  - it refuses to run unless the interaction state is back in idle wake-monitoring
+  - it drains the KWS worker queue before replay starts
+  - it temporarily forces `local_debug_mode` so wake-word replay does not hand off into cloud dialogue
+- Added worker-idle / snapshot-wait helpers in `river_voice_kws.cc` so replay can:
+  - start from a clean KWS frontend state
+  - pace frames in real time (`16 ms` per frame) instead of overflowing the `64`-frame KWS queue
+  - wait for the first exact tensor snapshot before auto-dumping it
+- Added automatic full dump emission after replay capture:
+  - `kws tensor dump begin`
+  - `kws tensor dump meta`
+  - all `feat_f32`, `input_raw`, and `output_raw` chunks
+  - then local debug / queue state is restored and the snapshot is cleared so normal wake-word handoff is not left blocked after the debug run
+- Extended the serial diag command with:
+  - `river kws align status`
+  - `river kws align run`
+- Verified on `2026-04-04`:
+  - regenerated the compiled alignment sample header successfully
+  - full local `RTL8730E` rebuild completed successfully with `Build done`

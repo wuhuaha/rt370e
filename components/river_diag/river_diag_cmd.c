@@ -41,7 +41,7 @@
 static void river_diag_help(void)
 {
     printf("\triver status\n");
-    printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
+    printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
 #if RIVER_CLOUD_TEXT_DEBUG_ENABLED
     printf("\triver echo <text>\n");
     printf("\triver tts <text>\n");
@@ -141,7 +141,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
     if (strcmp((const char *)argv[0], "kws") == 0) {
         if (argc < 2) {
-            printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
+            printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
             return 0;
         }
 
@@ -247,7 +247,29 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
             return 0;
         }
 
-        printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>>\n");
+        if (strcmp((const char *)argv[1], "align") == 0) {
+            if (argc < 3) {
+                printf("[river][diag] usage: river kws align <run|status>\n");
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "status") == 0) {
+                river_voice_kws_dump_alignment_status();
+                return 0;
+            }
+
+            if (strcmp((const char *)argv[2], "run") == 0) {
+                if (river_voice_kws_run_alignment_sample(true) != RIVER_OK) {
+                    printf("[river][diag] kws align run failed; ensure `river audio probe stop` and idle wake-monitoring state first\n");
+                }
+                return 0;
+            }
+
+            printf("[river][diag] usage: river kws align <run|status>\n");
+            return 0;
+        }
+
+        printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
         return 0;
     }
 

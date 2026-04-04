@@ -34,6 +34,8 @@ void river_voice_kws_dump_tensor_meta(void);
 river_status_t river_voice_kws_dump_tensor_chunk(
     river_voice_kws_tensor_dump_buffer_t buffer,
     uint32_t chunk_index);
+river_status_t river_voice_kws_run_alignment_sample(bool emit_dump);
+void river_voice_kws_dump_alignment_status(void);
 void river_voice_kws_dump_profile(void);
 void river_voice_kws_dump_status(void);
 

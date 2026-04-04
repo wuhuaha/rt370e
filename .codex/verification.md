@@ -5257,3 +5257,141 @@ Expected result after the step:
 - the review cleanup is recorded in the latest commit
 - the current branch is `agent_server`
 - the worktree is clean
+
+## Step 5.80 Verification
+
+Algorithm-side strict no-leakage split sanity check:
+
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import sys
+sys.path.insert(0, '/root/kws-training-pro')
+from kws_data_split import load_manifest_items, split_items_by_origin
+items = load_manifest_items('/root/kws-dataset-pro-blueprint/data/train_manifest.jsonl')
+items = [item for item in items if item.get('source') == 'device_recordings']
+train_items, val_items, summary = split_items_by_origin(items, val_ratio=0.1, seed=7)
+print(summary)
+PY
+```
+
+Expected result:
+- `shared_groups` is `[]`
+- `train_groups=105`
+- `val_groups=12`
+- positive and negative buckets both retain non-zero train/val groups
+
+Syntax check without writing `__pycache__` into the algorithm repo:
+
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+for path in [
+    '/root/kws-training-pro/kws_data_split.py',
+    '/root/kws-training-pro/train_v2.py',
+    '/root/kws-training-pro/validate_final.py',
+]:
+    compile(Path(path).read_text(encoding='utf-8'), path, 'exec')
+print('compile_ok')
+PY
+```
+
+Expected result:
+- prints `compile_ok`
+
+Strict holdout evaluation entrypoint:
+
+```bash
+cd /root/kws-training-pro
+python3 validate_final.py \
+  --model models/bc_resnet_iteration3/bc_resnet_best.onnx \
+  --manifest /root/kws-dataset-pro-blueprint/data/train_manifest.jsonl \
+  --source device_recordings \
+  --val-ratio 0.1 \
+  --split-seed 7 \
+  --threshold 0.6
+```
+
+Expected result:
+- first prints `Strict grouped holdout: ...`
+- shows bucket stats for `device_recordings/positive` and `device_recordings/negative`
+- runs threshold sweep only on the grouped holdout set, not on the full `5850` pool
+
+Note:
+- the default shell `python3` on this machine currently lacks `onnxruntime`, so the last command should be run inside the usual algorithm environment that already satisfies the old script dependencies
+
+## Step 5.81 Verification
+
+Regenerate the compiled-in alignment sample header:
+
+```bash
+cd /root/ameba-river
+python3 tools/kws/generate_alignment_sample_header.py
+```
+
+Expected result:
+- prints `generated /root/ameba-river/components/river_voice/generated/river_kws_alignment_sample_data.h`
+- reports `samples=37120`, `frames=145`, `lead_silence_frames=20`
+
+Full project build:
+
+```bash
+cd /root/ameba-river
+source env.sh
+ameba.py soc RTL8730E
+ameba.py build -p
+```
+
+Expected result:
+- the full external-project build succeeds
+- final line contains `Build done`
+
+Board-side monitor procedure for deterministic KWS replay:
+
+```text
+river audio probe stop
+river kws align status
+river kws align run
+```
+
+Preconditions:
+- the board must already have booted back into idle wake-monitoring
+- do not run this while the device is still inside an active xiaozhi conversation / follow-up window
+
+Expected runtime behavior:
+- `river kws align status` prints:
+  - compiled sample frame count and duration
+  - current probe state
+  - current interaction state
+  - whether KWS worker is idle
+- `river kws align run` prints:
+  - `kws align replay start: source=compiled_pcm ...`
+  - `kws align replay captured: seq=... infer=...`
+  - one full exact tensor dump stream:
+    - `kws tensor dump begin: ...`
+    - `kws tensor dump meta: ...`
+    - repeated `kws tensor dump feat_f32: ...`
+    - repeated `kws tensor dump input_raw: ...`
+    - repeated `kws tensor dump output_raw: ...`
+  - `kws align replay done: dump=emitted ...`
+
+Failure interpretation:
+- if monitor prints `kws align requires probe stopped`, run `river audio probe stop` first
+- if monitor prints `kws align requires idle wake monitoring`, wait until the device leaves follow-up / active session state and retry
+
+Host-side exact replay check from the captured monitor log:
+
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --model /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite \
+  --log /path/to/monitor.log
+```
+
+Expected result:
+- the parser finds one complete dump record
+- the replay tool reports matching or near-matching feature/input hashes and scalar output for the current `fp32_experimental` board model
+
+Note:
+- the replay command intentionally clears the in-memory snapshot after serial emission, so the serial log itself is the artifact to preserve for host-side comparison
