@@ -3274,3 +3274,31 @@
   - `board_output: raw=911 score=0.910520 q15=29835`
   - `output_parity: bytes_equal=yes raw_equal=yes`
 - This completes the host-side exact replay verification path for the current FP32 alignment artifact, while also documenting that the current board-emitted `input_raw` stream is anomalous.
+
+## Step 5.88
+- Fixed the board-side FP32 tensor dump capture point so `input_raw` is snapshotted before `Invoke()` can mutate or reuse the interpreter input buffer.
+- Refactored exact dump capture into two phases inside `components/river_voice/river_voice_kws.cc`:
+  - added dedicated staging buffers for the feature tensor and input tensor
+  - populated those staging buffers during `river_voice_kws_fill_input_tensor()`
+  - copied staging buffers into the final dump snapshot only when `river_voice_kws_capture_exact_tensors()` decides to capture the current inference
+- Updated tensor-dump memory accounting and teardown accordingly:
+  - reserved bytes now include both staging and final snapshot storage for feature/input
+  - failure cleanup frees the new staging allocations
+- Verified on `2026-04-04`:
+  - full local `RTL8730E` rebuild completed successfully with `Build done`
+  - flashed the new image to `/dev/ttyUSB0` at `1500000` using `tools/river_flash.py`
+  - captured a fresh live alignment dump to `/tmp/kws_align_full.log`
+  - board dump key values remained stable:
+    - `feat_hash=0x63dd772f`
+    - `input_hash=0x3ec7297e`
+    - `raw=911`
+    - `score=0.910520`
+    - `q15=29835`
+    - `output_raw hex=df17693f`
+  - the corruption is gone:
+    - `feat_f32 chunk=1/245` and `input_raw chunk=1/245` are byte-identical
+    - `output_raw chunk=1/1` remains separate and equal to `df17693f`
+  - host replay now consumes the real board-exported input tensor again:
+    - `host_hash: ... logged_input=0x3ec7297e effective_input=0x3ec7297e source=input_raw`
+    - `quant_parity: diff_bytes=0/15680 first_diff=[]`
+    - `output_parity: bytes_equal=yes raw_equal=yes`

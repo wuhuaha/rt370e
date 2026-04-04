@@ -5699,3 +5699,89 @@ Important interpretation:
   - the emitted `input_raw` bytes in this board log are not self-consistent with `input_hash`
   - but the raw `feat_f32` bytes are self-consistent with `input_hash`
   - replay result is still valid because the effective model input is reconstructed from the hash-matching float32 feature tensor
+
+## Step 5.88 Verification
+
+Rebuild the firmware:
+
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Expected build result:
+- final line contains `Build done`
+
+Flash the rebuilt image:
+
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Expected flash result:
+- the tool reports `Finished PASS`
+
+Capture a fresh live alignment dump:
+
+```bash
+cd /root/ameba-river
+bash -lc "stty -F /dev/ttyUSB0 1500000 raw -echo && cat /dev/ttyUSB0 > /tmp/kws_align_full.log"
+```
+
+In another shell, send the probe and alignment commands:
+
+```bash
+bash -lc "printf '\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align status\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+After the dump completes, stop the capture process:
+
+```bash
+pkill -f "cat /dev/ttyUSB0 > /tmp/kws_align_full.log"
+```
+
+Sanity-check that the exported input tensor is no longer corrupted:
+
+```bash
+rg -n \
+  "kws tensor dump feat_f32: seq=1 chunk=1/245|kws tensor dump input_raw: seq=1 chunk=1/245|kws tensor dump output_raw: seq=1 chunk=1/1" \
+  /tmp/kws_align_full.log
+```
+
+Expected sanity-check result:
+- `feat_f32 chunk=1/245` hex exactly equals `input_raw chunk=1/245`
+- `output_raw chunk=1/1` remains `df17693f`
+
+Replay the captured board dump on host:
+
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --model /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite \
+  --log /tmp/kws_align_full.log
+```
+
+Expected replay result after this fix:
+- `board_hash:` should show:
+  - `feature=0x63dd772f`
+  - `input=0x3ec7297e`
+- `host_hash:` should show:
+  - `feature=0x63dd772f`
+  - `logged_input=0x3ec7297e`
+  - `effective_input=0x3ec7297e`
+  - `source=input_raw`
+- `quant_parity:` should report:
+  - `diff_bytes=0/15680`
+  - `first_diff=[]`
+- `board_output:` should show:
+  - `raw=911`
+  - `score=0.910520`
+  - `q15=29835`
+- `output_parity:` should report:
+  - `bytes_equal=yes`
+  - `raw_equal=yes`

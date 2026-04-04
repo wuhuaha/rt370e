@@ -352,6 +352,8 @@ typedef struct {
     bool tensor_dump_feature_from_heap_types;
     bool tensor_dump_input_from_heap_types;
     bool tensor_dump_output_from_heap_types;
+    bool tensor_dump_feature_stage_from_heap_types;
+    bool tensor_dump_input_stage_from_heap_types;
     bool gate_open;
     bool gate_triggered;
     uint32_t mel_frames_seen;
@@ -445,7 +447,9 @@ typedef struct {
     float hann_window[RIVER_KWS_WINDOW_SAMPLES];
     float log_mel_history[RIVER_KWS_FEATURE_FRAMES][RIVER_KWS_MEL_BINS];
     float *tensor_dump_feature_tensor;
+    float *tensor_dump_feature_stage_tensor;
     uint8_t *tensor_dump_input_tensor;
+    uint8_t *tensor_dump_input_stage_tensor;
     uint8_t *tensor_dump_output_tensor;
     float power_bins[RIVER_KWS_FFT_BINS];
     int16_t sample_ring[RIVER_KWS_WINDOW_SAMPLES];
@@ -460,7 +464,9 @@ typedef struct {
     void *pre_roll_ring_storage_allocation;
     void *input_ring_storage_allocation;
     void *tensor_dump_feature_allocation;
+    void *tensor_dump_feature_stage_allocation;
     void *tensor_dump_input_allocation;
+    void *tensor_dump_input_stage_allocation;
     void *tensor_dump_output_allocation;
     uint8_t *tensor_arena;
     uint8_t *pre_roll_ring_storage;
@@ -1189,8 +1195,8 @@ static size_t river_voice_kws_tensor_dump_reserved_bytes(
         return 0U;
     }
 
-    return context->tensor_dump_feature_bytes_reserved +
-           context->tensor_dump_input_bytes_reserved +
+    return (context->tensor_dump_feature_bytes_reserved * 2U) +
+           (context->tensor_dump_input_bytes_reserved * 2U) +
            context->tensor_dump_output_bytes_reserved;
 }
 
@@ -1215,12 +1221,33 @@ static river_status_t river_voice_kws_ensure_tensor_dump_buffers(
         }
         context->tensor_dump_feature_tensor = (float *)buffer;
     }
+    if (context->tensor_dump_feature_stage_tensor == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_feature_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_feature_stage_allocation,
+            &context->tensor_dump_feature_stage_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_feature_stage_tensor = (float *)buffer;
+    }
     if (context->tensor_dump_input_tensor == NULL) {
         status = river_voice_kws_alloc_runtime_buffer(
             context->tensor_dump_input_bytes_reserved,
             &context->tensor_dump_input_tensor,
             &context->tensor_dump_input_allocation,
             &context->tensor_dump_input_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+    if (context->tensor_dump_input_stage_tensor == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_input_bytes_reserved,
+            &context->tensor_dump_input_stage_tensor,
+            &context->tensor_dump_input_stage_allocation,
+            &context->tensor_dump_input_stage_from_heap_types);
         if (status != RIVER_OK) {
             return status;
         }
@@ -1884,7 +1911,9 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
         context->output_tensor == NULL || context->input_tensor_data == NULL ||
         context->output_tensor_data == NULL ||
         context->tensor_dump_feature_tensor == NULL ||
+        context->tensor_dump_feature_stage_tensor == NULL ||
         context->tensor_dump_input_tensor == NULL ||
+        context->tensor_dump_input_stage_tensor == NULL ||
         context->tensor_dump_output_tensor == NULL) {
         return;
     }
@@ -1933,8 +1962,11 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
         context->tensor_dump_feature_bytes_reserved;
     context->tensor_dump_input_bytes_captured = input_bytes;
     context->tensor_dump_output_bytes_captured = output_bytes;
+    (void)memcpy(context->tensor_dump_feature_tensor,
+                 context->tensor_dump_feature_stage_tensor,
+                 context->tensor_dump_feature_bytes_reserved);
     (void)memcpy(context->tensor_dump_input_tensor,
-                 context->input_tensor_data,
+                 context->tensor_dump_input_stage_tensor,
                  input_bytes);
     (void)memcpy(context->tensor_dump_output_tensor,
                  context->output_tensor_data,
@@ -2521,7 +2553,7 @@ static river_status_t river_voice_kws_fill_input_tensor(
     uint8_t *dst_u8 = NULL;
     int8_t *dst_i8 = NULL;
     float *dst_f32 = NULL;
-    float *dump_feature_dst = NULL;
+    float *dump_feature_stage_dst = NULL;
 
     if (context == NULL || context->input_tensor_data == NULL) {
         return RIVER_ERR_ARG;
@@ -2535,8 +2567,9 @@ static river_status_t river_voice_kws_fill_input_tensor(
         dst_f32 = (float *)context->input_tensor_data;
     }
     if (context->tensor_dump_armed &&
-        context->tensor_dump_feature_tensor != NULL) {
-        dump_feature_dst = context->tensor_dump_feature_tensor;
+        context->tensor_dump_feature_stage_tensor != NULL &&
+        context->tensor_dump_input_stage_tensor != NULL) {
+        dump_feature_stage_dst = context->tensor_dump_feature_stage_tensor;
         context->tensor_dump_feature_valid = false;
     }
     for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
@@ -2583,8 +2616,8 @@ static river_status_t river_voice_kws_fill_input_tensor(
                     feature_hash,
                     (const uint8_t *)&normalized_milli,
                     sizeof(normalized_milli));
-                if (dump_feature_dst != NULL) {
-                    *dump_feature_dst++ = normalized;
+                if (dump_feature_stage_dst != NULL) {
+                    *dump_feature_stage_dst++ = normalized;
                 }
                 if (dst_u8 != NULL) {
                     quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
@@ -2633,8 +2666,8 @@ static river_status_t river_voice_kws_fill_input_tensor(
                     feature_hash,
                     (const uint8_t *)&normalized_milli,
                     sizeof(normalized_milli));
-                if (dump_feature_dst != NULL) {
-                    *dump_feature_dst++ = normalized;
+                if (dump_feature_stage_dst != NULL) {
+                    *dump_feature_stage_dst++ = normalized;
                 }
                 if (dst_u8 != NULL) {
                     quantized = (int)river_voice_kws_round_to_i32(normalized / context->input_scale) +
@@ -2664,7 +2697,10 @@ static river_status_t river_voice_kws_fill_input_tensor(
     }
     context->last_feature_hash = feature_hash;
     context->last_feature_hash_valid = true;
-    if (context->tensor_dump_armed && dump_feature_dst != NULL) {
+    if (context->tensor_dump_armed && dump_feature_stage_dst != NULL) {
+        (void)memcpy(context->tensor_dump_input_stage_tensor,
+                     context->input_tensor_data,
+                     context->input_tensor_bytes_resolved);
         context->tensor_dump_feature_valid = true;
     }
     river_voice_kws_capture_input_diag(context);
@@ -3740,8 +3776,14 @@ fail:
             g_river_voice_kws->tensor_dump_output_allocation,
             g_river_voice_kws->tensor_dump_output_from_heap_types);
         river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_input_stage_allocation,
+            g_river_voice_kws->tensor_dump_input_stage_from_heap_types);
+        river_voice_kws_free_allocation(
             g_river_voice_kws->tensor_dump_input_allocation,
             g_river_voice_kws->tensor_dump_input_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_feature_stage_allocation,
+            g_river_voice_kws->tensor_dump_feature_stage_from_heap_types);
         river_voice_kws_free_allocation(
             g_river_voice_kws->tensor_dump_feature_allocation,
             g_river_voice_kws->tensor_dump_feature_from_heap_types);
