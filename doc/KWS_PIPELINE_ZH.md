@@ -524,14 +524,15 @@ worker 再调用：
 
 | 项目 | 当前值 | 含义 |
 | --- | --- | --- |
-| `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` | `160` | TFLM arena 大小 |
-| `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` | `21299` | 主触发阈值，约 `650 pm` |
+| `CONFIG_RIVER_KWS_TENSOR_ARENA_KB` | `688` | TFLM arena 大小 |
+| `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` | `1024` | 主触发阈值，约 `31 pm` |
 | `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` | `1` | 主阈值命中所需连续帧数 |
 | `CONFIG_RIVER_KWS_COOLDOWN_MS` | `1800` | 命中后冷却时间 |
-| `CONFIG_RIVER_KWS_LOG_PERIOD_MS` | `3000` | 状态日志周期 |
-| `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES` | `4` | 窗准备好后每 4 个 mel 帧推一次 |
+| `CONFIG_RIVER_KWS_LOG_PERIOD_MS` | `5000` | 状态日志周期 |
+| `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES` | `8` | 窗准备好后每 8 个 mel 帧推一次 |
 | `CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS` | `320` | speech 开始前保留的 pre-roll |
-| `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES` | `40` | producer -> KWS worker 队列深度 |
+| `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES` | `16` | gate 打开后最多保留的 pre-roll 帧数 |
+| `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES` | `64` | producer -> KWS worker 队列深度 |
 
 当前硬编码但同样重要的参数在 `river_voice_kws.cc`：
 
@@ -542,7 +543,8 @@ worker 再调用：
 | FFT hop | `160` samples | 约 `10ms` |
 | mel bins | `40` | log-mel 维度 |
 | feature frames | `98` | 模型时序长度 |
-| fallback threshold | `350 pm` | 整段兜底命中弱阈值 |
+| fallback threshold floor | `400 pm` | 代码里的整段兜底弱阈值下限 |
+| effective weak threshold | `~31 pm` | 当主阈值低于 floor 时，运行时会夹到 `primary - 1` |
 | fallback min ms | `700ms` | 整段兜底最短 gate |
 | fallback max ms | `2500ms` | 整段兜底最长 gate |
 | fallback min infer | `4` | 整段兜底至少推理次数 |

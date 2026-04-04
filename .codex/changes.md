@@ -3329,3 +3329,24 @@
   - firmware-direct counters
   - values derived from the short sample window
   so the report does not overclaim long-run averages that are not actually present in the logs.
+
+## Step 5.90
+- Tuned the current wakeword operating point for higher recall on board by lowering
+  `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` in `prj.conf` from `1600` to `1024`.
+- This moves the main trigger threshold from about `48 pm` down to about `31 pm`.
+- Because the code-side fallback weak-threshold floor is hardcoded at `400 pm` but
+  clamped to `primary - 1` when the primary threshold is lower, the effective weak
+  threshold also drops with this change instead of staying at `400 pm`.
+- Raised XiaoZhi downlink playback soft gain in
+  `components/river_cloud/river_cloud_adapter.c` from `2/1` to `5/2` so cloud TTS
+  output is louder without changing SDK-side speaker-volume plumbing.
+- Updated `doc/KWS_PIPELINE_ZH.md` so the documented live KWS configuration matches
+  the current firmware:
+  - arena `688 KB`
+  - primary threshold `1024`
+  - stride `8`
+  - queue `64`
+  - pre-roll flush `16`
+  - effective weak threshold behavior under the runtime clamp
+- Rebuilt the firmware, reflashed the board successfully, and confirmed from the
+  boot log that the new KWS threshold is live on device.

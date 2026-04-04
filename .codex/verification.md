@@ -5808,3 +5808,53 @@ Expected result:
   - `echo` stack free `0 B`
   - model variant `bc_resnet_v3_fp32_experimental`
   - cloud reconnect timing around `xiaozhi connecting`
+
+## Step 5.90 Verification
+
+Build:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Boot-log check:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+```
+
+Then send:
+```text
+reboot
+```
+
+Expected runtime evidence from the boot log:
+- KWS backend log shows the lower threshold is live:
+```text
+kws backend: ... threshold_q15=1024 ...
+```
+- KWS status log reflects the lower permille threshold after init:
+```text
+kws status: ... thresh_pm=31 weak_pm=31 ...
+```
+
+Expected playback-gain evidence when XiaoZhi TTS downlink starts:
+```text
+xiaozhi playback start: ... gain=5/2
+```
+
+Current board-side note from this run:
+- Build passed.
+- Flash passed.
+- The boot log did confirm `threshold_q15=1024` and `thresh_pm=31 weak_pm=31`.
+- The `xiaozhi playback start: ... gain=5/2` line was not observed in this run because
+  the boot sequence reported `url_set=no token_set=no`, so no cloud TTS playback
+  session started during the verification window.
