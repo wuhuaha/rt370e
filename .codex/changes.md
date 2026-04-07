@@ -3598,3 +3598,26 @@
 - This step intentionally does not change board code, serial flow, or the
   parity mechanisms themselves. It packages the existing proven workflow into a
   reusable handoff document for future model bring-up.
+
+## Step 5.101
+- Added a focused realtime-analysis document for the current
+  `student_bc_resnet_tiny_v2_fp32_debug` branch:
+  [doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md](/root/ameba-river/doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md)
+- The new document consolidates the current investigation into one place:
+  - the measured board-side symptom: `infer_us` stays around `675 ms`
+  - the current runtime budget implied by `stride=16` and `hop=10 ms`
+  - why the bottleneck is model `Invoke()` cost rather than serial flow,
+    tensor-arena initialization, or threshold tuning
+  - the current frontend / model contract used by the student FP32 debug path
+  - the structural reasons the graph is unfriendly to `RTL8730E + TFLM FP32`
+  - why `101 -> 98` frames is only a secondary optimization lever
+  - the recommended next steps: keep FP32 for parity debug, evaluate `INT8`,
+    and ask the algorithm side to reduce graph cost structurally
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so this analysis is
+  discoverable from the main documentation index and grouped with the existing
+  KWS bring-up / parity material.
+- This step is documentation-only:
+  - no board code was changed
+  - no serial debug command flow was modified
+  - the preserved board/local parity tooling remains the baseline for future
+    model deployment investigation

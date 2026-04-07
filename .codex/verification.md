@@ -6348,3 +6348,56 @@ Interpretation:
 - no firmware rebuild or reflashing is required
 - the new document is ready to be handed to other teammates as the default
   onboarding reference for future board/local KWS deployment debugging
+
+## Step 5.101 Verification
+
+Review the new realtime-analysis document and confirm it is indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md
+rg -n "KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md" doc/README.md
+```
+
+Check that all relative markdown links inside the new analysis doc resolve:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+root = Path('/root/ameba-river')
+doc = root / 'doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md'
+text = doc.read_text(encoding='utf-8')
+base = doc.parent
+bad = []
+for target in re.findall(r'\[[^\]]+\]\(([^)]+)\)', text):
+    if '://' in target or target.startswith('#'):
+        continue
+    path = (base / target).resolve()
+    if not path.exists():
+        bad.append((target, str(path)))
+
+print('broken_links', len(bad))
+for target, path in bad:
+    print(target, '->', path)
+PY
+```
+
+Expected result:
+- the document clearly states:
+  - current board `infer_us` is about `675 ms`
+  - the active student FP32 path uses `40 x 101` input and `float32`
+  - the main cause is graph/runtime cost on `RTL8730E + TFLM FP32`
+  - changing `101 -> 98` alone is not enough to recover realtime behavior
+  - the practical next steps are `INT8` evaluation plus structural slimming
+- `doc/README.md` contains
+  `KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md`
+- link check prints:
+  - `broken_links 0`
+
+Interpretation:
+- this step is documentation-only
+- no firmware rebuild or reflashing is required
+- the new analysis can now be used directly when giving concrete feedback to
+  the algorithm team or when deciding whether to continue board-side debug on
+  the FP32 branch
