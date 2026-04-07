@@ -3506,3 +3506,39 @@
 - This step stops at compile validation only. Flashing and board-side exact
   parity on the student branch should be handled next as a separate runtime
   verification step.
+
+## Step 5.98
+- Extended the project-owned SDK layout helper
+  [tools/sdk/apply_rtl8730e_memory_layout_patch.py](/root/ameba-river/tools/sdk/apply_rtl8730e_memory_layout_patch.py)
+  with a new `aivoice_ca32_17mb` variant for large-model debug bring-up.
+- This variant expands the external SDK runtime layout to:
+  - `PSRAM_END = 0x61500000`
+  - `CA32_BL3_DRAM_NS = 0x60300000 ~ 0x61400000` (`17MB`)
+  - `KM4_DRAM_HEAP_EXT = 0x61400000 ~ 0x61500000` (`1MB`)
+- Verified the rebuilt CA32 image now exposes
+  `__psram_heap_buffer_size__ = 0x00d78000` (about `13.47 MiB`), and the
+  board runtime correspondingly showed early `heap_free` around `13.5 MiB`.
+- That larger layout alone did not fix the student FP32 model:
+  - the board still failed `AllocateTensors`
+  - the failure remained `Requested: 4700160, available 695604`
+  - this proved the direct blocker was the KWS tensor arena cap, not the total
+    CA32 heap size or the existing serial/parity tooling
+- Raised the project Kconfig limit for `RIVER_KWS_TENSOR_ARENA_KB` from
+  `2048` to `16384` in [Kconfig](/root/ameba-river/Kconfig) so large-model
+  debug builds are configurable from the project side.
+- Increased the current student FP32 debug deployment arena in
+  [prj.conf](/root/ameba-river/prj.conf) from `688KB` to `8192KB`.
+- Rebuilt and reflashed the student FP32 debug firmware with the larger arena
+  while preserving the existing board/local comparison path and serial command
+  flow.
+- Board verification after reflashing showed the student FP32 chain now
+  initializes and runs:
+  - `kws align guard: kws=ready`
+  - `kws perf: mem[arena=4709152/8192KB slack=3679456 ...]`
+  - `river kws align run` completed and emitted tensor dump chunks instead of
+    failing in `AllocateTensors`
+  - first replayed inference produced `raw=371`, `score=0.371203`,
+    `q15=12163`, and a held local-debug wakeword hit
+- This step keeps the previously implemented board/local tensor dump and
+  parity hooks intact, so later model debugging can continue to isolate model
+  quality from deployment/adaptation mistakes.

@@ -274,7 +274,7 @@ config RIVER_KWS_MEAN_PATCH_EN
 
 config RIVER_KWS_TENSOR_ARENA_KB
     int "Wake-word KWS tensor arena size in KB"
-    range 32 2048
+    range 32 16384
     default 160
     depends on RIVER_VOICE_CAPABILITY_KWS
 

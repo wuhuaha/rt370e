@@ -6161,3 +6161,80 @@ Scope note:
 - This step verifies compile-time model selection only.
 - It does not yet verify flashing or board/runtime parity for the student FP32
   debug branch.
+
+## Step 5.98 Verification
+
+Apply the larger CA32 debug layout in the external SDK:
+```bash
+cd /root/ameba-river
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --variant aivoice_ca32_17mb
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --variant aivoice_ca32_17mb --check
+```
+
+Build the student FP32 debug image with the enlarged tensor arena:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py soc RTL8730E
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -n \
+  build_RTL8730E/build/project_ap/image/target_img2.axf | \
+  rg '__psram_heap_buffer_size__|__psram_heap_buffer_start__|__non_secure_psram_end__|__ca32_fip_dram_start__'
+```
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 460800 -m nor
+```
+
+Board-side check from monitor:
+```text
+1. Wait for boot and Wi-Fi connection.
+2. Confirm KWS is no longer closed:
+   - river kws align status
+3. Run the existing local-debug replay path:
+   - river audio probe stop
+   - river kws align run
+   - river audio probe start
+```
+
+Expected result in the final fixed state:
+- build completes with `Build done`
+- artifact sizes remain:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 4019552`
+  - `build_RTL8730E/ota_all.bin 4019584`
+- CA32 image symbols show:
+  - `__psram_heap_buffer_size__ = 0x00d78000`
+  - `__psram_heap_buffer_start__ = 0x60688000`
+  - `__non_secure_psram_end__ = 0x61500000`
+  - `__ca32_fip_dram_start__ = 0x70300000`
+- boot/runtime logs show the larger heap is available before KWS steady state
+- `river kws align status` reports `kws=ready`
+- `river kws align run` no longer prints `kws AllocateTensors failed`
+- replay emits tensor dump chunks and ends with `kws align replay done`
+
+Observed board result on `2026-04-07`:
+- runtime after boot showed:
+  - early `heap_free=13564928`
+  - `wifi_connected heap_free=5091456`
+  - `stack_free=[...,kws:11568B]`
+- `river kws align status` reported:
+  - `kws align guard: kws=ready probe=running interaction=wake_monitoring detection=ready`
+- `river kws align run` reported:
+  - `kws debug local_only: enabled=yes`
+  - `kws align replay start: source=compiled_pcm frames=145 emit_dump=yes`
+  - `kws tensor dump captured: seq=1 infer=1`
+  - `wakeword hit: text=小欧管家 score_pm=371 q15=12163`
+  - `kws perf: ... mem[arena=4709152/8192KB slack=3679456 ...]`
+  - `kws align replay done: dump=emitted`
+
+Interpretation:
+- enlarging the CA32 layout was necessary to make large-arena experiments
+  viable, but it was not sufficient by itself
+- the student FP32 debug deployment was blocked specifically by the previous
+  `688KB` tensor arena cap
+- after raising the arena to `8192KB`, the existing board/local debug path
+  works without changing the serial flow or removing any parity hooks

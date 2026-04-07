@@ -26,6 +26,22 @@ CONSERVATIVE_8MB = {
     "psram_end": "0x60C00000",
     "ca32_end": "0x60B00000",
     "km4_ext_origin": "0x60B00000",
+    "ca32_comment": "8MB",
+    "km4_comment": "1MB, conservative expansion",
+}
+
+AIVOICE_17MB = {
+    "name": "aivoice_ca32_17mb",
+    "psram_end": "0x61500000",
+    "ca32_end": "0x61400000",
+    "km4_ext_origin": "0x61400000",
+    "ca32_comment": "17MB",
+    "km4_comment": "1MB, aivoice-style debug expansion",
+}
+
+VARIANTS = {
+    CONSERVATIVE_8MB["name"]: CONSERVATIVE_8MB,
+    AIVOICE_17MB["name"]: AIVOICE_17MB,
 }
 
 
@@ -47,13 +63,13 @@ def patch_layout(text: str, variant: dict[str, str]) -> str:
     updated = replace_or_fail(
         updated,
         r"(CA32_BL3_DRAM_NS \(rwx\) :\s+ORIGIN = 0x60300000, LENGTH = )0x[0-9A-Fa-f]+ - 0x60300000(\s+/\* CA32 BL3 DRAM NS: )[^*]+(\*/)",
-        rf"\g<1>{variant['ca32_end']} - 0x60300000\g<2>8MB \g<3>",
+        rf"\g<1>{variant['ca32_end']} - 0x60300000\g<2>{variant['ca32_comment']} \g<3>",
         "ameba_layout.ld CA32_BL3_DRAM_NS",
     )
     updated = replace_or_fail(
         updated,
         r"(KM4_DRAM_HEAP_EXT \(rwx\) :\s+ORIGIN = )0x[0-9A-Fa-f]+(, LENGTH = PSRAM_END - )0x[0-9A-Fa-f]+(\s+/\* KM4 PSRAM HEAP EXT: )1MB[^*]*(\*/)",
-        rf"\g<1>{variant['km4_ext_origin']}\g<2>{variant['km4_ext_origin']}\g<3>1MB, conservative expansion \g<4>",
+        rf"\g<1>{variant['km4_ext_origin']}\g<2>{variant['km4_ext_origin']}\g<3>{variant['km4_comment']} \g<4>",
         "ameba_layout.ld KM4_DRAM_HEAP_EXT",
     )
     return updated
@@ -81,7 +97,7 @@ def main() -> int:
     parser.add_argument(
         "--variant",
         default=CONSERVATIVE_8MB["name"],
-        choices=[CONSERVATIVE_8MB["name"]],
+        choices=sorted(VARIANTS.keys()),
         help="SDK memory layout variant to apply",
     )
     parser.add_argument(
@@ -91,7 +107,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    variant = CONSERVATIVE_8MB
+    variant = VARIANTS[args.variant]
 
     layout_original = SDK_LAYOUT.read_text(encoding="utf-8")
     hal_original = SDK_HAL_PLATFORM.read_text(encoding="utf-8")
