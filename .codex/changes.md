@@ -3695,3 +3695,33 @@
 - Restored the board to normal runtime after the test by turning `local_only`
   back off and restarting `audio probe`, so the board is not left in the
   parity-only state.
+
+## Step 5.104
+- Added a focused post-measurement analysis document for the current student
+  INT8 board result:
+  [doc/KWS_STUDENT_INT8_BOARD_REALTIME_ANALYSIS_ZH.md](/root/ameba-river/doc/KWS_STUDENT_INT8_BOARD_REALTIME_ANALYSIS_ZH.md)
+- This document records the actual root cause behind the poor board-side INT8
+  realtime result, instead of leaving the older estimate as the latest story:
+  - deployment parity is already correct, so the issue is no longer in
+    quantization wiring or board adaptation
+  - current board `infer_us` is about `2.34s`, much worse than the earlier
+    student FP32 `~675ms`
+  - the key runtime reason is in the SDK CA32 kernels:
+    - the INT8 `conv` path is explicitly forced to
+      `reference_integer_ops::ConvPerChannel(...)`
+    - the INT8 `depthwise` path is explicitly forced to
+      `reference_integer_ops::DepthwiseConvPerChannel(...)`
+    - student-heavy `MUL`, `LOGISTIC`, and `ADD` are also still on reference
+      style paths
+  - meanwhile the CA32 FP32 `conv` path still keeps an optimized
+    `Im2col + cpu_backend_gemm::Gemm` implementation
+  - so the current result is not “INT8 quantization is useless”, but “this
+    board is currently running a heavy student graph on reference INT8
+    kernels”
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new INT8
+  board-realtime postmortem is discoverable next to the existing FP32
+  realtime and INT8 estimate documents.
+- This step is documentation-only:
+  - no firmware code was changed
+  - no serial debug mechanism was changed
+  - it preserves the existing parity workflow as the baseline deployment proof

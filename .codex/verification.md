@@ -6560,3 +6560,45 @@ Expected restore result:
 - serial prints `vad probe started`
 - the board returns to the normal wake-monitoring path instead of remaining in
   the parity-only debug state
+
+## Step 5.104 Verification
+
+Review the new student INT8 board-realtime analysis document and confirm it is
+indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_STUDENT_INT8_BOARD_REALTIME_ANALYSIS_ZH.md
+rg -n "KWS_STUDENT_INT8_BOARD_REALTIME_ANALYSIS_ZH.md" doc/README.md
+```
+
+Verify the key SDK-side evidence cited by the document:
+```bash
+cd /root/ameba-river
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc | sed -n '220,267p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc | sed -n '141,158p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc | sed -n '114,170p'
+```
+
+Expected result:
+- the `conv.cc` INT8 path explicitly states the optimized path is not reliable
+  and immediately calls `reference_integer_ops::ConvPerChannel(...)`
+- the `depthwise_conv.cc` INT8 path explicitly states the optimized path is
+  not reliable and calls `reference_integer_ops::DepthwiseConvPerChannel(...)`
+- the FP32 `conv` path still shows `optimized_ops::Im2col(...)` and
+  `cpu_backend_gemm::Gemm(...)`
+
+Optional cross-check of the current measured board symptom from the captured
+INT8 parity log:
+```bash
+cd /root/ameba-river
+rg -n "kws infer slow: infer=8 us=2339206|kws perf: infer_us\\[last=2339206|quant_parity: diff_bytes=0/4040|output_parity: bytes_equal=yes raw_equal=yes" \
+  /tmp/kws_student_int8_serial.log \
+  .codex/verification.md
+```
+
+Expected interpretation:
+- the current student INT8 deployment is correct
+- the current student INT8 board latency problem is dominated by runtime kernel
+  choice plus the heavy model topology
+- it should not be misdiagnosed as a board-integration or quantization-wiring
+  error
