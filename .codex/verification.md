@@ -6123,3 +6123,41 @@ Scope note:
 - It does not mean the student branch has been board-validated; that requires
   reflashing a firmware image built with
   `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`.
+
+## Step 5.97 Verification
+
+Compile the student FP32 debug deployment image:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py soc RTL8730E
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+stat -c '%n %s' build_RTL8730E/km4_boot_all.bin build_RTL8730E/km0_km4_ca32_app.bin build_RTL8730E/ota_all.bin
+strings build_RTL8730E/km0_km4_ca32_app.bin | rg 'student_bc_resnet_tiny_v2_fp32_debug|bc_resnet_v3_fp32_experimental|per_clip_mean_std'
+```
+
+Expected result:
+- the build completes with `Build done`
+- `prj.conf` selects
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+- `strings ...` contains `student_bc_resnet_tiny_v2_fp32_debug`
+- `strings ...` contains the student frontend log format with
+  `norm=per_clip_mean_std`
+- `strings ...` does not contain `bc_resnet_v3_fp32_experimental`
+
+Observed compile result on `2026-04-07`:
+- build completed successfully with `Build done`
+- produced artifacts:
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 4019552`
+  - `build_RTL8730E/ota_all.bin 4019584`
+- `strings build_RTL8730E/km0_km4_ca32_app.bin` contained:
+  - `student_bc_resnet_tiny_v2_fp32_debug`
+  - `kws frontend: source=fixed_dsb_mono feature=log_mel bins=%u frames=%u log=natural norm=per_clip_mean_std wake_text=%s`
+- the same `strings` check did not return
+  `bc_resnet_v3_fp32_experimental`
+
+Scope note:
+- This step verifies compile-time model selection only.
+- It does not yet verify flashing or board/runtime parity for the student FP32
+  debug branch.

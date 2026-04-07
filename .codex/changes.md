@@ -3484,3 +3484,25 @@
   - the currently flashed firmware is not the student FP32 debug variant, so
     this parity result validates the mainline FP32 chain only
   - student-model parity on board requires reflashing the student build first
+
+## Step 5.97
+- Switched the committed KWS model selection in [prj.conf](/root/ameba-river/prj.conf)
+  from `CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL=y` to
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+  so the next board run can debug the new student FP32 deployment directly.
+- Kept the existing board/local parity tooling, tensor dump path, and serial
+  debug command flow unchanged; this step only changes which already-integrated
+  model variant is compiled into the image.
+- Rebuilt the full `RTL8730E` image set successfully with the student FP32
+  debug variant selected.
+- Verified the produced app image embeds
+  `student_bc_resnet_tiny_v2_fp32_debug` and the new student-frontend logging
+  string `log=natural norm=per_clip_mean_std`, confirming this is not just a
+  stale rebuild of the previous `bc_resnet_v3_fp32_experimental` image.
+- Produced new firmware artifacts:
+  - `build_RTL8730E/km4_boot_all.bin` = `51872`
+  - `build_RTL8730E/km0_km4_ca32_app.bin` = `4019552`
+  - `build_RTL8730E/ota_all.bin` = `4019584`
+- This step stops at compile validation only. Flashing and board-side exact
+  parity on the student branch should be handled next as a separate runtime
+  verification step.
