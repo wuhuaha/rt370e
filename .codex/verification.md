@@ -6401,3 +6401,83 @@ Interpretation:
 - the new analysis can now be used directly when giving concrete feedback to
   the algorithm team or when deciding whether to continue board-side debug on
   the FP32 branch
+
+## Step 5.102 Verification
+
+Review the new INT8 realtime-estimate document and confirm it is indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,320p' doc/KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md
+rg -n "KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md" doc/README.md
+```
+
+Check that all relative markdown links inside the new INT8 analysis doc resolve:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+root = Path('/root/ameba-river')
+doc = root / 'doc/KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md'
+text = doc.read_text(encoding='utf-8')
+base = doc.parent
+bad = []
+for target in re.findall(r'\[[^\]]+\]\(([^)]+)\)', text):
+    if '://' in target or target.startswith('#'):
+        continue
+    path = (base / target).resolve()
+    if not path.exists():
+        bad.append((target, str(path)))
+
+print('broken_links', len(bad))
+for target, path in bad:
+    print(target, '->', path)
+PY
+```
+
+Optional reproduction of the local evidence used in the document:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import time
+import numpy as np
+import tensorflow as tf
+
+base = '/root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/'
+for name in ['model.int8.tflite', 'model.fp32.tflite']:
+    it = tf.lite.Interpreter(model_path=base + name, num_threads=1)
+    it.allocate_tensors()
+    inp = it.get_input_details()[0]
+    x = np.zeros(inp['shape'], dtype=inp['dtype'])
+    if inp['dtype'] == np.int8:
+        x.fill(int(inp['quantization'][1]))
+    it.set_tensor(inp['index'], x)
+    for _ in range(20):
+        it.invoke()
+    t0 = time.perf_counter()
+    for _ in range(50):
+        it.invoke()
+    t1 = time.perf_counter()
+    print(name, 'avg_ms', ((t1 - t0) / 50.0) * 1000.0)
+PY
+```
+
+Expected result:
+- the document clearly states:
+  - INT8 and FP32 share the same high-cost topology
+  - INT8 is much more worth boarding than the current student FP32 debug path
+  - the local board-side estimate is still likely above the current `160ms`
+    stride budget, so it should be treated as a parallel debug candidate first
+  - first-board recommendations include keeping the FP32 parity path, using a
+    dedicated INT8 debug variant, and starting from a larger arena
+- `doc/README.md` contains
+  `KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md`
+- link check prints:
+  - `broken_links 0`
+
+Interpretation:
+- this step is documentation-only
+- no firmware rebuild or reflashing is required
+- the new document can now be used as the default written recommendation before
+  starting INT8 board bring-up for this student bundle

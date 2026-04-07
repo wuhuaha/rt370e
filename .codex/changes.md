@@ -3621,3 +3621,37 @@
   - no serial debug command flow was modified
   - the preserved board/local parity tooling remains the baseline for future
     model deployment investigation
+
+## Step 5.102
+- Added a same-caliber local realtime-estimate and board bring-up recommendation
+  document for the `student_bc_resnet_tiny_v2` INT8 bundle:
+  [doc/KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md](/root/ameba-river/doc/KWS_STUDENT_INT8_REALTIME_ESTIMATE_ZH.md)
+- The new document grounds the INT8 recommendation in concrete local evidence:
+  - exact bundle contract and quantization parameters from the algorithm export
+  - host-side operator inventory showing the INT8 / FP32 models share the same
+    graph shape and differ mainly by tensor dtype and kernel path
+  - file-size comparison: `124392B` INT8 vs `411560B` FP32
+  - interpreter tensor-byte comparison: `2,800,070B` INT8 vs `11,194,508B`
+    FP32
+  - host-side single-thread relative runtime checks:
+    - optimized path about `3.54x` faster for INT8
+    - builtin reference path about `1.69x` faster for INT8
+  - bundle-side parity / threshold / board-reference metrics and export-gate
+    status
+- Based on those inputs, the document records a local board-side estimate and
+  recommendation:
+  - INT8 is clearly more worth boarding than the current student FP32 debug
+    path
+  - expected board `infer_us` is likely improved substantially but still not
+    yet safe to assume it beats the current `160ms` stride budget
+  - first smoke should preserve the existing FP32 parity tooling, use a
+    parallel INT8 debug variant, start with a large arena, and gate decisions
+    on `infer_us`, queue growth, heap headroom, and int8-kernel stability
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the INT8
+  estimate is discoverable alongside the existing FP32 realtime and parity
+  debugging documents.
+- This step is documentation-only:
+  - no firmware code was changed
+  - no serial debug command flow was modified
+  - the existing board/local deployment-parity mechanism remains the required
+    baseline before any INT8 board-effect conclusions are accepted
