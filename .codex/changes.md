@@ -3405,3 +3405,15 @@
 - The goal of this step is repository hygiene:
   - preserve a stable return point for later wake-word experiments
   - keep the worktree clean before the next board-debug cycle
+
+## Step 5.94
+- Added a persistent repository rule to [AGENTS.md](/root/ameba-river/AGENTS.md)
+  for future wakeword-model debugging:
+  - keep the existing board-side vs local comparison and parity code paths
+  - do not delete or weaken tensor dump / alignment replay / comparison hooks
+    just to speed up model bring-up
+  - require an equivalent or stronger validation path before any future
+    replacement of that infrastructure
+- This step is a collaboration and debugging-discipline safeguard only.
+- No firmware logic, serial-debug settings, model selection, or board runtime
+  behavior was changed in this step.

@@ -5991,3 +5991,21 @@ Scope note:
 - This is a repository-hygiene step only.
 - It does not change the board debug monitor settings; the normal monitor command
   remains `ameba.py monitor -p /dev/ttyUSB0 -b 1500000`.
+
+## Step 5.94 Verification
+
+Repository rule check:
+```bash
+cd /root/ameba-river
+rg -n "Wakeword Debugging Discipline|board-side vs local comparison|tensor dumps|alignment replay|explicit user approval" AGENTS.md
+git diff -- AGENTS.md .codex/changes.md .codex/verification.md
+```
+
+Expected result:
+- `rg` shows the new persistent wakeword-debugging rule block in `AGENTS.md`
+- `git diff -- ...` shows only documentation changes for this step
+
+Scope note:
+- This step changes repository guidance only.
+- It does not modify firmware behavior, model artifacts, flashing flow, or the
+  board debug monitor configuration.

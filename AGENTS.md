@@ -42,6 +42,13 @@
 - Keep platform-specific code replaceable.
 - Favor deterministic logs and explicit error returns.
 
+## Wakeword Debugging Discipline
+- For all future wakeword-model debugging, preserve the existing board-side vs local comparison and parity code paths.
+- Do not remove, bypass, or weaken tensor dumps, alignment replay, feature/input/output comparison hooks, or other board/local cross-check tooling just to speed up model bring-up.
+- New wakeword-model adaptations should keep a path that can prove board behavior matches the intended local model contract before model-quality conclusions are drawn.
+- Treat deployment-verification code as part of the wakeword debug infrastructure, not as temporary scaffolding to delete after one model trial.
+- If a future change truly requires replacing that comparison path, first provide an equivalent or stronger validation path; do not regress this capability without explicit user approval.
+
 ## Current Objective
 - Phase 1: bootable project with monitor-based echo and simulated device control.
 - Future phases: real online control transport, local VAD, wake word, offline ASR, and online/offline fusion.
