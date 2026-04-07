@@ -3417,3 +3417,31 @@
 - This step is a collaboration and debugging-discipline safeguard only.
 - No firmware logic, serial-debug settings, model selection, or board runtime
   behavior was changed in this step.
+
+## Step 5.95
+- Added a parallel KWS model variant
+  `student_bc_resnet_tiny_v2_fp32_debug` in
+  [Kconfig](/root/ameba-river/Kconfig) for board/local parity work without
+  replacing the committed mainline model selection.
+- Imported the algorithm-side FP32 debug bundle as
+  [student_bc_resnet_tiny_v2_fp32_model_data.h](/root/ameba-river/components/river_voice/generated/student_bc_resnet_tiny_v2_fp32_model_data.h).
+- Extended
+  [river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+  to support variant-specific frontend/runtime contracts:
+  - the existing baseline, current FP32, and round6 branches keep the legacy
+    `40x98`, `n_fft=512`, relative-dB normalization path
+  - the new student debug branch uses the exported `40x101`, `n_fft=400`,
+    centered STFT, natural-log, per-clip mean/std frontend
+  - registered `MUL` and added a student-only TFLM `RfftFloat` path while
+    keeping the existing WebRTC FFT path for the current chain
+  - generalized profile logging so board/local parity output now reports the
+    actual selected frontend contract instead of hardcoded `fft=512` /
+    `frames=98`
+- Kept the committed deployment default on
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL=y` and added an explicit
+  `prj.conf` line to keep
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG`
+  disabled in the default image.
+- This step does not alter serial-debug commands and does not remove any
+  existing board/local comparison tooling; it only adds a selectable parallel
+  debug variant.

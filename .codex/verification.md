@@ -6009,3 +6009,56 @@ Scope note:
 - This step changes repository guidance only.
 - It does not modify firmware behavior, model artifacts, flashing flow, or the
   board debug monitor configuration.
+
+## Step 5.95 Verification
+
+Committed default build check:
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py soc RTL8730E
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Expected result:
+- the build completes with `Build done`
+- the committed config remains on
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL=y`
+- this step does not require any serial-debug command changes
+
+Temporary local-only student FP32 smoke build:
+```text
+Temporarily flip only these two lines in prj.conf:
+- set `# CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL is not set`
+- set `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+```
+
+```bash
+cd /root/ameba-river
+source env.sh
+python3 /root/ameba-rtos-1.2/ameba.py soc RTL8730E
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+```text
+Immediately restore prj.conf after the smoke build:
+- set `CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL=y`
+- set `# CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG is not set`
+```
+
+Expected result:
+- the temporary student build also completes with `Build done`
+- switching between the two variants requires only model-selection changes; no
+  KWS source edits, serial-debug changes, or parity-tool removals are needed
+
+Later board-side spot check when the temporary student build is flashed:
+```text
+kws backend: ... fft=400 hop=160 center=yes ...
+kws frontend: ... bins=40 frames=101 log=natural norm=per_clip_mean_std ...
+```
+
+Scope note:
+- This step verifies compile/link integration for the parallel variant.
+- Board/local replay parity, threshold calibration, and on-device quality
+  judgment for the student branch should be handled as the next separate
+  runtime step.

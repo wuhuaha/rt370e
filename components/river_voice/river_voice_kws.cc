@@ -30,21 +30,87 @@ extern "C" {
 #include "river/river_voice_kws.h"
 }
 
-#if defined(CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL)
+#if defined(CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG)
+#include "generated/student_bc_resnet_tiny_v2_fp32_model_data.h"
+#define RIVER_KWS_MODEL_DATA student_bc_resnet_tiny_v2_fp32_tflite
+#define RIVER_KWS_MODEL_DATA_LEN \
+    ((size_t)sizeof(student_bc_resnet_tiny_v2_fp32_tflite))
+#define RIVER_KWS_MODEL_VARIANT_NAME "student_bc_resnet_tiny_v2_fp32_debug"
+#define RIVER_KWS_WINDOW_SAMPLES 400U
+#define RIVER_KWS_HOP_SAMPLES 160U
+#define RIVER_KWS_MEL_BINS 40U
+#define RIVER_KWS_FEATURE_FRAMES 101U
+#define RIVER_KWS_FEATURE_DB_MIN (0.0f)
+#define RIVER_KWS_FEATURE_MEAN (0.0f)
+#define RIVER_KWS_FEATURE_STD (1.0f)
+#define RIVER_KWS_FMIN_HZ (20.0f)
+#define RIVER_KWS_FMAX_HZ (8000.0f)
+#define RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES (RIVER_KWS_WINDOW_SAMPLES / 2U)
+#define RIVER_KWS_FRONTEND_CENTER_EN 1
+#define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 1
+#define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 1
+#define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 1
+#elif defined(CONFIG_RIVER_KWS_MODEL_VARIANT_FP32_EXPERIMENTAL)
 #include "generated/bc_resnet_v3_fp32_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model_fp32
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_fp32_len
 #define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_fp32_experimental"
+#define RIVER_KWS_WINDOW_SAMPLES 512U
+#define RIVER_KWS_HOP_SAMPLES 160U
+#define RIVER_KWS_MEL_BINS 40U
+#define RIVER_KWS_FEATURE_FRAMES 98U
+#define RIVER_KWS_FEATURE_DB_MIN (-80.0f)
+#define RIVER_KWS_FEATURE_MEAN (-42.1177063f)
+#define RIVER_KWS_FEATURE_STD (17.5219841f)
+#define RIVER_KWS_FMIN_HZ (20.0f)
+#define RIVER_KWS_FMAX_HZ (8000.0f)
+#define RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES 0U
+#define RIVER_KWS_FRONTEND_CENTER_EN 0
+#define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 0
+#define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 0
+#define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 0
 #elif defined(CONFIG_RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL)
 #include "generated/xiaou_student_round6_targeted_int8_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model_round6_targeted
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_round6_targeted_len
 #define RIVER_KWS_MODEL_VARIANT_NAME "round6_targeted_experimental"
+#define RIVER_KWS_WINDOW_SAMPLES 512U
+#define RIVER_KWS_HOP_SAMPLES 160U
+#define RIVER_KWS_MEL_BINS 40U
+#define RIVER_KWS_FEATURE_FRAMES 98U
+#define RIVER_KWS_FEATURE_DB_MIN (-80.0f)
+#define RIVER_KWS_FEATURE_MEAN (-42.1177063f)
+#define RIVER_KWS_FEATURE_STD (17.5219841f)
+#define RIVER_KWS_FMIN_HZ (20.0f)
+#define RIVER_KWS_FMAX_HZ (8000.0f)
+#define RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES 0U
+#define RIVER_KWS_FRONTEND_CENTER_EN 0
+#define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 0
+#define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 0
+#define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 0
 #else
 #include "generated/river_wake_word_model_data.h"
 #define RIVER_KWS_MODEL_DATA kws_model
 #define RIVER_KWS_MODEL_DATA_LEN kws_model_len
 #define RIVER_KWS_MODEL_VARIANT_NAME "bc_resnet_v3_production_final_v2"
+#define RIVER_KWS_WINDOW_SAMPLES 512U
+#define RIVER_KWS_HOP_SAMPLES 160U
+#define RIVER_KWS_MEL_BINS 40U
+#define RIVER_KWS_FEATURE_FRAMES 98U
+#define RIVER_KWS_FEATURE_DB_MIN (-80.0f)
+#define RIVER_KWS_FEATURE_MEAN (-42.1177063f)
+#define RIVER_KWS_FEATURE_STD (17.5219841f)
+#define RIVER_KWS_FMIN_HZ (20.0f)
+#define RIVER_KWS_FMAX_HZ (8000.0f)
+#define RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES 0U
+#define RIVER_KWS_FRONTEND_CENTER_EN 0
+#define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 0
+#define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 0
+#define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 0
+#endif
+
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+#include "signal/src/rfft.h"
 #endif
 
 #include "generated/river_kws_alignment_sample_data.h"
@@ -113,21 +179,12 @@ extern "C" {
 #endif
 
 #define RIVER_KWS_SAMPLE_RATE_HZ 16000U
-#define RIVER_KWS_WINDOW_SAMPLES 512U
-#define RIVER_KWS_HOP_SAMPLES 160U
-#define RIVER_KWS_MEL_BINS 40U
-#define RIVER_KWS_FEATURE_FRAMES 98U
-#define RIVER_KWS_FEATURE_DB_MIN (-80.0f)
-#define RIVER_KWS_FEATURE_MEAN (-42.1177063f)
-#define RIVER_KWS_FEATURE_STD (17.5219841f)
-#define RIVER_KWS_FMIN_HZ (20.0f)
-#define RIVER_KWS_FMAX_HZ (8000.0f)
 #define RIVER_KWS_HANN_PI (3.14159265358979323846f)
 #define RIVER_KWS_MEL_POINT_COUNT (RIVER_KWS_MEL_BINS + 2U)
 #define RIVER_KWS_FFT_BINS ((RIVER_KWS_WINDOW_SAMPLES / 2U) + 1U)
 #define RIVER_KWS_TENSOR_ARENA_BYTES \
     ((uint32_t)CONFIG_RIVER_KWS_TENSOR_ARENA_KB * 1024U)
-#define RIVER_KWS_BASE_OP_COUNT 7U
+#define RIVER_KWS_BASE_OP_COUNT 8U
 #if CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
 #define RIVER_KWS_LEGACY_OP_COUNT 2U
 #else
@@ -257,6 +314,12 @@ class river_voice_kws_op_resolver_t : public tflite::MicroOpResolver {
         return AddBuiltin(tflite::BuiltinOperator_AVERAGE_POOL_2D,
                           tflite::Register_AVERAGE_POOL_2D(),
                           tflite::ParsePool);
+    }
+
+    TfLiteStatus AddMul()
+    {
+        return AddBuiltin(tflite::BuiltinOperator_MUL, tflite::Register_MUL(),
+                          tflite::ParseMul);
     }
 
 #if CONFIG_RIVER_KWS_LEGACY_MODEL_COMPAT_EN
@@ -453,13 +516,27 @@ typedef struct {
     uint8_t *tensor_dump_output_tensor;
     float power_bins[RIVER_KWS_FFT_BINS];
     int16_t sample_ring[RIVER_KWS_WINDOW_SAMPLES];
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+    alignas(RIVER_KWS_ALLOCATION_ALIGNMENT)
+        float fft_input_f32[RIVER_KWS_WINDOW_SAMPLES];
+    alignas(RIVER_KWS_ALLOCATION_ALIGNMENT)
+        Complex<float> fft_output_f32[RIVER_KWS_FFT_BINS];
+#else
     alignas(RIVER_KWS_ALLOCATION_ALIGNMENT)
         int16_t fft_input[RIVER_KWS_WINDOW_SAMPLES];
     alignas(RIVER_KWS_ALLOCATION_ALIGNMENT)
         int16_t fft_output[RIVER_KWS_WINDOW_SAMPLES + 2U];
+#endif
     uint32_t sample_ring_write_index;
     uint32_t sample_ring_fill_count;
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+    bool float_rfft_state_from_heap_types;
+    size_t float_rfft_state_bytes;
+    void *float_rfft_state_allocation;
+    void *float_rfft_state;
+#else
     struct RealFFT *real_fft;
+#endif
     void *tensor_arena_allocation;
     void *pre_roll_ring_storage_allocation;
     void *input_ring_storage_allocation;
@@ -2121,6 +2198,7 @@ static river_status_t river_voice_kws_register_ops(
         resolver->AddConv2D() != kTfLiteOk ||
         resolver->AddDepthwiseConv2D() != kTfLiteOk ||
         resolver->AddAveragePool2D() != kTfLiteOk ||
+        resolver->AddMul() != kTfLiteOk ||
         resolver->AddLogistic() != kTfLiteOk) {
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -2213,8 +2291,15 @@ static void river_voice_kws_prepare_mel_bands(river_voice_kws_context_t *context
 
 static void river_voice_kws_reset_frontend(river_voice_kws_context_t *context)
 {
+    uint32_t center_pad_samples;
+
     if (context == NULL) {
         return;
+    }
+
+    center_pad_samples = RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES;
+    if (center_pad_samples > RIVER_KWS_WINDOW_SAMPLES) {
+        center_pad_samples = RIVER_KWS_WINDOW_SAMPLES;
     }
 
     context->window_ready = false;
@@ -2230,13 +2315,19 @@ static void river_voice_kws_reset_frontend(river_voice_kws_context_t *context)
     context->gate_started_ms = 0U;
     context->gate_triggered = false;
     context->last_score = 0.0f;
-    context->sample_ring_write_index = 0U;
-    context->sample_ring_fill_count = 0U;
+    context->sample_ring_write_index =
+        center_pad_samples % RIVER_KWS_WINDOW_SAMPLES;
+    context->sample_ring_fill_count = center_pad_samples;
     memset(context->log_mel_history, 0, sizeof(context->log_mel_history));
     memset(context->power_bins, 0, sizeof(context->power_bins));
     memset(context->sample_ring, 0, sizeof(context->sample_ring));
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+    memset(context->fft_input_f32, 0, sizeof(context->fft_input_f32));
+    memset(context->fft_output_f32, 0, sizeof(context->fft_output_f32));
+#else
     memset(context->fft_input, 0, sizeof(context->fft_input));
     memset(context->fft_output, 0, sizeof(context->fft_output));
+#endif
 }
 
 static bool river_voice_kws_detection_allowed(void)
@@ -2466,8 +2557,12 @@ static void river_voice_kws_capture_window(river_voice_kws_context_t *context)
         uint32_t ring_index = (start + index) % RIVER_KWS_WINDOW_SAMPLES;
         float scaled =
             (float)context->sample_ring[ring_index] * context->hann_window[index];
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+        context->fft_input_f32[index] = scaled;
+#else
         context->fft_input[index] =
             river_voice_kws_clamp_i16(river_voice_kws_round_to_i32(scaled));
+#endif
     }
 }
 
@@ -2495,6 +2590,21 @@ static river_status_t river_voice_kws_compute_mel_frame(
     uint32_t band;
 
     river_voice_kws_capture_window(context);
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+    if (context->float_rfft_state == NULL) {
+        return RIVER_ERR_INVALID_STATE;
+    }
+    tflm_signal::RfftFloatApply(context->float_rfft_state,
+                                context->fft_input_f32,
+                                context->fft_output_f32);
+
+    for (band = 0U; band < RIVER_KWS_FFT_BINS; ++band) {
+        float real = context->fft_output_f32[band].real;
+        float imag = context->fft_output_f32[band].imag;
+
+        context->power_bins[band] = real * real + imag * imag;
+    }
+#else
     if (WebRtcSpl_RealForwardFFT(context->real_fft,
                                  context->fft_input,
                                  context->fft_output) != 0) {
@@ -2511,6 +2621,7 @@ static river_status_t river_voice_kws_compute_mel_frame(
     context->power_bins[RIVER_KWS_FFT_BINS - 1U] =
         (float)context->fft_output[RIVER_KWS_WINDOW_SAMPLES] *
         (float)context->fft_output[RIVER_KWS_WINDOW_SAMPLES];
+#endif
 
     for (band = 0U; band < RIVER_KWS_MEL_BINS; ++band) {
         uint32_t bin;
@@ -2533,11 +2644,38 @@ static river_status_t river_voice_kws_compute_mel_frame(
             energy += context->power_bins[bin] * weight;
         }
         energy *= context->mel_band_norm[band];
+#if RIVER_KWS_FRONTEND_USE_NATURAL_LOG
+        mel_frame[band] = logf(fmaxf(energy, 1.0e-5f));
+#else
         mel_frame[band] = 10.0f * log10f(fmaxf(energy, 1.0e-10f));
+#endif
     }
 
     river_voice_kws_store_mel_frame(context, mel_frame);
     return RIVER_OK;
+}
+
+static float river_voice_kws_normalize_feature_value(float feature_value,
+                                                     float max_db,
+                                                     float clip_mean,
+                                                     float clip_std)
+{
+#if RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM
+    (void)max_db;
+    return (feature_value - clip_mean) / clip_std;
+#else
+    float relative_db = feature_value - max_db;
+
+    (void)clip_mean;
+    (void)clip_std;
+    if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
+        relative_db = RIVER_KWS_FEATURE_DB_MIN;
+    }
+    if (relative_db > 0.0f) {
+        relative_db = 0.0f;
+    }
+    return (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+#endif
 }
 
 static river_status_t river_voice_kws_fill_input_tensor(
@@ -2547,9 +2685,15 @@ static river_status_t river_voice_kws_fill_input_tensor(
     uint32_t mel_index;
     uint32_t feature_hash = 2166136261UL;
     float max_db = -1.0e9f;
+    float clip_mean = 0.0f;
+    float clip_std = 1.0f;
     float feature_min = 1.0e9f;
     float feature_max = -1.0e9f;
     double feature_sum = 0.0;
+#if RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM
+    double raw_sum = 0.0;
+    double raw_square_sum = 0.0;
+#endif
     uint8_t *dst_u8 = NULL;
     int8_t *dst_i8 = NULL;
     float *dst_f32 = NULL;
@@ -2577,11 +2721,27 @@ static river_status_t river_voice_kws_fill_input_tensor(
             (context->mel_history_write_index + frame_index) %
             RIVER_KWS_FEATURE_FRAMES;
         for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
-            if (context->log_mel_history[history_index][mel_index] > max_db) {
-                max_db = context->log_mel_history[history_index][mel_index];
+            float feature_value = context->log_mel_history[history_index][mel_index];
+
+            if (feature_value > max_db) {
+                max_db = feature_value;
             }
+#if RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM
+            raw_sum += (double)feature_value;
+            raw_square_sum += (double)feature_value * (double)feature_value;
+#endif
         }
     }
+#if RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM
+    clip_mean = (float)(raw_sum / (double)RIVER_KWS_EXPECTED_INPUT_VALUES);
+    clip_std = (float)sqrt(fmax(
+        (raw_square_sum / (double)RIVER_KWS_EXPECTED_INPUT_VALUES) -
+            ((double)clip_mean * (double)clip_mean),
+        1.0e-12));
+    if (clip_std < 1.0e-6f) {
+        clip_std = 1.0f;
+    }
+#endif
 
     if (context->input_layout == RIVER_KWS_INPUT_LAYOUT_FRAMES_MELS) {
         for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
@@ -2589,20 +2749,14 @@ static river_status_t river_voice_kws_fill_input_tensor(
                 (context->mel_history_write_index + frame_index) %
                 RIVER_KWS_FEATURE_FRAMES;
             for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
-                float relative_db =
-                    context->log_mel_history[history_index][mel_index] - max_db;
+                float feature_value =
+                    context->log_mel_history[history_index][mel_index];
                 float normalized;
                 int32_t normalized_milli;
                 int quantized;
 
-                if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
-                    relative_db = RIVER_KWS_FEATURE_DB_MIN;
-                }
-                if (relative_db > 0.0f) {
-                    relative_db = 0.0f;
-                }
-                normalized =
-                    (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                normalized = river_voice_kws_normalize_feature_value(
+                    feature_value, max_db, clip_mean, clip_std);
                 if (normalized < feature_min) {
                     feature_min = normalized;
                 }
@@ -2633,26 +2787,20 @@ static river_status_t river_voice_kws_fill_input_tensor(
             }
         }
     } else {
-        /* BC-ResNet 导出的 NHWC 输入是 [1, 40, 98, 1]，这里直接按目标布局写入，避免额外转置缓冲。 */
+        /* NHWC 输入按 [1, mel, frame, 1] 直接写入，避免额外转置缓冲。 */
         for (mel_index = 0U; mel_index < RIVER_KWS_MEL_BINS; ++mel_index) {
             for (frame_index = 0U; frame_index < RIVER_KWS_FEATURE_FRAMES; ++frame_index) {
                 uint32_t history_index =
                     (context->mel_history_write_index + frame_index) %
                     RIVER_KWS_FEATURE_FRAMES;
-                float relative_db =
-                    context->log_mel_history[history_index][mel_index] - max_db;
+                float feature_value =
+                    context->log_mel_history[history_index][mel_index];
                 float normalized;
                 int32_t normalized_milli;
                 int quantized;
 
-                if (relative_db < RIVER_KWS_FEATURE_DB_MIN) {
-                    relative_db = RIVER_KWS_FEATURE_DB_MIN;
-                }
-                if (relative_db > 0.0f) {
-                    relative_db = 0.0f;
-                }
-                normalized =
-                    (relative_db - RIVER_KWS_FEATURE_MEAN) / RIVER_KWS_FEATURE_STD;
+                normalized = river_voice_kws_normalize_feature_value(
+                    feature_value, max_db, clip_mean, clip_std);
                 if (normalized < feature_min) {
                     feature_min = normalized;
                 }
@@ -3303,6 +3451,32 @@ extern "C" river_status_t river_voice_kws_init(void)
                (unsigned long)RIVER_KWS_MODEL_DATA_LEN,
                (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
 
+    river_voice_kws_prepare_hann_window(g_river_voice_kws);
+    river_voice_kws_prepare_mel_bands(g_river_voice_kws);
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+    g_river_voice_kws->float_rfft_state_bytes =
+        tflm_signal::RfftFloatGetNeededMemory(RIVER_KWS_WINDOW_SAMPLES);
+    g_river_voice_kws->float_rfft_state = river_voice_kws_alloc_aligned(
+        g_river_voice_kws->float_rfft_state_bytes,
+        RIVER_KWS_ALLOCATION_ALIGNMENT,
+        &g_river_voice_kws->float_rfft_state_from_heap_types,
+        &g_river_voice_kws->float_rfft_state_allocation);
+    if (g_river_voice_kws->float_rfft_state == NULL ||
+        tflm_signal::RfftFloatInit(RIVER_KWS_WINDOW_SAMPLES,
+                                   g_river_voice_kws->float_rfft_state,
+                                   g_river_voice_kws->float_rfft_state_bytes) ==
+            NULL) {
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->float_rfft_state_allocation,
+            g_river_voice_kws->float_rfft_state_from_heap_types);
+        river_voice_kws_free_allocation(g_river_voice_kws_allocation,
+                                        g_river_voice_kws_allocation_from_heap_types);
+        g_river_voice_kws_allocation = NULL;
+        g_river_voice_kws_allocation_from_heap_types = false;
+        g_river_voice_kws = NULL;
+        return RIVER_ERR_NO_MEMORY;
+    }
+#else
     g_river_voice_kws->real_fft = WebRtcSpl_CreateRealFFT(9);
     if (g_river_voice_kws->real_fft == NULL) {
         river_voice_kws_free_allocation(g_river_voice_kws_allocation,
@@ -3312,9 +3486,8 @@ extern "C" river_status_t river_voice_kws_init(void)
         g_river_voice_kws = NULL;
         return RIVER_ERR_NO_MEMORY;
     }
-
-    river_voice_kws_prepare_hann_window(g_river_voice_kws);
-    river_voice_kws_prepare_mel_bands(g_river_voice_kws);
+#endif
+    river_voice_kws_reset_frontend(g_river_voice_kws);
     RIVER_LOGI("kws init stage: fft_ready heap_free=%lu",
                (unsigned long)rtos_mem_get_free_heap_size());
 
@@ -3327,7 +3500,13 @@ extern "C" river_status_t river_voice_kws_init(void)
         RIVER_LOGE("kws tensor arena alloc failed: arena=%uKB heap_free=%lu",
                    (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
                    (unsigned long)rtos_mem_get_free_heap_size());
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->float_rfft_state_allocation,
+            g_river_voice_kws->float_rfft_state_from_heap_types);
+#else
         WebRtcSpl_FreeRealFFT(g_river_voice_kws->real_fft);
+#endif
         river_voice_kws_free_allocation(g_river_voice_kws_allocation,
                                         g_river_voice_kws_allocation_from_heap_types);
         g_river_voice_kws_allocation = NULL;
@@ -3578,16 +3757,34 @@ extern "C" river_status_t river_voice_kws_init(void)
     }
 
     fft_input_alignment =
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+        (uintptr_t)g_river_voice_kws->fft_input_f32 &
+#else
         (uintptr_t)g_river_voice_kws->fft_input &
+#endif
         (uintptr_t)(RIVER_KWS_ALLOCATION_ALIGNMENT - 1U);
     fft_output_alignment =
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+        (uintptr_t)g_river_voice_kws->fft_output_f32 &
+#else
         (uintptr_t)g_river_voice_kws->fft_output &
+#endif
         (uintptr_t)(RIVER_KWS_ALLOCATION_ALIGNMENT - 1U);
     if (fft_input_alignment != 0U || fft_output_alignment != 0U) {
         RIVER_LOGE("kws fft buffer alignment invalid: fft_in=%p mod=%lu fft_out=%p mod=%lu required=%u",
-                   (void *)g_river_voice_kws->fft_input,
+                   (void *)
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+                       g_river_voice_kws->fft_input_f32,
+#else
+                       g_river_voice_kws->fft_input,
+#endif
                    (unsigned long)fft_input_alignment,
-                   (void *)g_river_voice_kws->fft_output,
+                   (void *)
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+                       g_river_voice_kws->fft_output_f32,
+#else
+                       g_river_voice_kws->fft_output,
+#endif
                    (unsigned long)fft_output_alignment,
                    (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
         status = RIVER_ERR_UNSUPPORTED;
@@ -3718,8 +3915,18 @@ extern "C" river_status_t river_voice_kws_init(void)
                input_tensor_data,
                output_tensor_data);
     RIVER_LOGI("kws fft buffers: in=%p out=%p align=%u",
-               (void *)g_river_voice_kws->fft_input,
-               (void *)g_river_voice_kws->fft_output,
+               (void *)
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+                   g_river_voice_kws->fft_input_f32,
+#else
+                   g_river_voice_kws->fft_input,
+#endif
+               (void *)
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+                   g_river_voice_kws->fft_output_f32,
+#else
+                   g_river_voice_kws->fft_output,
+#endif
                (unsigned int)RIVER_KWS_ALLOCATION_ALIGNMENT);
     RIVER_LOGI("kws memory plan: heap_init=%lu->%lu min=%lu ctx=%luB pre=%luB queue=%luB dump=%luB",
                (unsigned long)g_river_voice_kws->init_heap_before_bytes,
@@ -3798,9 +4005,15 @@ fail:
                 g_river_voice_kws->tensor_arena_allocation,
                 g_river_voice_kws->tensor_arena_from_heap_types);
         }
+#if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->float_rfft_state_allocation,
+            g_river_voice_kws->float_rfft_state_from_heap_types);
+#else
         if (g_river_voice_kws->real_fft != NULL) {
             WebRtcSpl_FreeRealFFT(g_river_voice_kws->real_fft);
         }
+#endif
         river_voice_kws_free_allocation(g_river_voice_kws_allocation,
                                         g_river_voice_kws_allocation_from_heap_types);
         g_river_voice_kws_allocation = NULL;
@@ -3910,8 +4123,6 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
 
 extern "C" void river_voice_kws_dump_profile(void)
 {
-    int32_t mean_milli = (int32_t)lroundf(RIVER_KWS_FEATURE_MEAN * 1000.0f);
-    uint32_t std_milli = (uint32_t)lroundf(RIVER_KWS_FEATURE_STD * 1000.0f);
     unsigned long input_dim1 =
         (g_river_voice_kws != NULL && g_river_voice_kws->input_shape[1] != 0U) ?
             (unsigned long)g_river_voice_kws->input_shape[1] :
@@ -3925,10 +4136,13 @@ extern "C" void river_voice_kws_dump_profile(void)
             (unsigned long)g_river_voice_kws->input_shape[3] :
             1UL;
 
-    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=512 hop=160 arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u trim=%u->%u",
+    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=%u hop=%u center=%s arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u trim=%u->%u",
                input_dim1,
                input_dim2,
                input_dim3,
+               (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+               (unsigned int)RIVER_KWS_HOP_SAMPLES,
+               RIVER_KWS_FRONTEND_CENTER_EN ? "yes" : "no",
                (unsigned int)CONFIG_RIVER_KWS_TENSOR_ARENA_KB,
                (unsigned long)RIVER_KWS_MODEL_DATA_LEN,
                RIVER_KWS_MODEL_VARIANT_NAME,
@@ -3941,10 +4155,22 @@ extern "C" void river_voice_kws_dump_profile(void)
                (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
                (unsigned int)river_voice_kws_input_trim_high_water_frames(),
                (unsigned int)river_voice_kws_input_trim_target_frames());
-    RIVER_LOGI("kws frontend: source=fixed_dsb_mono feature=log_mel bins=40 frames=98 norm=global(mean_milli=%ld,std_milli=%lu) wake_text=%s",
+#if RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM
+    RIVER_LOGI("kws frontend: source=fixed_dsb_mono feature=log_mel bins=%u frames=%u log=natural norm=per_clip_mean_std wake_text=%s",
+               (unsigned int)RIVER_KWS_MEL_BINS,
+               (unsigned int)RIVER_KWS_FEATURE_FRAMES,
+               g_river_voice_kws_text);
+#else
+    int32_t mean_milli = (int32_t)lroundf(RIVER_KWS_FEATURE_MEAN * 1000.0f);
+    uint32_t std_milli = (uint32_t)lroundf(RIVER_KWS_FEATURE_STD * 1000.0f);
+
+    RIVER_LOGI("kws frontend: source=fixed_dsb_mono feature=log_mel bins=%u frames=%u log=db_relative_max norm=global(mean_milli=%ld,std_milli=%lu) wake_text=%s",
+               (unsigned int)RIVER_KWS_MEL_BINS,
+               (unsigned int)RIVER_KWS_FEATURE_FRAMES,
                (long)mean_milli,
                (unsigned long)std_milli,
                g_river_voice_kws_text);
+#endif
 }
 
 extern "C" void river_voice_kws_dump_status(void)
