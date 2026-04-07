@@ -3394,3 +3394,14 @@
   the existing `b'\\xe2'` transfer error on the large image. The successful
   deployment for this step used a lower flash baud only for programming; the
   normal debug monitor baud remains unchanged.
+
+## Step 5.93
+- Saved the current repository state as a clean milestone snapshot after the
+  recent wake-word timing and threshold tuning work.
+- Verified the worktree was already clean before snapshotting, so no source
+  cleanup or rollback was needed.
+- Added a focused archival commit for the snapshot record and tagged the current
+  `refactor` baseline as `m7-realtime-wake-threshold-tuned`.
+- The goal of this step is repository hygiene:
+  - preserve a stable return point for later wake-word experiments
+  - keep the worktree clean before the next board-debug cycle

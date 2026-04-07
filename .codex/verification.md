@@ -5970,3 +5970,24 @@ Current flashing note:
 - The successful deployment for this verification used
   `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 460800 -m nor`.
 - The board's normal debug monitor baud remains `1500000`.
+
+## Step 5.93 Verification
+
+Repository snapshot checks:
+```bash
+cd /root/ameba-river
+git status --short
+git rev-parse --short HEAD
+git tag --list m7-realtime-wake-threshold-tuned
+git show --no-patch --oneline m7-realtime-wake-threshold-tuned
+```
+
+Expected result:
+- `git status --short` prints nothing, confirming a clean worktree
+- `git tag --list ...` prints `m7-realtime-wake-threshold-tuned`
+- `git show --no-patch --oneline ...` resolves to the archived snapshot commit
+
+Scope note:
+- This is a repository-hygiene step only.
+- It does not change the board debug monitor settings; the normal monitor command
+  remains `ameba.py monitor -p /dev/ttyUSB0 -b 1500000`.
