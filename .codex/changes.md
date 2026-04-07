@@ -3542,3 +3542,39 @@
 - This step keeps the previously implemented board/local tensor dump and
   parity hooks intact, so later model debugging can continue to isolate model
   quality from deployment/adaptation mistakes.
+
+## Step 5.99
+- Hardened the host-side tensor replay tool
+  [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py)
+  for the preserved board/local KWS parity workflow, without changing board
+  serial commands or dump emission.
+- The replay tool now:
+  - tolerates malformed dump chunks in the monitor transcript instead of
+    aborting the whole parse immediately
+  - accepts `float32` debug dumps whose `input_raw` stream is truncated by
+    serial wrapping, as long as the recorded `input_hash` proves the board fed
+    the same raw bytes as `feat_f32`
+  - prints the exact `float32` output scalar in addition to the rounded
+    `raw/score` presentation so parity conclusions are not confused by display
+    precision
+- Verified that the currently embedded board model header
+  [components/river_voice/generated/student_bc_resnet_tiny_v2_fp32_model_data.h](/root/ameba-river/components/river_voice/generated/student_bc_resnet_tiny_v2_fp32_model_data.h)
+  is byte-identical to the algorithm export
+  `/root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite`:
+  - size `411560`
+  - sha256 `2f21649bfbbbf69aae7f0fd1dc4ef318702cfd44c36fc1221c06ddcc215a4c51`
+- Replayed the preserved board dump from
+  `/tmp/kws_student_fp32_debug_replay.clean.log` against that exact host model
+  and confirmed deployment parity for the student FP32 debug branch:
+  - board `feature_hash=0x7ce0b11d`
+  - board/effective input hash `0xd52f011c`
+  - board exact output `0.371203`
+  - host exact output `0.371203`
+  - `output_parity: bytes_equal=yes raw_equal=yes`
+- Conclusion of this step:
+  - the new `student_bc_resnet_tiny_v2 FP32` board deployment is correct for
+    the captured sample
+  - current board/local mismatch risk is no longer in model embedding or TFLM
+    input adaptation for this path
+  - the remaining issues to investigate, if any, are model behavior /
+    thresholding / runtime interaction rather than this deployment chain

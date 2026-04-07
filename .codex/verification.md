@@ -6238,3 +6238,61 @@ Interpretation:
   `688KB` tensor arena cap
 - after raising the arena to `8192KB`, the existing board/local debug path
   works without changing the serial flow or removing any parity hooks
+
+## Step 5.99 Verification
+
+Confirm the embedded board model header matches the algorithm export exactly:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+header = Path('components/river_voice/generated/student_bc_resnet_tiny_v2_fp32_model_data.h').read_text()
+values = [int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header)]
+data = bytes(values)
+model = Path('/root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite').read_bytes()
+print('header_bytes', len(data))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_bytes', len(model))
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Sanity-check and run the host replay against the preserved board dump:
+```bash
+cd /root/ameba-river
+python3 -m py_compile tools/kws/replay_board_tensor_dump.py
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_student_fp32_debug_replay.clean.log \
+  --model /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite \
+  --seq latest
+```
+
+Expected result for the current captured student FP32 replay:
+- the model header and export report:
+  - `header_bytes 411560`
+  - `model_bytes 411560`
+  - `header_sha256 2f21649bfbbbf69aae7f0fd1dc4ef318702cfd44c36fc1221c06ddcc215a4c51`
+  - `model_sha256 2f21649bfbbbf69aae7f0fd1dc4ef318702cfd44c36fc1221c06ddcc215a4c51`
+  - `exact_match yes`
+- replay prints a tolerated transcript warning for the malformed serial chunk,
+  but still succeeds by using the already-proven `feat_f32` raw bytes as the
+  effective input:
+  - `note: skipped malformed dump chunks: input_raw chunk=146/253 ...`
+  - `source=feat_f32_missing_input_raw`
+- parity result is exact at the output-byte level:
+  - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+  - `host_hash: feature=0x7ce0b11d ... effective_input=0xd52f011c`
+  - `board_output: raw=371 score=0.371203 exact=0.371203 q15=12163`
+  - `host_output: raw=371 score=0.371000 exact=0.371203`
+  - `output_parity: bytes_equal=yes raw_equal=yes first_diff=[]`
+
+Interpretation:
+- the `score=0.371000` line on host is only the rounded `raw/1000`
+  presentation of `raw=371`
+- the decisive check is `exact=0.371203` plus `bytes_equal=yes`, which proves
+  host replay and board output are byte-for-byte identical for this sample
+- for this student FP32 debug branch, the deployment path is correct and the
+  preserved board/local parity tooling remains usable even when the serial log
+  wraps part of `input_raw`

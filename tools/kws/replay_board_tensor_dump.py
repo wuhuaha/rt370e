@@ -127,19 +127,21 @@ class DumpRecord:
     feat_total_chunks: int | None = None
     input_total_chunks: int | None = None
     output_total_chunks: int | None = None
+    chunk_parse_errors: list[str] = field(default_factory=list)
     ended: bool = False
 
-    def require_complete(self) -> None:
+    def chunk_complete(self, chunks: dict[int, bytes], total: int | None) -> bool:
+        return total is not None and len(chunks) == total
+
+    def require_replayable(self) -> None:
         missing: list[str] = []
         if self.shape is None:
             missing.append("begin")
         if self.feat_hash is None:
             missing.append("meta")
-        if self.feat_total_chunks is None or len(self.feat_chunks) != self.feat_total_chunks:
+        if not self.chunk_complete(self.feat_chunks, self.feat_total_chunks):
             missing.append("feat_f32")
-        if self.input_total_chunks is None or len(self.input_chunks) != self.input_total_chunks:
-            missing.append("input_raw")
-        if self.output_total_chunks is None or len(self.output_chunks) != self.output_total_chunks:
+        if not self.chunk_complete(self.output_chunks, self.output_total_chunks):
             missing.append("output_raw")
         if missing:
             raise ValueError(f"dump seq={self.seq} incomplete: {', '.join(missing)}")
@@ -192,16 +194,26 @@ def parse_dump_records(log_path: Path) -> dict[int, DumpRecord]:
                 label = match.group("label")
                 chunk_idx = int(match.group("chunk"))
                 total = int(match.group("total"))
-                payload = bytes.fromhex(match.group("hex"))
+                hex_payload = match.group("hex")
                 if label == "feat_f32":
-                    record.feat_chunks[chunk_idx] = payload
                     record.feat_total_chunks = total
                 elif label == "input_raw":
-                    record.input_chunks[chunk_idx] = payload
                     record.input_total_chunks = total
                 elif label == "output_raw":
-                    record.output_chunks[chunk_idx] = payload
                     record.output_total_chunks = total
+                try:
+                    payload = bytes.fromhex(hex_payload)
+                except ValueError as exc:
+                    record.chunk_parse_errors.append(
+                        f"{label} chunk={chunk_idx}/{total} parse_error={exc}"
+                    )
+                    continue
+                if label == "feat_f32":
+                    record.feat_chunks[chunk_idx] = payload
+                elif label == "input_raw":
+                    record.input_chunks[chunk_idx] = payload
+                elif label == "output_raw":
+                    record.output_chunks[chunk_idx] = payload
                 continue
 
             if match := END_RE.search(line) or END_RE_COMPACT.search(line):
@@ -249,6 +261,12 @@ def dequant_score(raw_scalar: int, out_type: str, out_scale: float, out_zp: int)
     return float(raw_scalar - out_zp) * out_scale
 
 
+def decode_exact_output_scalar(output_bytes: bytes, out_type: str) -> float | None:
+    if out_type == "float32":
+        return float(np.frombuffer(output_bytes, dtype="<f4")[0])
+    return None
+
+
 def first_diff_indices(lhs: bytes, rhs: bytes, limit: int = 8) -> list[int]:
     diffs: list[int] = []
     for index, (lval, rval) in enumerate(zip(lhs, rhs)):
@@ -286,19 +304,33 @@ def main() -> int:
         raise SystemExit(f"dump seq={seq} not found in {args.log}")
 
     record = records[seq]
-    record.require_complete()
+    record.require_replayable()
 
     feature_bytes = record.assemble(record.feat_chunks, record.feat_total_chunks)
-    input_bytes = record.assemble(record.input_chunks, record.input_total_chunks)
     output_bytes = record.assemble(record.output_chunks, record.output_total_chunks)
+    feature_raw_hash = fnv1a32(feature_bytes)
+    input_bytes: bytes | None = None
+    input_parse_issue: str | None = None
+
+    if record.chunk_complete(record.input_chunks, record.input_total_chunks):
+        candidate_input_bytes = record.assemble(record.input_chunks, record.input_total_chunks)
+        if record.input_bytes is not None and len(candidate_input_bytes) != record.input_bytes:
+            input_parse_issue = (
+                f"input bytes mismatch: parsed={len(candidate_input_bytes)}"
+                f" expected={record.input_bytes}"
+            )
+        else:
+            input_bytes = candidate_input_bytes
+    elif record.input_total_chunks is None:
+        input_parse_issue = "input_raw chunk count missing"
+    else:
+        input_parse_issue = (
+            f"input_raw incomplete: parsed={len(record.input_chunks)}/{record.input_total_chunks}"
+        )
 
     if record.feat_bytes is not None and len(feature_bytes) != record.feat_bytes:
         raise SystemExit(
             f"feature bytes mismatch: parsed={len(feature_bytes)} expected={record.feat_bytes}"
-        )
-    if record.input_bytes is not None and len(input_bytes) != record.input_bytes:
-        raise SystemExit(
-            f"input bytes mismatch: parsed={len(input_bytes)} expected={record.input_bytes}"
         )
     if record.output_bytes is not None and len(output_bytes) != record.output_bytes:
         raise SystemExit(
@@ -317,25 +349,42 @@ def main() -> int:
 
     feature_tensor = np.frombuffer(feature_bytes, dtype="<f4").reshape(record.shape)
     recomputed_feature_hash = decode_feature_hash(feature_tensor)
-    recomputed_input_hash = fnv1a32(input_bytes)
-    feature_raw_hash = fnv1a32(feature_bytes)
-    requantized_input = quantize_feature_tensor(
-        feature_tensor, record.in_type, record.in_scale, record.in_zp
-    )
-    quant_diff = sum(a != b for a, b in zip(requantized_input, input_bytes))
+    recomputed_input_hash: int | None = None
+    requantized_input: bytes | None = None
+    quant_diff: int | None = None
+    quant_first_diff: list[int] | None = None
+
+    if input_bytes is not None:
+        recomputed_input_hash = fnv1a32(input_bytes)
+        requantized_input = quantize_feature_tensor(
+            feature_tensor, record.in_type, record.in_scale, record.in_zp
+        )
+        quant_diff = sum(a != b for a, b in zip(requantized_input, input_bytes))
+        quant_first_diff = first_diff_indices(requantized_input, input_bytes)
 
     effective_input_bytes = input_bytes
     effective_input_source = "input_raw"
     if (
         record.in_type == "float32"
-        and record.input_hash != recomputed_input_hash
         and record.input_hash == feature_raw_hash
-        and len(feature_bytes) == len(input_bytes)
+        and record.input_bytes == len(feature_bytes)
+        and (
+            recomputed_input_hash is None or record.input_hash != recomputed_input_hash
+        )
     ):
-        # Some board logs carry a corrupted input_raw stream even though the
-        # recorded input_hash still matches the feature tensor's raw float bytes.
+        # Some board logs carry a corrupted or truncated input_raw stream even
+        # though the recorded input_hash still matches the feature tensor's raw
+        # float bytes. For this debug path, replay the exact feature bytes.
         effective_input_bytes = feature_bytes
-        effective_input_source = "feat_f32_fallback"
+        effective_input_source = (
+            "feat_f32_fallback" if input_bytes is not None else "feat_f32_missing_input_raw"
+        )
+
+    if effective_input_bytes is None:
+        detail = input_parse_issue or "input_raw unavailable"
+        if record.chunk_parse_errors:
+            detail += f"; parse_errors={'; '.join(record.chunk_parse_errors)}"
+        raise SystemExit(f"dump seq={record.seq} unusable: {detail}")
 
     effective_input_hash = fnv1a32(effective_input_bytes)
 
@@ -354,6 +403,8 @@ def main() -> int:
     host_output_bytes = host_output.astype(output_details["dtype"], copy=False).tobytes()
     host_raw = decode_raw_scalar(host_output, record.out_type)
     host_score = dequant_score(host_raw, record.out_type, record.out_scale, record.out_zp)
+    board_exact_score = decode_exact_output_scalar(output_bytes, record.out_type)
+    host_exact_score = decode_exact_output_scalar(host_output_bytes, record.out_type)
 
     print(f"dump_seq={record.seq} infer={record.infer} gate={record.gate}")
     print(
@@ -368,20 +419,32 @@ def main() -> int:
     print(
         "host_hash:"
         f" feature=0x{recomputed_feature_hash:08x}"
-        f" logged_input=0x{recomputed_input_hash:08x}"
+        f" logged_input={'n/a' if recomputed_input_hash is None else f'0x{recomputed_input_hash:08x}'}"
         f" effective_input=0x{effective_input_hash:08x}"
         f" source={effective_input_source}"
     )
-    print(
-        "quant_parity:"
-        f" diff_bytes={quant_diff}/{len(input_bytes)}"
-        f" first_diff={first_diff_indices(requantized_input, input_bytes)}"
-    )
+    if quant_diff is not None and quant_first_diff is not None:
+        print(
+            "quant_parity:"
+            f" diff_bytes={quant_diff}/{len(input_bytes)}"
+            f" first_diff={quant_first_diff}"
+        )
+    else:
+        print(
+            "quant_parity:"
+            f" unavailable ({input_parse_issue or 'input_raw not fully parsed'})"
+        )
     print(
         "board_output:"
-        f" raw={record.raw} score={record.score:.6f} q15={record.q15}"
+        f" raw={record.raw} score={record.score:.6f}"
+        f"{'' if board_exact_score is None else f' exact={board_exact_score:.6f}'}"
+        f" q15={record.q15}"
     )
-    print(f"host_output: raw={host_raw} score={host_score:.6f}")
+    print(
+        "host_output:"
+        f" raw={host_raw} score={host_score:.6f}"
+        f"{'' if host_exact_score is None else f' exact={host_exact_score:.6f}'}"
+    )
     print(
         "output_parity:"
         f" bytes_equal={'yes' if host_output_bytes == output_bytes else 'no'}"
@@ -391,8 +454,13 @@ def main() -> int:
 
     if record.feat_hash != recomputed_feature_hash:
         print("warning: feature hash mismatch", file=sys.stderr)
-    if record.input_hash != recomputed_input_hash:
+    if recomputed_input_hash is not None and record.input_hash != recomputed_input_hash:
         print("warning: input hash mismatch", file=sys.stderr)
+    if record.chunk_parse_errors:
+        print(
+            "note: skipped malformed dump chunks: " + "; ".join(record.chunk_parse_errors),
+            file=sys.stderr,
+        )
     if effective_input_source != "input_raw":
         print(
             "note: using feature tensor bytes as effective input because they match the board input hash",
