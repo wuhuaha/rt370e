@@ -3574,7 +3574,27 @@
 - Conclusion of this step:
   - the new `student_bc_resnet_tiny_v2 FP32` board deployment is correct for
     the captured sample
-  - current board/local mismatch risk is no longer in model embedding or TFLM
-    input adaptation for this path
-  - the remaining issues to investigate, if any, are model behavior /
-    thresholding / runtime interaction rather than this deployment chain
+- current board/local mismatch risk is no longer in model embedding or TFLM
+  input adaptation for this path
+- the remaining issues to investigate, if any, are model behavior /
+  thresholding / runtime interaction rather than this deployment chain
+
+## Step 5.100
+- Added a new onboarding and operating guide for board/local KWS deployment
+  parity work:
+  [doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md](/root/ameba-river/doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md)
+- The new guide consolidates the currently scattered knowledge into one place:
+  - what the board/local parity mechanism proves
+  - which board commands belong to the preserved debug flow
+  - how `align run`, `dump next`, tensor dump, and host replay fit together
+  - how to confirm the board-embedded model and host `.tflite` are identical
+  - how to interpret `feat_f32`, `input_raw`, `output_raw`, `score`, `exact`,
+    and `bytes_equal`
+  - which conclusions are allowed before and after parity passes
+  - common pitfalls that previously caused wasted debugging cycles
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new guide is
+  discoverable from the documentation index and prioritized alongside the
+  existing KWS / frontend references.
+- This step intentionally does not change board code, serial flow, or the
+  parity mechanisms themselves. It packages the existing proven workflow into a
+  reusable handoff document for future model bring-up.

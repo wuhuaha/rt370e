@@ -6296,3 +6296,55 @@ Interpretation:
 - for this student FP32 debug branch, the deployment path is correct and the
   preserved board/local parity tooling remains usable even when the serial log
   wraps part of `input_raw`
+
+## Step 5.100 Verification
+
+Review the new guide and confirm it is indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md
+rg -n "KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md" doc/README.md
+```
+
+Check that all relative markdown links in the new guide resolve to real files:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+root = Path('/root/ameba-river')
+doc = root / 'doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md'
+text = doc.read_text(encoding='utf-8')
+base = doc.parent
+bad = []
+for target in re.findall(r'\[[^\]]+\]\(([^)]+)\)', text):
+    if '://' in target or target.startswith('#'):
+        continue
+    path = (base / target).resolve()
+    if not path.exists():
+        bad.append((target, str(path)))
+
+print('broken_links', len(bad))
+for target, path in bad:
+    print(target, '->', path)
+PY
+```
+
+Expected result:
+- the new guide renders the full workflow, including:
+  - mechanism overview
+  - board commands
+  - host replay flow
+  - result interpretation
+  - pitfalls and reporting template
+- `doc/README.md` contains
+  `KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md`
+- link check prints:
+  - `broken_links 0`
+
+Interpretation:
+- this step is documentation-only
+- no firmware rebuild or reflashing is required
+- the new document is ready to be handed to other teammates as the default
+  onboarding reference for future board/local KWS deployment debugging
