@@ -6062,3 +6062,64 @@ Scope note:
 - Board/local replay parity, threshold calibration, and on-device quality
   judgment for the student branch should be handled as the next separate
   runtime step.
+
+## Step 5.96 Verification
+
+Board-side exact tensor parity on the currently flashed firmware:
+```text
+1. Capture boot log and confirm the flashed model branch from the board itself.
+2. Run:
+   - river kws debug local on
+   - river audio probe stop
+   - river kws dump next
+   - river kws align run
+3. After the dump finishes, replay the serial log on host.
+4. Restore runtime state:
+   - river kws debug local off
+   - river audio probe start
+```
+
+Host replay command used in this run:
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_exact_parity_serial.log \
+  --model /root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite \
+  --seq 2
+```
+
+Observed result from the board boot log:
+- the flashed firmware is `bc_resnet_v3_fp32_experimental`
+- the board is not currently running
+  `student_bc_resnet_tiny_v2_fp32_debug`
+- active frontend/runtime contract is still:
+  - `input=40x98x1`
+  - `fft=512`
+  - `center=no`
+
+Observed parity result for `seq=2`:
+- board dump:
+  - `feat_hash=0xb89e7474`
+  - `input_hash=0x97354d89`
+  - `raw=25`
+  - `score=0.025023`
+- host replay:
+  - feature hash matches
+  - logged input hash matches
+  - `quant_parity: diff_bytes=0/15680`
+  - `raw_equal=yes`
+  - `host score=0.025000`
+  - `bytes_equal=no`, first differing output byte index=`0`
+
+Interpretation:
+- the exact input tensor path is aligned between board and host
+- the remaining float-output byte difference is tiny and does not change the
+  decoded score bucket or `raw` value
+- this validates the current mainline FP32 deployment path, not the student
+  FP32 debug branch
+
+Scope note:
+- This step is a runtime-debug verification step only.
+- It does not mean the student branch has been board-validated; that requires
+  reflashing a firmware image built with
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`.

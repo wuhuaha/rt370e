@@ -3445,3 +3445,42 @@
 - This step does not alter serial-debug commands and does not remove any
   existing board/local comparison tooling; it only adds a selectable parallel
   debug variant.
+
+## Step 5.96
+- Ran a board-side exact tensor parity session over the existing serial debug
+  flow, without changing the serial monitor settings or removing any parity
+  hooks.
+- The boot log from the flashed firmware proved the board is currently running
+  the committed mainline FP32 branch, not the parallel student branch:
+  - variant=`bc_resnet_v3_fp32_experimental`
+  - input shape=`1x40x98x1`
+  - frontend=`fft=512`, `frames=98`, `center=no`
+  - model size=`77848B`
+- Executed the existing parity path on board:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws dump next`
+  - `river kws align run`
+- The board emitted a complete exact tensor dump for alignment replay
+  `seq=2 infer=3` with:
+  - `feat_hash=0xb89e7474`
+  - `input_hash=0x97354d89`
+  - `raw=25`
+  - `score=0.025023`
+- Replayed that same dumped tensor locally against
+  `/root/kws-training-pro/models/bc_resnet_iteration3/bc_resnet_v3_fp32.tflite`
+  and verified:
+  - feature hash matches
+  - input hash matches
+  - quant parity is exact (`diff_bytes=0/15680`)
+  - output `raw` matches exactly (`25`)
+  - float output bytes differ by only the first byte, with host score
+    `0.025000` vs board score `0.025023`
+- Restored the board to the normal debug state after the run:
+  - `river kws debug local off`
+  - `river audio probe start`
+- Conclusion of this step:
+  - the existing board/local exact-tensor parity path is working
+  - the currently flashed firmware is not the student FP32 debug variant, so
+    this parity result validates the mainline FP32 chain only
+  - student-model parity on board requires reflashing the student build first
