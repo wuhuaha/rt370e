@@ -3655,3 +3655,43 @@
   - no serial debug command flow was modified
   - the existing board/local deployment-parity mechanism remains the required
     baseline before any INT8 board-effect conclusions are accepted
+
+## Step 5.103
+- Added a parallel board-debug KWS variant for the algorithm export
+  `student_bc_resnet_tiny_v2` INT8 bundle without replacing the preserved FP32
+  debug path:
+  - [Kconfig](/root/ameba-river/Kconfig) now exposes
+    `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG`
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+    now wires that variant to the exported INT8 TFLite blob while reusing the
+    same `40x101`, centered log-mel, per-clip norm frontend contract as the
+    student FP32 debug path
+  - [prj.conf](/root/ameba-river/prj.conf) switches the active deployment
+    build to the INT8 debug variant, starts from a `2048KB` arena, and uses
+    the bundle threshold `q15=9444`
+- Added the embedded model header generated from the algorithm bundle:
+  [components/river_voice/generated/student_bc_resnet_tiny_v2_int8_model_data.h](/root/ameba-river/components/river_voice/generated/student_bc_resnet_tiny_v2_int8_model_data.h)
+- Built, flashed, and exercised the INT8 firmware on the board while keeping
+  the existing board/local parity workflow intact:
+  - boot log confirms
+    `variant=student_bc_resnet_tiny_v2_int8_debug`
+  - runtime tensor contract confirms `input=int8`, `output=int8`,
+    `shape=1x40x101x1`
+  - the preserved `river kws debug local on` + `river audio probe stop` +
+    `river kws align run` flow still emits `feat_f32`, `input_raw`, and
+    `output_raw` chunks for host replay
+- Board/local parity passed for the INT8 path:
+  - host replay from
+    [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py)
+    reported `quant_parity: diff_bytes=0/4040`
+  - replay also reported `output_parity: bytes_equal=yes raw_equal=yes`
+  - board and host both produced `raw=-28`, `score=0.390625`, `q15=12800` on
+    the captured alignment sample
+- The deployment path is therefore correct, but realtime is not:
+  - board `infer_us` on this INT8 variant is about `2.34s`
+  - queue trimming still occurs aggressively before inference
+  - this means the current student INT8 graph is board-correct but far from
+    usable realtime on `RTL8730E`
+- Restored the board to normal runtime after the test by turning `local_only`
+  back off and restarting `audio probe`, so the board is not left in the
+  parity-only state.

@@ -249,6 +249,16 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG
       `40x101`, `n_fft=400`, centered log-mel frontend and must not
       replace the current mainline production or FP32 bring-up chain.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG
+    bool "Student BC-ResNet tiny v2 INT8 debug model"
+    help
+      Use the parallel INT8 deployment bundle exported from
+      /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2.
+      This variant is reserved for board/local parity work and board-side
+      realtime probing on the `40x101`, `n_fft=400`, centered log-mel
+      frontend, while keeping the existing FP32 debug path intact for
+      quantization-vs-deployment triage.
+
 endchoice
 
 config RIVER_KWS_LEGACY_MODEL_COMPAT_EN

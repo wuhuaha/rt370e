@@ -6481,3 +6481,82 @@ Interpretation:
 - no firmware rebuild or reflashing is required
 - the new document can now be used as the default written recommendation before
   starting INT8 board bring-up for this student bundle
+
+## Step 5.103 Verification
+
+Build the active student INT8 debug firmware:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Flash the board with the current project profile:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Capture a fresh boot log and verify the boot-time INT8 runtime contract:
+```bash
+script -q -f /tmp/kws_student_int8_serial.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; cat /dev/ttyUSB0'"
+```
+
+Optional if the serial capture started after boot:
+```bash
+bash -lc "printf 'reboot\r' > /dev/ttyUSB0"
+```
+
+Boot log must show:
+- `variant=student_bc_resnet_tiny_v2_int8_debug`
+- `kws tensor io: runtime_in=int8 runtime_out=int8`
+- `kws input shape: src=schema dims=[1,40,101,1]`
+- `kws quant: ... in_zp=-46 ... out_zp=-128`
+
+Run the preserved board-side parity flow without changing the existing debug
+mechanism:
+```bash
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Wait until the serial log contains both:
+- `kws tensor dump output_raw: seq=...`
+- `kws align replay done: dump=emitted local_only_restored=yes`
+
+Replay the captured dump on host against the exact INT8 bundle:
+```bash
+cd /root/ameba-river
+OMP_NUM_THREADS=1 TF_NUM_INTRAOP_THREADS=1 TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_student_int8_serial.log \
+  --model /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.int8.tflite \
+  --seq latest
+```
+
+Expected parity result:
+- `board_meta: input_type=int8 output_type=int8 shape=(1, 40, 101, 1)`
+- `quant_parity: diff_bytes=0/4040`
+- `output_parity: bytes_equal=yes raw_equal=yes`
+- `board_output: raw=-28 score=0.390625 q15=12800`
+- `host_output: raw=-28 score=0.390625`
+
+Realtime conclusion from the same board run:
+- boot/alignment logs show `kws infer slow` around `2339206us` to `2344471us`
+- queue trimming still appears before/around inference
+- this proves deployment correctness, but does not satisfy realtime needs on
+  the current `RTL8730E` board path
+
+Restore the board to the normal runtime state after the test:
+```bash
+bash -lc "printf 'river kws debug local off\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe start\r' > /dev/ttyUSB0"
+```
+
+Expected restore result:
+- serial prints `kws debug local_only: enabled=no`
+- serial prints `vad probe started`
+- the board returns to the normal wake-monitoring path instead of remaining in
+  the parity-only debug state
