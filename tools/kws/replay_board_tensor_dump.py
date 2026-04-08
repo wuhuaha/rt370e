@@ -290,6 +290,14 @@ def main() -> int:
         default="latest",
         help="dump sequence number to replay, or 'latest' (default)",
     )
+    parser.add_argument(
+        "--builtin-ref",
+        action="store_true",
+        help=(
+            "use the TensorFlow Lite builtin reference resolver on host to avoid "
+            "delegate-level FP32 drift during exact board parity checks"
+        ),
+    )
     args = parser.parse_args()
 
     records = parse_dump_records(args.log)
@@ -388,7 +396,13 @@ def main() -> int:
 
     effective_input_hash = fnv1a32(effective_input_bytes)
 
-    interpreter = tf.lite.Interpreter(model_path=str(args.model))
+    interpreter_kwargs: dict[str, Any] = {"model_path": str(args.model)}
+    if args.builtin_ref:
+        interpreter_kwargs["experimental_op_resolver_type"] = (
+            tf.lite.experimental.OpResolverType.BUILTIN_REF
+        )
+
+    interpreter = tf.lite.Interpreter(**interpreter_kwargs)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()[0]
     output_details = interpreter.get_output_details()[0]
@@ -412,6 +426,7 @@ def main() -> int:
         f" input_type={record.in_type} output_type={record.out_type}"
         f" shape={record.shape} layout={record.layout}"
     )
+    print(f"host_runtime: builtin_ref={'yes' if args.builtin_ref else 'no'}")
     print(
         "board_hash:"
         f" feature=0x{record.feat_hash:08x} input=0x{record.input_hash:08x}"
@@ -468,6 +483,12 @@ def main() -> int:
         )
     if host_output_bytes != output_bytes:
         print("warning: host replay output does not match board dump", file=sys.stderr)
+        if record.out_type == "float32" and not args.builtin_ref:
+            print(
+                "note: retry with --builtin-ref to remove host delegate drift from "
+                "FP32 exact-parity checks",
+                file=sys.stderr,
+            )
 
     return 0
 

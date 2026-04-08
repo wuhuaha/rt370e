@@ -3794,3 +3794,68 @@
   - no board flash yet
   - no serial-debug flow changes
   - parity confirmation and board performance measurement are handled next
+
+## Step 5.107
+- Completed the first full board deployment validation for
+  `student_bc_resnet_nano_v2_fp32_debug` while preserving the existing
+  board/local comparison workflow:
+  - captured a fresh nano FP32 boot/runtime log at `/tmp/kws_nano_fp32_debug.log`
+  - boot facts confirm the intended deployment contract:
+    - `variant=student_bc_resnet_nano_v2_fp32_debug`
+    - `runtime_in=float32 runtime_out=float32`
+    - `shape=[1,40,101,1]`
+    - `fft=400 hop=160 center=yes`
+    - `threshold_q15=8851`
+  - init memory facts from the board log show:
+    - `arena_used=3139392B`
+    - `arena_slack=1054912B`
+    - `boot_ready heap_free=9641216B`
+- Verified that the board-embedded model is byte-identical to the algorithm
+  bundle FP32 `.tflite`:
+  - header bytes = model bytes = `108828`
+  - both hashes are
+    `4ff052777e4796db44d5899e94c15eb62c3d24431edcc065d9388671c4df3945`
+- Ran the preserved standard parity path on the board without changing the
+  serial workflow:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align run`
+  - `river kws debug local off`
+  - `river audio probe start`
+- The nano FP32 alignment sample proves the deployment path is working:
+  - board `infer_us=277865`
+  - board `raw=363 score=0.363446 q15=11909`
+  - board produced a wake hit on the compiled sample
+  - `feature hash=0x7ce0b11d`
+  - `input hash=0xd52f011c`
+- Hardened the host replay tool for future FP32 exact-parity work without
+  touching the board-side debug path:
+  - [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py)
+    now supports `--builtin-ref`
+  - this forces the host-side TFLite replay onto the builtin reference
+    resolver to avoid false `bytes_equal=no` reports caused by host delegates
+  - the script now also prints `host_runtime: builtin_ref=yes|no` and explains
+    the retry path when a float32 dump mismatches only under delegate mode
+- Replayed the captured nano dump on host against the exact FP32 bundle and
+  confirmed exact parity under the new stable host mode:
+  - `quant_parity: diff_bytes=0/16160`
+  - `output_parity: bytes_equal=yes raw_equal=yes`
+  - board and host both produced `raw=363`
+  - board and host exact output both decode to `0.363446`
+- Confirmed the board is restored to the normal runtime path after parity
+  testing:
+  - subsequent live logs no longer show `wakeword handoff held: reason=local_debug`
+  - the board resumes normal `wakeword queued` and
+    `xiaozhi conversation window opened` behavior
+  - a later live sample still measured `infer_us=277681`, which is consistent
+    with the `align` sample latency level
+- Added two documentation updates so future model bring-up can reuse the same
+  path reliably:
+  - new board profile:
+    [doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md](/root/ameba-river/doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md)
+  - updated parity guide:
+    [doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md](/root/ameba-river/doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md)
+    now explicitly recommends `--builtin-ref` for FP32 exact parity
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the nano FP32
+  runtime profile is indexed beside the existing student/tiny and INT8
+  records.

@@ -6737,3 +6737,117 @@ Expected build result:
 Scope note:
 - Board/local parity confirmation and nano runtime measurement are the next
   step after this compile gate passes.
+
+## Step 5.107 Verification
+
+Capture a fresh nano FP32 serial log from the flashed board:
+```bash
+cd /root/ameba-river
+rm -f /tmp/kws_nano_fp32_debug.log
+script -q -f /tmp/kws_nano_fp32_debug.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; cat /dev/ttyUSB0'"
+```
+
+If capture starts after boot, trigger one reboot:
+```bash
+bash -lc "printf 'reboot\r' > /dev/ttyUSB0"
+```
+
+Boot log must show the intended nano FP32 contract:
+- `variant=student_bc_resnet_nano_v2_fp32_debug`
+- `kws tensor io: runtime_in=float32 runtime_out=float32`
+- `kws input shape: src=schema dims=[1,40,101,1]`
+- `kws backend: ... fft=400 hop=160 center=yes ... threshold_q15=8851`
+- `kws io binding: ... arena_used=3139392 ... arena_slack=1054912`
+
+Confirm the board-embedded model matches the algorithm FP32 bundle exactly:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+
+header = Path('components/river_voice/generated/student_bc_resnet_nano_v2_fp32_model_data.h').read_text()
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header))
+model = Path('/root/kws-trainint/artifacts/exports/student_bc_resnet_nano_v2/model.fp32.tflite').read_bytes()
+
+print('header_bytes', len(data))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_bytes', len(model))
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Expected result:
+- both byte counts are `108828`
+- both SHA256 values are
+  `4ff052777e4796db44d5899e94c15eb62c3d24431edcc065d9388671c4df3945`
+- `exact_match yes`
+
+Run the preserved board/local parity flow unchanged:
+```bash
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align status\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Wait until the log shows:
+- `kws align guard: kws=ready probe=stopped interaction=wake_monitoring detection=ready worker=idle snapshot=empty local_only=yes`
+- `kws align replay start: source=compiled_pcm frames=145 emit_dump=yes`
+- `kws diag: infer=1 gate=open out_type=float32 raw=363 score=0.363446 q15=11909`
+- `kws infer slow: infer=1 us=277865 queue=17/64 gate=open score_pm=363`
+- `kws tensor dump captured: seq=1 infer=1 mode=align_best`
+- `kws align replay done: dump=emitted local_only_restored=yes`
+
+Replay the board dump on host using the reference host mode:
+```bash
+cd /root/ameba-river
+OMP_NUM_THREADS=1 TF_NUM_INTRAOP_THREADS=1 TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_nano_fp32_debug.log \
+  --model /root/kws-trainint/artifacts/exports/student_bc_resnet_nano_v2/model.fp32.tflite \
+  --seq latest \
+  --builtin-ref
+```
+
+Expected parity result:
+- `host_runtime: builtin_ref=yes`
+- `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+- `host_hash: feature=0x7ce0b11d ... effective_input=0xd52f011c source=input_raw`
+- `quant_parity: diff_bytes=0/16160`
+- `board_output: raw=363 score=0.363446 exact=0.363446 q15=11909`
+- `host_output: raw=363 ... exact=0.363446`
+- `output_parity: bytes_equal=yes raw_equal=yes`
+
+Restore the board to normal runtime:
+```bash
+bash -lc "printf 'river kws debug local off\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe start\r' > /dev/ttyUSB0"
+```
+
+Expected restore result:
+- serial prints `vad probe started`
+- the board is not left in `local_only` / parity-only state
+
+Optional live-side confirmation after restore:
+- later log lines should return to the normal cloud handoff path instead of
+  `wakeword handoff held: reason=local_debug`
+- for example:
+  - `wakeword queued text=小欧管家 confidence=9971`
+  - `xiaozhi conversation window opened: source=wakeword mode=auto timeout_ms=8000`
+  - `kws infer slow: infer=7 us=277681 queue=6/64 gate=closed score_pm=304`
+
+Review the new nano FP32 board profile and doc index:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md
+rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md" doc/README.md
+rg -n -- "--builtin-ref|host delegate|delegate 数值路径差异" doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md
+```
+
+Expected interpretation:
+- nano FP32 deployment is board-correct
+- board/host exact parity can be reproduced stably with `--builtin-ref`
+- current nano FP32 latency is about `277.865ms`, which is much better than
+  student tiny FP32 but still well above the bundle `24ms` budget

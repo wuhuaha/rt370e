@@ -333,8 +333,23 @@ cd /root/ameba-river
 python3 tools/kws/replay_board_tensor_dump.py \
   --log /tmp/kws_student_fp32_debug_replay.clean.log \
   --model /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite \
-  --seq latest
+  --seq latest \
+  --builtin-ref
 ```
+
+说明：
+
+- 对 `FP32` 调试模型，推荐显式加 `--builtin-ref`
+- 原因不是板端输出错了，而是 host 侧 TensorFlow 默认 delegate 可能引入最低有效位漂移
+- exact parity 需要优先对齐：
+  - `feature hash`
+  - `effective_input hash`
+  - `output_raw` 原始字节
+- 若不加 `--builtin-ref` 时只看到：
+  - `output_parity: bytes_equal=no`
+  - 但 `raw_equal=yes`
+  - 且 `exact` 基本一致
+- 这优先解释为 host delegate 数值路径差异，不要直接判成板端部署错误
 
 ### 8.5 重点输出项怎么读
 
