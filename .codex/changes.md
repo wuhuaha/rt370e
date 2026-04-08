@@ -4262,3 +4262,26 @@
 - This step does not yet prove board runtime is normal; flash + serial
   validation is still needed to compare against the previous `0x00` failure
   mode.
+
+## Step 5.112
+- Flashed the latest-SDK FP32 control image built in Step `5.111` to the board
+  through `/dev/ttyUSB0`:
+  - entered UART burn with `reboot uartburn`
+  - flashed with `AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - flash ended with `Finished PASS`
+- Captured a fresh 20-second raw boot UART log immediately after flashing:
+  - `/tmp/kws_latest_sdk_fp32_boot.log`
+- The runtime result is still abnormal and matches the previously observed
+  latest-SDK failure signature:
+  - after the `script` header, `od -An -tx1 -j 160 -N 64` shows only `00`
+  - removing all `0x00` bytes leaves only the `script` start/end wrapper text
+  - no normal boot markers appear:
+    - no `File System Init Success`
+    - no `ameba-river boot`
+    - no `kws init`
+- This closes the loop on the current latest-SDK retry:
+  - latest upstream SDK plus the currently required river patches can compile
+    and flash
+  - but it still fails at runtime before any normal boot log becomes visible
+  - therefore the remaining blocker is still runtime / boot-chain divergence,
+    not the ability to generate or download the FP32 image

@@ -7456,3 +7456,46 @@ Interpretation:
   produce a complete FP32 debug image set
 - this step alone does not prove board runtime is healthy; flash + serial
   verification is still required next
+
+## Step 5.112 Verification
+
+Flash the latest-SDK FP32 control image to the board:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0'
+```
+
+Expected result:
+- flash reaches `Finished PASS`
+- device info is readable before download starts
+- both images are downloaded:
+  - `km4_boot_all.bin`
+  - `km0_km4_ca32_app.bin`
+
+Capture 20 seconds of raw boot UART immediately after flash:
+```bash
+rm -f /tmp/kws_latest_sdk_fp32_boot.log
+script -q -f /tmp/kws_latest_sdk_fp32_boot.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+od -An -tx1 -j 160 -N 64 /tmp/kws_latest_sdk_fp32_boot.log
+bash -lc "tr -d '\000' < /tmp/kws_latest_sdk_fp32_boot.log | sed -n '1,40p'"
+grep -a -n 'ameba-river boot\|File System Init Success\|kws init' /tmp/kws_latest_sdk_fp32_boot.log
+```
+
+Expected result for the current latest-SDK failure case:
+- raw UART shows continuous `0x00` bytes after the `script` header:
+  - `00 00 00 00 ...`
+- removing `0x00` bytes leaves only the `script` wrapper text:
+  - `Script started ...`
+  - `Script done ...`
+- `grep` finds no normal boot markers:
+  - no `File System Init Success`
+  - no `ameba-river boot`
+  - no `kws init`
+
+Interpretation:
+- the latest-SDK FP32 image is flashable but still does not boot into a normal
+  visible runtime
+- this reproduces the earlier `0x00` failure mode on the user's actual
+  `/root/ameba-rtos` checkout, so the blocker remains runtime / boot-chain
+  divergence rather than source download or build incompleteness
