@@ -7274,3 +7274,26 @@ Expected interpretation:
   `00 / 00 00 / 00 00 00 / 00 00 00 00`
 - this reproduces the clean-SDK INT8 failure signature recorded in
   [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md)
+
+Reproduce the clean-SDK FP32 control experiment:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG|CONFIG_RIVER_KWS_TENSOR_ARENA_KB|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15" prj.conf
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0
+script -q -f /tmp/kws_student_fp32_clean_sdk.log -c "bash -lc 'while true; do stty -F /dev/ttyUSB0 1500000 raw -echo && cat /dev/ttyUSB0; sleep 0.2; done'"
+```
+
+Expected interpretation:
+- `prj.conf` contains:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+- build completes with `Build done`
+- flash completes with `Finished PASS`
+- unlike the dirty-SDK FP32 baseline, the clean-SDK FP32 control image still
+  does not emit normal `ameba-river` boot text
+- the serial stream instead collapses into continuous `0x00` bytes, matching
+  the broader clean-SDK runtime failure recorded in
+  [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md)

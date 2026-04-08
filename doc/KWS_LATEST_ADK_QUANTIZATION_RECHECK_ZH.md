@@ -437,3 +437,53 @@
   - 保留现有板端 / 本机对拍代码
   - 保留当前 dirty SDK 中已经验证过的 correctness 兜底补丁
   - 不把“clean SDK 能编译 + 能烧录”误判成“INT8 已经可用”
+
+### 10.6 FP32 控制实验进一步收紧了边界
+
+为避免把上一小节的异常过早归因为“INT8 专属”，本次又补做了一个 clean SDK 下的 FP32 控制实验。
+
+控制实验做法：
+
+- 把项目切回此前已经在 dirty SDK 下验证过的：
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+- 仍然使用同一个 clean SDK：
+  - `/tmp/ameba-rtos-1.2-latest`
+- 重新完整 build + flash
+
+结果：
+
+- clean SDK 下 FP32 控制 build 也可以正常完成
+- 刷板也同样 `Finished PASS`
+- 但刷入后的串口行为并没有恢复正常
+- 一启动串口抓取就立刻落入持续 `0x00` 空字节流
+- 没有出现任何我们熟悉的：
+  - `ameba-river boot`
+  - `river.voice.kws`
+  - `river.wifi`
+  - `river.cloud`
+
+这个控制实验很重要，因为它说明：
+
+- 当前 clean SDK 路径下的异常，并不只是 `INT8` 量化算子问题
+- 至少在本项目当前接法里，clean SDK 编出来的固件存在一个更上游、更广泛的运行态异常
+- 因此：
+  - 不能把上一节的 `INT8` 上板失败简单解读成“量化链路独有故障”
+  - 更合理的判断是：当前 repo 还依赖 dirty SDK 中除量化 kernel 之外的其它已验证修正或兼容改动
+
+换句话说，当前阶段能成立的最严格结论是：
+
+- clean SDK superproject + 当前项目代码：
+  - 可以编译
+  - 可以烧录
+  - 但当前还不能稳定进入正常 `ameba-river` runtime
+- 所以：
+  - clean SDK 下的 `INT8` 失败，暂时不能单独作为“INT8 官方优化路径坏掉”的唯一证据
+  - 但也绝不能被解释成“官方 clean SDK 已可用，只是阈值或模型有问题”
+
+后续若要继续推进，优先级应调整为：
+
+1. 先找出 dirty SDK 相比 clean SDK 的更广义运行时差异。
+2. 在确认 clean SDK 能让 FP32 正常起机之前，不继续把 clean SDK 上的模型行为用于量化性能结论。
+3. 继续保留当前 dirty SDK + 板端/本机对拍机制，作为所有唤醒词模型 correctness 调试的稳定基线。

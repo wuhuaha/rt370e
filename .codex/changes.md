@@ -4078,3 +4078,22 @@
   - on the clean official SDK path, this student INT8 image does not yet reach
     the minimum bar of booting into a normal runtime state that can be used for
     board/host parity
+- Ran a clean-SDK FP32 control experiment to separate "quantization issue" from
+  "broader clean-SDK runtime issue":
+  - switched [prj.conf](/root/ameba-river/prj.conf) back to
+    `student_bc_resnet_tiny_v2_fp32_debug`
+  - restored the last known usable FP32 settings:
+    - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+    - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+- Rebuilt and reflashed the clean-SDK FP32 control image successfully:
+  - build completed with `Build done`
+  - flash completed with `Finished PASS`
+- The FP32 control image showed the same post-flash failure signature as the
+  clean-SDK INT8 retry:
+  - immediate serial degradation into continuous `0x00` bytes
+  - no `ameba-river boot` text log
+  - no usable runtime / monitor state for board-host parity
+- This control result materially changed the conclusion:
+  - the current clean-SDK failure is not isolated to INT8 kernels
+  - the repo still depends on broader dirty-SDK runtime compatibility changes
+    beyond the quantization correctness patches already documented
