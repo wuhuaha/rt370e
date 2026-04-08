@@ -3898,3 +3898,60 @@
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so this new
   constraint document is indexed next to the existing parity, FP32, and INT8
   runtime records.
+
+## Step 5.109
+- Added a parallel DS-CNN tiny FP32 debug deployment variant without touching
+  the mainline production KWS path:
+  - [components/river_voice/generated/student_dscnn_tiny_v2_fp32_model_data.h](/root/ameba-river/components/river_voice/generated/student_dscnn_tiny_v2_fp32_model_data.h)
+  - [Kconfig](/root/ameba-river/Kconfig)
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+  - [prj.conf](/root/ameba-river/prj.conf)
+- The new variant keeps the already-validated student debug contract intact:
+  - `40x101`
+  - `fft=400`
+  - `hop=160`
+  - `center=yes`
+  - `per_clip_mean_std`
+  - `float32 -> float32`
+- Preserved the existing board / host parity workflow rather than introducing
+  a special-case path for DS-CNN:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align run`
+  - host replay through
+    [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py)
+- First boot with `1024KB` arena failed at `AllocateTensors`; the DS-CNN tiny
+  FP32 path now uses a debug-only `2048KB` arena so bring-up can proceed to
+  parity and runtime measurement.
+- Rebuilt, flashed, and verified the new DS-CNN tiny FP32 variant boots
+  successfully:
+  - `variant=student_dscnn_tiny_v2_fp32_debug`
+  - `input shape=[1,40,101,1]`
+  - `runtime_in=float32 runtime_out=float32`
+  - `arena_used=1168336B`
+  - `arena_slack=928816B`
+- Verified the embedded board model bytes match the algorithm bundle exactly:
+  - header bytes `12376`
+  - model bytes `12376`
+  - shared `sha256=836b18e8c315c9142f5744bfa0183a35e4d011019c2526e33f86dd3da166c7c7`
+- Ran the preserved `align` parity flow on board and replayed the resulting
+  dump on host against the exact FP32 bundle:
+  - board `raw=297 score=0.296720 q15=9723`
+  - host `raw=297 exact=0.296720`
+  - `feature hash=0xf6cf59f0`
+  - `effective input hash=0x8aa04513`
+  - `output_parity: bytes_equal=no raw_equal=yes`
+- The DS-CNN tiny dump lost `input_raw` chunks `146` and `147` in serial
+  capture, but the replay tool correctly fell back to `feat_f32` because the
+  reconstructed feature bytes reproduced the board input hash exactly. This is
+  treated as a serial dump completeness issue, not a deployment mismatch.
+- Captured the first board-side runtime profile for this candidate:
+  - `infer_us[last=183988 avg=183969 max=183988]`
+  - `stride=16`, so the current debug cadence still has margin to the next
+    `256ms` infer slot
+  - still about `10.22x` slower than the bundle `18ms` CPU budget
+- Added the first DS-CNN tiny FP32 board profile document:
+  - [doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md](/root/ameba-river/doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md)
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new DS-CNN
+  tiny runtime profile is indexed beside the existing student bring-up and
+  constraint records.

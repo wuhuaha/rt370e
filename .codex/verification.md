@@ -6925,3 +6925,117 @@ Confirm the new document is indexed:
 cd /root/ameba-river
 rg -n \"KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md\" doc/README.md
 ```
+
+## Step 5.109 Verification
+
+Build and flash the DS-CNN tiny FP32 debug variant:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Expected boot confirmation in the serial log:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+text = Path('/tmp/kws_dscnn_tiny_fp32_debug.log').read_bytes().replace(b'\x00', b'').decode('utf-8', errors='replace')
+for needle in (
+    'variant=student_dscnn_tiny_v2_fp32_debug',
+    'kws init plan:',
+    'kws alloc:',
+    'kws backend:',
+    'kws input shape: src=schema dims=[1,40,101,1]',
+):
+    print(needle, '=>', needle in text)
+PY
+```
+
+Expected result:
+- all checks print `True`
+- there is no `kws AllocateTensors failed`
+
+Confirm the board-embedded header bytes exactly match the algorithm FP32 bundle:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+
+header = Path('components/river_voice/generated/student_dscnn_tiny_v2_fp32_model_data.h').read_text()
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header))
+model = Path('/root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2/model.fp32.tflite').read_bytes()
+
+print('header_bytes', len(data))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_bytes', len(model))
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Expected result:
+- both byte counts are `12376`
+- both SHA256 values are
+  `836b18e8c315c9142f5744bfa0183a35e4d011019c2526e33f86dd3da166c7c7`
+- `exact_match yes`
+
+Run the preserved board parity flow:
+```text
+river kws debug local on
+river audio probe stop
+river kws align status
+river kws align run
+river audio probe start
+river kws debug local off
+```
+
+Expected board-side evidence in the serial log:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+text = Path('/tmp/kws_dscnn_tiny_fp32_debug.log').read_bytes().replace(b'\x00', b'').decode('utf-8', errors='replace')
+for needle in (
+    'kws align guard: kws=ready probe=stopped interaction=wake_monitoring detection=ready worker=idle snapshot=empty local_only=yes',
+    'kws tensor dump begin:',
+    'kws tensor dump meta:',
+    'kws tensor dump output_raw: seq=1 chunk=1/1 hex=a5eb973e',
+    'kws align replay captured: seq=1 infer=2 score=0.296720 q15=9723',
+    'wakeword hit: text=小欧管家 score_pm=296 q15=9723',
+):
+    print(needle, '=>', needle in text)
+PY
+```
+
+Expected result:
+- all checks print `True`
+
+Replay the captured dump on host:
+```bash
+cd /root/ameba-river
+TF_ENABLE_ONEDNN_OPTS=0 \
+OMP_NUM_THREADS=1 \
+TF_NUM_INTRAOP_THREADS=1 \
+TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_dscnn_tiny_fp32_debug.log \
+  --model /root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2/model.fp32.tflite \
+  --seq latest \
+  --builtin-ref
+```
+
+Expected interpretation:
+- `feature hash` and `effective input hash` match the board values
+- the tool reports `raw_equal=yes`
+- board and host both decode to `raw=297`, `q15=9723`, `exact=0.296720`
+- `bytes_equal=no` is still acceptable for this FP32 candidate because the
+  remaining mismatch is only at the float output byte level while the decoded
+  scalar result is the same
+
+Confirm the new runtime profile doc is present and indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md
+rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md" doc/README.md
+```

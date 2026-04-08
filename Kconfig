@@ -250,6 +250,16 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG
       BC-ResNet nano branch can be deployment-checked without replacing the
       current mainline chain.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_FP32_DEBUG
+    bool "Student DS-CNN tiny v2 FP32 debug model"
+    help
+      Use the parallel FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2.
+      This variant is reserved for board/local parity work on the
+      `40x101`, `n_fft=400`, centered log-mel frontend so the smallest
+      current student bring-up model can be board-profiled without
+      disturbing the mainline chain.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG
     bool "Student BC-ResNet tiny v2 FP32 debug model"
     help
