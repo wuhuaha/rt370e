@@ -4150,3 +4150,31 @@
     normal clean-SDK runtime
   - the higher-priority remaining suspects are now the broader `component/aivoice`
     delta and/or other non-TFLM runtime compatibility changes in the dirty SDK
+- Scanned the clean SDK clone's actual submodule heads to avoid chasing
+  misleading gitlink metadata:
+  - `component/audio` actual HEAD is `e6de3cc` and matches dirty SDK
+  - `component/application/speechmind` actual HEAD is `b70cfe9` and matches
+    dirty SDK
+  - `component/ui` actual HEAD is `f5a5325` and matches dirty SDK
+  - only `component/aivoice` actual HEAD was still different:
+    - clean clone `739ba4e`
+    - dirty SDK `2809414`
+- Performed a clean-SDK retry with `component/aivoice` aligned to the dirty SDK
+  commit while keeping the earlier 17MB memory layout patch:
+  - reverted the temporary clean-clone TFLM overlay
+  - switched clean-clone `component/aivoice` to `280941488cb122f608d271d0c52a274e3c33a8ec`
+  - rebuilt the same FP32 control image and reflashed the board
+- Board result still did not improve:
+  - build completed with `Build done`
+  - flash completed with `Finished PASS`
+  - 20-second raw serial capture still contained only continuous `0x00`
+  - `od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_aivoice_commit.log`
+    still prints repeated `00`
+- Current engineering conclusion is now tighter:
+  - the clean-SDK runtime failure is not fixed by any one of the visible
+    high-signal deltas already tested individually:
+    - 17MB memory layout patch
+    - dirty local TFLM patch set
+    - dirty `component/aivoice` commit
+  - remaining root causes are now more likely to involve deeper/runtime-wide
+    clean-vs-dirty differences rather than a single obvious KWS-related patch

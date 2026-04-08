@@ -613,3 +613,65 @@
 因此当前针对 INT8/INT16 的工程边界可以再收紧一句：
 
 - 即便把 dirty SDK 的内存布局补丁和 TFLM 本地补丁都搬到 clean SDK clone 上，当前 clean SDK 仍然没有恢复到可用的正常 runtime 状态
+
+### 10.9 对齐 dirty `aivoice` 提交后，clean SDK 依然是 `0x00`
+
+在 10.8 之后，又补做了一次“把 visible delta 再排掉一个”的验证。
+
+先对 clean SDK clone 的几个关键子模块实际 HEAD 做了核对，避免被
+superproject 的 gitlink 状态误导。结果是：
+
+- `component/audio` 实际 HEAD：
+  - `e6de3cc`
+  - 与 dirty SDK 一致
+- `component/application/speechmind` 实际 HEAD：
+  - `b70cfe9`
+  - 与 dirty SDK 一致
+- `component/ui` 实际 HEAD：
+  - `f5a5325`
+  - 与 dirty SDK 一致
+- 只有 `component/aivoice` 实际 HEAD 还不同：
+  - clean SDK clone：`739ba4e`
+  - dirty SDK：`2809414`
+
+因此这次 clean-SDK 复测改成：
+
+1. 回退 10.8 临时加到 clean clone 的 TFLM 本地 overlay。
+2. 保留 10.7 已经验证过的 `aivoice_ca32_17mb` 内存布局补丁。
+3. 只把 clean clone 的 `component/aivoice` 切到 dirty SDK 的实际提交：
+   - `280941488cb122f608d271d0c52a274e3c33a8ec`
+4. 继续编译同一个 FP32 控制固件并刷板：
+   - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+   - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+   - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+
+结果仍然没有任何改善：
+
+- build 仍然 `Build done`
+- flash 仍然 `Finished PASS`
+- `/tmp/kws_student_fp32_clean_sdk_aivoice_commit.log` 抓到的仍然是：
+  - `script` 头
+  - 后面全是连续 `0x00`
+- `od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_aivoice_commit.log`
+  依然只看到：
+  - `00 00 00 00 ...`
+
+这一步的价值在于：
+
+- 目前已经逐个验证过的几个高信号 visible delta：
+  1. `aivoice_ca32_17mb` 内存布局补丁
+  2. dirty SDK 的本地 TFLM patch
+  3. dirty SDK 的 `component/aivoice` 实际提交
+- 它们都不能单独把 clean SDK 拉回到正常 `ameba-river` runtime
+
+所以到这里，结论必须再收紧：
+
+- clean SDK 当前的运行态异常，不像是“少了某一个显而易见的 KWS/量化补丁”
+- 更像是 clean SDK 与 dirty SDK 之间还存在更深层、更系统性的运行时差异
+
+从工程上看，后续排查重点应转向：
+
+1. 更广义的 dirty SDK 运行时环境差异，而不是继续只盯单个 KWS patch
+2. clean/dirty 构建产物、启动链路、平台配置的更底层比对
+3. 把 `component/network/websocket/wsclient_api.c` 这类晚期联网差异降权
+   - 这里是基于当前现象做的推断：因为板子连最早期 `ameba-river` 文本日志都没有出来

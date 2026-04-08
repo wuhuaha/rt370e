@@ -7347,3 +7347,29 @@ Expected interpretation:
 - `od` still shows continuous `00` bytes after the `script` header, proving the
   dirty SDK local TFLM patch set alone is not sufficient to restore a normal
   clean-SDK runtime
+
+Recheck whether aligning clean-SDK `component/aivoice` to the dirty SDK commit helps:
+```bash
+cd /root/ameba-river
+bash -lc "git -C /tmp/ameba-rtos-1.2-latest/component/audio rev-parse --short HEAD && git -C /tmp/ameba-rtos-1.2-latest/component/application/speechmind rev-parse --short HEAD && git -C /tmp/ameba-rtos-1.2-latest/component/ui rev-parse --short HEAD && git -C /tmp/ameba-rtos-1.2-latest/component/aivoice rev-parse --short HEAD"
+bash -lc "git -C /tmp/ameba-rtos-1.2-latest/component/tflite_micro apply -R /tmp/dirty_tflm_local.patch && git -C /tmp/ameba-rtos-1.2-latest/component/aivoice checkout 280941488cb122f608d271d0c52a274e3c33a8ec"
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0
+script -q -f /tmp/kws_student_fp32_clean_sdk_aivoice_commit.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+bash -lc "od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_aivoice_commit.log"
+```
+
+Expected interpretation:
+- the clean clone actual submodule heads show:
+  - `audio=e6de3cc`
+  - `speechmind=b70cfe9`
+  - `ui=f5a5325`
+  - `aivoice=739ba4e` before the checkout
+- after the checkout, clean-clone `aivoice` is at `2809414`
+- the rebuild still ends with `Build done`
+- the reflash still ends with `Finished PASS`
+- the post-flash serial capture still does not show `ameba-river boot`
+- `od` still shows continuous `00` bytes after the `script` header, proving the
+  dirty `component/aivoice` commit alone is also not sufficient to restore a
+  normal clean-SDK runtime
