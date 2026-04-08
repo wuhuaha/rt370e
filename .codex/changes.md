@@ -3725,3 +3725,43 @@
   - no firmware code was changed
   - no serial debug mechanism was changed
   - it preserves the existing parity workflow as the baseline deployment proof
+
+## Step 5.105
+- Switched the active deployment build back from the temporary student INT8
+  debug variant to the preserved student FP32 debug variant in
+  [prj.conf](/root/ameba-river/prj.conf):
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+  - `# CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG is not set`
+  - kept the large `8192KB` arena and the last known usable FP32 measurement
+    settings (`stride=16`, `queue=64`, `pre_roll_flush=16`, `threshold_q15=384`)
+- Rebuilt and reflashed the board with the FP32 metrics build, then captured a
+  fresh boot/runtime log at `/tmp/kws_student_fp32_debug.log`.
+- Measured the current board-side student FP32 resource profile while keeping
+  the existing serial and parity workflow intact:
+  - boot log confirms
+    `variant=student_bc_resnet_tiny_v2_fp32_debug`
+  - boot log confirms the student contract
+    `input=float32`, `output=float32`, `shape=1x40x101x1`
+  - KWS init uses `arena_used=4709152B`, `arena_slack=3679456B`
+  - `align` replay measured `infer_us=675892`
+  - restored live runtime measured `infer_us=675354`
+  - cumulative board average after two inferences is `675623us`
+  - live queue peak reached `43/64`
+- Replayed the captured board tensor dump on host against the exact FP32
+  bundle:
+  - `quant_parity: diff_bytes=0/16160`
+  - `output_parity: bytes_equal=yes raw_equal=yes`
+  - board and host both produced `raw=371`, `score=0.371203` on the captured
+    alignment sample
+- Added a dedicated dated performance record:
+  [doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_FP32_DEBUG_ZH.md](/root/ameba-river/doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_FP32_DEBUG_ZH.md)
+  which records:
+  - the exact measurement commands
+  - bundle checklist vs board actuals
+  - KWS init memory plan and heap snapshots
+  - `align` and live inference latency
+  - the reminder that this build keeps a deliberately low debug threshold and
+    should not be used for quality conclusions
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new FP32
+  board-profile document is indexed alongside the existing parity and
+  realtime-analysis material.

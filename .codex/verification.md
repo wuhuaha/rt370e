@@ -6602,3 +6602,100 @@ Expected interpretation:
   choice plus the heavy model topology
 - it should not be misdiagnosed as a board-integration or quantization-wiring
   error
+
+## Step 5.105 Verification
+
+Build the active student FP32 debug firmware:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Expected build result:
+- build completes with `Build done`
+- active build keeps
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+
+Flash the board with the current project profile:
+```bash
+cd /root/ameba-river
+python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Capture a fresh serial log:
+```bash
+rm -f /tmp/kws_student_fp32_debug.log
+script -q -f /tmp/kws_student_fp32_debug.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; cat /dev/ttyUSB0'"
+```
+
+If capture started after boot, trigger one reboot:
+```bash
+bash -lc "printf 'reboot\r' > /dev/ttyUSB0"
+```
+
+Boot log must show:
+- `variant=student_bc_resnet_tiny_v2_fp32_debug`
+- `kws tensor io: runtime_in=float32 runtime_out=float32`
+- `kws input shape: src=schema dims=[1,40,101,1]`
+- `kws backend: ... fft=400 hop=160 center=yes ...`
+- `kws io binding: ... arena_used=4709152 ... arena_slack=3679456`
+
+Run the preserved board/local debug flow without changing the serial mechanism:
+```bash
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align status\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Wait until the serial log contains:
+- `kws align replay start: source=compiled_pcm`
+- `kws infer slow: infer=1 us=675892`
+- `kws tensor dump output_raw: seq=1`
+- `kws align replay done: dump=emitted local_only_restored=yes`
+
+Replay the board dump on host against the exact FP32 bundle:
+```bash
+cd /root/ameba-river
+OMP_NUM_THREADS=1 TF_NUM_INTRAOP_THREADS=1 TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_student_fp32_debug.log \
+  --model /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite \
+  --seq latest
+```
+
+Expected parity result:
+- `board_meta: input_type=float32 output_type=float32 shape=(1, 40, 101, 1)`
+- `quant_parity: diff_bytes=0/16160`
+- `output_parity: bytes_equal=yes raw_equal=yes`
+- `board_output: raw=371 score=0.371203 exact=0.371203 q15=12163`
+
+Restore the board to normal runtime:
+```bash
+bash -lc "printf 'river kws debug local off\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe start\r' > /dev/ttyUSB0"
+```
+
+Expected restore result:
+- serial prints `kws debug local_only: enabled=no`
+- serial prints `vad probe started`
+
+Optional live-side follow-up check from the same log:
+- after restore, a natural live sample should still show FP32 latency in the
+  same range, for example:
+  - `kws infer slow: infer=2 us=675354`
+  - `kws perf: infer_us[last=675354 avg=675623 max=675892 ...]`
+
+Review the new performance record and confirm it is indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_FP32_DEBUG_ZH.md
+rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_FP32_DEBUG_ZH.md" doc/README.md
+```
+
+Expected interpretation:
+- current student FP32 deployment and board/local parity remain correct
+- current board-side student FP32 latency is still about `675ms`
+- current build is suitable for deployment/parity debugging, not for realtime
+  production use on `RTL8730E`
