@@ -7039,3 +7039,119 @@ cd /root/ameba-river
 sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md
 rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md" doc/README.md
 ```
+
+## Step 5.110 Verification
+
+Build and flash the DS-CNN small FP32 debug variant:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Expected boot confirmation in the serial log:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+text = Path('/tmp/kws_dscnn_small_fp32_debug.log').read_bytes().replace(b'\x00', b'').decode('utf-8', errors='replace')
+for needle in (
+    'variant=student_dscnn_small_v2_fp32_debug',
+    'kws init plan:',
+    'kws alloc:',
+    'kws backend:',
+    'kws input shape: src=schema dims=[1,40,101,1]',
+):
+    print(needle, '=>', needle in text)
+PY
+```
+
+Expected result:
+- all checks print `True`
+- there is no `AllocateTensors failed`
+
+Confirm the board-embedded header bytes exactly match the algorithm FP32 bundle:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+
+header = Path('components/river_voice/generated/student_dscnn_small_v2_fp32_model_data.h').read_text()
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header))
+model = Path('/root/kws-trainint/artifacts/exports/student_dscnn_small_v2/model.fp32.tflite').read_bytes()
+
+print('header_bytes', len(data))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_bytes', len(model))
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Expected result:
+- both byte counts are `23600`
+- both SHA256 values are
+  `e0a2bedd32801d3d05ca4b0b3369137bedba990d28e02b5253696dc021e56925`
+- `exact_match yes`
+
+Run the preserved board parity flow:
+```text
+river kws debug local on
+river audio probe stop
+river kws align status
+river kws align run
+river audio probe start
+river kws debug local off
+```
+
+Expected board-side evidence in the serial log:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+text = Path('/tmp/kws_dscnn_small_fp32_align_full.log').read_bytes().replace(b'\x00', b'').decode('utf-8', errors='replace')
+for needle in (
+    'kws align guard: kws=ready probe=stopped interaction=wake_monitoring detection=ready worker=idle snapshot=empty local_only=yes',
+    'kws tensor dump begin:',
+    'kws tensor dump meta:',
+    'kws tensor dump input_raw: seq=2 chunk=253/253',
+    'kws tensor dump output_raw: seq=2 chunk=1/1 hex=8287aa3e',
+    'kws align replay captured: seq=2 infer=4 score=0.333065 q15=10914',
+    'wakeword hit: text=小欧管家 score_pm=333 q15=10914',
+):
+    print(needle, '=>', needle in text)
+PY
+```
+
+Expected result:
+- all checks print `True`
+- if `kws tensor dump end:` is absent but `input_raw 253/253` and `output_raw`
+  are present, treat the dump as complete enough for replay
+
+Replay the captured dump on host:
+```bash
+cd /root/ameba-river
+TF_ENABLE_ONEDNN_OPTS=0 \
+OMP_NUM_THREADS=1 \
+TF_NUM_INTRAOP_THREADS=1 \
+TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_dscnn_small_fp32_align_full.log \
+  --model /root/kws-trainint/artifacts/exports/student_dscnn_small_v2/model.fp32.tflite \
+  --seq latest \
+  --builtin-ref
+```
+
+Expected interpretation:
+- `feature hash`, `logged_input`, and `effective input` hashes match the board values
+- the tool reports `quant_parity: diff_bytes=0/16160`
+- board and host both decode to `raw=333`, `exact=0.333065`, `q15=10914`
+- `bytes_equal=no` is still acceptable for this FP32 candidate because the
+  decoded scalar output still matches exactly
+
+Confirm the new runtime profile doc is present and indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md
+rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md" doc/README.md
+```

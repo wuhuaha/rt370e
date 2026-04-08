@@ -3955,3 +3955,60 @@
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new DS-CNN
   tiny runtime profile is indexed beside the existing student bring-up and
   constraint records.
+
+## Step 5.110
+- Added a parallel DS-CNN small FP32 debug deployment variant so the next
+  DS-CNN candidate can be brought up without touching the mainline KWS path:
+  - [components/river_voice/generated/student_dscnn_small_v2_fp32_model_data.h](/root/ameba-river/components/river_voice/generated/student_dscnn_small_v2_fp32_model_data.h)
+  - [Kconfig](/root/ameba-river/Kconfig)
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+  - [prj.conf](/root/ameba-river/prj.conf)
+- Kept the existing student debug frontend / parity contract unchanged:
+  - `40x101`
+  - `fft=400`
+  - `hop=160`
+  - `center=yes`
+  - `per_clip_mean_std`
+  - `float32 -> float32`
+- Rebuilt, flashed, and verified the new DS-CNN small FP32 variant boots
+  successfully:
+  - `variant=student_dscnn_small_v2_fp32_debug`
+  - `input shape=[1,40,101,1]`
+  - `runtime_in=float32 runtime_out=float32`
+  - `arena_used=1945648B`
+  - `arena_slack=151504B`
+- Verified the embedded board model bytes match the algorithm bundle exactly:
+  - header bytes `23600`
+  - model bytes `23600`
+  - shared `sha256=e0a2bedd32801d3d05ca4b0b3369137bedba990d28e02b5253696dc021e56925`
+- Reused the preserved board / host parity path instead of introducing a new
+  special-case debug flow:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align run`
+  - host replay through
+    [tools/kws/replay_board_tensor_dump.py](/root/ameba-river/tools/kws/replay_board_tensor_dump.py)
+- The board-side `align` sample triggered correctly on this model:
+  - board `raw=333 score=0.333065 q15=10914`
+  - threshold `q15=10534`
+  - wake hit recorded on board
+- Host replay against the exact FP32 bundle confirms deployment correctness:
+  - `feature hash=0xf6cf59f0`
+  - `effective input hash=0x8aa04513`
+  - board `raw=333 exact=0.333065`
+  - host `raw=333 exact=0.333065`
+  - `output_parity: bytes_equal=no raw_equal=yes`
+- One full-capture quirk was observed:
+  - the serial log did not emit an explicit `kws tensor dump end:` line
+  - but `input_raw` still reached `253/253`, `output_raw` was present, and host
+    replay succeeded
+  - this is treated as a serial logging quirk, not a deployment mismatch
+- Captured the board-side runtime profile for this candidate:
+  - `infer_us[last=389384 avg=389256 max=389454]`
+  - about `11.12x` slower than the bundle `35ms` CPU budget
+  - about `2.12x` slower than the already-tested `student_dscnn_tiny_v2_fp32_debug`
+  - `arena_used=1945648B`, about `4.95x` above the bundle `384KB` memory budget
+- Added the DS-CNN small FP32 board profile and model-selection recommendation:
+  - [doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md](/root/ameba-river/doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md)
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new DS-CNN
+  small runtime profile is indexed next to the existing student KWS records.
