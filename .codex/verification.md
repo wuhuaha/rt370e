@@ -7399,3 +7399,60 @@ Expected interpretation:
   - `km0_image2_all.bin` first observed difference at byte `41`
 - therefore the clean-vs-dirty split is a whole-image / boot-chain divergence,
   not merely an app-layer KWS patch difference
+
+## Step 5.111 Verification
+
+Build the preserved FP32 control firmware against the latest upstream SDK tree:
+```bash
+cd /root/ameba-river
+rm -rf build_RTL8730E/build
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build finishes with `Build done`
+- the latest SDK `.venv` is created successfully under `/root/ameba-rtos/.venv`
+- no `ameba.py: command not found` error remains, because the scripted
+  entrypoint uses `python /root/ameba-rtos/ameba.py`
+
+Confirm the packaged image artifacts exist and match the recorded sizes / hashes:
+```bash
+cd /root/ameba-river
+stat -c '%n %s' \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/build/project_hp/image/km4_image2_all.bin \
+  build_RTL8730E/build/project_lp/image/km0_image2_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin \
+  build_RTL8730E/km4_boot_all.bin
+sha256sum \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/build/project_hp/image/km4_image2_all.bin \
+  build_RTL8730E/build/project_lp/image/km0_image2_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin \
+  build_RTL8730E/km4_boot_all.bin
+```
+
+Expected result:
+- sizes:
+  - `build_RTL8730E/build/project_ap/image/ap_image_all.bin 3542112`
+  - `build_RTL8730E/build/project_hp/image/km4_image2_all.bin 380448`
+  - `build_RTL8730E/build/project_lp/image/km0_image2_all.bin 94208`
+  - `build_RTL8730E/km0_km4_ca32_app.bin 4024960`
+  - `build_RTL8730E/km4_boot_all.bin 51872`
+- hashes:
+  - `2f9d35ca635bcad71060403d725a5e706c5ea0455f2e303ca51f5c65543cd508`
+    `build_RTL8730E/build/project_ap/image/ap_image_all.bin`
+  - `47a518787efff594b981836fcbb9042b41c242850d6616cfd9d6727e215d95c7`
+    `build_RTL8730E/build/project_hp/image/km4_image2_all.bin`
+  - `328d80657d333dba15ac0efc72eec8e3c6552631014c0d4a6e204d29cb8395dd`
+    `build_RTL8730E/build/project_lp/image/km0_image2_all.bin`
+  - `469ea7db132addff59b0900b2f3bdfc18519415e6c3e1ba9c51d656a0e17b6fd`
+    `build_RTL8730E/km0_km4_ca32_app.bin`
+  - `faf20ef92b919df5b82dfa08dc31ae6c7f20da7cd5d701905a5cb7969b4e1ab6`
+    `build_RTL8730E/km4_boot_all.bin`
+
+Interpretation:
+- this step proves the latest SDK plus the currently required river patches can
+  produce a complete FP32 debug image set
+- this step alone does not prove board runtime is healthy; flash + serial
+  verification is still required next

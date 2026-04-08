@@ -4205,3 +4205,60 @@
   - even early-chain images differ, so the no-log / `0x00` failure now points
     more strongly at boot-chain / image-generation / platform-runtime divergence
     than at a single model-side patch
+
+## Step 5.111
+- Switched the latest-SDK retry target to the user-provided upstream checkout:
+  - `/root/ameba-rtos`
+  - branch `master`
+  - commit `d9800ffc6fe3754d1c275eecdfb3f2e0991dbb49`
+- Synced only the SDK-side changes that are still relevant to the preserved
+  `student_bc_resnet_tiny_v2_fp32_debug` control build:
+  - patched top-level latest-SDK files:
+    - `component/network/websocket/wsclient_api.c`
+    - `component/soc/amebasmart/fwlib/include/hal_platform.h`
+    - `component/soc/amebasmart/project/ameba_layout.ld`
+    - `component/soc/usrcfg/amebasmart/ameba_flashcfg.c`
+  - overlaid the current local `tflite_micro` patch set into
+    `/root/ameba-rtos/component/tflite_micro`:
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc`
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc`
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h`
+    - `tensorflow/lite/micro/kernels/reduce_common.cc`
+- Deliberately did not carry over the old `component/aivoice` demo patch set in
+  this step:
+  - current `ameba-river` wake path no longer depends on
+    `examples/speechmind_demo/platform/ameba_dsp`
+  - latest `master` aivoice tree has already diverged structurally from the
+    dirty `release/v1.2` patch base
+  - leaving it out keeps this retry focused on the current KWS control path
+- Identified a latest-SDK environment difference that would otherwise look like
+  a build failure:
+  - `/root/ameba-rtos/env.sh` defines `ameba.py` as a shell alias
+  - non-interactive `bash -lc` does not expand that alias by default
+  - the correct scripted entrypoint is therefore
+    `python /root/ameba-rtos/ameba.py ...`
+- Confirmed the latest SDK now builds the preserved FP32 control image all the
+  way through packaging:
+  - build ended with `Build done`
+  - produced image sizes:
+    - `ap_image_all.bin = 3542112`
+    - `km4_image2_all.bin = 380448`
+    - `km0_image2_all.bin = 94208`
+    - `km0_km4_ca32_app.bin = 4024960`
+    - `km4_boot_all.bin = 51872`
+  - captured image hashes for later board/runtime comparison:
+    - `ap_image_all.bin`
+      `2f9d35ca635bcad71060403d725a5e706c5ea0455f2e303ca51f5c65543cd508`
+    - `km4_image2_all.bin`
+      `47a518787efff594b981836fcbb9042b41c242850d6616cfd9d6727e215d95c7`
+    - `km0_image2_all.bin`
+      `328d80657d333dba15ac0efc72eec8e3c6552631014c0d4a6e204d29cb8395dd`
+    - `km0_km4_ca32_app.bin`
+      `469ea7db132addff59b0900b2f3bdfc18519415e6c3e1ba9c51d656a0e17b6fd`
+    - `km4_boot_all.bin`
+      `faf20ef92b919df5b82dfa08dc31ae6c7f20da7cd5d701905a5cb7969b4e1ab6`
+- This step proves the latest upstream SDK plus the currently required river
+  patches is buildable for the preserved FP32 debug path.
+- This step does not yet prove board runtime is normal; flash + serial
+  validation is still needed to compare against the previous `0x00` failure
+  mode.
