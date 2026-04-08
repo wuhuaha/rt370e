@@ -7155,3 +7155,76 @@ cd /root/ameba-river
 sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md
 rg -n "RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md" doc/README.md
 ```
+
+Reproduce the latest ADK quantization re-check:
+```bash
+cd /root/ameba-river
+git -C /root/ameba-rtos-1.2 rev-parse HEAD
+git -C /tmp/ameba-rtos-1.2-latest rev-parse HEAD
+git -C /root/ameba-rtos-1.2 ls-tree HEAD component/tflite_micro
+git -C /tmp/ameba-rtos-1.2-latest ls-tree HEAD component/tflite_micro
+git -C /root/ameba-rtos-1.2 ls-tree origin/master component/tflite_micro
+git -C /root/ameba-rtos-1.2/component/tflite_micro for-each-ref --format='%(refname:short) %(objectname)' refs/remotes/origin
+git -C /root/ameba-rtos-1.2/component/tflite_micro diff \
+  dbda29aa7240ad14cf21cf3636ff2792a05ddcc1..origin/main -- \
+  tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc \
+  tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc \
+  tensorflow/lite/micro/kernels/reduce_common.cc \
+  tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h
+```
+
+Expected interpretation:
+- `/root/ameba-rtos-1.2` resolves to `8624cbeccf840c929db1624e05cc5b681024a3bf`
+- `/tmp/ameba-rtos-1.2-latest` resolves to `8ef72a545c384ec439eef9a200baf4f569e21a73`
+- both `release/v1.2` trees point `component/tflite_micro` to
+  `dbda29aa7240ad14cf21cf3636ff2792a05ddcc1`
+- `origin/master` points `component/tflite_micro` to
+  `8b38d3dac9ea733e93ad73c2b637ef1a28753fb3`
+- the `git diff dbda29a..origin/main -- <4 files>` command prints nothing,
+  proving the currently visible official master ref still does not absorb the
+  local quantization patches used by the dirty SDK
+
+Confirm the current dirty SDK really contains the local correctness patches:
+```bash
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc | sed -n '245,267p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc | sed -n '141,159p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/reduce_common.cc | sed -n '142,224p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/reduce_common.cc | sed -n '306,309p'
+nl -ba /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h | sed -n '135,188p'
+```
+
+Expected interpretation:
+- `conv.cc` contains the comment that the CA32 INT8 optimized conv path is "not
+  reliable" and directly calls `reference_integer_ops::ConvPerChannel(...)`
+- `depthwise_conv.cc` contains the same style of comment and calls
+  `reference_integer_ops::DepthwiseConvPerChannel(...)`
+- `reduce_common.cc` contains `IsChannelGapMeanInt8(...)` and
+  `EvalChannelGapMeanInt8(...)`, and `EvalMeanHelper(...)` dispatches to that
+  path for INT8 GAP / MEAN
+- `im2col_utils.h` uses `single_buffer_length = kheight * kwidth * input_depth`
+  instead of the old `output_depth`-based length
+
+Confirm project-side `INT16` is still not a deployable KWS target:
+```bash
+cd /root/ameba-river
+nl -ba components/river_voice/river_voice_kws.cc | sed -n '770,863p'
+nl -ba components/river_voice/river_voice_kws.cc | sed -n '1158,1184p'
+nl -ba components/river_voice/river_voice_kws.cc | sed -n '3683,3688p'
+nl -ba tools/kws/export_bc_resnet_tflite.py | sed -n '36,40p'
+nl -ba tools/kws/replay_board_tensor_dump.py | sed -n '93,100p'
+```
+
+Expected interpretation:
+- `river_voice_kws.cc` only maps / accepts `float32`, `uint8`, and `int8`
+- `INT16` is absent from schema type mapping, effective type selection, storage
+  byte sizing, and init-time allowed tensor types
+- `tools/kws/export_bc_resnet_tflite.py` only offers `float32` and `int8`
+- `tools/kws/replay_board_tensor_dump.py` only accepts `int8`, `uint8`, and
+  `float32`
+
+Confirm the new document is present and indexed:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md
+rg -n "KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md" doc/README.md
+```

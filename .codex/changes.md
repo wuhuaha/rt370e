@@ -4012,3 +4012,36 @@
   - [doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md](/root/ameba-river/doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md)
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new DS-CNN
   small runtime profile is indexed next to the existing student KWS records.
+- Re-checked whether "latest ADK" actually makes `INT8 / INT16` usable, without
+  disturbing the current in-use dirty SDK tree:
+  - current in-use SDK `/root/ameba-rtos-1.2` at
+    `8624cbeccf840c929db1624e05cc5b681024a3bf`
+  - clean latest `release/v1.2` clone `/tmp/ameba-rtos-1.2-latest` at
+    `8ef72a545c384ec439eef9a200baf4f569e21a73`
+  - both still point `component/tflite_micro` at
+    `dbda29aa7240ad14cf21cf3636ff2792a05ddcc1`
+- Also checked the locally available upstream refs already present in the SDK:
+  - SDK `origin/master` is `2def66020a2bd6b37894e8dc8341c49130ca8405`
+  - `tflite_micro origin/main` is `8b38d3dac9ea733e93ad73c2b637ef1a28753fb3`
+  - but the key quantization files still show no diff versus `dbda29a`:
+    - `conv.cc`
+    - `depthwise_conv.cc`
+    - `reduce_common.cc`
+    - `im2col_utils.h`
+- Captured the practical implication in a new document:
+  - [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md)
+  - the document separates three states that must not be conflated:
+    - clean official `release/v1.2`
+    - locally fetched official `origin/master / origin/main`
+    - current dirty SDK with local correctness patches
+- The re-check makes the current engineering status explicit:
+  - current official refs visible on this machine do not prove that the INT8
+    optimized CA32 path is fixed
+  - current proven INT8 board correctness still depends on the existing local
+    SDK patches that preserve board/host parity
+  - current `ameba-river` KWS integration still rejects `INT16` at app/tooling
+    level, so `INT16` is not a deployable target yet even if some lower-layer
+    kernels exist
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so this latest ADK
+  quantization re-check is indexed next to the existing INT8 / INT16
+  constraint and runtime-analysis documents.
