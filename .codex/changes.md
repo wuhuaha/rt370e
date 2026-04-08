@@ -3859,3 +3859,42 @@
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so the nano FP32
   runtime profile is indexed beside the existing student/tiny and INT8
   records.
+
+## Step 5.108
+- Added a focused constraint document that explains, with current board and
+  SDK evidence, why `INT8`/`INT16` deployment is not automatically a realtime
+  win on the current `RTL8730E` path:
+  [doc/KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md](/root/ameba-river/doc/KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md)
+- This document consolidates three layers of evidence into one place:
+  - board facts already measured in this repo:
+    - `student_bc_resnet_tiny_v2_int8_debug` parity is correct but
+      `infer_us` is about `2.34s`
+    - `student_bc_resnet_tiny_v2_fp32_debug` is about `675ms`
+    - `student_bc_resnet_nano_v2_fp32_debug` is about `278ms`
+  - current CA32 SDK kernel reality:
+    - `int8 conv` is explicitly forced to
+      `reference_integer_ops::ConvPerChannel(...)`
+    - `int8 depthwise` is explicitly forced to
+      `reference_integer_ops::DepthwiseConvPerChannel(...)`
+    - `int8/int16` `MUL`, `LOGISTIC`, `ADD`, and pooling remain reference-style
+      or generic paths
+  - current project-side deployment-chain reality:
+    - KWS app currently accepts only `uint8`, `int8`, and `float32` tensor I/O
+    - current host replay tool likewise supports only `uint8`, `int8`, and
+      `float32`
+    - therefore `INT16` is not just “probably slow”, but “not an accepted
+      deployment target on the current app/tooling path”
+- The new document translates these facts into explicit downstream rules for
+  algorithm training and candidate selection:
+  - no `INT16` delivery for the current board path
+  - `INT8` remains the only quantized delivery target worth considering
+  - future models must stay within the currently integrated resolver subset
+  - future candidates must reduce high-resolution compute early and avoid
+    heavy `LOGISTIC + MUL` gating
+  - board `infer_us`, not offline budget declarations alone, is the real
+    acceptance gate
+  - exact board/host parity remains mandatory before any threshold or quality
+    discussion
+- Updated [doc/README.md](/root/ameba-river/doc/README.md) so this new
+  constraint document is indexed next to the existing parity, FP32, and INT8
+  runtime records.

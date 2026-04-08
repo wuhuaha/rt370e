@@ -6851,3 +6851,77 @@ Expected interpretation:
 - board/host exact parity can be reproduced stably with `--builtin-ref`
 - current nano FP32 latency is about `277.865ms`, which is much better than
   student tiny FP32 but still well above the bundle `24ms` budget
+
+## Step 5.108 Verification
+
+Review the new INT8/INT16 deployment-constraint document:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md
+```
+
+Cross-check the three key implementation constraints cited in the document.
+
+1. Current KWS app rejects `int16` tensor I/O:
+```bash
+cd /root/ameba-river
+sed -n '3633,3658p' components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- the accepted effective tensor types are only `kTfLiteUInt8`, `kTfLiteInt8`,
+  and `kTfLiteFloat32`
+- any other type, including `kTfLiteInt16`, falls into
+  `kws tensor type unsupported`
+
+2. Current host replay tool does not support `int16`:
+```bash
+cd /root/ameba-river
+rg -n \"unsupported input dtype|if name == \\\"int8\\\"|if name == \\\"uint8\\\"|if name == \\\"float32\\\"\" \
+  tools/kws/replay_board_tensor_dump.py
+```
+
+Expected result:
+- replay input dtype decoding only handles `int8`, `uint8`, and `float32`
+- there is no `int16` replay path today
+
+3. Current CA32 quantized kernel paths are reference-dominated:
+```bash
+sed -n '240,280p' /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc
+sed -n '135,175p' /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc
+sed -n '35,60p' /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/mul.cc
+sed -n '55,95p' /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/logistic.cc
+sed -n '112,154p' /root/ameba-rtos-1.2/component/tflite_micro/tensorflow/lite/micro/kernels/add.cc
+```
+
+Expected result:
+- CA32 `int8 conv` explicitly calls `reference_integer_ops::ConvPerChannel(...)`
+- CA32 `int8 depthwise` explicitly calls
+  `reference_integer_ops::DepthwiseConvPerChannel(...)`
+- `MUL`, `LOGISTIC`, and `ADD` quantized paths are all reference style
+
+Cross-check the current board-side evidence already recorded in repo docs:
+```bash
+cd /root/ameba-river
+rg -n \"2\\.34s|2343|2344|student_bc_resnet_tiny_v2_int8_debug|reference kernel|reference_integer_ops::ConvPerChannel\" \
+  doc/KWS_STUDENT_INT8_BOARD_REALTIME_ANALYSIS_ZH.md \
+  .codex/changes.md
+rg -n \"675 ms|675\\.892|student_bc_resnet_tiny_v2_fp32_debug\" \
+  doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md
+rg -n \"277\\.865|student_bc_resnet_nano_v2_fp32_debug\" \
+  doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md
+```
+
+Expected interpretation:
+- current project evidence is consistent with the new constraint document:
+  - INT8 board correctness has already been proven
+  - INT8 realtime on this runtime path is still unacceptable
+  - INT16 is not currently a supported deployment target
+  - future algorithm candidates must be filtered by runtime-path reality, not
+    by offline budget declarations alone
+
+Confirm the new document is indexed:
+```bash
+cd /root/ameba-river
+rg -n \"KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md\" doc/README.md
+```
