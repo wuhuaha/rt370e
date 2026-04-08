@@ -4126,3 +4126,27 @@
   - the remaining suspects are other dirty-SDK runtime deltas, especially the
     TFLM submodule, `component/aivoice`, and possibly additional platform/runtime
     changes outside the layout patch
+- Performed a tighter clean-SDK retry by overlaying only the dirty SDK's local
+  `tflite_micro` patch set onto the clean SDK clone:
+  - patched files in the clean clone:
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc`
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc`
+    - `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h`
+    - `tensorflow/lite/micro/kernels/reduce_common.cc`
+  - patch magnitude matched the dirty SDK local diff:
+    - `4 files changed, 114 insertions(+), 47 deletions(-)`
+- Rebuilt and reflashed the clean-SDK FP32 control image with:
+  - clean SDK memory layout patch still applied
+  - dirty TFLM local patch overlaid
+- Board result did not improve:
+  - build completed with `Build done`
+  - flash completed with `Finished PASS`
+  - 20-second raw serial capture still contained only the `script` header
+    followed by continuous `0x00`
+  - `od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_tflm_patch.log`
+    still prints repeated `00`
+- This further narrows the causality:
+  - dirty SDK's local TFLM patch set is not sufficient by itself to restore a
+    normal clean-SDK runtime
+  - the higher-priority remaining suspects are now the broader `component/aivoice`
+    delta and/or other non-TFLM runtime compatibility changes in the dirty SDK

@@ -559,3 +559,57 @@
 - 不能把“clean SDK 可编译、可烧录”误判成“官方量化链路已经可用”
 - 在 clean SDK 能先让 FP32 正常起机之前，不应继续用 clean SDK 板端现象来下量化性能结论
 - 当前所有模型 correctness 与板端/本机对拍，仍应继续依赖已经验证过的 dirty SDK 基线
+
+### 10.8 仅补 dirty TFLM 本地补丁，clean SDK 仍然是 `0x00`
+
+在 10.7 之后，最自然的下一个怀疑点就是：
+
+- dirty SDK 的 `component/tflite_micro` 虽然和 clean SDK 指向同一个子模块提交
+- 但 dirty SDK 工作树里还额外带着 4 个本地补丁文件
+
+具体是：
+
+1. `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc`
+2. `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc`
+3. `tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h`
+4. `tensorflow/lite/micro/kernels/reduce_common.cc`
+
+这 4 个文件的 dirty 本地 diff 规模是：
+
+- `4 files changed, 114 insertions(+), 47 deletions(-)`
+
+因此又做了一次更收敛的 clean-SDK 复测：
+
+- 继续使用已经补上 `aivoice_ca32_17mb` 的 clean SDK clone
+- 只把 dirty SDK 里这 4 个 TFLM 本地补丁 overlay 到 clean SDK clone
+- 其它 clean SDK 内容保持不变
+- 仍然跑同一个 FP32 控制固件：
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+
+结果仍然没有改善：
+
+- build 仍然 `Build done`
+- flash 仍然 `Finished PASS`
+- 串口 20 秒抓取仍然没有任何 `ameba-river` 正常文本日志
+- `/tmp/kws_student_fp32_clean_sdk_tflm_patch.log` 在 `script` 头之后，依然是连续 `0x00`
+- `od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_tflm_patch.log` 依然只看到：
+  - `00 00 00 00 ...`
+
+这一步的意义非常直接：
+
+- dirty SDK 里的本地 TFLM 补丁很可能对模型 correctness/量化路径仍然重要
+- 但它们并不是 clean SDK 当前“根本起不来”的唯一原因
+- 也就是说：
+  - 不能把 clean SDK 运行态异常简单归因到 `tflite_micro` 这 4 个本地补丁缺失
+
+到这里为止，clean SDK 相关根因优先级应继续调整为：
+
+1. 更广义的 dirty SDK 运行时兼容差异仍然存在
+2. `component/aivoice` 整体提交点差异和相关运行时耦合，需要进入更高优先级
+3. dirty SDK 里除 TFLM/内存布局之外的其它平台级差异，仍不能排除
+
+因此当前针对 INT8/INT16 的工程边界可以再收紧一句：
+
+- 即便把 dirty SDK 的内存布局补丁和 TFLM 本地补丁都搬到 clean SDK clone 上，当前 clean SDK 仍然没有恢复到可用的正常 runtime 状态

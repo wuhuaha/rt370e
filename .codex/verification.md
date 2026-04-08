@@ -7321,3 +7321,29 @@ Expected interpretation:
 - the post-flash serial capture still does not show `ameba-river boot`
 - `od` shows continuous `00` bytes after the `script` header, proving the
   missing memory layout patch is not the only clean-SDK runtime blocker
+
+Recheck whether the dirty SDK local TFLM patch set alone can recover the clean SDK:
+```bash
+cd /root/ameba-river
+bash -lc "git -C /root/ameba-rtos-1.2/component/tflite_micro diff -- tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/im2col_utils.h tensorflow/lite/micro/kernels/reduce_common.cc > /tmp/dirty_tflm_local.patch && git -C /tmp/ameba-rtos-1.2-latest/component/tflite_micro apply /tmp/dirty_tflm_local.patch"
+bash -lc "git -C /tmp/ameba-rtos-1.2-latest/component/tflite_micro diff --stat"
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0
+script -q -f /tmp/kws_student_fp32_clean_sdk_tflm_patch.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+bash -lc "od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_tflm_patch.log"
+```
+
+Expected interpretation:
+- `git diff --stat` in the clean clone shows the same 4-file dirty TFLM patch
+  set:
+  - `conv.cc`
+  - `depthwise_conv.cc`
+  - `im2col_utils.h`
+  - `reduce_common.cc`
+- the rebuild still ends with `Build done`
+- the reflash still ends with `Finished PASS`
+- the post-flash serial capture still does not show `ameba-river boot`
+- `od` still shows continuous `00` bytes after the `script` header, proving the
+  dirty SDK local TFLM patch set alone is not sufficient to restore a normal
+  clean-SDK runtime
