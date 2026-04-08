@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -12,7 +13,8 @@ def main() -> int:
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parents[1]
-    sdk_flash_root = project_root.parent / "ameba-rtos-1.2" / "tools" / "ameba" / "Flash"
+    sdk_root = Path(os.environ.get("AMEBA_SDK_ROOT", project_root.parent / "ameba-rtos-1.2")).resolve()
+    sdk_flash_root = sdk_root / "tools" / "ameba" / "Flash"
     sys.path.insert(0, str(sdk_flash_root))
 
     try:

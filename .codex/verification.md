@@ -7228,3 +7228,49 @@ cd /root/ameba-river
 sed -n '1,260p' doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md
 rg -n "KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md" doc/README.md
 ```
+
+Reproduce the clean-SDK INT8 retry build:
+```bash
+cd /root/ameba-river
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'
+```
+
+Expected interpretation:
+- build completes with `Build done`
+- the build uses `/tmp/ameba-rtos-1.2-latest`, not the default
+  `/root/ameba-rtos-1.2`
+
+Confirm the project is configured for the clean-SDK INT8 retry:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15|CONFIG_RIVER_KWS_TENSOR_ARENA_KB" prj.conf
+```
+
+Expected interpretation:
+- `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG=y`
+- `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9444`
+- `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048`
+
+Flash the clean-SDK INT8 image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0
+```
+
+Expected interpretation:
+- the flash tool reports `Finished PASS`
+
+Probe the post-flash serial state with the clean SDK monitor:
+```bash
+cd /root/ameba-river
+python3 /tmp/ameba-rtos-1.2-latest/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000 --debug
+```
+
+Expected interpretation:
+- monitor connects successfully and sends `AT+LIST`
+- no valid monitor command list is returned
+- instead of `ameba-river` boot logs, the serial output degrades into repeated
+  `00 / 00 00 / 00 00 00 / 00 00 00 00`
+- this reproduces the clean-SDK INT8 failure signature recorded in
+  [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md)

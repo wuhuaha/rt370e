@@ -4045,3 +4045,36 @@
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so this latest ADK
   quantization re-check is indexed next to the existing INT8 / INT16
   constraint and runtime-analysis documents.
+- Added project-owned SDK path override support so `ameba-river` can build and
+  flash against a clean SDK tree without touching `/root/ameba-rtos-1.2`:
+  - [env.sh](/root/ameba-river/env.sh)
+  - [tools/river_flash.py](/root/ameba-river/tools/river_flash.py)
+  - [tools/generate_rdev.py](/root/ameba-river/tools/generate_rdev.py)
+  - [components/river_cloud/CMakeLists.txt](/root/ameba-river/components/river_cloud/CMakeLists.txt)
+- Switched the active deployment retry to the clean-SDK INT8 student bundle in
+  [prj.conf](/root/ameba-river/prj.conf):
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG=y`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9444`
+  - kept the preserved debug arena / stride / pre-roll / queue settings so the
+    retry did not disturb the existing board/host parity mechanism
+- Verified the clean SDK build path works end to end:
+  - SDK root `/tmp/ameba-rtos-1.2-latest`
+  - SDK commit `8ef72a545c384ec439eef9a200baf4f569e21a73`
+  - project build completed with `Build done`
+- Reflashed the board with the clean-SDK INT8 image using the existing serial
+  workflow:
+  - board first had to be switched into download mode via the preserved
+    `reboot uartburn` monitor command
+  - `tools/river_flash.py` then completed with `Finished PASS`
+- Captured the critical clean-SDK board symptom and recorded it in
+  [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md):
+  - after successful flash, the board did not enter normal `ameba-river`
+    runtime / monitor text logging
+  - raw serial only showed command echo or continuous `0x00` bytes
+  - clean SDK `monitor.py --debug` sent `AT+LIST` but received no monitor list,
+    only repeated `00 / 00 00 / 00 00 00 / 00 00 00 00`
+- The clean-SDK INT8 retry therefore tightened the engineering conclusion:
+  - this is not just "INT8 still lacks speedup"
+  - on the clean official SDK path, this student INT8 image does not yet reach
+    the minimum bar of booting into a normal runtime state that can be used for
+    board/host parity

@@ -34,7 +34,7 @@ def main() -> int:
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parents[1]
-    sdk_root = project_root.parent / "ameba-rtos-1.2"
+    sdk_root = Path(os.environ.get("AMEBA_SDK_ROOT", project_root.parent / "ameba-rtos-1.2")).resolve()
     flash_tool = sdk_root / "tools" / "ameba" / "Flash" / "AmebaFlash.py"
     profile = resolve_profile(project_root, sdk_root, args.device, args.memory_type, args.use_sdk_profile)
 

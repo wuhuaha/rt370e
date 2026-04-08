@@ -328,3 +328,112 @@
    - 本机回放 / 对拍工具
 
 在这之前，不建议把 `INT16` 视为当前可交付方向。
+
+## 10. Clean SDK 下的实际 INT8 上板复测
+
+上面几节解决的是“源码状态能否证明官方已修好”。这一节补上更关键的一环：
+
+- 用干净 SDK 真正编译、刷板、起机
+- 看 `student_bc_resnet_tiny_v2_int8_debug` 在 clean SDK 下的真实板端行为
+
+### 10.1 本次 clean SDK 复测前提
+
+- 项目仓已补充 `AMEBA_SDK_ROOT` 覆盖能力，确保：
+  - `env.sh`
+  - `tools/river_flash.py`
+  - `tools/generate_rdev.py`
+  - `components/river_cloud/CMakeLists.txt`
+  都可以显式指向非默认 SDK
+- 本次 clean SDK 使用：
+  - `/tmp/ameba-rtos-1.2-latest`
+  - `release/v1.2`
+  - commit `8ef72a545c384ec439eef9a200baf4f569e21a73`
+- 固件配置切到：
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_INT8_DEBUG=y`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9444`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048`
+
+### 10.2 clean SDK 构建结果
+
+使用 clean SDK 路径构建时，项目可以正常完成编译：
+
+- 构建命令：
+  - `bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'`
+- 结果：
+  - `Build done`
+
+这说明：
+
+- `AMEBA_SDK_ROOT` 覆盖链路本身是通的
+- clean SDK 至少能把当前 INT8 debug 变体编译成可烧录镜像
+
+### 10.3 clean SDK 刷板结果
+
+实际刷板时观察到两种状态：
+
+1. 直接刷：
+   - `env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0`
+   - 如果板子不在下载态，会报：
+     - `Flashloader download fail: ErrType.SYS_PROTO`
+2. 先走已有 monitor 命令把板子切到下载态，再刷：
+   - `printf 'reboot uartburn\r' > /dev/ttyUSB0`
+   - 再执行同一个 `river_flash.py`
+   - 可以成功刷入：
+     - `Finished PASS`
+
+这一步说明：
+
+- clean SDK 生成的镜像可以被正常烧写
+- 烧录工具链没有因为 SDK 覆盖而失效
+
+### 10.4 刷入后的实际串口行为
+
+刷入成功后，板子没有进入此前已验证过的 `ameba-river` 正常 runtime / monitor 文本日志状态。
+
+使用最原始 `cat /dev/ttyUSB0` 抓取时，现象是：
+
+- 普通 monitor 命令只有回显
+- 看不到熟悉的：
+  - `ameba-river boot`
+  - `kws init`
+  - `wifi`
+  - `river ...` 文本日志
+
+进一步用 clean SDK 自带 monitor 工具做短探测：
+
+- 命令：
+  - `python3 /tmp/ameba-rtos-1.2-latest/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000 --debug`
+- monitor 会先发：
+  - `AT+LIST`
+- 实际观测到：
+  - 没有任何 monitor 命令列表返回
+  - 串口持续输出的不是文本，而是大量：
+    - `00`
+    - `00 00`
+    - `00 00 00`
+    - `00 00 00 00`
+
+也就是说，这次 clean SDK + INT8 实测的板端形态不是：
+
+- “能启动，只是 INT8 没提速”
+
+而更接近：
+
+- “烧录后串口进入异常空字节流状态，没有进入我们已知的正常应用日志/monitor 状态”
+
+### 10.5 这次 clean SDK 实测能得出的结论
+
+这次板端复测把结论进一步收紧了：
+
+- clean SDK `release/v1.2` 不仅没有证明 INT8 优化路径已经恢复可用
+- 在当前 `student_bc_resnet_tiny_v2_int8_debug` 实测里，板端行为甚至比 dirty SDK 下的“reference fallback 但 correctness 可对拍”更差
+- 当前 clean SDK 路径下，这个 INT8 变体还没有达到“可进入正常 runtime、可做端侧/本机对拍”的最低门槛
+
+因此当前最稳妥的工程判断是：
+
+- clean official SDK：
+  - 还不能替代当前 dirty SDK 上那套已验证 correctness 的量化补丁路径
+- 当前 INT8 的可靠调试基础仍然是：
+  - 保留现有板端 / 本机对拍代码
+  - 保留当前 dirty SDK 中已经验证过的 correctness 兜底补丁
+  - 不把“clean SDK 能编译 + 能烧录”误判成“INT8 已经可用”

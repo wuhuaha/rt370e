@@ -2,8 +2,14 @@ set(public_includes)
 set(public_definitions)
 set(public_libraries)
 
+if(DEFINED ENV{AMEBA_SDK_ROOT} AND NOT "$ENV{AMEBA_SDK_ROOT}" STREQUAL "")
+    set(RIVER_SDK_ROOT $ENV{AMEBA_SDK_ROOT})
+else()
+    set(RIVER_SDK_ROOT ${RIVER_PROJECT_DIR}/../ameba-rtos-1.2)
+endif()
+
 set(river_opus_component_dir
-    ${RIVER_PROJECT_DIR}/../ameba-rtos-1.2/component/audio/third_party/libopus
+    ${RIVER_SDK_ROOT}/component/audio/third_party/libopus
 )
 
 ameba_list_append(public_includes
