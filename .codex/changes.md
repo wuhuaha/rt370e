@@ -4178,3 +4178,30 @@
     - dirty `component/aivoice` commit
   - remaining root causes are now more likely to involve deeper/runtime-wide
     clean-vs-dirty differences rather than a single obvious KWS-related patch
+- Took a snapshot of the last clean-SDK image set that still reproduced the
+  `0x00` failure:
+  - `/tmp/clean_sdk_aivoice_align_snapshot`
+- Rebuilt the same FP32 control configuration against the dirty SDK baseline
+  and captured a second image snapshot:
+  - `/tmp/dirty_sdk_fp32_control_snapshot`
+- Compared clean-vs-dirty images at the artifact level and found the divergence
+  is system-wide, not app-only:
+  - `km4_boot_all.bin`
+    - size: `51872` vs `51872`
+    - hash: different
+    - first observed byte difference from `cmp -l`: byte `10119`
+  - `km0_image2_all.bin`
+    - size: `94208` vs `94208`
+    - hash: different
+    - first observed byte difference from `cmp -l`: byte `41`
+  - `km4_image2_all.bin`
+    - size: clean `380064`, dirty `379136`
+  - `ap_image_all.bin`
+    - size: clean `3558496`, dirty `3538016`
+  - `km0_km4_ca32_app.bin`
+    - size: clean `4040960`, dirty `4019552`
+- This materially shifts the debugging frame:
+  - the clean-vs-dirty split is not limited to the KWS app payload
+  - even early-chain images differ, so the no-log / `0x00` failure now points
+    more strongly at boot-chain / image-generation / platform-runtime divergence
+    than at a single model-side patch

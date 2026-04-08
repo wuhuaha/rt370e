@@ -7373,3 +7373,29 @@ Expected interpretation:
 - `od` still shows continuous `00` bytes after the `script` header, proving the
   dirty `component/aivoice` commit alone is also not sufficient to restore a
   normal clean-SDK runtime
+
+Compare clean-vs-dirty image artifacts directly for the same FP32 control config:
+```bash
+cd /root/ameba-river
+bash -lc 'mkdir -p /tmp/clean_sdk_aivoice_align_snapshot && cp -a build_RTL8730E/build/project_hp/image /tmp/clean_sdk_aivoice_align_snapshot/project_hp_image && cp -a build_RTL8730E/build/project_lp/image /tmp/clean_sdk_aivoice_align_snapshot/project_lp_image && cp -a build_RTL8730E/build/project_ap/image /tmp/clean_sdk_aivoice_align_snapshot/project_ap_image'
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && unset AMEBA_SDK_ROOT; source env.sh; python3 /root/ameba-rtos-1.2/ameba.py build -p'
+bash -lc 'mkdir -p /tmp/dirty_sdk_fp32_control_snapshot && cp -a build_RTL8730E/build/project_hp/image /tmp/dirty_sdk_fp32_control_snapshot/project_hp_image && cp -a build_RTL8730E/build/project_lp/image /tmp/dirty_sdk_fp32_control_snapshot/project_lp_image && cp -a build_RTL8730E/build/project_ap/image /tmp/dirty_sdk_fp32_control_snapshot/project_ap_image'
+bash -lc 'for f in km4_boot_all.bin km4_image2_all.bin km0_km4_ca32_app.bin; do printf "## %s\n" "$f"; stat -c "clean %n %s" "/tmp/clean_sdk_aivoice_align_snapshot/project_hp_image/$f" 2>/dev/null || true; stat -c "dirty %n %s" "/tmp/dirty_sdk_fp32_control_snapshot/project_hp_image/$f" 2>/dev/null || true; done; for f in km0_image2_all.bin; do printf "## %s\n" "$f"; stat -c "clean %n %s" "/tmp/clean_sdk_aivoice_align_snapshot/project_lp_image/$f"; stat -c "dirty %n %s" "/tmp/dirty_sdk_fp32_control_snapshot/project_lp_image/$f"; done; for f in ap_image_all.bin; do printf "## %s\n" "$f"; stat -c "clean %n %s" "/tmp/clean_sdk_aivoice_align_snapshot/project_ap_image/$f"; stat -c "dirty %n %s" "/tmp/dirty_sdk_fp32_control_snapshot/project_ap_image/$f"; done'
+bash -lc 'for pair in "/tmp/clean_sdk_aivoice_align_snapshot/project_hp_image/km4_boot_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_hp_image/km4_boot_all.bin" "/tmp/clean_sdk_aivoice_align_snapshot/project_hp_image/km4_image2_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_hp_image/km4_image2_all.bin" "/tmp/clean_sdk_aivoice_align_snapshot/project_lp_image/km0_image2_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_lp_image/km0_image2_all.bin" "/tmp/clean_sdk_aivoice_align_snapshot/project_ap_image/ap_image_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_ap_image/ap_image_all.bin"; do set -- $pair; printf "## %s\n" "$(basename "$1")"; if cmp -s "$1" "$2"; then echo identical; else echo different; fi; done'
+bash -lc 'cmp -l /tmp/clean_sdk_aivoice_align_snapshot/project_hp_image/km4_boot_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_hp_image/km4_boot_all.bin | sed -n "1,20p"'
+bash -lc 'cmp -l /tmp/clean_sdk_aivoice_align_snapshot/project_lp_image/km0_image2_all.bin /tmp/dirty_sdk_fp32_control_snapshot/project_lp_image/km0_image2_all.bin | sed -n "1,20p"'
+```
+
+Expected interpretation:
+- dirty-SDK build completes with `Build done`
+- the dirty image snapshot is created successfully
+- `cmp -s` reports all key images as `different`
+- AP/KM4 app-side image sizes diverge materially:
+  - `ap_image_all.bin`: clean `3558496`, dirty `3538016`
+  - `km4_image2_all.bin`: clean `380064`, dirty `379136`
+  - `km0_km4_ca32_app.bin`: clean `4040960`, dirty `4019552`
+- even same-size early-chain images still differ at the byte level:
+  - `km4_boot_all.bin` first observed difference at byte `10119`
+  - `km0_image2_all.bin` first observed difference at byte `41`
+- therefore the clean-vs-dirty split is a whole-image / boot-chain divergence,
+  not merely an app-layer KWS patch difference

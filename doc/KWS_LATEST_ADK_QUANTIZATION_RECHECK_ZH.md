@@ -675,3 +675,87 @@ superproject 的 gitlink 状态误导。结果是：
 2. clean/dirty 构建产物、启动链路、平台配置的更底层比对
 3. 把 `component/network/websocket/wsclient_api.c` 这类晚期联网差异降权
    - 这里是基于当前现象做的推断：因为板子连最早期 `ameba-river` 文本日志都没有出来
+
+### 10.10 clean / dirty 的分叉已经进入整条镜像链，不只是 APP
+
+在 10.9 之后，又补了一步更底层的验证：
+
+- 不再继续猜某个单独 patch
+- 直接比较 clean SDK 和 dirty SDK 在同一 `prj.conf` 下生成的镜像产物
+
+对比口径是：
+
+- clean SDK 使用的是 10.9 那一版：
+  - 已补 `aivoice_ca32_17mb`
+  - `component/aivoice` 也已对齐到 dirty 提交
+  - 但板端仍然是 `0x00`
+- 先把这版 clean 产物快照到：
+  - `/tmp/clean_sdk_aivoice_align_snapshot`
+- 然后在相同 `prj.conf` 下，重新用 dirty SDK 完整 build
+- 再把 dirty 产物快照到：
+  - `/tmp/dirty_sdk_fp32_control_snapshot`
+
+比较结果非常关键。
+
+#### 10.10.1 关键镜像尺寸已经明显分叉
+
+- `km4_boot_all.bin`
+  - clean：`51872`
+  - dirty：`51872`
+- `km0_image2_all.bin`
+  - clean：`94208`
+  - dirty：`94208`
+- `km4_image2_all.bin`
+  - clean：`380064`
+  - dirty：`379136`
+- `ap_image_all.bin`
+  - clean：`3558496`
+  - dirty：`3538016`
+- `km0_km4_ca32_app.bin`
+  - clean：`4040960`
+  - dirty：`4019552`
+
+也就是说：
+
+- 不只是 AP 应用镜像不同
+- 连合成后的整包尺寸也已经不同
+- 其中 AP / KM4 层差异达到 KB 级，不能用“仅仅时间戳不同”来解释
+
+#### 10.10.2 即便尺寸相同，早期镜像内容也不同
+
+继续做字节级比较：
+
+- `km4_boot_all.bin`
+  - hash 不同
+  - `cmp -l` 看到的首个差异在字节 `10119`
+- `km0_image2_all.bin`
+  - hash 不同
+  - `cmp -l` 看到的首个差异在字节 `41`
+
+这里需要谨慎说明：
+
+- 同尺寸镜像出现 hash 差异，里面可能混有 build 时间戳、校验、版本串等噪声
+- 但当前现象不能被轻描淡写地当成“只有时间戳不同”
+- 因为：
+  - AP / KM4 / 合成包尺寸本身已经明显不同
+  - clean 板端现象又恰好是“连最早期文本日志都没有”
+
+所以这一步更合理的工程解释是：
+
+- clean / dirty 的分叉已经进入了整条镜像链
+- 问题不再像是“某个 KWS patch 没搬过去”
+- 更像是：
+  - 启动链
+  - 镜像生成
+  - 平台配置
+  - 运行时集成
+  这一类更基础的 clean-vs-dirty 分叉
+
+#### 10.10.3 这一步对后续调试策略的影响
+
+到 10.10 为止，排查策略需要正式切换：
+
+1. 不再把 clean SDK 当前异常优先归咎于模型接入或量化 patch。
+2. 后续应优先做 clean/dirty 启动链和镜像级对照，而不是继续做单点 patch 猜测。
+3. `wsclient_api.c`、云端协议这类较晚阶段差异继续降权。
+   - 这是基于现象的推断，因为 clean 板端连 `ameba-river boot` 这一层都没出来。
