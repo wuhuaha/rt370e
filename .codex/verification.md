@@ -7297,3 +7297,27 @@ Expected interpretation:
 - the serial stream instead collapses into continuous `0x00` bytes, matching
   the broader clean-SDK runtime failure recorded in
   [doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md](/root/ameba-river/doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md)
+
+Recheck whether the missing 17MB layout patch is the clean-SDK blocker:
+```bash
+cd /root/ameba-river
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /root/ameba-rtos-1.2 --variant aivoice_ca32_17mb --check
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /tmp/ameba-rtos-1.2-latest --variant aivoice_ca32_17mb --check
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /tmp/ameba-rtos-1.2-latest --variant aivoice_ca32_17mb
+bash -lc 'mkdir -p /tmp/ccache-tmp && export CCACHE_TEMPDIR=/tmp/ccache-tmp && export AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest; source env.sh; python3 /tmp/ameba-rtos-1.2-latest/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+env AMEBA_SDK_ROOT=/tmp/ameba-rtos-1.2-latest python3 tools/river_flash.py -p /dev/ttyUSB0
+script -q -f /tmp/kws_student_fp32_clean_sdk_patched.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+bash -lc "od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_patched.log"
+```
+
+Expected interpretation:
+- dirty SDK check prints `applied`
+- clean SDK pre-patch check prints `not-applied`
+- patching the clean SDK prints:
+  - `sdk_root=/tmp/ameba-rtos-1.2-latest variant=aivoice_ca32_17mb layout=changed hal=changed`
+- the rebuild still ends with `Build done`
+- the reflash still ends with `Finished PASS`
+- the post-flash serial capture still does not show `ameba-river boot`
+- `od` shows continuous `00` bytes after the `script` header, proving the
+  missing memory layout patch is not the only clean-SDK runtime blocker

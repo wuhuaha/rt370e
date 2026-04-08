@@ -487,3 +487,75 @@
 1. 先找出 dirty SDK 相比 clean SDK 的更广义运行时差异。
 2. 在确认 clean SDK 能让 FP32 正常起机之前，不继续把 clean SDK 上的模型行为用于量化性能结论。
 3. 继续保留当前 dirty SDK + 板端/本机对拍机制，作为所有唤醒词模型 correctness 调试的稳定基线。
+
+### 10.7 补上 17MB 内存布局后，clean SDK 仍然不是正常 runtime
+
+上面 10.6 已经证明：
+
+- clean SDK 下的问题不只像是 `INT8` kernel 问题
+- 因为连 FP32 控制固件都会在刷板后退化成持续 `0x00` 串口流
+
+接下来又继续验证了一个非常直接的怀疑点：
+
+- dirty SDK 里已经存在的 `aivoice_ca32_17mb` 内存布局补丁
+- clean SDK clone `/tmp/ameba-rtos-1.2-latest` 里默认并没有这一补丁
+
+为了不改 `/root/ameba-rtos-1.2`，项目内工具
+`tools/sdk/apply_rtl8730e_memory_layout_patch.py` 先扩展了一个能力：
+
+- 新增 `--sdk-root`
+- 可以直接对任意 SDK clone 做 `--check` 或打补丁
+
+这样先做了两个显式检查：
+
+- dirty SDK：
+  - `python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /root/ameba-rtos-1.2 --variant aivoice_ca32_17mb --check`
+  - 返回 `applied`
+- clean SDK：
+  - `python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /tmp/ameba-rtos-1.2-latest --variant aivoice_ca32_17mb --check`
+  - 返回 `not-applied`
+
+随后对 clean SDK clone 应用了同一个布局补丁：
+
+- `python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py --sdk-root /tmp/ameba-rtos-1.2-latest --variant aivoice_ca32_17mb`
+- 返回：
+  - `sdk_root=/tmp/ameba-rtos-1.2-latest variant=aivoice_ca32_17mb layout=changed hal=changed`
+
+然后使用这份“已经补上 17MB 布局”的 clean SDK，再次做 FP32 控制复测：
+
+- `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG=y`
+- `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=8192`
+- `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+
+结果仍然是：
+
+- build 正常 `Build done`
+- flash 正常 `Finished PASS`
+- 但抓取 `/dev/ttyUSB0` 20 秒后，串口依然只有：
+  - `script` 自己写入的头
+  - 后面跟着连续的 `0x00`
+- `od -An -tx1 -j 160 -N 64 /tmp/kws_student_fp32_clean_sdk_patched.log` 看到的是：
+  - `00 00 00 00 ...`
+
+也就是说，这一步把边界又收紧了一次：
+
+- clean SDK 的异常，不能只归因于“少了 17MB CA32 / PSRAM 内存布局补丁”
+- 内存布局补丁即使补上，当前 clean SDK superproject + 本项目代码，仍然不能稳定进入我们熟悉的正常 `ameba-river` runtime
+
+因此当前更合理的工程判断是：
+
+- `aivoice_ca32_17mb` 是 dirty SDK 与 clean SDK 的真实差异之一
+- 但它不是唯一、也不是充分修复条件
+- clean SDK 还缺少其它对当前项目运行态至关重要的 dirty-SDK 差异
+
+后续优先怀疑对象应当包括：
+
+1. dirty SDK 中的 `component/tflite_micro` 子模块差异
+2. dirty SDK 中的 `component/aivoice` 子模块差异
+3. 其它未被这次 layout patch 覆盖的底层运行时/平台兼容改动
+
+所以现阶段关于 INT8/INT16 的约束结论需要继续保持保守：
+
+- 不能把“clean SDK 可编译、可烧录”误判成“官方量化链路已经可用”
+- 在 clean SDK 能先让 FP32 正常起机之前，不应继续用 clean SDK 板端现象来下量化性能结论
+- 当前所有模型 correctness 与板端/本机对拍，仍应继续依赖已经验证过的 dirty SDK 基线

@@ -4097,3 +4097,32 @@
   - the current clean-SDK failure is not isolated to INT8 kernels
   - the repo still depends on broader dirty-SDK runtime compatibility changes
     beyond the quantization correctness patches already documented
+- Extended the project-owned memory layout helper so it can target arbitrary SDK
+  clones without touching the primary dirty SDK:
+  - [tools/sdk/apply_rtl8730e_memory_layout_patch.py](/root/ameba-river/tools/sdk/apply_rtl8730e_memory_layout_patch.py)
+    now accepts `--sdk-root`
+  - this allows the clean SDK clone under `/tmp/ameba-rtos-1.2-latest` to be
+    checked/patched in a controlled way
+- Verified the memory-layout delta explicitly before retrying the clean SDK:
+  - dirty SDK `/root/ameba-rtos-1.2` reports
+    `--variant aivoice_ca32_17mb --check` as `applied`
+  - clean SDK `/tmp/ameba-rtos-1.2-latest` initially reports the same check as
+    `not-applied`
+  - applying the patch to the clean clone reports:
+    `sdk_root=/tmp/ameba-rtos-1.2-latest variant=aivoice_ca32_17mb layout=changed hal=changed`
+- Rebuilt and reflashed the clean-SDK FP32 control image after applying the
+  memory layout patch to the clean SDK clone:
+  - build still completed with `Build done`
+  - flash still completed with `Finished PASS`
+- Captured the post-flash serial state for 20s and confirmed the failure
+  signature did not improve:
+  - the capture file contains the normal `script` header followed by continuous
+    `0x00` bytes
+  - there is still no `ameba-river boot` text log or usable monitor/runtime
+    output
+- This narrows the root-cause boundary again:
+  - the clean-SDK runtime failure is not explained by the missing 17MB memory
+    layout patch alone
+  - the remaining suspects are other dirty-SDK runtime deltas, especially the
+    TFLM submodule, `component/aivoice`, and possibly additional platform/runtime
+    changes outside the layout patch

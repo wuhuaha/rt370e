@@ -13,14 +13,6 @@ import re
 import sys
 
 
-SDK_LAYOUT = pathlib.Path(
-    "/root/ameba-rtos-1.2/component/soc/amebasmart/project/ameba_layout.ld"
-)
-SDK_HAL_PLATFORM = pathlib.Path(
-    "/root/ameba-rtos-1.2/component/soc/amebasmart/fwlib/include/hal_platform.h"
-)
-
-
 CONSERVATIVE_8MB = {
     "name": "conservative_ca32_8mb",
     "psram_end": "0x60C00000",
@@ -95,6 +87,11 @@ def write_if_changed(path: pathlib.Path, content: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--sdk-root",
+        default="/root/ameba-rtos-1.2",
+        help="SDK root to patch or check",
+    )
+    parser.add_argument(
         "--variant",
         default=CONSERVATIVE_8MB["name"],
         choices=sorted(VARIANTS.keys()),
@@ -108,9 +105,25 @@ def main() -> int:
     args = parser.parse_args()
 
     variant = VARIANTS[args.variant]
+    sdk_root = pathlib.Path(args.sdk_root).resolve()
+    sdk_layout = sdk_root / "component" / "soc" / "amebasmart" / "project" / "ameba_layout.ld"
+    sdk_hal_platform = (
+        sdk_root
+        / "component"
+        / "soc"
+        / "amebasmart"
+        / "fwlib"
+        / "include"
+        / "hal_platform.h"
+    )
 
-    layout_original = SDK_LAYOUT.read_text(encoding="utf-8")
-    hal_original = SDK_HAL_PLATFORM.read_text(encoding="utf-8")
+    if not sdk_layout.exists():
+        raise FileNotFoundError(f"layout file not found: {sdk_layout}")
+    if not sdk_hal_platform.exists():
+        raise FileNotFoundError(f"hal_platform file not found: {sdk_hal_platform}")
+
+    layout_original = sdk_layout.read_text(encoding="utf-8")
+    hal_original = sdk_hal_platform.read_text(encoding="utf-8")
     layout_updated = patch_layout(layout_original, variant)
     hal_updated = patch_hal_platform(hal_original, variant)
 
@@ -119,10 +132,11 @@ def main() -> int:
         print("applied" if ok else "not-applied")
         return 0 if ok else 1
 
-    layout_changed = write_if_changed(SDK_LAYOUT, layout_updated)
-    hal_changed = write_if_changed(SDK_HAL_PLATFORM, hal_updated)
+    layout_changed = write_if_changed(sdk_layout, layout_updated)
+    hal_changed = write_if_changed(sdk_hal_platform, hal_updated)
 
     print(
+        f"sdk_root={sdk_root} "
         f"variant={variant['name']} "
         f"layout={'changed' if layout_changed else 'unchanged'} "
         f"hal={'changed' if hal_changed else 'unchanged'}"
