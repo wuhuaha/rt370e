@@ -6699,3 +6699,41 @@ Expected interpretation:
 - current board-side student FP32 latency is still about `675ms`
 - current build is suitable for deployment/parity debugging, not for realtime
   production use on `RTL8730E`
+
+## Step 5.106 Verification
+
+Verify the nano FP32 debug variant is wired into the source tree:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG|student_bc_resnet_nano_v2_fp32_debug|student_bc_resnet_nano_v2_fp32_tflite" \
+  Kconfig \
+  prj.conf \
+  components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- `Kconfig` defines `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG`
+- `prj.conf` enables that nano FP32 debug variant
+- `river_voice_kws.cc` maps the variant to
+  `student_bc_resnet_nano_v2_fp32_tflite`
+
+Verify the generated model header is present:
+```bash
+cd /root/ameba-river
+ls -l components/river_voice/generated/student_bc_resnet_nano_v2_fp32_model_data.h
+```
+
+Build the active nano FP32 debug firmware:
+```bash
+cd /root/ameba-river
+source env.sh >/dev/null
+python3 /root/ameba-rtos-1.2/ameba.py build -p
+```
+
+Expected build result:
+- build completes with `Build done`
+- this step validates integration only; it does not yet require flashing
+
+Scope note:
+- Board/local parity confirmation and nano runtime measurement are the next
+  step after this compile gate passes.

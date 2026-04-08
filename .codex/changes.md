@@ -3765,3 +3765,32 @@
 - Updated [doc/README.md](/root/ameba-river/doc/README.md) so the new FP32
   board-profile document is indexed alongside the existing parity and
   realtime-analysis material.
+
+## Step 5.106
+- Added a parallel `student_bc_resnet_nano_v2_fp32_debug` board-debug variant
+  without disturbing the preserved student/tiny parity workflow:
+  - [Kconfig](/root/ameba-river/Kconfig) now exposes
+    `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG`
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+    now maps that variant to the exported nano FP32 bundle and keeps the same
+    `40x101`, `fft=400`, centered log-mel, per-clip normalization contract
+  - this keeps the existing board/local parity tooling applicable to the nano
+    branch instead of introducing a parallel debug mechanism
+- Imported the generated nano FP32 model header into the repository so the
+  firmware build stays reproducible:
+  [components/river_voice/generated/student_bc_resnet_nano_v2_fp32_model_data.h](/root/ameba-river/components/river_voice/generated/student_bc_resnet_nano_v2_fp32_model_data.h)
+- Switched the active deployment-test build in
+  [prj.conf](/root/ameba-river/prj.conf) to the nano FP32 debug branch:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=4096`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=8851`
+  - preserved the already-validated parity-friendly scheduling settings
+    (`stride=16`, `pre_roll_flush=16`, `queue=64`)
+- Rebuilt the full `RTL8730E` firmware successfully after the nano-variant
+  integration:
+  - `river_voice_kws.o` compiled with the new symbol path
+  - the full image build completed with `Build done`
+- This step is integration-only:
+  - no board flash yet
+  - no serial-debug flow changes
+  - parity confirmation and board performance measurement are handled next

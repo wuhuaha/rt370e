@@ -240,6 +240,16 @@ config RIVER_KWS_MODEL_VARIANT_ROUND6_TARGETED_EXPERIMENTAL
       /root/river-openwakeword-lab. This is an engineering smoke-test
       variant for the DS-CNN branch and is not yet a deploy-ready model.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_NANO_V2_FP32_DEBUG
+    bool "Student BC-ResNet nano v2 FP32 debug model"
+    help
+      Use the parallel FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_bc_resnet_nano_v2.
+      This variant is reserved for board/local parity work on the
+      `40x101`, `n_fft=400`, centered log-mel frontend so the lighter
+      BC-ResNet nano branch can be deployment-checked without replacing the
+      current mainline chain.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG
     bool "Student BC-ResNet tiny v2 FP32 debug model"
     help
