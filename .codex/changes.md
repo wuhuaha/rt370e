@@ -4316,3 +4316,42 @@
 - Immediate conclusion for this step:
   - the latest-vs-dirty runtime comparison is now blocked by board/session
     state, not by lack of a flashable control build
+
+## Step 5.114
+- After the user power-cycled the board, the USB-serial device had detached from
+  WSL:
+  - `/dev/ttyUSB0` disappeared
+  - Windows still showed the PL2303 adapter as shared on `BUSID 4-4`
+- Re-attached the USB serial device into WSL with `usbipd.exe attach --wsl` and
+  recovered `/dev/ttyUSB0`.
+- Probed the board immediately after the power cycle without reflashing:
+  - no UART output appeared
+  - but, importantly, the board was no longer stuck in continuous `0x00`
+- Re-established the dirty-SDK control path on this fresh board state:
+  - reflashed the dirty-SDK FP32 control firmware
+  - initial 20-second passive capture was silent
+  - after a minimal `ESC + CRLF` probe, the board resumed normal runtime logs
+  - recovered dirty-SDK runtime evidence is in:
+    - `/tmp/kws_dirty_sdk_esc_after_powercycle.log`
+  - those logs include live KWS/cloud activity such as:
+    - `wakeword hit: text=小欧管家`
+    - `xiaozhi ota bootstrap ok`
+    - `Connected to websocket server`
+- Reflashed the latest-SDK FP32 control firmware on the same recovered board:
+  - flash again ended with `Finished PASS`
+  - the subsequent 20-second raw UART capture showed normal runtime text rather
+    than `0x00`
+  - latest-SDK runtime evidence is in:
+    - `/tmp/kws_latest_sdk_fp32_boot_after_powercycle.log`
+  - captured lines include:
+    - `Closing the Connection with websocket server`
+    - `river.cloud`
+    - `river.interaction`
+- A follow-up `ESC + CRLF` probe on the latest-SDK image then returned to
+  silence, but still did not reproduce `0x00`.
+- This materially changes the current conclusion:
+  - the earlier latest-SDK `0x00` result is not a stable reproduction after a
+    power-cycle recovery
+  - board/session state is a major variable in the prior failure captures
+  - with the board freshly recovered, the latest-SDK FP32 image is now observed
+    running and emitting normal application logs

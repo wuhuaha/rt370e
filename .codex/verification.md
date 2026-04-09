@@ -7550,3 +7550,79 @@ Interpretation:
   serial boot output
 - next recovery actions should therefore target board/session state first
   before making stronger latest-vs-dirty runtime claims
+
+## Step 5.114 Verification
+
+After a board power cycle, re-attach the USB serial device to WSL if needed:
+```bash
+usbipd.exe list
+usbipd.exe attach --wsl --busid 4-4
+bash -lc 'ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true'
+```
+
+Expected result:
+- the PL2303 serial device is visible in `usbipd.exe list`
+- `/dev/ttyUSB0` reappears in WSL
+
+Probe the board immediately after the power cycle:
+```bash
+rm -f /tmp/kws_powercycle_probe.log
+script -q -f /tmp/kws_powercycle_probe.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+od -An -tx1 -j 0 -N 128 /tmp/kws_powercycle_probe.log
+```
+
+Observed result:
+- no UART output was captured
+- unlike the earlier failure case, the file contains only the `script` wrapper,
+  not continuous `0x00`
+
+Reflash the dirty-SDK control image on the recovered board and probe it:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos-1.2; python3 tools/river_flash.py -p /dev/ttyUSB0'
+rm -f /tmp/kws_dirty_sdk_fp32_boot_after_powercycle.log
+script -q -f /tmp/kws_dirty_sdk_fp32_boot_after_powercycle.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+rm -f /tmp/kws_dirty_sdk_esc_after_powercycle.log
+script -q -f /tmp/kws_dirty_sdk_esc_after_powercycle.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+```
+
+Observed result:
+- the initial 20-second passive capture may remain silent
+- after `ESC + CRLF`, the board emits normal runtime logs again
+- `/tmp/kws_dirty_sdk_esc_after_powercycle.log` contains normal application
+  text such as:
+  - `wakeword hit: text=小欧管家`
+  - `xiaozhi ota bootstrap ok`
+  - `Connected to websocket server`
+
+Reflash the latest-SDK image on the same recovered board and probe it:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0'
+rm -f /tmp/kws_latest_sdk_fp32_boot_after_powercycle.log
+script -q -f /tmp/kws_latest_sdk_fp32_boot_after_powercycle.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+rm -f /tmp/kws_latest_sdk_esc_after_powercycle.log
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+script -q -f /tmp/kws_latest_sdk_esc_after_powercycle.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+```
+
+Observed result:
+- the latest-SDK image also flashes with `Finished PASS`
+- `/tmp/kws_latest_sdk_fp32_boot_after_powercycle.log` contains normal runtime
+  text rather than `0x00`, for example:
+  - `Closing the Connection with websocket server`
+  - `[river.cloud] xiaozhi conversation window closed: reason=followup_timeout`
+  - `[river.interaction] interaction_state: wake_confirmed -> wake_monitoring`
+- the follow-up ESC probe may be silent, but it still does not regress to
+  `0x00`
+
+Interpretation:
+- after a real power-cycle recovery, the earlier latest-SDK `0x00` behavior is
+  not stable
+- board/session state significantly influenced the earlier runtime-failure
+  captures
+- in the recovered state, both the dirty-SDK control image and the latest-SDK
+  FP32 image have been observed emitting normal runtime logs
