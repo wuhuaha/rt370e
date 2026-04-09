@@ -2671,7 +2671,17 @@ static void river_voice_kws_emit_trigger(river_voice_kws_context_t *context,
     event.text = g_river_voice_kws_text;
     event.confidence = (int)confidence_q15;
     (void)river_voice_frontend_dispatch_event(&event);
+    RIVER_LOGI("kws trigger dispatch done: text=%s q15=%lu",
+               g_river_voice_kws_text,
+               (unsigned long)confidence_q15);
     river_voice_kws_disarm_after_trigger(context);
+    RIVER_LOGI("kws trigger post-disarm: gate=%s cooldown_left_ms=%lu",
+               context->gate_triggered ? "latched" : "cleared",
+               (unsigned long)((context->cooldown_until_ms >
+                                (uint64_t)rtos_time_get_current_system_time_ms()) ?
+                                   (context->cooldown_until_ms -
+                                    (uint64_t)rtos_time_get_current_system_time_ms()) :
+                                   0U));
 }
 
 static void river_voice_kws_push_sample(river_voice_kws_context_t *context,
@@ -4547,6 +4557,8 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     river_status_t restore_status;
     river_voice_kws_context_t *context = g_river_voice_kws;
     bool previous_local_debug_mode;
+    bool replay_trigger_observed = false;
+    bool first_post_trigger_queue_wait_logged = false;
     uint32_t frame_index;
     uint8_t trailing_silence[RIVER_KWS_INPUT_FRAME_BYTES];
 
@@ -4640,11 +4652,28 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                        (int)status);
             goto cleanup;
         }
+        if (!replay_trigger_observed && context->gate_triggered) {
+            replay_trigger_observed = true;
+            RIVER_LOGI("kws align replay trigger observed: frame=%lu infer=%lu snapshot=%s",
+                       (unsigned long)frame_index,
+                       (unsigned long)context->inference_count,
+                       context->tensor_dump_snapshot_ready ? "ready" : "empty");
+        }
         rtos_time_delay_ms(RIVER_KWS_INPUT_FRAME_MS);
+        if (replay_trigger_observed && !first_post_trigger_queue_wait_logged) {
+            RIVER_LOGI("kws align replay first post-trigger queue wait begin: frame=%lu",
+                       (unsigned long)frame_index);
+        }
         status = river_voice_kws_wait_for_alignment_queue_room(
             context,
             (uint32_t)RIVER_KWS_ALIGNMENT_MAX_BACKLOG_FRAMES,
             RIVER_KWS_ALIGNMENT_FEED_WAIT_TIMEOUT_MS);
+        if (replay_trigger_observed && !first_post_trigger_queue_wait_logged) {
+            RIVER_LOGI("kws align replay first post-trigger queue wait done: frame=%lu status=%d",
+                       (unsigned long)frame_index,
+                       (int)status);
+            first_post_trigger_queue_wait_logged = true;
+        }
         if (status != RIVER_OK) {
             RIVER_LOGE("kws align queue throttle failed: frame=%lu status=%d",
                        (unsigned long)frame_index,
@@ -4652,6 +4681,11 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
             goto cleanup;
         }
     }
+
+    RIVER_LOGI("kws align replay feed done: trigger=%s infer=%lu snapshot=%s",
+               replay_trigger_observed ? "yes" : "no",
+               (unsigned long)context->inference_count,
+               context->tensor_dump_snapshot_ready ? "ready" : "empty");
 
     if (status == RIVER_OK) {
         for (frame_index = 0U;
@@ -4681,9 +4715,19 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
         }
     }
 
+    RIVER_LOGI("kws align replay tail done: gate=%s infer=%lu snapshot=%s",
+               context->gate_triggered ? "latched" : "cleared",
+               (unsigned long)context->inference_count,
+               context->tensor_dump_snapshot_ready ? "ready" : "empty");
+
+    RIVER_LOGI("kws align replay wait idle begin: infer=%lu gate=%s trigger=%s",
+               (unsigned long)context->inference_count,
+               context->gate_open ? "open" : "closed",
+               context->gate_triggered ? "yes" : "no");
     status = river_voice_kws_wait_for_worker_idle(
         context,
         RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS);
+    RIVER_LOGI("kws align replay wait idle status=%d", (int)status);
     if (status != RIVER_OK) {
         RIVER_LOGE("kws align worker idle wait failed: status=%d", (int)status);
         goto cleanup;

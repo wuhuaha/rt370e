@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.127
+Build the latest-SDK image with post-trigger replay diagnostics:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected build result:
+- `Build done`
+- updated image exists at `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Board-side follow-up after flashing this build:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+```
+
+Expected new diagnostic markers:
+- trigger return path:
+  - `kws trigger dispatch done: ...`
+  - `kws trigger post-disarm: ...`
+- first replay step after trigger:
+  - `kws align replay trigger observed: frame=... infer=... snapshot=...`
+  - `kws align replay first post-trigger queue wait begin: frame=...`
+  - `kws align replay first post-trigger queue wait done: frame=... status=...`
+- replay tail / snapshot wait path:
+  - `kws align replay feed done: ...`
+  - `kws align replay tail done: ...`
+  - `kws align replay wait idle begin: ...`
+  - `kws align replay wait idle status=...`
+
+Interpretation:
+- if `kws trigger post-disarm: ...` is missing, the worker is still stuck before `emit_trigger()` fully returns
+- if `queue wait begin` appears without `queue wait done`, the next blocker is inside the first post-trigger queue-room wait path
+- if replay feed/tail markers appear but `kws align replay captured` is still absent, the next blocker moves to the idle/snapshot-wait stage
+
 ## Step 5.126
 Reproduce the narrowed latest-SDK DS-CNN tiny INT8 alignment hang:
 ```bash

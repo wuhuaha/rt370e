@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.127
+- Added a second-stage INT8 alignment diagnostic slice to narrow the remaining hang that still occurs after trigger-side `disarm`.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added `kws trigger dispatch done: ...` immediately after wakeword event dispatch returns
+  - added `kws trigger post-disarm: ...` immediately after `river_voice_kws_disarm_after_trigger(...)` returns
+  - added alignment replay markers for the first post-trigger phase:
+    - `kws align replay trigger observed: frame=... infer=... snapshot=...`
+    - `kws align replay first post-trigger queue wait begin: ...`
+    - `kws align replay first post-trigger queue wait done: ...`
+  - added end-of-replay phase markers:
+    - `kws align replay feed done: ...`
+    - `kws align replay tail done: ...`
+    - `kws align replay wait idle begin/status=...`
+- Verified this step with a full latest-SDK rebuild against `/root/ameba-rtos`; the build completed with `Build done`.
+
 ## Step 5.126
 - Re-flashed the latest-SDK `student_dscnn_tiny_v2_int8_debug` image that includes the cleanup-stage diagnostics and re-ran the preserved board/local parity command path on `2026-04-09`.
 - Flashing required the known serial recovery sequence before download mode:
