@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.129
+- Trimmed the `river kws align run` UART output one step further for slow/fragile INT8 bring-up while preserving the full manual parity path.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - removed the automatic `begin/meta/snapshot` summary emission from `river kws align run`
+  - kept the captured snapshot itself intact, so the existing manual commands remain the parity path:
+    - `river kws dump meta`
+    - `river kws dump chunk feat_f32 ...`
+    - `river kws dump chunk input_raw ...`
+    - `river kws dump chunk output_raw ...`
+- Rationale:
+  - board validation in Step `5.128` proved the command now reaches `kws align replay captured: ...`
+  - but the shell still blocked immediately after the auto-emitted snapshot summary
+  - reducing `align run` to preserve snapshot without auto-printing summary is the smallest behavior change that keeps the existing board/local parity mechanism intact
+- Removed the now-unused helper `river_voice_kws_log_tensor_dump_snapshot_summary(...)`.
+- Verified this step with a full latest-SDK rebuild against `/root/ameba-rtos`; the build completed with `Build done`.
+
 ## Step 5.128
 - Re-flashed the `ace9300` latest-SDK image after the user power-cycled the board and successfully restored the PL2303 UART node inside WSL.
 - A host-side serial-node issue had to be corrected first:

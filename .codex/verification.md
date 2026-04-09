@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.129
+Build the latest-SDK image with auto-summary disabled in `river kws align run`:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected build result:
+- `Build done`
+- updated image exists at `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Board-side follow-up after flashing this build:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+river kws dump meta
+```
+
+Expected runtime behavior after this change:
+- `river kws align run` should still reach:
+  - `kws align replay captured: ...`
+- but it should no longer auto-print:
+  - `kws tensor dump begin: ...`
+  - `kws tensor dump meta: ...`
+  - `kws tensor dump snapshot: ...`
+- if the auto-summary was the blocker, the command should now continue into:
+  - `kws align cleanup: ...`
+  - `kws align replay done: dump=preserved ...`
+- after `align run` returns, `river kws dump meta` should execute and print the preserved snapshot metadata on demand
+
+Interpretation:
+- success means the preserved-snapshot parity path survives, while the shell no longer wedges on automatic snapshot summary emission
+- if the shell still blocks before cleanup, the remaining issue is deeper than the summary logging itself
+
 ## Step 5.128
 Reproduce the latest narrowed INT8 post-snapshot blocker:
 ```bash
