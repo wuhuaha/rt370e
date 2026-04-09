@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.121
+Build the latest-SDK image with the alignment replay fix:
+```bash
+cd /root/ameba-river
+rm -rf build_RTL8730E/build
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected build result:
+- `Build done`
+- updated image exists at `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Board-side validation target after flashing this build:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+```
+
+Expected runtime behavior:
+- the alignment replay should no longer stall permanently after `kws tensor dump captured: ...`
+- it should continue into:
+  - `kws align replay captured: ...`
+  - `kws tensor dump begin: ...`
+  - `kws tensor dump meta: ...`
+  - `kws tensor dump feat_f32: ...`
+  - `kws tensor dump input_raw: ...`
+  - `kws tensor dump output_raw: ...`
+  - `kws align replay done: dump=emitted ...`
+
 ## Step 5.120
 Build with latest SDK:
 ```bash

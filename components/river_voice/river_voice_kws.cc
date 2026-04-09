@@ -320,8 +320,10 @@ extern "C" {
 #define RIVER_KWS_ALIGNMENT_FRAME_BYTES \
     (RIVER_KWS_ALIGNMENT_FRAME_SAMPLES * sizeof(int16_t))
 #define RIVER_KWS_ALIGNMENT_TAIL_SILENCE_FRAMES 4U
-#define RIVER_KWS_ALIGNMENT_IDLE_WAIT_TIMEOUT_MS 2000U
-#define RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS 6000U
+#define RIVER_KWS_ALIGNMENT_IDLE_WAIT_TIMEOUT_MS 4000U
+#define RIVER_KWS_ALIGNMENT_SNAPSHOT_WAIT_TIMEOUT_MS 12000U
+#define RIVER_KWS_ALIGNMENT_MAX_BACKLOG_FRAMES 8U
+#define RIVER_KWS_ALIGNMENT_FEED_WAIT_TIMEOUT_MS 4000U
 #define RIVER_KWS_ALIGNMENT_POLL_DELAY_MS 10U
 /* V3 final docs recommend 0.4 as the high-sensitivity operating point. Keep
  * gate fallback no weaker than that documented floor. */
@@ -2474,6 +2476,39 @@ static river_status_t river_voice_kws_wait_for_worker_idle(
     return RIVER_OK;
 }
 
+static river_status_t river_voice_kws_wait_for_alignment_queue_room(
+    river_voice_kws_context_t *context,
+    uint32_t max_frames,
+    uint32_t timeout_ms)
+{
+    uint64_t start_ms;
+    uint32_t queue_count;
+
+    if (context == NULL) {
+        return RIVER_ERR_ARG;
+    }
+    if (!context->input_ring.initialized) {
+        return RIVER_OK;
+    }
+
+    start_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    while (true) {
+        queue_count = river_audio_frame_ring_count(&context->input_ring);
+        if (queue_count <= max_frames) {
+            return RIVER_OK;
+        }
+        if (((uint64_t)rtos_time_get_current_system_time_ms() - start_ms) >=
+            (uint64_t)timeout_ms) {
+            RIVER_LOGE("kws align queue wait failed: queue=%lu max=%lu timeout_ms=%lu",
+                       (unsigned long)queue_count,
+                       (unsigned long)max_frames,
+                       (unsigned long)timeout_ms);
+            return RIVER_ERR_BUSY;
+        }
+        rtos_time_delay_ms(RIVER_KWS_ALIGNMENT_POLL_DELAY_MS);
+    }
+}
+
 static void river_voice_kws_drain_input_signal(
     river_voice_kws_context_t *context)
 {
@@ -4598,6 +4633,16 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
             goto cleanup;
         }
         rtos_time_delay_ms(RIVER_KWS_INPUT_FRAME_MS);
+        status = river_voice_kws_wait_for_alignment_queue_room(
+            context,
+            (uint32_t)RIVER_KWS_ALIGNMENT_MAX_BACKLOG_FRAMES,
+            RIVER_KWS_ALIGNMENT_FEED_WAIT_TIMEOUT_MS);
+        if (status != RIVER_OK) {
+            RIVER_LOGE("kws align queue throttle failed: frame=%lu status=%d",
+                       (unsigned long)frame_index,
+                       (int)status);
+            goto cleanup;
+        }
     }
 
     if (status == RIVER_OK) {
@@ -4615,6 +4660,16 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                 goto cleanup;
             }
             rtos_time_delay_ms(RIVER_KWS_INPUT_FRAME_MS);
+            status = river_voice_kws_wait_for_alignment_queue_room(
+                context,
+                (uint32_t)RIVER_KWS_ALIGNMENT_MAX_BACKLOG_FRAMES,
+                RIVER_KWS_ALIGNMENT_FEED_WAIT_TIMEOUT_MS);
+            if (status != RIVER_OK) {
+                RIVER_LOGE("kws align trailing queue throttle failed: frame=%lu status=%d",
+                           (unsigned long)frame_index,
+                           (int)status);
+                goto cleanup;
+            }
         }
     }
 

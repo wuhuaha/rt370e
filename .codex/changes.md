@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.121
+- Hardened the preserved `river kws align run` diagnostic path for slow KWS variants without changing the normal wakeword runtime path.
+- In `components/river_voice/river_voice_kws.cc`:
+  - added alignment-only queue throttling so the compiled-sample replay no longer keeps feeding frames unchecked while a slow model is still draining the worker queue
+  - widened the alignment idle/snapshot wait windows for latest-SDK slow-model bring-up
+- Kept the existing board/host parity mechanism intact:
+  - `river kws align run`
+  - `river kws dump meta`
+  - `river kws dump chunk ...`
+  - `tools/kws/replay_board_tensor_dump.py`
+- Verified this step with a full latest-SDK rebuild after the change.
+
 ## Step 5.120
 - Added a parallel `student_dscnn_tiny_v2_int8_debug` wakeword variant without removing any of the preserved board/host parity infrastructure.
 - Generated and embedded the algorithm bundle's `student_dscnn_tiny_v2` INT8 TFLite model as:
