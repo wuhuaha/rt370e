@@ -4460,3 +4460,45 @@
   - on the recovered latest-SDK board, the FP32 student debug variant is not
     only parity-correct, but also alive on the real wakeword -> cloud ASR ->
     TTS playback chain
+
+## Step 5.117
+- Investigated the remaining latest-SDK FP32 runtime caveat without changing
+  code or UART behavior:
+  - repeated `xiaozhi ws backpressure`
+  - repeated `xiaozhi uplink backpressure`
+  - runtime status ending in `last_err=send_queue_busy`
+- Traced the issue through the actual project code path and confirmed the
+  problem is in the cloud uplink path after wakeword, not in the KWS deploy
+  path:
+  - websocket queue gate:
+    - `RIVER_XIAOZHI_WS_QUEUE_MAX = 8`
+    - `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE = 2`
+    - effective audio backpressure threshold is therefore `ready >= 6`
+  - websocket transport is intentionally configured non-blocking:
+    - `ws_set_senddata_block_time(0)`
+    - `ws_multisend_opts(..., 1)`
+  - when busy occurs, the uplink worker:
+    - increments `busy_count`
+    - applies exponential backoff up to `160 ms`
+    - trims stale uplink audio down to `6` frames
+- Verified an important interpretation point from the live status snapshot:
+  - `q_peak=6` matches the design-side clamp exactly and is not evidence that
+    the websocket queue truly ran away beyond the intended soft ceiling
+- Confirmed the current implementation also has a startup burst factor on the
+  XiaoZhi path:
+  - wake/open uses `256 ms` pre-roll
+  - bridge input is `16 ms`
+  - uplink Opus packetization is `20 ms`
+  - opening a session can therefore inject roughly `12` full uplink packets
+    into the project-side ring before live streaming settles into steady state
+- Wrote the analysis into a dedicated project document so later model bring-up
+  can distinguish:
+  - KWS parity/deployment problems
+  - cloud uplink congestion problems
+- New document:
+  - `doc/XIAOZHI_UPLINK_BACKPRESSURE_ANALYSIS_LATEST_SDK_FP32_ZH.md`
+- The resulting conclusion for the current board baseline is:
+  - latest-SDK FP32 is functionally alive
+  - `send_queue_busy` is presently a realtime quality/freshness-protection
+    issue in the XiaoZhi uplink path, not a blocker proving model deployment is
+    wrong

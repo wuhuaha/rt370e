@@ -7780,3 +7780,49 @@ Interpretation:
 - repeated `xiaozhi uplink backpressure` warnings can still appear during the
   session; treat them as a runtime quality issue unless they prevent wake, ASR,
   or TTS from completing
+
+## Step 5.117 Verification
+
+Read the analysis document:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/XIAOZHI_UPLINK_BACKPRESSURE_ANALYSIS_LATEST_SDK_FP32_ZH.md
+```
+
+Then confirm the key code-side constraints referenced by the document:
+```bash
+cd /root/ameba-river
+nl -ba include/river/river_xiaozhi_credentials.h | sed -n '20,50p'
+nl -ba components/river_cloud/river_xiaozhi_ws.c | sed -n '228,266p'
+nl -ba components/river_cloud/river_cloud_adapter.c | sed -n '300,328p'
+nl -ba components/river_cloud/river_cloud_adapter.c | sed -n '1888,1948p'
+nl -ba components/river_cloud/river_cloud_internal.h | sed -n '52,61p'
+```
+
+Expected result:
+- credentials/config shows:
+  - uplink frame duration `20 ms`
+  - websocket queue max `8`
+- websocket path shows:
+  - audio reserve `2`
+  - `send_queue_busy` is set when `(ready + reserve) >= max`
+- cloud adapter shows:
+  - busy path increments counters
+  - busy path applies backoff
+  - busy path trims stale uplink frames
+- cloud internal constants show:
+  - uplink ring `64`
+  - stale keep `6`
+  - pre-roll max `256 ms`
+
+Optional runtime cross-check on the board:
+1. attach the official monitor
+2. trigger one real wake session
+3. run `river status`
+
+Expected runtime interpretation:
+- if the board again shows `q_peak=6`, `bp>0`, and `last_err=send_queue_busy`
+  while wake/ASR/TTS still complete, that matches the mechanism documented in
+  this step
+- do not interpret this alone as a KWS model deployment failure, because the
+  issue lives after wakeword in the XiaoZhi uplink transport path
