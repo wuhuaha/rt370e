@@ -1,5 +1,55 @@
 # Verification
 
+## Step 5.126
+Reproduce the narrowed latest-SDK DS-CNN tiny INT8 alignment hang:
+```bash
+cd /root/ameba-river
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+script -q -f /tmp/kws_int8_cleanup_probe_after_reboot.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 8s cat /dev/ttyUSB0'"
+bash -lc "printf 'reboot\r' > /dev/ttyUSB0"
+script -q -f /tmp/kws_int8_cleanup_align.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 25s cat /dev/ttyUSB0'"
+```
+
+During that `25s` capture window, send:
+```bash
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Expected observed result for the current narrowed blocker:
+- flash succeeds with `Finished PASS`
+- the application runtime may need an explicit `reboot` before logs resume normally
+- `river kws align run` shows:
+  - the first alignment disarm completes
+  - replay starts
+  - INT8 replay inference reaches at least:
+    - `infer=1 ... score=0.242188 ...`
+    - `infer=2 ... score=0.296875 ...`
+  - trigger-time snapshot capture occurs:
+    - `kws tensor dump captured: seq=1 infer=2 ...`
+  - trigger-side local debug suppression occurs:
+    - `wakeword handoff held: reason=local_debug ...`
+  - the second trigger-side disarm also completes its currently instrumented markers
+
+Expected missing markers in the current failure:
+- no `kws align replay captured: ...`
+- no `kws align cleanup: ...`
+- no `kws align replay done: ...`
+
+Optional liveness probe after the hang:
+```bash
+script -q -f /tmp/kws_int8_cleanup_posthang.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 10s cat /dev/ttyUSB0'"
+bash -lc "printf 'river kws dump meta\r' > /dev/ttyUSB0"
+```
+
+Current interpretation:
+- the hang occurs before outer alignment cleanup begins
+- the command path itself remains blocked after the trigger-side disarm
+- the next diagnostic step should instrument the post-trigger replay loop and the no-log calls immediately after the second `disarm`
+
 ## Step 5.125
 Build the latest-SDK image with cleanup-stage diagnostics:
 ```bash

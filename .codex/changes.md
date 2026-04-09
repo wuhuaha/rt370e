@@ -1,5 +1,41 @@
 # Change Log
 
+## Step 5.126
+- Re-flashed the latest-SDK `student_dscnn_tiny_v2_int8_debug` image that includes the cleanup-stage diagnostics and re-ran the preserved board/local parity command path on `2026-04-09`.
+- Flashing required the known serial recovery sequence before download mode:
+  - send `ESC+CRLF`
+  - send `reboot uartburn`
+  - flash with `tools/river_flash.py`
+  - result: `Finished PASS`
+- After flashing, the board did not immediately resume normal runtime logs on its own; sending a plain `reboot` restored the application runtime, after which UART logs resumed normally.
+- Reproduced the alignment path with:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align run`
+- New observed behavior:
+  - the initial alignment disarm path completed fully before replay start
+  - replay progressed into real INT8 inference:
+    - `infer=1 score=0.242188 q15=7936`
+    - `infer=2 score=0.296875 q15=9728`
+  - tensor snapshot capture is working during replay:
+    - `kws tensor dump captured: seq=1 infer=2 ...`
+  - local-debug wake suppression is working:
+    - `wakeword handoff held: reason=local_debug ...`
+  - after the trigger, a second `kws disarm` also completed all currently instrumented substeps:
+    - `frontend reset done`
+    - `input ring reset done`
+    - `pre-roll ring reset done`
+    - `input signal drained`
+- But the command still never reached the later alignment-stage markers:
+  - no `kws align replay captured: ...`
+  - no `kws align cleanup: ...`
+  - no `kws align replay done: ...`
+- A follow-up `river kws dump meta` was only echoed by UART and produced no command execution output, which shows the CLI remained blocked inside the original `river kws align run`.
+- Current narrowed conclusion:
+  - the remaining hang is no longer in the outer cleanup block entry
+  - it happens earlier, after trigger-side `river_voice_kws_disarm_after_trigger()` finishes, but before `river_voice_kws_run_alignment_sample()` reaches the post-feed snapshot/cleanup section
+  - likely next suspects are the replay loop's post-trigger frame submission / queue-room checks or another no-log ring/mutex call immediately after the second disarm
+
 ## Step 5.125
 - Added alignment-cleanup diagnostics for the latest-SDK `student_dscnn_tiny_v2_int8_debug` replay path so the remaining post-snapshot stall can be localized without changing the normal wakeword runtime flow.
 - In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
