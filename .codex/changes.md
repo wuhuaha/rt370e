@@ -4353,5 +4353,63 @@
   - the earlier latest-SDK `0x00` result is not a stable reproduction after a
     power-cycle recovery
   - board/session state is a major variable in the prior failure captures
-  - with the board freshly recovered, the latest-SDK FP32 image is now observed
-    running and emitting normal application logs
+- with the board freshly recovered, the latest-SDK FP32 image is now observed
+  running and emitting normal application logs
+
+## Step 5.115
+- Continued from the recovered latest-SDK board state and validated the
+  preserved board/host parity path end-to-end on the actual `master` SDK build.
+- Switched from raw `cat /dev/ttyUSB0` capture to the official Ameba monitor for
+  interactive work:
+  - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
+  - this reliably returned the `>` prompt and accepted monitor commands, while
+    the raw capture path was too unstable for command/response validation
+- Verified latest-SDK board command responsiveness through the preserved KWS
+  debug interface:
+  - `river kws debug local status`
+  - `river kws align status`
+  - board reported:
+    - `local_only=yes`
+    - `probe=stopped`
+    - compiled align sample `frames=145 duration_ms=2320`
+- Re-ran the preserved latest-SDK align dump flow under monitor log mode:
+  - monitor log file:
+    - `/tmp/kws_latest_monitor_logdir/ttyUSB0_20260409_135610.txt`
+  - command sequence:
+    - `river kws debug local on`
+    - `river audio probe stop`
+    - `river kws align run`
+- Latest-SDK board-side align result is healthy and deterministic:
+  - `seq=2`
+  - `infer=7`
+  - `raw=371`
+  - `score=0.371203`
+  - `q15=12163`
+  - `feat_hash=0x7ce0b11d`
+  - `input_hash=0xd52f011c`
+  - full tensor dump completed:
+    - `feat_chunks=253`
+    - `input_chunks=253`
+    - `output_chunks=1`
+- Replayed that exact latest-SDK board dump on host against the preserved FP32
+  bundle:
+  - model:
+    - `/root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite`
+  - host replay result:
+    - `board_meta: input_type=float32 output_type=float32 shape=(1, 40, 101, 1)`
+    - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+    - `host_hash: feature=0x7ce0b11d logged_input=0xd52f011c effective_input=0xd52f011c`
+    - `quant_parity: diff_bytes=0/16160`
+    - `board_output: raw=371 score=0.371203 exact=0.371203 q15=12163`
+    - `host_output: raw=371 score=0.371000 exact=0.371203`
+    - `output_parity: bytes_equal=yes raw_equal=yes`
+- Restored the board to a normal runtime state after the parity check:
+  - `river kws debug local off`
+  - `river audio probe start`
+  - board confirmed:
+    - `local_only=no`
+    - `wake_handoff=normal`
+    - `vad probe started`
+- This step establishes the most important current fact:
+  - on the recovered board, the latest-SDK FP32 deployment is not only runnable
+    but also board/host parity-correct through the preserved debug workflow

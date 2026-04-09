@@ -7626,3 +7626,97 @@ Interpretation:
   captures
 - in the recovered state, both the dirty-SDK control image and the latest-SDK
   FP32 image have been observed emitting normal runtime logs
+
+## Step 5.115 Verification
+
+Attach the official Ameba monitor to the recovered latest-SDK board:
+```bash
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- monitor prints:
+  - `Successfully connected to /dev/ttyUSB0, baud rate: 1500000`
+- the interactive prompt `>` appears
+
+Confirm the preserved KWS debug path is reachable on the latest-SDK board:
+```text
+river kws debug local status
+river kws align status
+```
+
+Expected result:
+- `river kws debug local status` shows:
+  - `local_only=yes`
+  - `kws status`
+  - `kws perf`
+- `river kws align status` shows:
+  - `source=compiled_pcm`
+  - `frames=145`
+  - `duration_ms=2320`
+  - `probe=stopped`
+
+Run the preserved align dump flow under monitor log mode:
+```bash
+rm -rf /tmp/kws_latest_monitor_logdir
+mkdir -p /tmp/kws_latest_monitor_logdir
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  --log \
+  --log-dir /tmp/kws_latest_monitor_logdir
+```
+
+Then in the monitor console:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+```
+
+Expected board-side result in the monitor output and log file:
+- log file:
+  - `/tmp/kws_latest_monitor_logdir/ttyUSB0_20260409_135610.txt`
+- align replay shows:
+  - `kws tensor dump armed: mode=align_best`
+  - `kws align replay start`
+  - `kws tensor dump captured: seq=2 infer=7 mode=align_best feat_chunks=253 input_chunks=253 output_chunks=1`
+  - `wakeword hit: text=小欧管家 score_pm=371 q15=12163`
+  - `kws align replay captured: seq=2 infer=7 score=0.371203 q15=12163`
+  - `kws align replay done: dump=emitted`
+
+Replay the exact latest-SDK board dump on host:
+```bash
+cd /root/ameba-river
+OMP_NUM_THREADS=1 TF_NUM_INTRAOP_THREADS=1 TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_latest_monitor_logdir/ttyUSB0_20260409_135610.txt \
+  --model /root/kws-trainint/artifacts/exports/student_bc_resnet_tiny_v2/model.fp32.tflite \
+  --seq latest
+```
+
+Expected host replay result:
+- `dump_seq=2 infer=7 gate=open`
+- `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+- `host_hash: feature=0x7ce0b11d logged_input=0xd52f011c effective_input=0xd52f011c`
+- `quant_parity: diff_bytes=0/16160`
+- `board_output: raw=371 score=0.371203 exact=0.371203 q15=12163`
+- `host_output: raw=371 score=0.371000 exact=0.371203`
+- `output_parity: bytes_equal=yes raw_equal=yes`
+
+Restore the board to normal runtime behavior:
+```text
+river kws debug local off
+river audio probe start
+```
+
+Expected result:
+- `local_only=no`
+- `wake_handoff=normal`
+- `vad probe started`
+
+Interpretation:
+- on the recovered board, the latest-SDK FP32 image passes the preserved
+  board/host parity workflow end-to-end
+- this means the current latest-SDK deployment is functionally correct at least
+  through the preserved tensor-dump and host-replay contract
