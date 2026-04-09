@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.130
+- Validated the latest-SDK `student_dscnn_tiny_v2_int8_debug` alignment cleanup change on real hardware after flashing the rebuilt image from `/root/ameba-rtos`.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - alignment cleanup now skips the final `river_voice_kws_disarm(context, true)` only when the replay already succeeded, the KWS worker is idle, and the gate is fully cleared
+  - the normal runtime KWS path is unchanged; this only affects the debug-only `river kws align run` success cleanup path
+- Board validation on `2026-04-09` proved the previous hang point moved:
+  - `river kws debug local on` at boot successfully blocked cloud handoff during false wakes
+  - `river audio probe stop` prevented live probe traffic from racing the compiled-sample replay
+  - `river kws align run` now reaches all of these later markers on board:
+    - `kws align replay captured: seq=1 infer=2 score=0.296875 q15=9728`
+    - `kws align cleanup: status=0 emit_dump=yes local_only_restore=yes`
+    - `kws align cleanup: disarm skipped worker already idle snapshot=ready`
+    - `kws align cleanup: worker idle wait status=0`
+    - `kws align cleanup: disarm tensor dump begin`
+    - `kws align cleanup: disarm tensor dump done`
+    - `kws align cleanup: local debug restored=yes`
+- Newly confirmed remaining blockers:
+  - the final `kws align replay done: ...` line is still missing
+  - a manual follow-up `river kws dump meta` still does not execute after that run
+  - the board then falls into repeated `[INIC-A] Dev api ipc timeout: cur id 0x1 ...` logs, so the shell is still not fully returning
+- Additional board finding from the same run:
+  - on a clean boot without early `local debug`, this INT8 model false-triggers very early on live audio:
+    - `infer=1 score_pm=304`
+    - `wakeword hit: ... score_pm=304 q15=9984`
+  - with the configured threshold at `278`, the current debug image is not stable enough to leave live probe traffic running during alignment work
+
 ## Step 5.129
 - Trimmed the `river kws align run` UART output one step further for slow/fragile INT8 bring-up while preserving the full manual parity path.
 - In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):

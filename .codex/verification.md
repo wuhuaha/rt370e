@@ -1,5 +1,63 @@
 # Verification
 
+## Step 5.130
+Build the latest-SDK image that skips the redundant final align disarm when the worker is already idle:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Flash and reproduce the narrowed latest-SDK INT8 board result:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+After flash succeeds, run the controlled serial sequence that suppresses the live false-wake path before alignment:
+```bash
+stty -F /dev/ttyUSB0 1500000 raw -echo
+rm -f /tmp/kws_int8_fast_stop_align.log
+(timeout 22s cat /dev/ttyUSB0 > /tmp/kws_int8_fast_stop_align.log) &
+reader=$!
+printf 'reboot\r' > /dev/ttyUSB0
+sleep 0.40
+printf 'river kws debug local on\r' > /dev/ttyUSB0
+sleep 0.20
+printf 'river audio probe stop\r' > /dev/ttyUSB0
+sleep 0.80
+printf 'river kws align run\r' > /dev/ttyUSB0
+wait $reader
+```
+
+Expected current result on board:
+- the image boots as `variant=student_dscnn_tiny_v2_int8_debug`
+- `river kws debug local on` is accepted very early and prints:
+  - `kws debug local_only: enabled=yes ...`
+- `river audio probe stop` succeeds and prints:
+  - `vad probe stopped`
+- `river kws align run` reaches the late cleanup path:
+  - `kws align replay captured: seq=1 infer=2 score=0.296875 q15=9728`
+  - `kws align cleanup: status=0 emit_dump=yes local_only_restore=yes`
+  - `kws align cleanup: disarm skipped worker already idle snapshot=ready`
+  - `kws align cleanup: worker idle wait status=0`
+  - `kws align cleanup: disarm tensor dump begin`
+  - `kws align cleanup: disarm tensor dump done`
+  - `kws align cleanup: local debug restored=yes`
+
+Expected remaining failure in the current image:
+- no `kws align replay done: ...`
+- no successful manual `river kws dump meta` response after the run
+- board starts repeating:
+  - `[INIC-A] Dev api ipc timeout: cur id 0x1, evt 0x0; latest id 0x1, evt 0x0`
+
+Additional clean-boot observation for this INT8 variant:
+- if `local debug` is not enabled very early, live audio can false-trigger before alignment begins:
+  - `wakeword hit: ... score_pm=304 q15=9984`
+- because the active threshold is `278`, do not rely on live probe traffic remaining quiet during on-board parity work
+
 ## Step 5.129
 Build the latest-SDK image with auto-summary disabled in `river kws align run`:
 ```bash

@@ -4719,12 +4719,23 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     }
 
 cleanup:
+    bool skip_final_disarm = false;
+
     RIVER_LOGI("kws align cleanup: status=%d emit_dump=%s local_only_restore=%s",
                (int)status,
                emit_dump ? "yes" : "no",
                previous_local_debug_mode ? "yes" : "no");
-    river_voice_kws_disarm(context, true);
-    RIVER_LOGI("kws align cleanup: disarm done");
+    skip_final_disarm = (status == RIVER_OK) &&
+                        river_voice_kws_worker_idle(context) &&
+                        !context->gate_open &&
+                        !context->gate_triggered;
+    if (skip_final_disarm) {
+        RIVER_LOGI("kws align cleanup: disarm skipped worker already idle snapshot=%s",
+                   context->tensor_dump_snapshot_ready ? "ready" : "empty");
+    } else {
+        river_voice_kws_disarm(context, true);
+        RIVER_LOGI("kws align cleanup: disarm done");
+    }
     restore_status = river_voice_kws_wait_for_worker_idle(
         context,
         RIVER_KWS_ALIGNMENT_IDLE_WAIT_TIMEOUT_MS);
