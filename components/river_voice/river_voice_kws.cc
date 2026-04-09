@@ -2196,46 +2196,36 @@ static river_status_t river_voice_kws_tensor_dump_buffer_view(
     }
 }
 
-static void river_voice_kws_log_tensor_dump_snapshot(
+static void river_voice_kws_log_tensor_dump_snapshot_summary(
     const river_voice_kws_context_t *context)
 {
-    const river_voice_kws_tensor_dump_buffer_t buffers[] = {
-        RIVER_VOICE_KWS_TENSOR_DUMP_FEATURE_F32,
-        RIVER_VOICE_KWS_TENSOR_DUMP_INPUT_RAW,
-        RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW};
-    size_t buffer_index;
+    size_t feat_chunks;
+    size_t input_chunks;
+    size_t output_chunks;
 
     if (context == NULL || !context->tensor_dump_snapshot_ready) {
         return;
     }
 
     river_voice_kws_tensor_dump_log_begin_meta(context);
-    for (buffer_index = 0U;
-         buffer_index < (sizeof(buffers) / sizeof(buffers[0]));
-         ++buffer_index) {
-        const uint8_t *data = NULL;
-        size_t bytes = 0U;
-        size_t chunk_index;
-        size_t chunk_count;
-
-        if (river_voice_kws_tensor_dump_buffer_view(context,
-                                                    buffers[buffer_index],
-                                                    &data,
-                                                    &bytes) != RIVER_OK ||
-            data == NULL || bytes == 0U) {
-            continue;
-        }
-
-        chunk_count = river_voice_kws_tensor_dump_chunk_count(bytes);
-        for (chunk_index = 1U; chunk_index <= chunk_count; ++chunk_index) {
-            river_voice_kws_log_hex_chunk(
-                river_voice_kws_tensor_dump_buffer_name(buffers[buffer_index]),
-                context->tensor_dump_capture_seq,
-                data,
-                bytes,
-                (uint32_t)chunk_index);
-        }
-    }
+    feat_chunks = context->tensor_dump_feature_bytes_captured == 0U ?
+                      0U :
+                      river_voice_kws_tensor_dump_chunk_count(
+                          context->tensor_dump_feature_bytes_captured);
+    input_chunks = context->tensor_dump_input_bytes_captured == 0U ?
+                       0U :
+                       river_voice_kws_tensor_dump_chunk_count(
+                           context->tensor_dump_input_bytes_captured);
+    output_chunks = context->tensor_dump_output_bytes_captured == 0U ?
+                        0U :
+                        river_voice_kws_tensor_dump_chunk_count(
+                            context->tensor_dump_output_bytes_captured);
+    RIVER_LOGI("kws tensor dump snapshot: seq=%lu infer=%lu chunks=[feat:%lu input:%lu output:%lu]",
+               (unsigned long)context->tensor_dump_capture_seq,
+               (unsigned long)context->tensor_dump_capture_infer,
+               (unsigned long)feat_chunks,
+               (unsigned long)input_chunks,
+               (unsigned long)output_chunks);
 }
 
 static const char *river_voice_kws_wake_handoff_block_reason_locked(
@@ -4696,7 +4686,7 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
                    (unsigned long)context->tensor_dump_capture_infer,
                    (double)context->tensor_dump_capture_score,
                    (unsigned long)context->tensor_dump_capture_confidence_q15);
-        river_voice_kws_log_tensor_dump_snapshot(context);
+        river_voice_kws_log_tensor_dump_snapshot_summary(context);
     }
 
 cleanup:
@@ -4708,13 +4698,15 @@ cleanup:
         status = restore_status;
     }
     if (emit_dump) {
-        river_voice_kws_tensor_dump_snapshot_reset(context);
         river_voice_kws_disarm_tensor_dump(context);
+        if (status != RIVER_OK) {
+            river_voice_kws_tensor_dump_snapshot_reset(context);
+        }
     }
     river_voice_kws_set_local_debug_mode(previous_local_debug_mode);
     if (status == RIVER_OK) {
         RIVER_LOGI("kws align replay done: dump=%s local_only_restored=%s",
-                   emit_dump ? "emitted" : "disabled",
+                   emit_dump ? "preserved" : "disabled",
                    previous_local_debug_mode ? "yes" : "no");
     }
     return status;

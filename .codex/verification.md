@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.122
+Build the latest-SDK image with the preserved snapshot summary flow:
+```bash
+cd /root/ameba-river
+rm -rf build_RTL8730E/build
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected build result:
+- `Build done`
+- updated image exists at `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Board-side validation target after flashing this build:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+river kws dump meta
+river kws dump chunk output_raw 1
+river kws dump chunk input_raw 1
+river kws dump chunk feat_f32 1
+```
+
+Expected runtime behavior:
+- `river kws align run` should stop after:
+  - `kws align replay captured: ...`
+  - `kws tensor dump begin: ...`
+  - `kws tensor dump meta: ...`
+  - `kws tensor dump snapshot: seq=... infer=... chunks=[feat:... input:... output:...]`
+  - `kws align replay done: dump=preserved ...`
+- it should no longer auto-print all tensor chunks in one burst
+- the preserved snapshot should remain queryable through `river kws dump meta` and `river kws dump chunk ...`
+
 ## Step 5.121
 Build the latest-SDK image with the alignment replay fix:
 ```bash

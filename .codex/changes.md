@@ -1,5 +1,14 @@
 # Change Log
 
+## Step 5.122
+- Refined the preserved `river kws align run` diagnostic path for the latest-SDK `student_dscnn_tiny_v2_int8_debug` bring-up.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - changed `river kws align run` to emit only tensor-dump `begin/meta/summary` after a successful replay capture
+  - kept the captured snapshot alive after `align run` success so the existing `river kws dump meta` and `river kws dump chunk ...` commands can fetch data incrementally
+  - only clear the preserved snapshot on alignment failure
+- This keeps the board/local parity mechanism unchanged while avoiding the UART flood caused by auto-printing hundreds of dump chunks in one burst.
+- Verified this step with a full latest-SDK rebuild after the change.
+
 ## Step 5.121
 - Hardened the preserved `river kws align run` diagnostic path for slow KWS variants without changing the normal wakeword runtime path.
 - In `components/river_voice/river_voice_kws.cc`:
