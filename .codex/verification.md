@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.120
+Build with latest SDK:
+```bash
+cd /root/ameba-river
+rm -rf build_RTL8730E/build
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Config confirmation:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_INT8_DEBUG|CONFIG_RIVER_KWS_TENSOR_ARENA_KB|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15" \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32 \
+  prj.conf -S
+```
+
+Expected lines:
+- `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_INT8_DEBUG=y`
+- `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048`
+- `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9125`
+
+Build artifacts:
+```bash
+cd /root/ameba-river
+ls -lh \
+  build_RTL8730E/km0_km4_ca32_app.bin \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/build/project_hp/image/km4_image2_all.bin \
+  build_RTL8730E/build/project_lp/image/km0_image2_all.bin
+```
+
+Expected result:
+- full latest-SDK build completes with `Build done`
+- the combined image `build_RTL8730E/km0_km4_ca32_app.bin` exists
+- no parity/debug commands were removed; this step only prepares the new INT8 variant for board validation
+
 ## Step 5.119
 Policy verification:
 - Check `AGENTS.md` and confirm the repository now records `/root/ameba-rtos` as the default SDK baseline.

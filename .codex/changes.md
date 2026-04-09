@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.120
+- Added a parallel `student_dscnn_tiny_v2_int8_debug` wakeword variant without removing any of the preserved board/host parity infrastructure.
+- Generated and embedded the algorithm bundle's `student_dscnn_tiny_v2` INT8 TFLite model as:
+  - `components/river_voice/generated/student_dscnn_tiny_v2_int8_model_data.h`
+- Extended KWS model selection so the new DS-CNN tiny INT8 bundle can reuse the same `40x101`, centered log-mel, tensor-dump, align-replay, and host-replay workflow already used by prior debug variants.
+- Switched the active project configuration to:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_INT8_DEBUG=y`
+  - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9125`
+- Updated `env.sh` so the repository helper now defaults to the latest SDK checkout at `/root/ameba-rtos`.
+- Verified a full `RTL8730E` build against `/root/ameba-rtos` completed successfully and produced:
+  - `build_RTL8730E/km0_km4_ca32_app.bin`
+  - `build_RTL8730E/build/project_ap/image/ap_image_all.bin`
+
 ## Step 5.119
 - Persisted the SDK baseline rule in `AGENTS.md`.
 - Future work should default to the latest SDK checkout at `/root/ameba-rtos` for build, flash, validation, and wakeword-model bring-up unless the user explicitly requests another SDK tree.

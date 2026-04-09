@@ -260,6 +260,16 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_FP32_DEBUG
       current student bring-up model can be board-profiled without
       disturbing the mainline chain.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_TINY_V2_INT8_DEBUG
+    bool "Student DS-CNN tiny v2 INT8 debug model"
+    help
+      Use the parallel INT8 deployment bundle exported from
+      /root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2.
+      This variant is reserved for board/local parity work and board-side
+      realtime probing on the `40x101`, `n_fft=400`, centered log-mel
+      frontend, while keeping the existing FP32 debug path intact for
+      quantization-vs-deployment triage.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_SMALL_V2_FP32_DEBUG
     bool "Student DS-CNN small v2 FP32 debug model"
     help
