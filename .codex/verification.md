@@ -1,5 +1,10 @@
 # Verification
 
+## Step 5.119
+Policy verification:
+- Check `AGENTS.md` and confirm the repository now records `/root/ameba-rtos` as the default SDK baseline.
+- For subsequent tasks, use the latest SDK tree unless the user explicitly redirects to another SDK checkout.
+
 ## Step 1
 Build:
 ```bash

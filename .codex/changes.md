@@ -1,5 +1,9 @@
 # Change Log
 
+## Step 5.119
+- Persisted the SDK baseline rule in `AGENTS.md`.
+- Future work should default to the latest SDK checkout at `/root/ameba-rtos` for build, flash, validation, and wakeword-model bring-up unless the user explicitly requests another SDK tree.
+
 ## Step 1
 - Initialized external Ameba project `ameba-river`.
 - Added project-level `AGENTS.md` and `.codex` workflow documents.

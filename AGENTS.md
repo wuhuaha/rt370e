@@ -2,6 +2,8 @@
 
 ## Scope
 - This repository is an external Ameba RTOS project for `RTL8730E`.
+- Default SDK baseline is the latest SDK checkout at `/root/ameba-rtos`.
+- Unless the user explicitly asks otherwise, use `/root/ameba-rtos` for build, flash, runtime validation, SDK capability checks, and future wakeword-model bring-up work.
 - Do not modify SDK sources under `/root/ameba-rtos-1.2` unless the user explicitly asks.
 - Keep all project-specific code, docs, and process records inside this repository.
 
