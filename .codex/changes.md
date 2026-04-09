@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.128
+- Re-flashed the `ace9300` latest-SDK image after the user power-cycled the board and successfully restored the PL2303 UART node inside WSL.
+- A host-side serial-node issue had to be corrected first:
+  - because `/dev/ttyUSB0` was missing, earlier redirections had created a regular file at that path
+  - reattached USB device `4-4` with `usbipd.exe attach --wsl --busid 4-4`
+  - confirmed the kernel still exposed `ttyUSB0` in `/sys/class/tty/ttyUSB0`
+  - removed the bogus `/dev/ttyUSB0` file and recreated the proper character device node from kernel major/minor `188:0`
+- Flash then succeeded normally with `Finished PASS`.
+- Re-ran the latest-SDK DS-CNN tiny INT8 parity command path:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align run`
+- New observed narrowing on `2026-04-09`:
+  - trigger-side path fully returns now:
+    - `kws trigger dispatch done: ...`
+    - `kws trigger post-disarm: gate=latched ...`
+  - replay loop also completes its feed and tail phases:
+    - `kws align replay feed done: trigger=no infer=2 snapshot=ready`
+    - `kws align replay tail done: gate=cleared infer=2 snapshot=ready`
+    - `kws align replay wait idle status=0`
+  - snapshot summary now fully prints:
+    - `kws align replay captured: seq=1 infer=2 score=0.296875 q15=9728`
+    - `kws tensor dump begin: ...`
+    - `kws tensor dump meta: ...`
+    - `kws tensor dump snapshot: seq=1 infer=2 chunks=[feat:253 input:64 output:1]`
+  - immediately after that, runtime prints:
+    - `[INIC-E] WIFI TRX IPC 4 timeout`
+- The command still never reaches:
+  - `kws align cleanup: ...`
+  - `kws align replay done: ...`
+- A follow-up `river kws dump meta` still only echoes at UART and does not execute, confirming the shell remains blocked inside the original `river kws align run`.
+- Current narrowed conclusion:
+  - the remaining hang is now specifically between the last line of `river_voice_kws_log_tensor_dump_snapshot_summary(...)` and the first outer cleanup log
+  - the next diagnostic step should instrument the end of snapshot-summary emission and the first statement after it
+
 ## Step 5.127
 - Added a second-stage INT8 alignment diagnostic slice to narrow the remaining hang that still occurs after trigger-side `disarm`.
 - In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):

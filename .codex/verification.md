@@ -1,5 +1,58 @@
 # Verification
 
+## Step 5.128
+Reproduce the latest narrowed INT8 post-snapshot blocker:
+```bash
+cd /root/ameba-river
+usbipd.exe attach --wsl --busid 4-4
+rm -f /dev/ttyUSB0
+mknod /dev/ttyUSB0 c 188 0
+chown root:dialout /dev/ttyUSB0
+chmod 660 /dev/ttyUSB0
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+script -q -f /tmp/kws_int8_posttrigger_align.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 30s cat /dev/ttyUSB0'"
+```
+
+During that `30s` capture window, send:
+```bash
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Expected observed result for the current narrowed blocker:
+- `river kws align run` now reaches all of these points:
+  - `kws trigger dispatch done: ...`
+  - `kws trigger post-disarm: ...`
+  - `kws align replay feed done: ...`
+  - `kws align replay tail done: ...`
+  - `kws align replay wait idle status=0`
+  - `kws align replay captured: ...`
+  - `kws tensor dump begin: ...`
+  - `kws tensor dump meta: ...`
+  - `kws tensor dump snapshot: ...`
+- immediately after snapshot summary, runtime may print:
+  - `[INIC-E] WIFI TRX IPC 4 timeout`
+
+Expected missing markers in the current failure:
+- no `kws align cleanup: ...`
+- no `kws align replay done: ...`
+
+Post-hang liveness probe:
+```bash
+script -q -f /tmp/kws_int8_postsnapshot_probe.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 12s cat /dev/ttyUSB0'"
+bash -lc "printf 'river kws dump meta\r' > /dev/ttyUSB0"
+```
+
+Expected result:
+- UART only echoes `river kws dump meta`
+- no actual dump response executes
+
+Interpretation:
+- this confirms the command path is blocked after snapshot-summary emission but before the outer cleanup log executes
+
 ## Step 5.127
 Build the latest-SDK image with post-trigger replay diagnostics:
 ```bash
