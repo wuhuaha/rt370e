@@ -4413,3 +4413,50 @@
 - This step establishes the most important current fact:
   - on the recovered board, the latest-SDK FP32 deployment is not only runnable
     but also board/host parity-correct through the preserved debug workflow
+
+## Step 5.116
+- Continued on the same latest-SDK FP32 board image after Step `5.115` and
+  validated the real online wake-to-cloud runtime path instead of stopping at
+  tensor parity only.
+- Reattached the official Ameba monitor to the live board:
+  - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
+  - confirmed the board stayed responsive and in normal runtime mode
+- Observed a real wakeword trigger on the latest-SDK FP32 image through the
+  normal runtime path:
+  - `wakeword hit: text=小欧管家 score_pm=271 q15=8912 triggers=10`
+  - `wakeword queued text=小欧家 confidence=8912`
+  - `kws debug status` remained:
+    - `local_only=no`
+    - `wake_handoff=normal`
+- Observed the complete cloud handoff open successfully after wake:
+  - `xiaozhi ota bootstrap ok`
+  - `xiaozhi connecting`
+  - `Connected to websocket server`
+  - `server hello: sid=8665a824`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+- Observed live ASR and dialogue traffic on that same session:
+  - `asr provider=xiaozhi_realtime session started sid=8665a824`
+  - partial/final STT logs were emitted
+  - LLM response logs were emitted
+- Observed the board-side TTS playback path actually start and stop on the
+  latest-SDK FP32 image:
+  - `tts ... state=sentence_start text=没听清呢，`
+  - `playback start: stream=xiaozhi_tts rate=24000Hz frame=20ms ...`
+  - `xiaozhi playback start: 24000Hz frame=20ms mono=960B queued=8 mode=no_ref gain=5/2`
+  - `ameba_audio_stream_tx_start`
+  - `tts ... state=stop`
+  - `playback stop: stream=xiaozhi_tts epoch=11`
+- Captured a runtime status snapshot during the live session:
+  - `interaction_state=asr_streaming`
+  - `playback_service=idle ... starts=6 stops=6`
+  - `asr provider=xiaozhi_realtime ... wifi=connected`
+  - `xiaozhi session=yes hello=yes`
+- Current caveat remains visible but is not a functional blocker for this step:
+  - repeated `xiaozhi uplink backpressure`
+  - `last_err=send_queue_busy`
+  - despite that, wake, websocket connect, ASR, LLM, TTS start, and playback
+    stop all completed in the same session
+- This step adds the runtime conclusion missing from Step `5.115`:
+  - on the recovered latest-SDK board, the FP32 student debug variant is not
+    only parity-correct, but also alive on the real wakeword -> cloud ASR ->
+    TTS playback chain

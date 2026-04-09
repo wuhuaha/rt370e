@@ -7720,3 +7720,63 @@ Interpretation:
   board/host parity workflow end-to-end
 - this means the current latest-SDK deployment is functionally correct at least
   through the preserved tensor-dump and host-replay contract
+
+## Step 5.116 Verification
+
+Attach the official Ameba monitor to the latest-SDK FP32 board:
+```bash
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- monitor connects successfully and shows the `>` prompt
+
+Trigger a real runtime session on the board:
+- say the wakeword near the board
+- then say one short follow-up utterance so cloud ASR and TTS both have a
+  chance to run
+
+Expected runtime logs:
+- wake stage:
+  - `wakeword hit: text=小欧管家`
+  - `wakeword queued`
+  - `Connected to websocket server`
+  - `server hello: sid=...`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+- ASR stage:
+  - `asr provider=xiaozhi_realtime session started sid=...`
+  - `asr stream active`
+  - one or more `partial` / `final` STT lines
+- TTS/playback stage:
+  - `tts sid=... state=sentence_start`
+  - `playback start: stream=xiaozhi_tts`
+  - `ameba_audio_stream_tx_start`
+  - later `tts sid=... state=stop`
+  - later `playback stop: stream=xiaozhi_tts`
+
+During or immediately after that session, capture a status snapshot:
+```text
+river status
+```
+
+Expected result:
+- `kws debug status` still shows:
+  - `local_only=no`
+  - `wake_handoff=normal`
+- cloud/runtime state shows:
+  - `wifi=connected`
+  - `xiaozhi session=yes` while the session is open
+  - nonzero `audio_rx` after TTS playback has started
+- playback state shows nonzero lifecycle counters such as:
+  - `starts=...`
+  - `stops=...`
+
+Interpretation:
+- if the logs reach `playback start` and later `playback stop`, the board-side
+  TTS output path is being exercised on the latest-SDK FP32 firmware
+- if someone is physically near the board, audible confirmation should still be
+  checked by ear; serial logs alone prove the playback pipeline ran, not what
+  the user actually heard
+- repeated `xiaozhi uplink backpressure` warnings can still appear during the
+  session; treat them as a runtime quality issue unless they prevent wake, ASR,
+  or TTS from completing
