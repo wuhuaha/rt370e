@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.123
+Reproduce the current latest-SDK DS-CNN tiny INT8 board blocker:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+rm -f /tmp/kws_dscnn_tiny_int8_manual_dump.log
+script -q -f /tmp/kws_dscnn_tiny_int8_manual_dump.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+od -An -tx1 -j 160 -N 64 /tmp/kws_dscnn_tiny_int8_manual_dump.log
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000 --debug
+```
+
+Expected observed result for the current blocker:
+- flash still succeeds with `Finished PASS`
+- passive UART capture shows continuous `0x00` bytes instead of boot text
+- official monitor connects, sends `AT+LIST`, and receives only repeated `00 / 00 00 / 00 00 00 / 00 00 00 00`
+- no normal application markers appear:
+  - no `File System Init Success`
+  - no `ameba-river boot`
+  - no `kws init`
+
+Interpretation:
+- do not continue to `river kws align run` or board/host replay while the board is in this state
+- the current failure is before parity or KWS inference; it is a board-runtime bring-up blocker for this latest-SDK INT8 image
+
 ## Step 5.122
 Build the latest-SDK image with the preserved snapshot summary flow:
 ```bash

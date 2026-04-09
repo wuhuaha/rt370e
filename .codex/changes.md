@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.123
+- Revalidated the latest-SDK `student_dscnn_tiny_v2_int8_debug` board bring-up on `2026-04-09` after the preserved-snapshot diagnostic change.
+- Flash path remained healthy:
+  - sent `reboot uartburn` over `/dev/ttyUSB0`
+  - flashed with `tools/river_flash.py` against `AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - AmebaFlash finished with `Finished PASS`
+- Board runtime still failed before any KWS parity work could begin:
+  - passive UART capture on `/dev/ttyUSB0` produced continuous `0x00`
+  - official `monitor.py --debug` connected successfully, sent `AT+LIST`, and still received only repeated `0x00`
+  - no normal boot markers appeared, including no `File System Init Success`, no `ameba-river boot`, and no KWS init logs
+- This confirms the current blocker is still the latest-SDK INT8 image failing to enter a readable runtime / monitor state on board, not the new manual-chunk parity workflow.
+
 ## Step 5.122
 - Refined the preserved `river kws align run` diagnostic path for the latest-SDK `student_dscnn_tiny_v2_int8_debug` bring-up.
 - In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
