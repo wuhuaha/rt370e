@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.124
+Reproduce the post-power-cycle latest-SDK DS-CNN tiny INT8 alignment state:
+```bash
+usbipd.exe attach --wsl --busid 4-4
+bash -lc 'ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true'
+script -q -f /tmp/kws_int8_retry_powercycle_probe.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+bash -lc "printf 'river kws debug local on\r' > /dev/ttyUSB0"
+bash -lc "printf 'river audio probe stop\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align status\r' > /dev/ttyUSB0"
+bash -lc "printf 'river kws align run\r' > /dev/ttyUSB0"
+```
+
+Expected observed result after this specific power-cycle retry:
+- the board is back in readable runtime text mode, not the earlier pure `0x00` state
+- runtime logs show the DS-CNN tiny INT8 characteristics, including:
+  - `out_type=int8`
+  - `thresh_pm=278`
+  - `arena=295764/2048KB`
+  - `infer_us` around `491-493 ms`
+- `river kws align run` now reaches the preserved-summary parity stage:
+  - `kws align replay captured: ...`
+  - `kws tensor dump begin: ...`
+  - `kws tensor dump meta: ...`
+  - `kws tensor dump snapshot: seq=... chunks=[feat:253 input:64 output:1]`
+
+Current remaining blocker after that point:
+- `kws align replay done: dump=preserved ...` still does not appear
+- repeated `IPC Get Semaphore Timeout` starts after the snapshot line
+- a subsequent `river kws dump meta` may be echoed by UART but does not execute
+
+Interpretation:
+- this retry proves the board can now enter runtime and the summary-based dump path works
+- but the alignment flow still stalls after snapshot capture, so manual chunk pulling and final board/host parity are still blocked for this INT8 image
+
 ## Step 5.123
 Reproduce the current latest-SDK DS-CNN tiny INT8 board blocker:
 ```bash

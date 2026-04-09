@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.124
+- Re-tried the latest-SDK `student_dscnn_tiny_v2_int8_debug` board validation after the user power-cycled the board and reattached the PL2303 USB serial device.
+- New observed state on `2026-04-09`:
+  - the board no longer stayed in the earlier pure-`0x00` boot-failure state
+  - passive UART capture immediately showed normal runtime KWS/VAD logs again
+  - the active image characteristics still matched the DS-CNN tiny INT8 debug variant:
+    - `out_type=int8`
+    - `threshold_pm=278`
+    - `arena=295764/2048KB`
+    - `infer_us` around `491-493 ms`
+- Ran the preserved-snapshot alignment workflow again:
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws align status`
+  - `river kws align run`
+- The board now progressed through the intended summary-based parity path:
+  - `kws align replay captured: seq=1 infer=12 score=0.296875 q15=9728`
+  - `kws tensor dump begin: ... in_type=int8 out_type=int8 ...`
+  - `kws tensor dump meta: ... in_scale=0.029209241 in_zp=-9 out_scale=0.003906250 out_zp=-128`
+  - `kws tensor dump snapshot: seq=1 infer=12 chunks=[feat:253 input:64 output:1]`
+- But the run still did not fully return to an interactive shell:
+  - `kws align replay done: dump=preserved ...` did not appear
+  - after the snapshot line, the board started repeating `IPC Get Semaphore Timeout`
+  - a follow-up `river kws dump meta` input was echoed by UART but produced no executed dump response
+- Current conclusion:
+  - the preserved-snapshot summary change is effective on board
+  - the previous UART-flood failure is no longer the first blocker after this power cycle
+  - another stall remains after snapshot capture, so board/local parity still cannot be completed for this INT8 image yet
+
 ## Step 5.123
 - Revalidated the latest-SDK `student_dscnn_tiny_v2_int8_debug` board bring-up on `2026-04-09` after the preserved-snapshot diagnostic change.
 - Flash path remained healthy:
