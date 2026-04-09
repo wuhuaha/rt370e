@@ -1,5 +1,42 @@
 # Change Log
 
+## Step 5.133
+- Flashed the latest-SDK image containing the new diag return-path
+  instrumentation commit `8c23a03` onto real hardware and revalidated the
+  INT8 alignment path on board.
+- Verified on boot from the captured board log:
+  - `runtime_in=int8 runtime_out=int8`
+  - `variant=student_dscnn_tiny_v2_int8_debug`
+- Reproduced the controlled latest-SDK command sequence on board:
+  - `reboot`
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws debug local off`
+  - `river kws align run`
+  - `river kws dump meta`
+  - `river kws align status`
+- New decisive board finding on `2026-04-09`:
+  - the KWS replay path completes and the diag command handler also returns:
+    - `kws align replay done: dump=preserved local_only_restored=no`
+    - `[river][diag] kws align run returned status=0`
+  - this proves the remaining blocker is no longer inside
+    `river_voice_kws_run_alignment_sample(...)`
+  - the command has already returned to the diag / monitor layer before the
+    post-align failure appears
+- Remaining failure reproduced immediately after the returned marker:
+  - runtime prints:
+    - `[INIC-E] WIFI TRX IPC 4 timeout`
+  - subsequent commands are only echoed and do not execute:
+    - `river kws dump meta`
+    - `river kws align status`
+- Additional probe in the same post-align state:
+  - a plain `reboot` command emitted no boot log within the probe window
+  - this further supports that the board monitor / command execution path is
+    no longer functioning normally after the successful align command returns
+- Current narrowed conclusion:
+  - the remaining issue is a post-return monitor/parser/system-state problem,
+    not a missing final replay log and not the core INT8 replay function
+
 ## Step 5.132
 - Added one-step monitor return-path instrumentation for the remaining
   latest-SDK INT8 alignment-shell hang investigation without changing the KWS

@@ -1,5 +1,72 @@
 # Verification
 
+## Step 5.133
+Flash the return-path-instrumented image and reproduce the post-return INT8
+alignment behavior on board:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Capture the controlled reboot-to-align sequence:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+script -q -f /tmp/kws_int8_return_probe.log -c "timeout 38s cat /dev/ttyUSB0"
+```
+
+While that capture is active, run:
+```bash
+cd /root/ameba-river
+bash -lc 'printf "reboot\r" > /dev/ttyUSB0; sleep 0.40; printf "river kws debug local on\r" > /dev/ttyUSB0; sleep 8.60; printf "river audio probe stop\r" > /dev/ttyUSB0; sleep 0.80; printf "river kws debug local off\r" > /dev/ttyUSB0; sleep 0.40; printf "river kws align run\r" > /dev/ttyUSB0; sleep 6.50; printf "river kws dump meta\r" > /dev/ttyUSB0; sleep 1.00; printf "river kws align status\r" > /dev/ttyUSB0'
+```
+
+Extract the decisive markers:
+```bash
+cd /root/ameba-river
+rg -n "variant=|runtime_in=|kws debug local_only|vad probe stopped|kws align replay captured|kws align replay done|\\[river\\]\\[diag\\] kws align run returned|\\[river\\]\\[diag\\] kws dump meta returned|WIFI TRX IPC 4 timeout|river kws dump meta|river kws align status" /tmp/kws_int8_return_probe.log
+```
+
+Expected current board result:
+- the flashed image boots as:
+  - `variant=student_dscnn_tiny_v2_int8_debug`
+  - `runtime_in=int8 runtime_out=int8`
+- the controlled sequence is accepted:
+  - `kws debug local_only: enabled=yes ...`
+  - `vad probe stopped`
+  - `kws debug local_only: enabled=no ...`
+- the align replay fully completes:
+  - `kws align replay captured: seq=1 infer=12 score=0.296875 q15=9728`
+  - `kws align replay done: dump=preserved local_only_restored=no`
+- the new diag marker appears:
+  - `[river][diag] kws align run returned status=0`
+
+Expected remaining failure:
+- immediately after the returned marker:
+  - `[INIC-E] WIFI TRX IPC 4 timeout`
+- later commands are only echoed and do not execute:
+  - `river kws dump meta`
+  - `river kws align status`
+- no `[river][diag] kws dump meta returned` line appears
+
+Optional confirmation probe from the same post-align state:
+```bash
+cd /root/ameba-river
+timeout 6s cat /dev/ttyUSB0
+bash -lc "printf 'reboot\r' > /dev/ttyUSB0"
+```
+
+Expected current result:
+- no clean reboot boot log is observed in the probe window
+
+Interpretation:
+- this step is complete once board logs prove that:
+  - `river_voice_kws_run_alignment_sample(...)` already returned successfully
+  - the post-align failure now lives after the command returns, in monitor /
+    parser / broader system state rather than in the replay function itself
+
 ## Step 5.132
 Confirm the new monitor return-path instrumentation is present:
 ```bash
