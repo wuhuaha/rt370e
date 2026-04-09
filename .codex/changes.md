@@ -4283,5 +4283,36 @@
   - latest upstream SDK plus the currently required river patches can compile
     and flash
   - but it still fails at runtime before any normal boot log becomes visible
-  - therefore the remaining blocker is still runtime / boot-chain divergence,
-    not the ability to generate or download the FP32 image
+- therefore the remaining blocker is still runtime / boot-chain divergence,
+  not the ability to generate or download the FP32 image
+
+## Step 5.113
+- Rebuilt the same preserved FP32 control firmware against the known dirty-SDK
+  baseline for a control comparison:
+  - `AMEBA_SDK_ROOT=/root/ameba-rtos-1.2`
+  - build completed with `Build done`
+- Reflashed that dirty-SDK control image to the same board:
+  - flash again ended with `Finished PASS`
+- Captured a fresh 20-second raw boot UART log after the dirty-SDK reflash:
+  - `/tmp/kws_dirty_sdk_fp32_boot.log`
+- Unexpectedly, the dirty-SDK control image now shows the same abnormal UART
+  symptom as the latest-SDK image in this board session:
+  - `od -An -tx1 -j 160 -N 64` still shows only `00`
+  - removing all `0x00` bytes again leaves only the `script` wrapper text
+  - no `File System Init Success`, `ameba-river boot`, or `kws init`
+- Performed one additional minimal UART probe on top of the dirty-SDK image:
+  - sent only `ESC + CRLF`
+  - captured `/tmp/kws_serial_probe_after_esc.log`
+  - probe result was still continuous `0x00` without any shell/banner text
+- This changes the interpretation of the current verification session:
+  - Step `5.112` still proves the latest-SDK image reproduces the `0x00` boot
+    failure on real hardware
+  - but the board can no longer serve as a clean immediate control after the
+    dirty-SDK reflash also enters the same `0x00` state
+  - therefore the current session now indicates either:
+    - board state / reset state / UART state has become abnormal, or
+    - the current rebuilt dirty-SDK image no longer restores the previously
+      known-good runtime on this board
+- Immediate conclusion for this step:
+  - the latest-vs-dirty runtime comparison is now blocked by board/session
+    state, not by lack of a flashable control build

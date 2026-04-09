@@ -7499,3 +7499,54 @@ Interpretation:
 - this reproduces the earlier `0x00` failure mode on the user's actual
   `/root/ameba-rtos` checkout, so the blocker remains runtime / boot-chain
   divergence rather than source download or build incompleteness
+
+## Step 5.113 Verification
+
+Rebuild the same FP32 control firmware against the dirty-SDK baseline:
+```bash
+cd /root/ameba-river
+rm -rf build_RTL8730E/build
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos-1.2; source /root/ameba-river/env.sh; python /root/ameba-rtos-1.2/ameba.py soc RTL8730E; python /root/ameba-rtos-1.2/ameba.py build -p'
+```
+
+Expected result:
+- build finishes with `Build done`
+
+Flash the dirty-SDK control image and capture raw boot UART:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos-1.2; python3 tools/river_flash.py -p /dev/ttyUSB0'
+rm -f /tmp/kws_dirty_sdk_fp32_boot.log
+script -q -f /tmp/kws_dirty_sdk_fp32_boot.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 20s cat /dev/ttyUSB0'"
+od -An -tx1 -j 160 -N 64 /tmp/kws_dirty_sdk_fp32_boot.log
+bash -lc "tr -d '\000' < /tmp/kws_dirty_sdk_fp32_boot.log | sed -n '1,40p'"
+grep -a -n 'ameba-river boot\|File System Init Success\|kws init' /tmp/kws_dirty_sdk_fp32_boot.log
+```
+
+Observed result in the current board session:
+- flash still reaches `Finished PASS`
+- but boot UART is again continuous `0x00`
+- removing `0x00` bytes leaves only:
+  - `Script started ...`
+  - `Script done ...`
+- `grep` finds no normal boot markers
+
+Run one minimal UART liveness probe on the dirty-SDK image:
+```bash
+bash -lc "printf '\033\r\n' > /dev/ttyUSB0"
+rm -f /tmp/kws_serial_probe_after_esc.log
+script -q -f /tmp/kws_serial_probe_after_esc.log -c "bash -lc 'stty -F /dev/ttyUSB0 1500000 raw -echo; timeout 5s cat /dev/ttyUSB0'"
+od -An -tx1 -j 160 -N 64 /tmp/kws_serial_probe_after_esc.log
+```
+
+Observed result:
+- probe UART is still continuous `0x00`
+- no shell prompt or banner text appears
+
+Interpretation:
+- in this session, the board can no longer act as a clean dirty-vs-latest
+  runtime control, because even the dirty-SDK rebuild no longer restores normal
+  serial boot output
+- next recovery actions should therefore target board/session state first
+  before making stronger latest-vs-dirty runtime claims
