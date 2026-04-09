@@ -1,5 +1,50 @@
 # Verification
 
+## Step 5.131
+Reproduce the latest narrowed post-success INT8 alignment state:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+rm -f /tmp/kws_int8_prev_local_off.log
+(timeout 38s cat /dev/ttyUSB0 > /tmp/kws_int8_prev_local_off.log) &
+reader=$!
+printf 'reboot\r' > /dev/ttyUSB0
+sleep 0.40
+printf 'river kws debug local on\r' > /dev/ttyUSB0
+sleep 8.60
+printf 'river audio probe stop\r' > /dev/ttyUSB0
+sleep 0.80
+printf 'river kws debug local off\r' > /dev/ttyUSB0
+sleep 0.40
+printf 'river kws align run\r' > /dev/ttyUSB0
+sleep 6.50
+printf 'river kws dump meta\r' > /dev/ttyUSB0
+wait $reader
+```
+
+Expected current board result:
+- early boot local-debug enable is accepted:
+  - `kws debug local_only: enabled=yes ...`
+- live false wake may still happen before replay, but it is held locally:
+  - `wakeword hit: ... score_pm=289 q15=9472`
+  - `wakeword handoff held: reason=local_debug ...`
+- probe stop succeeds:
+  - `vad probe stopped`
+- local debug is turned back off before replay:
+  - `kws debug local_only: enabled=no ...`
+  - `kws align cleanup: ... local_only_restore=no`
+- `river kws align run` now reaches the final success marker:
+  - `kws align replay done: dump=preserved local_only_restored=no`
+
+Expected remaining failure after that success line:
+- runtime immediately prints:
+  - `[INIC-E] WIFI TRX IPC 4 timeout`
+- the later `river kws dump meta` is only echoed by UART and does not execute
+
+Interpretation:
+- if `kws align replay done: ...` appears only when `previous_local_debug_mode=no`, then the prior missing-final-line symptom is specifically tied to the cleanup path that restores `local_debug_mode=yes`
+- if `river kws dump meta` still does not execute, the remaining issue is no longer the final disarm or the missing success log; it is a later shell / monitor usability problem after the align command returns
+
 ## Step 5.130
 Build the latest-SDK image that skips the redundant final align disarm when the worker is already idle:
 ```bash

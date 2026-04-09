@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.131
+- Narrowed the remaining latest-SDK INT8 alignment blocker one step further on real hardware without changing code yet.
+- Revalidated the same `student_dscnn_tiny_v2_int8_debug` image with a controlled monitor sequence:
+  - early boot: `river kws debug local on`
+  - after Wi-Fi settled and before replay: `river audio probe stop`
+  - immediately before replay: `river kws debug local off`
+  - then: `river kws align run`
+- New board finding on `2026-04-09`:
+  - when `align run` starts with `previous_local_debug_mode=no`, the command now reaches the final success marker:
+    - `kws align replay done: dump=preserved local_only_restored=no`
+  - this proves the previous missing-final-line symptom is no longer caused by the skipped final `disarm`; it is specifically correlated with the cleanup path where `align run` restores `local_debug_mode=yes`
+- The same run still shows an unresolved post-success problem:
+  - immediately after `kws align replay done: ...`, runtime prints:
+    - `[INIC-E] WIFI TRX IPC 4 timeout`
+  - a follow-up `river kws dump meta` is only echoed by UART and still does not execute
+  - this means the shell / monitor path is still not reliably usable after a successful INT8 align run, even once `replay done` is printed
+- Additional observations from the same controlled boot:
+  - the live INT8 model still false-triggers before replay work unless `local debug` is enabled very early
+  - in this run the early live false wake was:
+    - `score_pm=289 q15=9472`
+    - still above the configured threshold (`278`)
+  - after `river kws debug local off`, `align run` internally re-enables local debug for the replay itself, so the compiled-sample wake is still held locally and does not wake the cloud path
+
 ## Step 5.130
 - Validated the latest-SDK `student_dscnn_tiny_v2_int8_debug` alignment cleanup change on real hardware after flashing the rebuilt image from `/root/ameba-rtos`.
 - In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
