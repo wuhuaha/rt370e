@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.132
+- Added one-step monitor return-path instrumentation for the remaining
+  latest-SDK INT8 alignment-shell hang investigation without changing the KWS
+  parity flow itself.
+- In [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c):
+  - `river kws dump meta` now prints:
+    - `[river][diag] kws dump meta returned`
+    after `river_voice_kws_dump_tensor_meta()` returns
+  - successful `river kws align run` now prints:
+    - `[river][diag] kws align run returned status=0`
+    after `river_voice_kws_run_alignment_sample(true)` returns
+- Purpose of this step:
+  - distinguish whether the remaining post-align freeze is still inside
+    `river_voice_kws_run_alignment_sample(...)`
+  - or whether the command handler returns and the shell wedges later in the
+    monitor path
+- Scope guard:
+  - no KWS runtime behavior, threshold, tensor dump contents, or board/host
+    parity commands were changed
+  - this is strictly additional diag output on the existing monitor commands
+- Rebuilt the project against the latest SDK at `/root/ameba-rtos`; the build
+  completed successfully with `Build done`
+
 ## Step 5.131
 - Narrowed the remaining latest-SDK INT8 alignment blocker one step further on real hardware without changing code yet.
 - Revalidated the same `student_dscnn_tiny_v2_int8_debug` image with a controlled monitor sequence:

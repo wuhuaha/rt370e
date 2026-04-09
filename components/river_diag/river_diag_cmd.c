@@ -210,6 +210,7 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
 
             if (strcmp((const char *)argv[2], "meta") == 0) {
                 river_voice_kws_dump_tensor_meta();
+                printf("[river][diag] kws dump meta returned\n");
                 return 0;
             }
 
@@ -263,6 +264,9 @@ static u32 river_diag_cmd(u16 argc, u8 *argv[])
                     river_voice_kws_run_alignment_sample(true);
                 if (status != RIVER_OK) {
                     printf("[river][diag] kws align run failed status=%d; check KWS logs above\n",
+                           (int)status);
+                } else {
+                    printf("[river][diag] kws align run returned status=%d\n",
                            (int)status);
                 }
                 return 0;

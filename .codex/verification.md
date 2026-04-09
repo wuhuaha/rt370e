@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.132
+Confirm the new monitor return-path instrumentation is present:
+```bash
+cd /root/ameba-river
+nl -ba components/river_diag/river_diag_cmd.c | sed -n '211,214p'
+nl -ba components/river_diag/river_diag_cmd.c | sed -n '262,271p'
+```
+
+Build the updated image against the latest SDK baseline:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the `dump meta` handler prints:
+  - `[river][diag] kws dump meta returned`
+- the successful `align run` handler prints:
+  - `[river][diag] kws align run returned status=%d`
+- the build completes successfully with:
+  - `Build done`
+
+Interpretation:
+- this step is complete once the firmware image contains the new return markers
+  and still builds cleanly on the latest SDK baseline
+- board validation of those markers is intentionally deferred to the next
+  runtime reproduction step
+
 ## Step 5.131
 Reproduce the latest narrowed post-success INT8 alignment state:
 ```bash
