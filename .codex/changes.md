@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.125
+- Added alignment-cleanup diagnostics for the latest-SDK `student_dscnn_tiny_v2_int8_debug` replay path so the remaining post-snapshot stall can be localized without changing the normal wakeword runtime flow.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added timeout diagnostics in `river_voice_kws_wait_for_worker_idle(...)` to print:
+    - `reset_pending`
+    - `worker_processing`
+    - pending input-ring frame count
+    - timeout budget
+  - added step-by-step logs inside `river_voice_kws_disarm(...)` to show whether cleanup reaches:
+    - frontend reset
+    - input-ring reset
+    - pre-roll-ring reset
+    - input-signal drain
+  - added cleanup-stage logs in `river_voice_kws_run_alignment_sample(...)` to show whether alignment teardown reaches:
+    - `disarm done`
+    - `worker idle wait status=...`
+    - tensor-dump disarm begin/done
+    - local-debug restore
+- Verified this step with a full latest-SDK rebuild against `/root/ameba-rtos`; the build completed with `Build done`.
+
 ## Step 5.124
 - Re-tried the latest-SDK `student_dscnn_tiny_v2_int8_debug` board validation after the user power-cycled the board and reattached the PL2303 USB serial device.
 - New observed state on `2026-04-09`:

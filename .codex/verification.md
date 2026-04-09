@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.125
+Build the latest-SDK image with cleanup-stage diagnostics:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected build result:
+- `Build done`
+- updated image exists at `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Board-side follow-up after flashing this build:
+```text
+river kws debug local on
+river audio probe stop
+river kws align run
+```
+
+Expected new diagnostic markers during the remaining INT8 alignment blocker:
+- cleanup entry:
+  - `kws align cleanup: status=... emit_dump=yes ...`
+- disarm progress:
+  - `kws disarm: begin ...`
+  - `kws disarm: frontend reset done`
+  - `kws disarm: input ring reset done`
+  - `kws disarm: pre-roll ring reset done`
+  - `kws disarm: input signal drained`
+- post-disarm progress:
+  - `kws align cleanup: disarm done`
+  - `kws align cleanup: worker idle wait status=...`
+  - `kws align cleanup: disarm tensor dump begin`
+  - `kws align cleanup: disarm tensor dump done`
+  - `kws align cleanup: local debug restored=...`
+
+Interpretation:
+- whichever last marker appears before the stall identifies the cleanup stage that is still blocking `river kws align run`
+- if `kws worker idle timeout: ...` appears, use the printed `reset_pending`, `worker_processing`, and queue depth to decide whether the stuck state is in worker drain vs. ring/semaphore cleanup
+
 ## Step 5.124
 Reproduce the post-power-cycle latest-SDK DS-CNN tiny INT8 alignment state:
 ```bash

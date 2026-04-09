@@ -2449,6 +2449,7 @@ static river_status_t river_voice_kws_wait_for_worker_idle(
     uint32_t timeout_ms)
 {
     uint64_t start_ms;
+    uint32_t pending_frames;
 
     if (context == NULL) {
         return RIVER_ERR_ARG;
@@ -2458,6 +2459,14 @@ static river_status_t river_voice_kws_wait_for_worker_idle(
     while (!river_voice_kws_worker_idle(context)) {
         if (((uint64_t)rtos_time_get_current_system_time_ms() - start_ms) >=
             (uint64_t)timeout_ms) {
+            pending_frames = context->input_ring.initialized ?
+                                 river_audio_frame_ring_count(&context->input_ring) :
+                                 0U;
+            RIVER_LOGE("kws worker idle timeout: reset_pending=%s worker_processing=%s queue=%lu timeout_ms=%lu",
+                       context->reset_pending ? "yes" : "no",
+                       context->worker_processing ? "yes" : "no",
+                       (unsigned long)pending_frames,
+                       (unsigned long)timeout_ms);
             return RIVER_ERR_BUSY;
         }
         rtos_time_delay_ms(RIVER_KWS_ALIGNMENT_POLL_DELAY_MS);
@@ -2577,17 +2586,26 @@ static void river_voice_kws_disarm(river_voice_kws_context_t *context,
         return;
     }
 
+    RIVER_LOGI("kws disarm: begin clear_pre_roll=%s gate=%s queue_reset=%s pre_reset=%s",
+               clear_pre_roll ? "yes" : "no",
+               context->gate_open ? "open" : "closed",
+               context->input_ring.initialized ? "yes" : "no",
+               (clear_pre_roll && context->pre_roll_ring.initialized) ? "yes" : "no");
     context->gate_open = false;
     context->gate_triggered = false;
     context->reset_pending = false;
     river_voice_kws_reset_frontend(context);
+    RIVER_LOGI("kws disarm: frontend reset done");
     if (context->input_ring.initialized) {
         river_audio_frame_ring_reset(&context->input_ring);
+        RIVER_LOGI("kws disarm: input ring reset done");
     }
     if (clear_pre_roll && context->pre_roll_ring.initialized) {
         river_audio_frame_ring_reset(&context->pre_roll_ring);
+        RIVER_LOGI("kws disarm: pre-roll ring reset done");
     }
     river_voice_kws_drain_input_signal(context);
+    RIVER_LOGI("kws disarm: input signal drained");
 }
 
 static void river_voice_kws_disarm_after_trigger(
@@ -4690,20 +4708,31 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     }
 
 cleanup:
+    RIVER_LOGI("kws align cleanup: status=%d emit_dump=%s local_only_restore=%s",
+               (int)status,
+               emit_dump ? "yes" : "no",
+               previous_local_debug_mode ? "yes" : "no");
     river_voice_kws_disarm(context, true);
+    RIVER_LOGI("kws align cleanup: disarm done");
     restore_status = river_voice_kws_wait_for_worker_idle(
         context,
         RIVER_KWS_ALIGNMENT_IDLE_WAIT_TIMEOUT_MS);
+    RIVER_LOGI("kws align cleanup: worker idle wait status=%d", (int)restore_status);
     if (restore_status != RIVER_OK && status == RIVER_OK) {
         status = restore_status;
     }
     if (emit_dump) {
+        RIVER_LOGI("kws align cleanup: disarm tensor dump begin");
         river_voice_kws_disarm_tensor_dump(context);
+        RIVER_LOGI("kws align cleanup: disarm tensor dump done");
         if (status != RIVER_OK) {
             river_voice_kws_tensor_dump_snapshot_reset(context);
+            RIVER_LOGI("kws align cleanup: snapshot reset due to error");
         }
     }
     river_voice_kws_set_local_debug_mode(previous_local_debug_mode);
+    RIVER_LOGI("kws align cleanup: local debug restored=%s",
+               previous_local_debug_mode ? "yes" : "no");
     if (status == RIVER_OK) {
         RIVER_LOGI("kws align replay done: dump=%s local_only_restored=%s",
                    emit_dump ? "preserved" : "disabled",
