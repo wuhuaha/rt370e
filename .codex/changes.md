@@ -4502,3 +4502,31 @@
   - `send_queue_busy` is presently a realtime quality/freshness-protection
     issue in the XiaoZhi uplink path, not a blocker proving model deployment is
     wrong
+
+## Step 5.118
+- Added a new project-level status snapshot document that consolidates the
+  current branch, SDK baselines, implemented runtime chain, verified model
+  matrix, preserved parity workflow, active issues, and next-step priorities:
+  - `doc/PROJECT_STATUS_SNAPSHOT_2026-04-09_ZH.md`
+- This document is intentionally broader than the older
+  `doc/PROJECT_STATUS_ZH.md`:
+  - it reflects the current `kws` branch instead of the historical `DS-CNN`
+    staging state
+  - it includes the now-verified latest-SDK runtime and parity conclusions
+  - it explicitly records the preserved board/host parity workflow as a
+    non-negotiable project asset
+  - it summarizes the tested model matrix across:
+    - `student_bc_resnet_tiny_v2_fp32_debug`
+    - `student_bc_resnet_tiny_v2_int8_debug`
+    - `student_bc_resnet_nano_v2_fp32_debug`
+    - `student_dscnn_tiny_v2_fp32_debug`
+    - `student_dscnn_small_v2_fp32_debug`
+  - it captures the current project-level problem map:
+    - student FP32 realtime insufficiency
+    - INT8 gain not materializing on current runtime
+    - XiaoZhi uplink backpressure
+    - local `16ms` vs uplink `20ms` cadence mismatch as a structural issue
+- The document also makes the current overall engineering state explicit:
+  - the project already has a runnable end-to-end chain
+  - the main blockers are now runtime quality and deployability, not basic
+    bring-up

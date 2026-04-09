@@ -7826,3 +7826,40 @@ Expected runtime interpretation:
   this step
 - do not interpret this alone as a KWS model deployment failure, because the
   issue lives after wakeword in the XiaoZhi uplink transport path
+
+## Step 5.118 Verification
+
+Read the new project status snapshot:
+```bash
+cd /root/ameba-river
+sed -n '1,320p' doc/PROJECT_STATUS_SNAPSHOT_2026-04-09_ZH.md
+```
+
+Cross-check that the snapshot points to the expected supporting documents:
+```bash
+cd /root/ameba-river
+ls doc/PROJECT_STATUS_ZH.md \
+   doc/KWS_BOARD_HOST_PARITY_DEBUG_GUIDE_ZH.md \
+   doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_FP32_DEBUG_ZH.md \
+   doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_NANO_FP32_DEBUG_ZH.md \
+   doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md \
+   doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_SMALL_FP32_DEBUG_ZH.md \
+   doc/KWS_STUDENT_FP32_REALTIME_ANALYSIS_ZH.md \
+   doc/KWS_INT8_INT16_DEPLOYMENT_CONSTRAINTS_ZH.md \
+   doc/KWS_LATEST_ADK_QUANTIZATION_RECHECK_ZH.md \
+   doc/XIAOZHI_UPLINK_BACKPRESSURE_ANALYSIS_LATEST_SDK_FP32_ZH.md
+```
+
+Expected result:
+- the new snapshot document exists
+- it summarizes the current `kws` branch state instead of the older `DS-CNN`
+  staging snapshot
+- all referenced support documents exist locally and can be opened directly
+
+Interpretation:
+- this step is complete if another engineer can open one document and get an
+  accurate current overview of:
+  - implemented chain status
+  - verified model status
+  - preserved debug/parity mechanisms
+  - main blockers and recommended next priorities
