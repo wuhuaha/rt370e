@@ -1,5 +1,47 @@
 # Change Log
 
+## Step 5.134
+- Validated the shell-stack-pressure hypothesis on real hardware with a minimal
+  debug-only code change in the latest-SDK INT8 alignment path.
+- In [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - removed the stack-local
+    `uint8_t trailing_silence[RIVER_KWS_INPUT_FRAME_BYTES]`
+    from `river_voice_kws_run_alignment_sample(...)`
+  - replaced it with a static zero-filled buffer:
+    - `g_river_kws_alignment_trailing_silence`
+- Why this specific probe was chosen:
+  - prior board proof already showed:
+    - `river_voice_kws_run_alignment_sample(...)` returned
+    - `[river][diag] kws align run returned status=0` printed
+    - but the monitor path became unreliable immediately afterward
+  - the same board boot also showed the monitor-side `shell_task` had only
+    about `700B` stack headroom early in runtime
+  - the alignment command itself was still allocating a `512B` silence frame on
+    that shell task stack, making stack pressure the most direct low-risk
+    hypothesis to test
+- Board result on `2026-04-10` after flashing the new image:
+  - image still boots as:
+    - `variant=student_dscnn_tiny_v2_int8_debug`
+    - `runtime_in=int8 runtime_out=int8`
+  - the controlled sequence still reaches:
+    - `kws align replay captured: seq=1 infer=2 score=0.296875 q15=9728`
+    - `kws align replay done: dump=preserved local_only_restored=no`
+    - `[river][diag] kws align run returned status=0`
+  - but unlike the previous baseline, the post-align monitor remains usable:
+    - `river kws dump meta` executes
+    - `kws tensor dump meta: ... score=0.296875 q15=9728 ...`
+    - `[river][diag] kws dump meta returned`
+    - `river kws align status` executes
+    - `kws align guard: kws=ready probe=stopped interaction=wake_monitoring detection=ready worker=idle snapshot=ready local_only=no`
+- Negative evidence from the same run:
+  - the prior post-return failure marker did not recur:
+    - no `[INIC-E] WIFI TRX IPC 4 timeout` appeared in the captured align window
+- Current conclusion:
+  - the remaining post-align shell failure was strongly tied to shell-task
+    stack pressure
+  - removing the `512B` local alignment silence buffer was sufficient to
+    restore the preserved board/host parity command workflow on this path
+
 ## Step 5.133
 - Flashed the latest-SDK image containing the new diag return-path
   instrumentation commit `8c23a03` onto real hardware and revalidated the

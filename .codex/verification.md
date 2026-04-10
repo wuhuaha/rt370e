@@ -1,5 +1,68 @@
 # Verification
 
+## Step 5.134
+Build the stack-pressure test image where the alignment trailing-silence frame
+no longer lives on the shell task stack:
+```bash
+cd /root/ameba-river
+bash -lc 'source /root/ameba-river/env.sh >/dev/null && python /root/ameba-rtos/ameba.py soc RTL8730E && python /root/ameba-rtos/ameba.py build -p'
+```
+
+Flash it:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Capture the controlled reboot-to-align sequence:
+```bash
+cd /root/ameba-river
+stty -F /dev/ttyUSB0 1500000 raw -echo
+script -q -f /tmp/kws_int8_stack_pressure_probe.log -c "timeout 38s cat /dev/ttyUSB0"
+```
+
+While the capture is running, execute:
+```bash
+cd /root/ameba-river
+bash -lc 'printf "reboot\r" > /dev/ttyUSB0; sleep 0.40; printf "river kws debug local on\r" > /dev/ttyUSB0; sleep 8.60; printf "river audio probe stop\r" > /dev/ttyUSB0; sleep 0.80; printf "river kws debug local off\r" > /dev/ttyUSB0; sleep 0.40; printf "river kws align run\r" > /dev/ttyUSB0; sleep 6.50; printf "river kws dump meta\r" > /dev/ttyUSB0; sleep 1.00; printf "river kws align status\r" > /dev/ttyUSB0'
+```
+
+Extract the decisive markers:
+```bash
+cd /root/ameba-river
+rg -n "variant=|runtime_in=|shell_task|kws align replay captured|kws align replay done|\\[river\\]\\[diag\\] kws align run returned|\\[river\\]\\[diag\\] kws dump meta returned|kws tensor dump meta:|kws align guard:|WIFI TRX IPC 4 timeout|river kws dump meta|river kws align status" /tmp/kws_int8_stack_pressure_probe.log
+```
+
+Expected current board result:
+- the image still boots as:
+  - `variant=student_dscnn_tiny_v2_int8_debug`
+  - `runtime_in=int8 runtime_out=int8`
+- early runtime still shows limited shell-task headroom:
+  - `shell_task:1%/700B`
+- the align replay still succeeds:
+  - `kws align replay captured: seq=1 infer=2 score=0.296875 q15=9728`
+  - `kws align replay done: dump=preserved local_only_restored=no`
+  - `[river][diag] kws align run returned status=0`
+
+Expected improvement over the previous baseline:
+- `river kws dump meta` now executes after `align run returned`
+- the board prints:
+  - `kws tensor dump meta: ... score=0.296875 q15=9728 ...`
+  - `[river][diag] kws dump meta returned`
+- `river kws align status` also executes after that
+- the board prints:
+  - `kws align guard: kws=ready probe=stopped interaction=wake_monitoring detection=ready worker=idle snapshot=ready local_only=no`
+- no `[INIC-E] WIFI TRX IPC 4 timeout` appears in the captured align window
+
+Interpretation:
+- this step is complete once the board proves that moving the `512B`
+  trailing-silence buffer off the shell task stack is enough to restore
+  post-align monitor usability
+- that is strong evidence the previous post-return failure was driven by
+  shell-side stack pressure rather than by the replay function itself
+
 ## Step 5.133
 Flash the return-path-instrumented image and reproduce the post-return INT8
 alignment behavior on board:

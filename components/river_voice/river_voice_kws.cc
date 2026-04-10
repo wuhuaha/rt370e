@@ -325,6 +325,10 @@ extern "C" {
 #define RIVER_KWS_ALIGNMENT_MAX_BACKLOG_FRAMES 8U
 #define RIVER_KWS_ALIGNMENT_FEED_WAIT_TIMEOUT_MS 4000U
 #define RIVER_KWS_ALIGNMENT_POLL_DELAY_MS 10U
+
+static const uint8_t g_river_kws_alignment_trailing_silence
+    [RIVER_KWS_INPUT_FRAME_BYTES] = {0};
+
 /* V3 final docs recommend 0.4 as the high-sensitivity operating point. Keep
  * gate fallback no weaker than that documented floor. */
 #define RIVER_KWS_GATE_FALLBACK_THRESHOLD_PM 400U
@@ -4528,7 +4532,6 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     bool replay_trigger_observed = false;
     bool first_post_trigger_queue_wait_logged = false;
     uint32_t frame_index;
-    uint8_t trailing_silence[RIVER_KWS_INPUT_FRAME_BYTES];
 
     if (context == NULL || !context->initialized) {
         RIVER_LOGW("kws align lazy init: current_state=closed");
@@ -4561,7 +4564,6 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
         return RIVER_ERR_BUSY;
     }
 
-    memset(trailing_silence, 0, sizeof(trailing_silence));
     previous_local_debug_mode = context->local_debug_mode;
 
     status = river_voice_kws_wait_for_worker_idle(
@@ -4659,8 +4661,9 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
         for (frame_index = 0U;
              frame_index < (uint32_t)RIVER_KWS_ALIGNMENT_TAIL_SILENCE_FRAMES;
              ++frame_index) {
-            status = river_voice_kws_submit_frame(trailing_silence,
-                                                  sizeof(trailing_silence),
+            status = river_voice_kws_submit_frame(
+                g_river_kws_alignment_trailing_silence,
+                sizeof(g_river_kws_alignment_trailing_silence),
                                                   true,
                                                   false);
             if (status != RIVER_OK) {
