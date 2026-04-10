@@ -1,5 +1,137 @@
 # Verification
 
+## Step 5.140
+Confirm the tracked board-profile config now selects the nano FP32 debug path:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG|RIVER_KWS_SCORE_THRESHOLD_Q15=9008|RIVER_KWS_TENSOR_ARENA_KB=2048|RIVER_KWS_INFERENCE_STRIDE_FRAMES=16" \
+  prj.conf
+```
+
+Expected result:
+- `prj.conf` enables:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008`
+- the existing `40x101` debug arena / stride settings remain unchanged
+
+Rebuild the latest-SDK image through the official external-project entrypoint:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- configure source is:
+  - `/root/ameba-rtos/component/soc/amebasmart/project`
+- configure uses:
+  - `-DEXTERN_DIR=/root/ameba-river`
+  - `-DEXAMPLE=/root/ameba-river`
+- final output ends with `Build done`
+
+Confirm the generated build config and linked library now point to the nano FP32 variant:
+```bash
+cd /root/ameba-river
+rg -n "CONV_RESNET_ED_NANO_V1|CONV_RESNET_ED_TINY_V1|SCORE_THRESHOLD_Q15 9008" \
+  build_RTL8730E/menuconfig/.config \
+  build_RTL8730E/menuconfig/.config_ca32 \
+  build_RTL8730E/menuconfig/project_ap/platform_autoconf.h \
+  build_RTL8730E/build/project_ap/.config_ca32
+strings build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_voice/lib_river_voice.a | \
+  rg "student_conv_resnet_ed_(nano|tiny)_v1_fp32_debug|student_dscnn_tiny_v2_int8_debug"
+```
+
+Expected result:
+- generated config enables:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+- tiny / dscnn active variants are not set
+- `platform_autoconf.h` contains:
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15 9008`
+- `lib_river_voice.a` contains:
+  - `student_conv_resnet_ed_nano_v1_fp32_debug`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Confirm the packaged image sizes:
+```bash
+cd /root/ameba-river
+stat -c '%n %s' \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/build/project_hp/image/km4_image2_all.bin \
+  build_RTL8730E/build/project_lp/image/km0_image2_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin \
+  build_RTL8730E/km4_boot_all.bin
+```
+
+Expected result:
+- `ap_image_all.bin 3275872`
+- `km4_image2_all.bin 380448`
+- `km0_image2_all.bin 94208`
+- `km0_km4_ca32_app.bin 3758720`
+- `km4_boot_all.bin 51872`
+
+Confirm the boot contract from the captured board log:
+```bash
+cd /root/ameba-river
+rg -a -n "runtime_in=float32 runtime_out=float32|dims=\\[1,40,101,1\\]|variant=student_conv_resnet_ed_nano_v1_fp32_debug|arena_used=436528|threshold_q15=9008|kws frontend:" \
+  /tmp/kws_conv_resnet_ed_nano_fp32_align.log
+```
+
+Expected result:
+- boot log shows:
+  - `variant=student_conv_resnet_ed_nano_v1_fp32_debug`
+  - `runtime_in=float32 runtime_out=float32`
+  - `dims=[1,40,101,1]`
+  - `arena_used=436528`
+  - `threshold_q15=9008`
+
+Confirm the board/host replay parity result:
+```bash
+cd /root/ameba-river
+TF_ENABLE_ONEDNN_OPTS=0 \
+OMP_NUM_THREADS=1 \
+TF_NUM_INTRAOP_THREADS=1 \
+TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_conv_resnet_ed_nano_fp32_align.log \
+  --model /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_v1/model.fp32.tflite \
+  --seq latest \
+  --builtin-ref
+```
+
+Expected result:
+- replay prints:
+  - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+  - `host_hash: feature=0x7ce0b11d logged_input=n/a effective_input=0xd52f011c`
+  - `board_output: raw=306 score=0.305877 exact=0.305877 q15=10023`
+  - `host_output: raw=306 score=0.306000 exact=0.305877`
+  - `output_parity: bytes_equal=yes raw_equal=yes first_diff=[]`
+
+Confirm the current runtime snapshot and report:
+```bash
+cd /root/ameba-river
+rg -a -n "kws status:|kws perf: infer_us\\[last=29826 avg=29826 max=29826|mem\\[arena=436528/2048KB" \
+  /tmp/kws_conv_resnet_ed_nano_fp32_status.log
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_CONV_RESNET_ED_NANO_FP32_DEBUG_ZH.md
+```
+
+Expected result:
+- runtime snapshot shows:
+  - `infer_us[last=29826 avg=29826 max=29826]`
+  - `arena=436528/2048KB`
+- the report clearly states:
+  - output parity closed
+  - `29.826 ms` vs `18.0 ms`
+  - `436528 B` vs `384 KB`
+  - nano is about `3.23x` faster than the matching `conv_resnet_ed_tiny` FP32 debug path
+
 ## Step 5.139
 Confirm the new `conv_resnet_ed_nano` FP32 debug variant is wired into the repo:
 ```bash

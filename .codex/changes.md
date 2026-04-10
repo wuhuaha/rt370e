@@ -1,5 +1,70 @@
 # Change Log
 
+## Step 5.140
+- Switched the tracked board-profile config in [prj.conf](/root/ameba-river/prj.conf)
+  to the new nano FP32 path:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008`
+  - retained the validated `40x101` parity settings:
+    - `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048`
+    - `CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES=16`
+    - `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=64`
+    - `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES=16`
+- Rebuilt the full latest-SDK image through the official external-project path:
+  - `source env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+- Verified the generated build config and compiled library now really point to
+  the nano FP32 variant:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+  - `platform_autoconf.h` shows `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15 9008`
+  - `lib_river_voice.a` contains:
+    - `student_conv_resnet_ed_nano_v1_fp32_debug`
+- Flashed the new image to real hardware and confirmed:
+  - `tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor` finished with
+    `PASS`
+  - current packaged image sizes are:
+    - `ap_image_all.bin`: `3275872 B`
+    - `km4_image2_all.bin`: `380448 B`
+    - `km0_image2_all.bin`: `94208 B`
+    - `km0_km4_ca32_app.bin`: `3758720 B`
+    - `km4_boot_all.bin`: `51872 B`
+- Completed the same-caliber board parity run for
+  `student_conv_resnet_ed_nano_v1_fp32_debug`:
+  - boot contract confirms:
+    - `runtime_in=float32 runtime_out=float32`
+    - `dims=[1,40,101,1]`
+    - `variant=student_conv_resnet_ed_nano_v1_fp32_debug`
+    - `arena_used=436528 B`
+  - align replay result:
+    - `raw=306`
+    - `score=0.305877`
+    - `q15=10023`
+    - `infer_us=29826`
+    - `wakeword hit` above the current `threshold_q15=9008`
+  - tensor dump transcript was complete on the first pass:
+    - `feat_f32` chunk count `253/253`
+- Closed board/host correctness for this nano FP32 image:
+  - host replay against
+    `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_v1/model.fp32.tflite`
+    reports:
+    - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+    - `host_hash: feature=0x7ce0b11d effective_input=0xd52f011c`
+    - `board_output: raw=306 exact=0.305877 q15=10023`
+    - `host_output: raw=306 exact=0.305877`
+    - `output_parity: bytes_equal=yes raw_equal=yes`
+- Recorded the full build / flash / boot / parity / performance report in:
+  - `doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_CONV_RESNET_ED_NANO_FP32_DEBUG_ZH.md`
+- Current board-side conclusion:
+  - `infer_us[last=29826 avg=29826 max=29826]`
+  - `arena_used=436528 B`
+  - vs bundle budget:
+    - CPU: `29.826 ms` vs `18.0 ms` (`1.66x` over)
+    - memory: `436528 B` vs `384 KB` (`1.11x` over)
+  - vs `student_conv_resnet_ed_tiny_v1_fp32_debug`:
+    - latency about `3.23x` faster
+    - arena about `33.4%` lower
+
 ## Step 5.139
 - Added a parallel `student_conv_resnet_ed_nano_v1_fp32_debug` wakeword
   bring-up path without touching the current mainline chain:
