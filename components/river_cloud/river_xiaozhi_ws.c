@@ -55,6 +55,7 @@
 #define RIVER_XIAOZHI_WS_SEND_BLOCK_MS     0U
 #define RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE 2U
 #define RIVER_XIAOZHI_WS_QUEUE_LOG_INTERVAL_MS 1000U
+#define RIVER_XIAOZHI_POLL_LOCK_SLICE_MS   5U
 #define RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD (64U * 1024U)
 
 typedef struct {
@@ -2068,14 +2069,9 @@ river_status_t river_xiaozhi_open_session(void)
            g_river_xiaozhi.wsclient != NULL &&
            g_river_xiaozhi.wsclient->readyState == WSC_OPEN &&
            waited_ms < RIVER_XIAOZHI_OPEN_READY_WAIT_MS) {
-        bool locked = river_xiaozhi_transport_lock();
-
-        if (!locked || g_river_xiaozhi.wsclient == NULL) {
-            river_xiaozhi_transport_unlock(locked);
+        if (river_xiaozhi_poll(50U) != RIVER_OK) {
             break;
         }
-        ws_poll(50, &g_river_xiaozhi.wsclient);
-        river_xiaozhi_transport_unlock(locked);
         waited_ms += 50U;
     }
 
@@ -2106,19 +2102,44 @@ bool river_xiaozhi_session_open(void)
 
 river_status_t river_xiaozhi_poll(uint32_t timeout_ms)
 {
+    uint32_t remaining_ms;
     bool locked;
+    bool keep_polling = true;
 
     if (!g_river_xiaozhi.initialized || g_river_xiaozhi.wsclient == NULL) {
         return RIVER_OK;
     }
 
-    locked = river_xiaozhi_transport_lock();
-    if (!locked || g_river_xiaozhi.wsclient == NULL) {
-        river_xiaozhi_transport_unlock(locked);
-        return RIVER_ERR_BUSY;
+    remaining_ms = timeout_ms;
+    if (remaining_ms == 0U) {
+        remaining_ms = 1U;
     }
-    ws_poll((int)timeout_ms, &g_river_xiaozhi.wsclient);
-    river_xiaozhi_transport_unlock(locked);
+
+    while (keep_polling) {
+        uint32_t slice_ms = remaining_ms;
+
+        if (slice_ms > RIVER_XIAOZHI_POLL_LOCK_SLICE_MS) {
+            slice_ms = RIVER_XIAOZHI_POLL_LOCK_SLICE_MS;
+        }
+
+        locked = river_xiaozhi_transport_lock();
+        if (!locked || g_river_xiaozhi.wsclient == NULL) {
+            river_xiaozhi_transport_unlock(locked);
+            return locked ? RIVER_OK : RIVER_ERR_BUSY;
+        }
+
+        ws_poll((int)slice_ms, &g_river_xiaozhi.wsclient);
+        keep_polling = g_river_xiaozhi.wsclient != NULL &&
+                       g_river_xiaozhi.wsclient->readyState == WSC_OPEN &&
+                       remaining_ms > slice_ms;
+        river_xiaozhi_transport_unlock(locked);
+
+        if (remaining_ms <= slice_ms) {
+            break;
+        }
+        remaining_ms -= slice_ms;
+    }
+
     return RIVER_OK;
 }
 

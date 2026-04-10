@@ -163,9 +163,10 @@ static void river_cloud_xiaozhi_pump_task(void *arg)
         if (river_cloud_xiaozhi_pump_active()) {
             if (river_xiaozhi_session_open()) {
                 (void)river_xiaozhi_poll(RIVER_CLOUD_XIAOZHI_PUMP_ACTIVE_MS);
+            } else {
+                rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_PUMP_ACTIVE_MS);
             }
             river_cloud_xiaozhi_check_pending_playback_stop();
-            rtos_time_delay_ms(5U);
             continue;
         }
 

@@ -1,5 +1,60 @@
 # Verification
 
+## Step 5.142
+Rebuild the latest-SDK image after the websocket queue / poll-drive change:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image to the board:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh runtime log while reproducing the same wake-and-speak case that
+previously produced `xiaozhi ws backpressure`:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- wake / cloud handoff still works:
+  - `wakeword hit:`
+  - `wakeword queued`
+  - `xiaozhi connecting:`
+  - `Connected to websocket server`
+  - `server hello:`
+  - `asr provider=xiaozhi_realtime session started`
+- the earlier repeated post-handoff cleanup regression does not return:
+  - no continuous stream of
+    `kws disarm: begin clear_pre_roll=yes gate=closed queue_reset=yes pre_reset=yes`
+- if websocket queue pressure still appears, the new queue depth is visible in
+  the log:
+  - `xiaozhi ws backpressure: kind=audio ... max=16 ...`
+  - not the old `max=8`
+- under the same utterance and WLAN conditions as the 2026-04-10 14:58:38 to
+  14:58:39 failure window, `xiaozhi ws backpressure`,
+  `xiaozhi uplink backpressure`, and `stale_drop` should occur less often than
+  before; if it still reproduces, record the exact lines containing:
+  - `ready=`
+  - `recycle=`
+  - `queued=`
+  - `busy=`
+  - `streak=`
+  - `stale_drop=`
+
 ## Step 5.141
 Rebuild the latest-SDK image after the KWS post-wake disarm fix:
 ```bash

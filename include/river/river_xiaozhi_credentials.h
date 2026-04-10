@@ -38,12 +38,12 @@
 #define RIVER_XIAOZHI_WS_TX_MAX                 1024
 #define RIVER_XIAOZHI_WS_RX_MAX                 12288
 /*
- * Keep a little more headroom than the original depth of 4 so short network
- * jitter does not immediately force the realtime audio path into queue-full
- * churn. The queue is still intentionally small enough to preserve freshness
- * instead of hiding sustained congestion for too long.
+ * Keep enough headroom that brief WLAN / TLS send stalls do not immediately
+ * push realtime audio into queue-full churn. The queue is still intentionally
+ * bounded so the project-side stale-frame trimming remains the freshness guard
+ * under sustained congestion.
  */
-#define RIVER_XIAOZHI_WS_QUEUE_MAX              8
+#define RIVER_XIAOZHI_WS_QUEUE_MAX              16
 #define RIVER_XIAOZHI_OPEN_READY_WAIT_MS        10000U
 #define RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC      10U
 

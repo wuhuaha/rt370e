@@ -1,5 +1,41 @@
 # Change Log
 
+## Step 5.142
+- Reduced the websocket-side source of `xiaozhi uplink backpressure` across:
+  [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c),
+  [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c),
+  [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h),
+  and
+  [include/river/river_xiaozhi_credentials.h](/root/ameba-river/include/river/river_xiaozhi_credentials.h):
+  - increased `RIVER_XIAOZHI_WS_QUEUE_MAX` from `8` to `16` so short WLAN /
+    TLS send stalls do not hit the project BUSY guard as quickly
+  - reduced the active xiaozhi pump cadence from `20 ms` to `5 ms`
+  - removed the extra fixed `5 ms` active-loop sleep once the pump is already
+    driving an open websocket session
+  - changed `river_xiaozhi_poll()` to split long polls into `5 ms`
+    transport-lock slices instead of holding the websocket transport lock
+    around a single `20 ms` `ws_poll()` call
+  - reused the sliced `river_xiaozhi_poll()` path during session-open hello
+    waiting so the same lock-hold bound applies there too
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+- Flashed the rebuilt image to the board:
+  - `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor`
+  - result: `Finished PASS`
+- Ran a short live serial smoke after flashing:
+  - saw a normal wake handoff chain with a single post-hit `kws disarm`
+  - cloud path still reached:
+    - `xiaozhi connecting`
+    - `Connected to websocket server`
+    - `server hello`
+  - deeper same-utterance before/after backpressure comparison is still
+    pending a longer runtime capture under the previously failing scenario
+
 ## Step 5.141
 - Fixed the repeated post-wake `kws disarm` loop in
   [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
