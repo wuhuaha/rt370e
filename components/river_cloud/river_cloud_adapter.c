@@ -50,6 +50,8 @@ static river_status_t river_cloud_xiaozhi_control_request(
     river_cloud_xiaozhi_control_op_t op,
     const char *arg);
 static void river_cloud_xiaozhi_process_control_queue(void);
+static uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
+static bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
 static void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames);
 static void river_cloud_xiaozhi_round_request_finish(const char *reason);
 static void river_cloud_xiaozhi_round_finish(const char *reason);
@@ -126,6 +128,58 @@ static bool river_cloud_xiaozhi_downlink_active(void)
     return river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) > 0U ||
            g_river_cloud.xiaozhi_tts_stop_pending ||
            g_river_cloud.xiaozhi_playback_active;
+}
+
+static uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
+{
+    if (!g_river_cloud.xiaozhi_window_active ||
+        river_cloud_xiaozhi_playback_allows_vad_open()) {
+        return RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES;
+    }
+
+    return RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES;
+}
+
+static bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech)
+{
+    uint64_t now_ms;
+    bool guard_active;
+
+    if (!g_river_cloud.xiaozhi_window_active ||
+        river_cloud_xiaozhi_playback_allows_vad_open()) {
+        return true;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    guard_active =
+        g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms != 0U &&
+        now_ms < g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms;
+
+    if (g_river_cloud.xiaozhi_no_ref_reopen_rearm) {
+        if (is_speech) {
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
+        } else if (g_river_cloud.xiaozhi_no_ref_reopen_silence_frames <
+                   RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES) {
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames++;
+        }
+
+        if (!guard_active &&
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames >=
+                RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES) {
+            g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
+            g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+            RIVER_LOGI("xiaozhi no_ref reopen rearmed after silence: frames=%u",
+                       (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES);
+            return true;
+        }
+    }
+
+    if (!guard_active) {
+        g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+    }
+
+    return !guard_active && !g_river_cloud.xiaozhi_no_ref_reopen_rearm;
 }
 
 static uint32_t river_cloud_xiaozhi_uplink_busy_backoff_ms(uint32_t frame_ms,
@@ -2248,6 +2302,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
                                                             bool is_speech)
 {
     river_status_t status;
+    uint32_t open_hold_frames;
 
     if (!g_river_cloud.audio_bridge_open || pcm == NULL || bytes != g_river_cloud.frame_bytes) {
         return RIVER_ERR_ARG;
@@ -2276,6 +2331,12 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         return RIVER_OK;
     }
 
+    if (!g_river_cloud.stream_active &&
+        !river_cloud_xiaozhi_no_ref_reopen_ready(is_speech)) {
+        g_river_cloud.xiaozhi_open_speech_frames = 0U;
+        return RIVER_OK;
+    }
+
     if (!g_river_cloud.stream_active && g_river_cloud.xiaozhi_listen_stop_pending) {
         return RIVER_ERR_BUSY;
     }
@@ -2285,6 +2346,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         uint32_t read_index;
         uint32_t frame_index;
 
+        open_hold_frames = river_cloud_xiaozhi_open_hold_frames_required();
         if (!is_speech) {
             g_river_cloud.xiaozhi_open_speech_frames = 0U;
             return RIVER_OK;
@@ -2293,7 +2355,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         if (g_river_cloud.xiaozhi_open_speech_frames < UINT32_MAX) {
             g_river_cloud.xiaozhi_open_speech_frames++;
         }
-        if (g_river_cloud.xiaozhi_open_speech_frames < RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES) {
+        if (g_river_cloud.xiaozhi_open_speech_frames < open_hold_frames) {
             return RIVER_OK;
         }
 
@@ -2546,6 +2608,10 @@ void river_cloud_adapter_dump_status(void)
              g_river_cloud.xiaozhi_window_deadline_ms > now_ms) ?
                 (g_river_cloud.xiaozhi_window_deadline_ms - now_ms) :
                 0U;
+        uint64_t reopen_guard_left_ms =
+            (g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms > now_ms) ?
+                (g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms - now_ms) :
+                0U;
         RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s stop_pending=%s window=%s followup_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
                    g_river_cloud.xiaozhi_enabled ? "yes" : "no",
                    g_river_cloud.xiaozhi_io_started ? "running" : "off",
@@ -2558,6 +2624,12 @@ void river_cloud_adapter_dump_status(void)
                    river_cloud_xiaozhi_idle_requires_wakeword() ? "wakeword" : "legacy_vad",
                    g_river_cloud.xiaozhi_session_id[0] != '\0' ? g_river_cloud.xiaozhi_session_id : "-",
                    g_river_cloud.xiaozhi_pending_text_valid ? g_river_cloud.xiaozhi_pending_text : "-");
+        RIVER_LOGI("xiaozhi no_ref reopen rearm=%s silence=%lu/%u guard_left_ms=%lu open_hold_frames=%u",
+                   g_river_cloud.xiaozhi_no_ref_reopen_rearm ? "yes" : "no",
+                   (unsigned long)g_river_cloud.xiaozhi_no_ref_reopen_silence_frames,
+                   (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES,
+                   (unsigned long)reopen_guard_left_ms,
+                   (unsigned int)river_cloud_xiaozhi_open_hold_frames_required());
     }
     RIVER_LOGI("xiaozhi control queue=%lu/%u peak=%lu owner=%s",
                (unsigned long)g_river_cloud.xiaozhi_control_count,

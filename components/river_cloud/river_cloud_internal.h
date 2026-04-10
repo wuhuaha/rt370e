@@ -60,6 +60,9 @@
 #define RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS    128U
 #define RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES   2U
+#define RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES 6U
+#define RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS 480U
+#define RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
@@ -158,10 +161,12 @@ typedef struct {
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
+    uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
     uint32_t xiaozhi_control_read_index;
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
+    uint32_t xiaozhi_no_ref_reopen_silence_frames;
     size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
     uint8_t xiaozhi_uplink_ring_storage[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX *
@@ -191,6 +196,7 @@ typedef struct {
     uint32_t xiaozhi_asr_round_fail_base;
     uint32_t xiaozhi_asr_round_stale_drop_base;
     uint32_t xiaozhi_asr_round_ring_drop_base;
+    bool xiaozhi_no_ref_reopen_rearm;
     char xiaozhi_session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     char xiaozhi_asr_round_close_reason[32];
     char xiaozhi_pending_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];

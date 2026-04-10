@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.148
+- Tightened XiaoZhi follow-up reopen behavior for the current `no_ref` playback
+  profile:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Added a `no_ref` reopen rearm state in the cloud bridge:
+  - playback stop now arms a short post-playback guard window
+  - follow-up reopen is blocked until the guard expires and the VAD path has
+    observed a minimum silence run after playback
+  - this directly targets the false empty ASR round seen immediately after
+    playback stop, where the board reopened on residual tail speech with:
+    - `partial=0`
+    - `final=0`
+    - `busy=0`
+- Raised the local reopen speech hold threshold for `no_ref` follow-up:
+  - default open gate remains `2` frames
+  - `no_ref` follow-up now requires `6` consecutive speech frames before a new
+    ASR round opens
+- Added debug visibility for the new state:
+  - `xiaozhi no_ref reopen guard armed: ...`
+  - `xiaozhi no_ref reopen rearmed after silence: ...`
+  - runtime dump now prints:
+    - `xiaozhi no_ref reopen rearm=... silence=... guard_left_ms=... open_hold_frames=...`
+- Reason for the change:
+  - the new single-owner I/O logs showed control-plane serialization was fixed
+  - remaining bad behavior had moved to `no_ref` follow-up policy:
+    - playback stopped
+    - a new ASR round reopened tens of milliseconds later
+    - that round often carried no `partial/final` result and looked like
+      playback tail / residual near-end speech, not a fresh user utterance
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  `no_ref` follow-up guard change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.147
 - Reworked the project-side XiaoZhi realtime transport ownership into a
   single-owner I/O thread:

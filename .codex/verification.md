@@ -1,5 +1,53 @@
 # Verification
 
+## Step 5.148
+Rebuild the latest-SDK image after tightening `no_ref` follow-up reopen:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake -> speak -> TTS -> follow-up log:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- when playback stops under the current `mode=no_ref` profile, the bridge now
+  arms a local reopen guard:
+  - `xiaozhi no_ref reopen guard armed: tail_ms=480 silence_frames=6`
+- after playback really settles, the bridge rearms follow-up only after a short
+  silence run:
+  - `xiaozhi no_ref reopen rearmed after silence: frames=6`
+- status dump now exposes the reopen state directly:
+  - `xiaozhi no_ref reopen rearm=... silence=... guard_left_ms=... open_hold_frames=...`
+- the earlier false immediate reopen after playback stop should disappear:
+  - avoid the previous pattern where a new round starts only a few tens of
+    milliseconds after `playback stop`
+  - especially avoid the empty round symptom:
+    - `xiaozhi asr round finish: ... partial=0 final=0 busy=0 fail=0 stale_drop=0 ring_drop=0`
+- legitimate follow-up should still work after the guard:
+  - a real next utterance should still produce:
+    - `asr provider=xiaozhi_realtime session started`
+    - `xiaozhi asr round begin: ...`
+    - `partial` / `final` results for that round
+
 ## Step 5.147
 Rebuild the latest-SDK image after moving XiaoZhi transport ownership to a
 single project-side I/O thread and adding per-round ASR stats:
