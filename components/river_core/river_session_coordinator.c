@@ -277,6 +277,9 @@ static void river_session_wakeword_worker(void *param)
                                                      "wakeword_detected");
                     river_session_state_unlock();
                 }
+                RIVER_LOGI("wakeword admission accepted: text=%s confidence=%d",
+                           wake_text[0] != '\0' ? wake_text : "-",
+                           confidence);
                 continue;
             }
 

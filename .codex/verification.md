@@ -1,5 +1,49 @@
 # Verification
 
+## Step 5.143
+Rebuild the latest-SDK image after adding wake-admission tracing:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake log for the current stuck-after-hello case:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- around a successful wake, the log now shows the exact admission progression:
+  - `xiaozhi wake admission begin:`
+  - `xiaozhi wake admission transport ready:`
+  - then either:
+    - `xiaozhi wake admission listen_start sent:`
+    - `xiaozhi conversation window opened:`
+    - `xiaozhi wake admission ready:`
+    - `wakeword admission accepted:`
+  - or a precise failure point:
+    - `xiaozhi wake admission open_session failed:`
+    - or `xiaozhi wake admission listen_start failed:`
+- compare those lines with the still-missing higher-level state transitions:
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+  - `asr provider=xiaozhi_realtime session started`
+
 ## Step 5.142
 Rebuild the latest-SDK image after the websocket queue / poll-drive change:
 ```bash

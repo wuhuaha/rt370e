@@ -292,6 +292,7 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
 river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
 {
     river_status_t status;
+    const char *reason = (source != NULL && source[0] != '\0') ? source : "-";
 
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
         return RIVER_ERR_UNSUPPORTED;
@@ -316,25 +317,52 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
         RIVER_LOGI("wake admission proceeding with build-seeded utc estimate");
     }
 
+    RIVER_LOGI("xiaozhi wake admission begin: source=%s session=%s listening=%s window=%s sid=%s",
+               reason,
+               river_xiaozhi_session_open() ? "open" : "closed",
+               g_river_cloud.xiaozhi_listening ? "yes" : "no",
+               g_river_cloud.xiaozhi_window_active ? "open" : "closed",
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+
     if (!river_xiaozhi_session_open()) {
         status = river_xiaozhi_open_session();
         if (status != RIVER_OK) {
+            RIVER_LOGW("xiaozhi wake admission open_session failed: source=%s status=%d last_err=%s",
+                       reason,
+                       (int)status,
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
             return status;
         }
     }
     river_cloud_xiaozhi_copy_session_id_from_transport();
+    RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
+               reason,
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
     if (!g_river_cloud.xiaozhi_listening) {
         status = river_xiaozhi_send_listen_start("auto");
         if (status != RIVER_OK) {
+            RIVER_LOGW("xiaozhi wake admission listen_start failed: source=%s status=%d sid=%s last_err=%s",
+                       reason,
+                       (int)status,
+                       river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
             return status;
         }
         g_river_cloud.xiaozhi_listening = true;
+        RIVER_LOGI("xiaozhi wake admission listen_start sent: source=%s sid=%s",
+                   reason,
+                   river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
     }
 
-    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, source);
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, reason);
     g_river_cloud.xiaozhi_open_speech_frames = 0U;
     river_cloud_pre_roll_reset();
     g_river_cloud.xiaozhi_listen_stop_pending = false;
+    RIVER_LOGI("xiaozhi wake admission ready: source=%s listening=%s window=%s sid=%s",
+               reason,
+               g_river_cloud.xiaozhi_listening ? "yes" : "no",
+               g_river_cloud.xiaozhi_window_active ? "open" : "closed",
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
     return RIVER_OK;
 }
 #endif

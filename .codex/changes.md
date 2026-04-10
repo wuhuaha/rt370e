@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.143
+- Added narrow wake-admission tracing around the new post-backpressure issue:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- The new logs pin the wakeword handoff path at these exact points:
+  - `xiaozhi wake admission begin`
+  - `xiaozhi wake admission transport ready`
+  - `xiaozhi wake admission listen_start failed`
+  - `xiaozhi wake admission listen_start sent`
+  - `xiaozhi wake admission ready`
+  - `wakeword admission accepted`
+- This was added because the latest board log no longer showed websocket
+  backpressure, but it also did not reach the expected:
+  - `xiaozhi conversation window opened`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+  - `asr provider=xiaozhi_realtime session started`
+  after `server hello`, so the current blocker has moved from transport queue
+  saturation to the wake-admission / listen-start handoff.
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  tracing change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.142
 - Reduced the websocket-side source of `xiaozhi uplink backpressure` across:
   [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c),
