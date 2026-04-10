@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.141
+- Fixed the repeated post-wake `kws disarm` loop in
+  [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc):
+  - added `river_voice_kws_needs_disarm_for_detection_block()`
+  - when wake detection is blocked because interaction has already left
+    `wake_monitoring` or the cloud conversation window is active,
+    `river_voice_kws_submit_frame()` now only calls
+    `river_voice_kws_disarm(..., true)` if the KWS path is not already
+    quiesced
+- This keeps the intended one-time cleanup semantics after wake handoff, while
+  preventing the per-frame `kws disarm: begin ... gate=closed` spam that
+  showed up immediately after a successful wake.
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the fix:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.140
 - Switched the tracked board-profile config in [prj.conf](/root/ameba-river/prj.conf)
   to the new nano FP32 path:

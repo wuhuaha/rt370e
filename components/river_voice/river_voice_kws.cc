@@ -2463,6 +2463,27 @@ static bool river_voice_kws_detection_allowed(void)
     return river_interaction_state_get() == RIVER_INTERACTION_WAKE_MONITORING;
 }
 
+static bool river_voice_kws_needs_disarm_for_detection_block(
+    river_voice_kws_context_t *context)
+{
+    if (context == NULL) {
+        return false;
+    }
+
+    if (context->gate_open || context->gate_triggered || context->reset_pending ||
+        context->worker_processing) {
+        return true;
+    }
+
+    if (context->input_ring.initialized &&
+        river_audio_frame_ring_count(&context->input_ring) > 0U) {
+        return true;
+    }
+
+    return context->pre_roll_ring.initialized &&
+           river_audio_frame_ring_count(&context->pre_roll_ring) > 0U;
+}
+
 static bool river_voice_kws_worker_idle(
     river_voice_kws_context_t *context)
 {
@@ -4232,6 +4253,9 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
     }
 
     if (!river_voice_kws_detection_allowed()) {
+        if (!river_voice_kws_needs_disarm_for_detection_block(context)) {
+            return RIVER_OK;
+        }
         river_voice_kws_disarm(context, true);
         return RIVER_OK;
     }

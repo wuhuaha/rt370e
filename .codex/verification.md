@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.141
+Rebuild the latest-SDK image after the KWS post-wake disarm fix:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image and capture a fresh wake log:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py /dev/ttyUSB0 1500000 | tee /tmp/kws_post_wake_disarm_fix.log
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+- after one successful wake, the log still shows the normal handoff chain:
+  - `wakeword hit:`
+  - `wakeword queued`
+  - `interaction_state: wake_monitoring -> wake_confirmed`
+- but it should no longer show a burst of repeated:
+  - `kws disarm: begin clear_pre_roll=yes gate=closed queue_reset=yes pre_reset=yes`
+- at most one extra blocked-path cleanup immediately after handoff is
+  acceptable; a continuous per-frame `gate=closed` disarm stream is not
+
 ## Step 5.140
 Confirm the tracked board-profile config now selects the nano FP32 debug path:
 ```bash
