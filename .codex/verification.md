@@ -1,5 +1,117 @@
 # Verification
 
+## Step 5.135
+Read the parity-status note for the current active INT8 model:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_DSCNN_TINY_INT8_PARITY_STATUS_2026-04-10_ZH.md
+```
+
+Flash the current `HEAD` image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
+
+Capture one full INT8 exact-parity run with raw serial automation:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import serial, threading, time
+from pathlib import Path
+
+port = '/dev/ttyUSB0'
+baud = 1500000
+log_path = Path('/tmp/kws_dscnn_tiny_int8_exact_parity_20260410.log')
+stop = False
+
+with serial.Serial(port, baud, timeout=0.1) as ser, log_path.open('wb') as f:
+    def reader():
+        while not stop:
+            data = ser.read(4096)
+            if data:
+                f.write(data)
+                f.flush()
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+
+    def send(cmd: str, delay: float = 0.0):
+        ser.write(cmd.encode('utf-8') + b'\r')
+        ser.flush()
+        if delay:
+            time.sleep(delay)
+
+    send('reboot', 0.40)
+    send('river kws debug local on', 8.60)
+    send('river audio probe stop', 0.80)
+    send('river kws debug local off', 0.40)
+    send('river kws align run', 6.80)
+    send('river kws dump meta', 0.60)
+    send('river kws dump chunk output_raw 1', 0.05)
+    for i in range(1, 254):
+        send(f'river kws dump chunk feat_f32 {i}', 0.03)
+    for i in range(1, 65):
+        send(f'river kws dump chunk input_raw {i}', 0.03)
+    send('river kws align status', 1.00)
+    time.sleep(2.0)
+    stop = True
+    t.join(timeout=1.0)
+
+print(log_path)
+PY
+```
+
+Confirm the board log contains the full current-model dump:
+```bash
+cd /root/ameba-river
+rg -n "variant=student_dscnn_tiny_v2_int8_debug|kws align replay done|kws tensor dump begin|kws tensor dump meta:|kws tensor dump output_raw:|kws tensor dump feat_f32:|kws tensor dump input_raw:|kws align guard:" \
+  /tmp/kws_dscnn_tiny_int8_exact_parity_20260410.log
+```
+
+Expected board result:
+- the boot log contains:
+  - `variant=student_dscnn_tiny_v2_int8_debug`
+- the alignment command returns successfully:
+  - `kws align replay done: dump=preserved local_only_restored=no`
+- the preserved snapshot is complete:
+  - one `output_raw 1/1`
+  - `feat_f32 1/253` through `253/253`
+  - `input_raw 1/64` through `64/64`
+- `river kws align status` still executes after the dump, proving the shell is
+  still usable
+
+Replay the captured dump on host:
+```bash
+cd /root/ameba-river
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_dscnn_tiny_int8_exact_parity_20260410.log \
+  --model /root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2/model.int8.tflite \
+  --seq latest
+```
+
+Expected replay result:
+- `board_hash: feature=0xf6cf59f0 input=0x1bb7980a`
+- `host_hash: feature=0xf6cf59f0 logged_input=0x1bb7980a effective_input=0x1bb7980a source=input_raw`
+- `quant_parity: diff_bytes=0/4040 first_diff=[]`
+- `board_output: raw=-52 score=0.296875 q15=9728`
+- `host_output: raw=-52 score=0.296875`
+- `output_parity: bytes_equal=yes raw_equal=yes first_diff=[]`
+
+Confirm the current board-side performance markers from the same log:
+```bash
+cd /root/ameba-river
+rg -n "kws perf: infer_us\\[last=492733 avg=492784 max=493321|arena=295764/2048KB slack=1801388|kws align replay captured: seq=1 infer=9 score=0.296875 q15=9728" \
+  /tmp/kws_dscnn_tiny_int8_exact_parity_20260410.log
+```
+
+Interpretation:
+- this step is complete once the currently active INT8 image is proven
+  board/host exact-parity correct
+- after this point, the remaining question for
+  `student_dscnn_tiny_v2_int8_debug` is no longer deployment correctness; it
+  is runtime value at roughly `~493ms` board latency
+
 ## Step 5.134
 Build the stack-pressure test image where the alignment trailing-silence frame
 no longer lives on the shell task stack:

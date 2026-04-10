@@ -1,5 +1,63 @@
 # Change Log
 
+## Step 5.135
+- Consolidated the current `student_dscnn_tiny_v2_int8_debug` parity state into
+  a dedicated project note:
+  - `doc/KWS_DSCNN_TINY_INT8_PARITY_STATUS_2026-04-10_ZH.md`
+- Reflashed the current `HEAD` image from this branch onto the board and
+  re-ran the preserved INT8 board/host parity workflow against the latest SDK
+  baseline at `/root/ameba-rtos`.
+- Verified on the new board log that the active image is still:
+  - `variant=student_dscnn_tiny_v2_int8_debug`
+  - `runtime_in=int8 runtime_out=int8`
+  - `input=40x101x1`
+- Used the preserved alignment path without changing the board-side command
+  contract:
+  - `reboot`
+  - `river kws debug local on`
+  - `river audio probe stop`
+  - `river kws debug local off`
+  - `river kws align run`
+  - `river kws dump meta`
+  - `river kws dump chunk output_raw 1`
+  - `river kws dump chunk feat_f32 1..253`
+  - `river kws dump chunk input_raw 1..64`
+  - `river kws align status`
+- New decisive result on `2026-04-10`:
+  - the current DSCNN tiny INT8 path is now fully replayable on host
+  - board log contains a complete dump:
+    - `kws tensor dump begin`
+    - `kws tensor dump meta`
+    - `output_raw 1/1`
+    - `feat_f32 1/253 ... 253/253`
+    - `input_raw 1/64 ... 64/64`
+  - host replay against
+    `/root/kws-trainint/artifacts/exports/student_dscnn_tiny_v2/model.int8.tflite`
+    reports:
+    - `quant_parity: diff_bytes=0/4040`
+    - `output_parity: bytes_equal=yes raw_equal=yes`
+    - board/host both:
+      - `raw=-52`
+      - `score=0.296875`
+      - `q15=9728`
+- This closes the remaining correctness question for the currently active INT8
+  model:
+  - exact board/host parity now holds for
+    `student_dscnn_tiny_v2_int8_debug`
+  - the previously blocking post-align shell failure is no longer the main
+    outstanding issue on this path
+- Recorded the resulting board/profile summary in a new dedicated report:
+  - `doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_DSCNN_TINY_INT8_DEBUG_ZH.md`
+  - current board runtime profile from the captured log is roughly:
+    - `infer_us[last=492733 avg=492784 max=493321]`
+    - `arena=295764/2048KB`
+    - `slack=1801388`
+- Updated project-level interpretation:
+  - current DSCNN tiny INT8 is now an `INT8 correctness / deployability`
+    baseline
+  - it is still not a realtime-ready mainline candidate at the present
+    `~493ms` board latency
+
 ## Step 5.134
 - Validated the shell-stack-pressure hypothesis on real hardware with a minimal
   debug-only code change in the latest-SDK INT8 alignment path.
