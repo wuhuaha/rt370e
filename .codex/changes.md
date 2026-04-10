@@ -1,5 +1,48 @@
 # Change Log
 
+## Step 5.138
+- Validated the new `student_conv_resnet_ed_tiny_v1_fp32_debug` bring-up on
+  real hardware under the latest SDK and wrote the resulting deployment /
+  parity / performance report into:
+  - `doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_CONV_RESNET_ED_TINY_FP32_DEBUG_ZH.md`
+- Confirmed the active board image and model contract from boot log:
+  - `variant=student_conv_resnet_ed_tiny_v1_fp32_debug`
+  - `runtime_in=float32 runtime_out=float32`
+  - `input shape=[1,40,101,1]`
+  - `threshold_q15=9038`
+  - `arena_used=654960 B`
+- Closed board/host deployment correctness for the FP32 debug variant:
+  - the embedded header and
+    `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_tiny_v1/model.fp32.tflite`
+    are byte-identical
+  - host replay reports:
+    - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+    - `host_hash: feature=0x7ce0b11d effective_input=0xd52f011c`
+    - `board_output: raw=345 exact=0.345300 q15=11314`
+    - `host_output: raw=345 exact=0.345300`
+    - `output_parity: bytes_equal=yes raw_equal=yes`
+- Recorded the important process nuance for future reuse:
+  - the stable preserved parity sequence was:
+    - `reboot`
+    - `river kws debug local on`
+    - `river audio probe stop`
+    - `river kws debug local off`
+    - `river kws align run`
+    - `river kws dump meta`
+    - `river kws dump chunk output_raw 1`
+    - `river kws dump chunk feat_f32 1..253`
+  - the first transcript had UART-corrupted / missing `feat_f32` chunks
+    (`4`, `5`, `120`, `121`), but the preserved snapshot allowed targeted
+    re-pull of only those chunks without re-running inference
+- Recorded the current board-side FP32 performance conclusion:
+  - live `infer_us[last=96460 avg=96420 max=96475]`
+  - align capture `infer_us=96295`
+  - bundle budget comparison:
+    - CPU: `96.4 ms` vs `24.0 ms` (`4.02x` over)
+    - memory: `654960 B` vs `512 KB` (`1.25x` over)
+  - among the already archived student FP32 candidates in this repo, this is
+    currently the best board result so far
+
 ## Step 5.137
 - Added a parallel `student_conv_resnet_ed_tiny_v1` wakeword bring-up path
   without touching the current mainline chain:

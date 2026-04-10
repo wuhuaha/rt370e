@@ -1,5 +1,74 @@
 # Verification
 
+## Step 5.138
+Read the finalized FP32 deployment / parity / performance report:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_CONV_RESNET_ED_TINY_FP32_DEBUG_ZH.md
+```
+
+Confirm the board boot contract for the current FP32 image:
+```bash
+cd /root/ameba-river
+rg -a -n "kws init plan:|runtime_in=float32 runtime_out=float32|dims=\\[1,40,101,1\\]|arena_used=654960B|variant=student_conv_resnet_ed_tiny_v1_fp32_debug|threshold_q15=9038" \
+  /tmp/kws_conv_resnet_ed_tiny_fp32_reboot_boot.log
+```
+
+Expected result:
+- boot log shows:
+  - `variant=student_conv_resnet_ed_tiny_v1_fp32_debug`
+  - `runtime_in=float32 runtime_out=float32`
+  - `dims=[1,40,101,1]`
+  - `arena_used=654960B`
+  - `threshold_q15=9038`
+
+Confirm board/header vs algorithm `.tflite` file identity:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+header = Path('components/river_voice/generated/student_conv_resnet_ed_tiny_v1_fp32_model_data.h').read_text()
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header))
+model = Path('/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_tiny_v1/model.fp32.tflite').read_bytes()
+print('header_bytes', len(data))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_bytes', len(model))
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Expected result:
+- `header_bytes 479008`
+- `model_bytes 479008`
+- both SHA256 are:
+  - `3fa05447484ba77a6b24da050da1867271ae2d77fbd27ae1fd2144a682376e66`
+- `exact_match yes`
+
+Confirm the finalized host replay parity result:
+```bash
+cd /root/ameba-river
+TF_ENABLE_ONEDNN_OPTS=0 \
+OMP_NUM_THREADS=1 \
+TF_NUM_INTRAOP_THREADS=1 \
+TF_NUM_INTEROP_THREADS=1 \
+python3 tools/kws/replay_board_tensor_dump.py \
+  --log /tmp/kws_conv_resnet_ed_tiny_fp32_exact_parity.log \
+  --model /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_tiny_v1/model.fp32.tflite \
+  --seq latest \
+  --builtin-ref
+```
+
+Expected result:
+- replay prints:
+  - `note: using feature tensor bytes as effective input because they match the board input hash`
+  - `board_hash: feature=0x7ce0b11d input=0xd52f011c`
+  - `host_hash: feature=0x7ce0b11d logged_input=n/a effective_input=0xd52f011c`
+  - `board_output: raw=345 score=0.345300 exact=0.345300 q15=11314`
+  - `host_output: raw=345 score=0.345000 exact=0.345300`
+  - `output_parity: bytes_equal=yes raw_equal=yes first_diff=[]`
+
 ## Step 5.137
 Confirm the new `conv_resnet_ed` debug variants are wired into the repo:
 ```bash
