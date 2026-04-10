@@ -280,6 +280,26 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_DSCNN_SMALL_V2_FP32_DEBUG
       DS-CNN candidate can be board-profiled without replacing the
       current mainline chain.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG
+    bool "Student Conv-ResNet-ED tiny v1 FP32 debug model"
+    help
+      Use the parallel FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_tiny_v1.
+      This variant is reserved for board/local parity work on the
+      `40x101`, `n_fft=400`, centered log-mel frontend so the new
+      kernel-aware Conv-ResNet-ED route can be deployment-checked
+      without replacing the current mainline chain.
+
+config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_INT8_DEBUG
+    bool "Student Conv-ResNet-ED tiny v1 INT8 debug model"
+    help
+      Use the parallel INT8 deployment bundle exported from
+      /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_tiny_v1.
+      This variant is reserved for board/local parity work and board-side
+      realtime probing on the `40x101`, `n_fft=400`, centered log-mel
+      frontend, while keeping the matching FP32 debug path intact for
+      quantization-vs-deployment triage.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_BC_RESNET_TINY_V2_FP32_DEBUG
     bool "Student BC-ResNet tiny v2 FP32 debug model"
     help

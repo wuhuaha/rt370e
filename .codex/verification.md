@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.137
+Confirm the new `conv_resnet_ed` debug variants are wired into the repo:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_CONV_RESNET_ED_TINY_V1|student_conv_resnet_ed_tiny_v1_" \
+  Kconfig \
+  components/river_voice/river_voice_kws.cc \
+  components/river_voice/generated
+```
+
+Expected result:
+- `Kconfig` contains both new choices:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG`
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_INT8_DEBUG`
+- `components/river_voice/river_voice_kws.cc` contains both runtime branches:
+  - `variant=student_conv_resnet_ed_tiny_v1_fp32_debug`
+  - `variant=student_conv_resnet_ed_tiny_v1_int8_debug`
+- the generated headers exist under:
+  - `components/river_voice/generated/student_conv_resnet_ed_tiny_v1_fp32_model_data.h`
+  - `components/river_voice/generated/student_conv_resnet_ed_tiny_v1_int8_model_data.h`
+
+Spot-check the imported model header sizes:
+```bash
+cd /root/ameba-river
+rg -n "Size: 479008 bytes|Size: 135504 bytes" \
+  components/river_voice/generated/student_conv_resnet_ed_tiny_v1_fp32_model_data.h \
+  components/river_voice/generated/student_conv_resnet_ed_tiny_v1_int8_model_data.h
+```
+
+Expected result:
+- FP32 header reports `Size: 479008 bytes`
+- INT8 header reports `Size: 135504 bytes`
+
 ## Step 5.136
 Read the FP32 / INT8 comparison note:
 ```bash

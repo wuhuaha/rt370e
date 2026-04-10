@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.137
+- Added a parallel `student_conv_resnet_ed_tiny_v1` wakeword bring-up path
+  without touching the current mainline chain:
+  - copied the new algorithm-side exported headers into:
+    - `components/river_voice/generated/student_conv_resnet_ed_tiny_v1_fp32_model_data.h`
+    - `components/river_voice/generated/student_conv_resnet_ed_tiny_v1_int8_model_data.h`
+  - added two new Kconfig model variants:
+    - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG`
+    - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_INT8_DEBUG`
+- Wired both variants into
+  [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+  using the already-proven `40x101`, `n_fft=400`, centered log-mel frontend
+  contract that the algorithm bundle requires.
+- Kept the preserved board/local parity infrastructure unchanged:
+  - no removal or weakening of tensor dumps, replay alignment, or debug-only
+    host-vs-board comparison hooks
+  - no change to the mainline baseline or existing student debug variants
+- Confirmed the new model family stays within the current board kernel
+  operator envelope declared by the export bundle:
+  - model family: `conv_resnet_ed`
+  - required ops: `ADD`, `AVERAGE_POOL_2D`, `CONV_2D`, `LOGISTIC`
+  - frontend contract: `40x101`
+  - exported model sizes:
+    - FP32 `479008 B`
+    - INT8 `135504 B`
+
 ## Step 5.136
 - Compared the matching `student_dscnn_tiny_v2` FP32 and INT8 board baselines
   after the new INT8 exact-parity proof, and wrote the result into:
