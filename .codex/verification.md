@@ -1,5 +1,62 @@
 # Verification
 
+## Step 5.136
+Read the FP32 / INT8 comparison note:
+```bash
+cd /root/ameba-river
+sed -n '1,260p' doc/KWS_DSCNN_TINY_FP32_INT8_COMPARISON_2026-04-10_ZH.md
+```
+
+Confirm the corresponding FP32 board baseline had already been deployed:
+```bash
+cd /root/ameba-river
+rg -n "student_dscnn_tiny_v2_fp32_debug|infer_us\\[last=183988 avg=183969 max=183988\\]|arena 实际使用 \\| `1168336 B`" \
+  doc/RUNTIME_RESOURCE_PROFILE_2026-04-08_STUDENT_DSCNN_TINY_FP32_DEBUG_ZH.md
+```
+
+Expected result:
+- the FP32 report exists
+- it clearly states:
+  - `student_dscnn_tiny_v2_fp32_debug`
+  - `infer_us[last=183988 avg=183969 max=183988]`
+  - arena used `1168336 B`
+
+Confirm the current INT8 board baseline:
+```bash
+cd /root/ameba-river
+rg -n "student_dscnn_tiny_v2_int8_debug|infer_us ≈ 492\\.7 ms|last=492733|avg=492784|max=493321|arena=295764/2048KB|quant_parity: diff_bytes=0/4040|output_parity: bytes_equal=yes raw_equal=yes" \
+  doc/RUNTIME_RESOURCE_PROFILE_2026-04-10_STUDENT_DSCNN_TINY_INT8_DEBUG_ZH.md
+```
+
+Expected result:
+- the INT8 report exists
+- it clearly states:
+  - exact parity passed
+  - `infer_us` around `492.7 ms`
+  - arena used `295764 B`
+
+Re-check the current latest-SDK CA32 quantized-kernel source path:
+```bash
+cd /root/ameba-river
+nl -ba /root/ameba-rtos/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc | sed -n '248,267p'
+nl -ba /root/ameba-rtos/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc | sed -n '141,158p'
+```
+
+Expected result:
+- `conv.cc` still shows:
+  - `The current CA32 int8 conv optimized path is not reliable`
+  - immediate call to `reference_integer_ops::ConvPerChannel(...)`
+- `depthwise_conv.cc` still shows:
+  - `The CA32 optimized int8 depthwise kernel is not reliable`
+  - immediate call to `reference_integer_ops::DepthwiseConvPerChannel(...)`
+
+Interpretation:
+- this step is complete once the local repo records all three facts together:
+  - the matching FP32 model had already been deployed
+  - the matching INT8 model is exact-parity correct but about `2.68x` slower
+  - the current latest-SDK source still routes the relevant CA32 INT8 compute
+    path through reference kernels rather than a restored optimized path
+
 ## Step 5.135
 Read the parity-status note for the current active INT8 model:
 ```bash

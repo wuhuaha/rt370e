@@ -1,5 +1,39 @@
 # Change Log
 
+## Step 5.136
+- Compared the matching `student_dscnn_tiny_v2` FP32 and INT8 board baselines
+  after the new INT8 exact-parity proof, and wrote the result into:
+  - `doc/KWS_DSCNN_TINY_FP32_INT8_COMPARISON_2026-04-10_ZH.md`
+- Confirmed from existing board reports that the corresponding FP32 model had
+  already been deployed and measured earlier:
+  - `student_dscnn_tiny_v2_fp32_debug`
+  - board `infer_us[last=183988 avg=183969 max=183988]`
+  - arena used `1168336 B`
+- Compared that against the newly closed INT8 path:
+  - `student_dscnn_tiny_v2_int8_debug`
+  - board `infer_us[last=492733 avg=492784 max=493321]`
+  - arena used `295764 B`
+- Resulting same-family conclusion:
+  - INT8 is about `2.68x` slower than the corresponding FP32 model on the
+    current board path
+  - INT8 reduces arena usage to about `25.3%` of FP32, i.e. about `74.7%`
+    lower memory
+- Re-checked the current latest-SDK source under `/root/ameba-rtos` instead of
+  relying only on older notes:
+  - `/root/ameba-rtos/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/conv.cc`
+    still contains the explicit `int8 conv optimized path is not reliable`
+    comment and immediately calls `reference_integer_ops::ConvPerChannel(...)`
+  - `/root/ameba-rtos/component/tflite_micro/tensorflow/lite/micro/kernels/ameba-aiot/amebasmart_ca32/depthwise_conv.cc`
+    still contains the explicit `optimized int8 depthwise kernel is not
+    reliable` comment and immediately calls
+    `reference_integer_ops::DepthwiseConvPerChannel(...)`
+- Updated the project interpretation accordingly:
+  - current latest-SDK does not show evidence that CA32 INT8 compute
+    optimization has actually come back into effect for this wakeword path
+  - the current DSCNN tiny INT8 improvement over the old BC-ResNet INT8 path
+    should be attributed to a lighter model topology, not to restored
+    quantized-kernel acceleration
+
 ## Step 5.135
 - Consolidated the current `student_dscnn_tiny_v2_int8_debug` parity state into
   a dedicated project note:
