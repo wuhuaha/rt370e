@@ -1,5 +1,42 @@
 # Change Log
 
+## Step 5.146
+- Fixed a websocket transport fairness problem in the XiaoZhi pump path:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Added a small active-loop fairness delay to `river_xz_pump`:
+  - introduced `RIVER_CLOUD_XIAOZHI_PUMP_FAIRNESS_DELAY_MS` with a `1 ms`
+    project-local default
+  - after each active `river_xiaozhi_poll()` slice, the pump now sleeps briefly
+    before re-entering the transport mutex
+- Reason for the change:
+  - the latest board logs no longer showed uplink-ring overflow at the wake
+    boundary, but wake admission still stopped after
+    `xiaozhi wake admission transport ready`
+  - code inspection showed `river_xz_pump` running at priority `4` while the
+    wake admission worker `river_wake_evt` runs at priority `3`
+  - once `server hello` marks the session open, the higher-priority pump could
+    loop continuously around `river_xiaozhi_poll(5 ms)` and reacquire the same
+    transport mutex fast enough to starve the lower-priority
+    `river_xiaozhi_send_listen_start("auto")` control send
+  - this explains why the project can stall locally even though the server
+    already accepted the websocket and sent `server hello`
+- Expected effect of this step:
+  - wake admission should progress past `transport ready`
+  - the board should again print:
+    - `xiaozhi wake admission listen_start sent`
+    - `xiaozhi wake admission ready`
+    - `wakeword admission accepted`
+  - this step targets local control-plane starvation; it does not change the
+    KWS model threshold or server protocol
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the pump
+  fairness change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.145
 - Tightened the xiaozhi realtime uplink path to behave more like the reference
   `xiaozhi-esp32` client instead of buffering a long local backlog:

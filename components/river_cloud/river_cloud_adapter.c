@@ -184,6 +184,13 @@ static void river_cloud_xiaozhi_pump_task(void *arg)
                 rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_PUMP_ACTIVE_MS);
             }
             river_cloud_xiaozhi_check_pending_playback_stop();
+            /*
+             * The wake admission worker runs below the dedicated websocket
+             * pump priority. Without a short sleep here, the pump can reopen
+             * the transport mutex immediately after every poll slice and
+             * starve control-plane sends such as listen_start().
+             */
+            rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_PUMP_FAIRNESS_DELAY_MS);
             continue;
         }
 

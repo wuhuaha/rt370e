@@ -1,5 +1,49 @@
 # Verification
 
+## Step 5.146
+Rebuild the latest-SDK image after adding XiaoZhi pump fairness yielding:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake log and say the wake word once:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- after:
+  - `server hello: sid=...`
+  - `xiaozhi wake admission transport ready: source=wakeword sid=...`
+- the control path now continues instead of stopping there:
+  - `xiaozhi wake admission listen_start sent: source=wakeword sid=...`
+  - `xiaozhi wake admission ready: source=wakeword listening=yes window=open sid=...`
+  - `wakeword admission accepted: text=... confidence=...`
+- ASR startup resumes:
+  - `asr provider=xiaozhi_realtime session started sid=...`
+  - `asr stream active: provider=xiaozhi_realtime pre_roll_frames=...`
+- the wake worker should no longer appear wedged behind a live websocket
+  session:
+  - no repeated pattern where KWS keeps retriggering while an earlier wake is
+    stuck forever after `transport ready`
+
 ## Step 5.145
 Rebuild the latest-SDK image after tightening xiaozhi uplink backlog control:
 ```bash
