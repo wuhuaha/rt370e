@@ -8501,3 +8501,77 @@ Interpretation:
   - verified model status
   - preserved debug/parity mechanisms
   - main blockers and recommended next priorities
+
+## Step 5.119 Verification
+
+Confirm the latest SDK already uses the larger debug memory layout:
+```bash
+cd /root/ameba-river
+python3 tools/sdk/apply_rtl8730e_memory_layout_patch.py \
+  --sdk-root /root/ameba-rtos \
+  --variant aivoice_ca32_17mb \
+  --check
+```
+
+Expected result:
+- output is `applied`
+
+Confirm the SDK Kconfig value itself was not edited by this step:
+```bash
+cd /root/ameba-river
+rg -n --fixed-strings "CONFIG_SHELL_TASK_STACK_BASIC_SIZE=" \
+  build_RTL8730E/build/project_ap/.config_ca32
+```
+
+Expected result:
+- the generated config still shows the SDK value `2440`
+- this proves the debug branch did not patch the SDK Kconfig default
+
+Confirm the effective AP monitor compile uses the project-local forced include:
+```bash
+cd /root/ameba-river
+rg -n --fixed-strings "river_sdk_debug_overrides.h" \
+  build_RTL8730E/build/compile_commands.json
+```
+
+Expected result:
+- the `shell_ram.c` AP compile command contains:
+  `-include /root/ameba-river/include/river/river_sdk_debug_overrides.h`
+
+Rebuild the full image from the external project:
+```bash
+cd /root/ameba-river
+source ./env.sh >/dev/null
+cmake -S /root/ameba-rtos/component/soc/amebasmart/project \
+  -B /root/ameba-river/build_RTL8730E/build \
+  -G Ninja \
+  -DEXTERN_DIR=/root/ameba-river \
+  -DFINAL_IMAGE_DIR=/root/ameba-river/build_RTL8730E
+cmake --build /root/ameba-river/build_RTL8730E/build --target gen_submodule_info
+cmake -S /root/ameba-rtos/component/soc/amebasmart/project \
+  -B /root/ameba-river/build_RTL8730E/build \
+  -G Ninja \
+  -DEXTERN_DIR=/root/ameba-river \
+  -DFINAL_IMAGE_DIR=/root/ameba-river/build_RTL8730E \
+  -DEXAMPLE=/root/ameba-river
+cmake --build /root/ameba-river/build_RTL8730E/build --parallel
+```
+
+Expected result:
+- build exits successfully
+- final images exist:
+  - `build_RTL8730E/build/project_ap/image/ap_image_all.bin`
+  - `build_RTL8730E/km0_km4_ca32_app.bin`
+
+Post-flash debug-branch check on serial:
+```text
+river kws status
+river kws dump status
+river kws dump meta
+```
+
+Expected result:
+- shell remains responsive during repeated KWS debug commands
+- no obvious shell stack crash/reset appears while running normal debug flows
+- this step only validates debug stability and headroom; it does not change KWS
+  model behavior

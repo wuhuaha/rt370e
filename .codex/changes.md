@@ -4883,3 +4883,38 @@
   - the project already has a runnable end-to-end chain
   - the main blockers are now runtime quality and deployability, not basic
     bring-up
+
+## Step 5.119
+- Raised AP shell stack headroom for this `kws` debug branch without modifying
+  `/root/ameba-rtos`:
+  - added project-local forced-include header
+    `include/river/river_sdk_debug_overrides.h`
+  - the header overrides `CONFIG_SHELL_TASK_STACK_BASIC_SIZE` to `8192`
+  - the override is injected only on the AP `monitor_*` target from the
+    external project `CMakeLists.txt`
+- Kept the latest-SDK debug memory layout as the baseline instead of inventing a
+  second project-side memory map:
+  - checked `tools/sdk/apply_rtl8730e_memory_layout_patch.py`
+  - confirmed `/root/ameba-rtos` is already in `aivoice_ca32_17mb` state
+- Explicitly did not use `prj.conf` for the shell stack change:
+  - the SDK `SHELL_TASK_STACK_BASIC_SIZE` symbol is a non-prompt Kconfig item
+  - generated `.config_ca32` still stays at the SDK value `2440`
+  - the effective debug value now comes from the AP monitor compile command via
+    forced include, not from Kconfig
+- Added a tiny project-local `ccache` shim and `env.sh` fallback so the debug
+  branch can still build cleanly on machines where the SDK expects `ccache` but
+  the binary is absent:
+  - `tools/shims/ccache`
+  - `env.sh`
+- Reconfigured and rebuilt the full RTL8730E image successfully after the
+  change:
+  - AP compile commands contain
+    `-include /root/ameba-river/include/river/river_sdk_debug_overrides.h`
+  - final images were regenerated:
+    - `build_RTL8730E/build/project_ap/image/ap_image_all.bin`
+    - `build_RTL8730E/km0_km4_ca32_app.bin`
+- Result for this step:
+  - debug branch keeps the larger latest-SDK CA32 layout
+  - AP shell now has materially more stack headroom for heavy serial/KWS debug
+    flows
+  - SDK sources remain untouched
