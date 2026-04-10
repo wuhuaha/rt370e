@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.145
+- Tightened the xiaozhi realtime uplink path to behave more like the reference
+  `xiaozhi-esp32` client instead of buffering a long local backlog:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- The step changes three related pieces of backlog control:
+  - reduced the xiaozhi-specific ASR pre-roll cap from `256 ms` to `128 ms` so
+    `asr_stream_active` does not begin by bursting such a large historical
+    backlog into the websocket uplink path
+  - changed uplink BUSY backoff growth from frame-based (`40/80/160 ms` for a
+    `20 ms` Opus frame) to poll-based (`5/10/20/40 ms`), which matches the
+    current websocket pump cadence and avoids leaving the local PCM ring behind
+    real time after the first transient stall
+  - trimmed stale uplink PCM on the enqueue side before write, so the local ring
+    stays close to the realtime tail instead of waiting to hit `64/64` and then
+    logging repeated overflow drops
+- Reason for the change:
+  - the latest board logs still showed first wake admission succeeding, but the
+    session quickly entered repeated
+    `xiaozhi uplink ring overflow: ... queued=64 capacity=64`
+  - compared with `/root/xiaozhi-esp32`, our Ameba path had accumulated more
+    buffering layers and a much more conservative BUSY retry schedule
+  - `xiaozhi-esp32` effectively drains on events and keeps queues short, so the
+    right direction here is smaller burst, shorter retry delay, and earlier
+    stale-frame trimming rather than allowing a long local backlog to build
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  backlog-control change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.144
 - Changed the xiaozhi uplink worker pacing in
   [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):

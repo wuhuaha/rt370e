@@ -1,5 +1,49 @@
 # Verification
 
+## Step 5.145
+Rebuild the latest-SDK image after tightening xiaozhi uplink backlog control:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake-and-speak log:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- first wake still reaches:
+  - `xiaozhi wake admission ready:`
+  - `asr provider=xiaozhi_realtime session started`
+- xiaozhi stream start now shows a smaller backlog burst:
+  - `asr stream active: provider=xiaozhi_realtime pre_roll_frames=8`
+    or otherwise clearly smaller than the previous `16`
+- the previous local overflow storm is gone or materially reduced:
+  - no long run of `xiaozhi uplink ring overflow: dropped=... queued=64 capacity=64`
+- if transport pressure still exists, it should now show up as bounded realtime
+  shedding instead of full-ring saturation:
+  - `stale_drop=` may increase
+  - occasional `xiaozhi uplink backpressure:` is acceptable
+  - follow-up wake should no longer get stuck behind a long lingering
+    `listen_stop_pending` drain
+
 ## Step 5.144
 Rebuild the latest-SDK image after the uplink pacing change:
 ```bash

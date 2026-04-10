@@ -95,9 +95,20 @@ static uint32_t river_cloud_xiaozhi_uplink_busy_backoff_ms(uint32_t frame_ms,
 {
     uint32_t delay_ms;
     uint32_t shift_count;
+    uint32_t soft_cap_ms;
 
-    delay_ms = frame_ms != 0U ? frame_ms : RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
-    shift_count = busy_streak;
+    /*
+     * The websocket pump is already running at 5 ms cadence. Starting BUSY
+     * backoff at 40 ms leaves the uplink worker far behind real-time audio and
+     * lets the local PCM ring fill before the transport has a chance to
+     * recover. Grow from the poll cadence instead.
+     */
+    delay_ms = RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS;
+    if (delay_ms == 0U) {
+        delay_ms = 1U;
+    }
+
+    shift_count = busy_streak > 0U ? (busy_streak - 1U) : 0U;
     if (shift_count > 3U) {
         shift_count = 3U;
     }
@@ -110,6 +121,12 @@ static uint32_t river_cloud_xiaozhi_uplink_busy_backoff_ms(uint32_t frame_ms,
     if (delay_ms > RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS) {
         delay_ms = RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS;
     }
+
+    soft_cap_ms = frame_ms != 0U ? (frame_ms * 2U) : (RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS * 2U);
+    if (soft_cap_ms != 0U && delay_ms > soft_cap_ms) {
+        delay_ms = soft_cap_ms;
+    }
+
     return delay_ms;
 }
 
@@ -1033,10 +1050,22 @@ static river_status_t river_cloud_xiaozhi_queue_uplink_packet(const uint8_t *pcm
                                                               size_t pcm_bytes)
 {
     river_status_t status;
+    uint32_t keep_before_write;
 
     if (pcm == NULL || pcm_bytes == 0U || !g_river_cloud.xiaozhi_uplink_ring.initialized) {
         return RIVER_ERR_ARG;
     }
+
+    /*
+     * Keep the realtime uplink queue short. Once the transport falls behind,
+     * older audio is less valuable than preserving a low-latency tail for live
+     * ASR. This mirrors the reference xiaozhi client more closely than waiting
+     * for the full 64-frame ring to overflow.
+     */
+    keep_before_write = (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX > 0U) ?
+                            (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX - 1U) :
+                            0U;
+    (void)river_cloud_xiaozhi_trim_uplink_stale_frames(keep_before_write);
 
     status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_uplink_ring, pcm);
     if (status == RIVER_OK) {
