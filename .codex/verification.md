@@ -1,5 +1,46 @@
 # Verification
 
+## Step 5.144
+Rebuild the latest-SDK image after the uplink pacing change:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py soc RTL8730E; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake-and-speak log after the first successful admission:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- the first wake still reaches:
+  - `xiaozhi wake admission ready:`
+  - `wakeword admission accepted:`
+  - `asr provider=xiaozhi_realtime session started`
+- during the following `asr_streaming` window, the previous local overflow storm
+  is gone or materially reduced:
+  - no long run of `xiaozhi uplink ring overflow: dropped=... queued=64 capacity=64`
+- if transport pressure still exists, it should now show up primarily as the
+  existing throttled backpressure signal instead of local ring saturation:
+  - occasional `xiaozhi uplink backpressure:`
+  - possible `stale_drop=` growth without the ring pinning at `64/64`
+
 ## Step 5.143
 Rebuild the latest-SDK image after adding wake-admission tracing:
 ```bash

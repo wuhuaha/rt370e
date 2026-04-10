@@ -332,15 +332,14 @@ static void river_cloud_xiaozhi_uplink_task(void *arg)
                     }
 
                     if (status == RIVER_OK) {
-                        if (frame_ms == 0U ||
-                            g_river_cloud.xiaozhi_uplink_next_send_ms == 0U ||
-                            now_ms > (g_river_cloud.xiaozhi_uplink_next_send_ms +
-                                      (uint64_t)frame_ms)) {
-                            g_river_cloud.xiaozhi_uplink_next_send_ms =
-                                now_ms + (uint64_t)frame_ms;
-                        } else {
-                            g_river_cloud.xiaozhi_uplink_next_send_ms += (uint64_t)frame_ms;
-                        }
+                        /*
+                         * Frames arrive in real time on the producer side, so
+                         * successful sends do not need local pacing. Keeping a
+                         * future deadline here leaves the worker permanently
+                         * behind after any transient stall and eventually fills
+                         * the PCM ring. Only BUSY/error paths should back off.
+                         */
+                        g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
                     }
                 } else {
                     g_river_cloud.xiaozhi_uplink_busy_streak = 0U;

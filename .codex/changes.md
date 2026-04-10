@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.144
+- Changed the xiaozhi uplink worker pacing in
+  [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c):
+  - successful Opus uplink sends now clear `xiaozhi_uplink_next_send_ms`
+    instead of advancing it by another `frame_duration_ms`
+  - explicit backoff remains only on `RIVER_ERR_BUSY` and generic send-failure
+    paths
+- Reason for the change:
+  - the worker previously kept a future send deadline even after a successful
+    send
+  - once any transient stall created backlog, the worker stayed permanently
+    behind real time and the local `xiaozhi_uplink_ring` eventually filled to
+    `64/64`, producing the repeated `xiaozhi uplink ring overflow` storm seen
+    on the board
+  - clearing the deadline on success lets the worker immediately drain queued
+    PCM until it catches up, while websocket-side BUSY handling still provides
+    transport backoff
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  pacing fix:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py soc RTL8730E`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.143
 - Added narrow wake-admission tracing around the new post-backpressure issue:
   - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
