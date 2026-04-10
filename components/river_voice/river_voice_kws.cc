@@ -130,6 +130,26 @@ extern "C" {
 #define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 1
 #define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 1
 #define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 1
+#elif defined(CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG)
+#include "generated/student_conv_resnet_ed_nano_v1_fp32_model_data.h"
+#define RIVER_KWS_MODEL_DATA student_conv_resnet_ed_nano_v1_fp32_tflite
+#define RIVER_KWS_MODEL_DATA_LEN \
+    ((size_t)sizeof(student_conv_resnet_ed_nano_v1_fp32_tflite))
+#define RIVER_KWS_MODEL_VARIANT_NAME "student_conv_resnet_ed_nano_v1_fp32_debug"
+#define RIVER_KWS_WINDOW_SAMPLES 400U
+#define RIVER_KWS_HOP_SAMPLES 160U
+#define RIVER_KWS_MEL_BINS 40U
+#define RIVER_KWS_FEATURE_FRAMES 101U
+#define RIVER_KWS_FEATURE_DB_MIN (0.0f)
+#define RIVER_KWS_FEATURE_MEAN (0.0f)
+#define RIVER_KWS_FEATURE_STD (1.0f)
+#define RIVER_KWS_FMIN_HZ (20.0f)
+#define RIVER_KWS_FMAX_HZ (8000.0f)
+#define RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES (RIVER_KWS_WINDOW_SAMPLES / 2U)
+#define RIVER_KWS_FRONTEND_CENTER_EN 1
+#define RIVER_KWS_FRONTEND_USE_PER_CLIP_NORM 1
+#define RIVER_KWS_FRONTEND_USE_NATURAL_LOG 1
+#define RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT 1
 #elif defined(CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG)
 #include "generated/student_conv_resnet_ed_tiny_v1_fp32_model_data.h"
 #define RIVER_KWS_MODEL_DATA student_conv_resnet_ed_tiny_v1_fp32_tflite

@@ -1,5 +1,50 @@
 # Verification
 
+## Step 5.139
+Confirm the new `conv_resnet_ed_nano` FP32 debug variant is wired into the repo:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_CONV_RESNET_ED_NANO_V1|student_conv_resnet_ed_nano_v1_fp32" \
+  Kconfig \
+  components/river_voice/river_voice_kws.cc \
+  components/river_voice/generated/student_conv_resnet_ed_nano_v1_fp32_model_data.h \
+  build_RTL8730E/menuconfig/prj.conf
+```
+
+Expected result:
+- `Kconfig` contains:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG`
+- `components/river_voice/river_voice_kws.cc` contains:
+  - `variant=student_conv_resnet_ed_nano_v1_fp32_debug`
+- the generated header exists:
+  - `components/river_voice/generated/student_conv_resnet_ed_nano_v1_fp32_model_data.h`
+- `build_RTL8730E/menuconfig/prj.conf` enables:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+
+Confirm the imported header matches the algorithm FP32 export exactly:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+import hashlib, re
+header = Path('components/river_voice/generated/student_conv_resnet_ed_nano_v1_fp32_model_data.h').read_text()
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{2})', header))
+model = Path('/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_v1/model.fp32.tflite').read_bytes()
+print('header_bytes', len(data))
+print('model_bytes', len(model))
+print('header_sha256', hashlib.sha256(data).hexdigest())
+print('model_sha256', hashlib.sha256(model).hexdigest())
+print('exact_match', 'yes' if data == model else 'no')
+PY
+```
+
+Expected result:
+- `header_bytes 141700`
+- `model_bytes 141700`
+- both SHA256 are:
+  - `5c955b390db469ddd5d82c22c2b00022eb8a82f596e4e5dd2194d3c7b07c7727`
+- `exact_match yes`
+
 ## Step 5.138
 Read the finalized FP32 deployment / parity / performance report:
 ```bash

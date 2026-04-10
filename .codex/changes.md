@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.139
+- Added a parallel `student_conv_resnet_ed_nano_v1_fp32_debug` wakeword
+  bring-up path without touching the current mainline chain:
+  - added
+    `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG`
+    to `Kconfig`
+  - wired the new variant into
+    [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+    using the same `40x101`, `n_fft=400`, centered log-mel FP32 frontend
+    contract already validated on the recent `conv_resnet_ed` tiny path
+- Imported the matching algorithm-side FP32 debug model into the repo as:
+  - `components/river_voice/generated/student_conv_resnet_ed_nano_v1_fp32_model_data.h`
+- Switched the active board-profile build config in
+  `build_RTL8730E/menuconfig/prj.conf` to:
+  - `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG=y`
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008`
+  - retained `CONFIG_RIVER_KWS_TENSOR_ARENA_KB=2048` and the existing
+    stride / queue / pre-roll settings so the next board pass stays directly
+    comparable with the recent `40x101` student measurements
+- Confirmed the imported FP32 header matches the algorithm export exactly:
+  - header bytes: `141700`
+  - model bytes: `141700`
+  - SHA256:
+    `5c955b390db469ddd5d82c22c2b00022eb8a82f596e4e5dd2194d3c7b07c7727`
+  - exact match: `yes`
+
 ## Step 5.138
 - Validated the new `student_conv_resnet_ed_tiny_v1_fp32_debug` bring-up on
   real hardware under the latest SDK and wrote the resulting deployment /
