@@ -1,5 +1,45 @@
 # Change Log
 
+## Step 5.147
+- Reworked the project-side XiaoZhi realtime transport ownership into a
+  single-owner I/O thread:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- The project-side thread model now becomes:
+  - `river_xz_io` owns websocket polling, wake/listen/abort/close control sends,
+    and realtime uplink audio sends
+  - `river_xz_down` remains responsible for downlink decode / playback feeding
+  - non-owner threads no longer call transport control APIs directly; they post
+    synchronous control requests into a dedicated control queue and wait for the
+    I/O owner to execute them
+- Added an explicit control-plane queue beside the existing audio queue:
+  - `OPEN_AND_LISTEN`
+  - `LISTEN_STOP`
+  - `ABORT`
+  - `CLOSE_SESSION`
+  - owner-thread fast-path is preserved so the I/O owner executes its own
+    requests directly instead of deadlocking on self-queued work
+- Added per-ASR-round closed-loop stats so each round now logs:
+  - round id / sid
+  - pre-roll frame count
+  - first-packet delay
+  - packet count
+  - busy / fail / stale-drop / ring-drop deltas
+  - partial / final counts and seen flags
+  - close reason
+- Updated the runtime status dump to expose the new ownership split:
+  - `xiaozhi runtime ... io=running`
+  - `xiaozhi control queue=...`
+  - `xiaozhi uplink queue=... owner=running`
+  - `xiaozhi asr round ...`
+- Rebuilt the full latest-SDK image against `/root/ameba-rtos` after the
+  single-owner I/O + round-stats change:
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos`
+  - `source /root/ameba-river/env.sh`
+  - `python /root/ameba-rtos/ameba.py build -p`
+  - result: `Build done`
+
 ## Step 5.146
 - Fixed a websocket transport fairness problem in the XiaoZhi pump path:
   - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)

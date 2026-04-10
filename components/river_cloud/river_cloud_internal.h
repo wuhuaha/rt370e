@@ -36,11 +36,11 @@
     (((24000U * 60U) / 1000U) * sizeof(int16_t))
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS 500U
 #define RIVER_CLOUD_XIAOZHI_TTS_STREAM_NAME  "xiaozhi_tts"
-#define RIVER_CLOUD_XIAOZHI_PUMP_STACK       (1024U * 16U)
-#define RIVER_CLOUD_XIAOZHI_PUMP_PRIO        4U
-#define RIVER_CLOUD_XIAOZHI_PUMP_ACTIVE_MS   5U
-#define RIVER_CLOUD_XIAOZHI_PUMP_FAIRNESS_DELAY_MS 1U
-#define RIVER_CLOUD_XIAOZHI_PUMP_IDLE_MS     100U
+#define RIVER_CLOUD_XIAOZHI_IO_TASK_STACK    (1024U * 48U)
+#define RIVER_CLOUD_XIAOZHI_IO_TASK_PRIO     4U
+#define RIVER_CLOUD_XIAOZHI_IO_ACTIVE_MS     5U
+#define RIVER_CLOUD_XIAOZHI_IO_FAIRNESS_DELAY_MS 1U
+#define RIVER_CLOUD_XIAOZHI_IO_IDLE_MS       20U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STACK (1024U * 16U)
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_PRIO  4U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS    5U
@@ -50,14 +50,14 @@
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 3U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 2U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_TASK_STACK (1024U * 48U)
-#define RIVER_CLOUD_XIAOZHI_UPLINK_TASK_PRIO  4U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_IDLE_MS    20U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 6U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
+#define RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH 8U
+#define RIVER_CLOUD_XIAOZHI_CONTROL_WAIT_MS 0xFFFFFFFFU
+#define RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS    128U
 #define RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES   2U
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
@@ -65,6 +65,20 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
+
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN = 0,
+    RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP = 1,
+    RIVER_CLOUD_XIAOZHI_CTRL_ABORT = 2,
+    RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION = 3
+} river_cloud_xiaozhi_control_op_t;
+
+typedef struct {
+    river_cloud_xiaozhi_control_op_t op;
+    char arg[RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX];
+    rtos_sema_t completion;
+    river_status_t *result_out;
+} river_cloud_xiaozhi_control_request_t;
 
 typedef struct {
     bool initialized;
@@ -117,12 +131,13 @@ typedef struct {
     bool xiaozhi_playback_active;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
-    bool xiaozhi_pump_started;
+    bool xiaozhi_io_started;
     bool xiaozhi_downlink_started;
-    bool xiaozhi_uplink_started;
-    rtos_task_t xiaozhi_pump_task;
+    rtos_mutex_t xiaozhi_control_lock;
+    rtos_sema_t xiaozhi_control_ready;
+    rtos_sema_t xiaozhi_control_space;
+    rtos_task_t xiaozhi_io_task;
     rtos_task_t xiaozhi_downlink_task;
-    rtos_task_t xiaozhi_uplink_task;
     river_audio_frame_ring_t xiaozhi_downlink_ring;
     river_audio_frame_ring_t xiaozhi_uplink_ring;
     river_opus_encoder_t xiaozhi_encoder;
@@ -143,6 +158,10 @@ typedef struct {
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
+    uint32_t xiaozhi_control_read_index;
+    uint32_t xiaozhi_control_write_index;
+    uint32_t xiaozhi_control_count;
+    uint32_t xiaozhi_control_high_watermark;
     size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
     uint8_t xiaozhi_uplink_ring_storage[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX *
@@ -156,7 +175,24 @@ typedef struct {
     uint8_t xiaozhi_downlink_drop_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
     int16_t xiaozhi_downlink_mono[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX];
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
+    river_cloud_xiaozhi_control_request_t
+        xiaozhi_control_queue[RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH];
+    uint32_t xiaozhi_asr_round_id;
+    bool xiaozhi_asr_round_active;
+    uint32_t xiaozhi_asr_round_started_ms;
+    uint32_t xiaozhi_asr_round_first_packet_ms;
+    uint32_t xiaozhi_asr_round_pre_roll_frames;
+    uint32_t xiaozhi_asr_round_packets_sent;
+    uint32_t xiaozhi_asr_round_partial_count;
+    uint32_t xiaozhi_asr_round_final_count;
+    bool xiaozhi_asr_round_partial_seen;
+    bool xiaozhi_asr_round_final_seen;
+    uint32_t xiaozhi_asr_round_busy_base;
+    uint32_t xiaozhi_asr_round_fail_base;
+    uint32_t xiaozhi_asr_round_stale_drop_base;
+    uint32_t xiaozhi_asr_round_ring_drop_base;
     char xiaozhi_session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
+    char xiaozhi_asr_round_close_reason[32];
     char xiaozhi_pending_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
 #endif
     char last_text[192];
@@ -200,6 +236,10 @@ void river_cloud_xiaozhi_reset_playback_state(void);
 void river_cloud_xiaozhi_reset_downlink_state(void);
 void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed);
 void river_cloud_xiaozhi_check_window_timeout(void);
+river_status_t river_cloud_xiaozhi_request_open_and_listen(const char *mode);
+river_status_t river_cloud_xiaozhi_request_listen_stop(void);
+river_status_t river_cloud_xiaozhi_request_abort(const char *reason);
+river_status_t river_cloud_xiaozhi_request_close_session(void);
 river_status_t river_cloud_xiaozhi_open_session_and_listen(void);
 river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source);
 #endif

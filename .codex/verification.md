@@ -1,5 +1,60 @@
 # Verification
 
+## Step 5.147
+Rebuild the latest-SDK image after moving XiaoZhi transport ownership to a
+single project-side I/O thread and adding per-round ASR stats:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python /root/ameba-rtos/ameba.py build -p'
+```
+
+Expected result:
+- the build completes successfully
+- final output contains:
+  - `Build done`
+
+Flash the rebuilt image:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+```
+
+Expected result:
+- flash finishes with `Finished PASS`
+
+Capture a fresh wake-and-speak log:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- boot now shows the project-side owner split instead of the old project-side
+  pump/uplink worker split:
+  - `xiaozhi io owner started`
+  - `xiaozhi downlink worker started`
+- status dump exposes the new ownership and queue surfaces:
+  - `xiaozhi runtime enabled=yes io=running ...`
+  - `xiaozhi control queue=...`
+  - `xiaozhi uplink queue=... owner=running`
+  - `xiaozhi asr round id=...`
+- after a wake and one ASR round, the log now contains a bounded per-round
+  begin/finish pair:
+  - `xiaozhi asr round begin: id=... sid=... pre_roll_frames=...`
+  - `xiaozhi asr round finish: id=... sid=... reason=... duration_ms=... first_packet_delay_ms=... packets=... busy=... fail=... stale_drop=... ring_drop=... partial=... final=...`
+- wake/listen control should continue to work through the owner queue:
+  - `xiaozhi wake admission transport ready:`
+  - `xiaozhi wake admission listen_start sent:`
+  - `xiaozhi wake admission ready:`
+  - `asr provider=xiaozhi_realtime session started`
+- when transport pressure reproduces, the new round-finish log should let you
+  tell whether the problem is:
+  - control-plane serialization
+  - websocket backpressure / `busy`
+  - local stale-drop or ring-drop
+  without correlating multiple unrelated counters by hand
+
 ## Step 5.146
 Rebuild the latest-SDK image after adding XiaoZhi pump fairness yielding:
 ```bash

@@ -73,11 +73,11 @@ void river_cloud_xiaozhi_window_close(const char *reason)
     g_river_cloud.xiaozhi_open_speech_frames = 0U;
     g_river_cloud.xiaozhi_listen_stop_pending = false;
     if (g_river_cloud.xiaozhi_listening && river_xiaozhi_session_open()) {
-        (void)river_xiaozhi_send_listen_stop();
+        (void)river_cloud_xiaozhi_request_listen_stop();
     }
     g_river_cloud.xiaozhi_listening = false;
     river_cloud_pre_roll_reset();
-    river_xiaozhi_close_session();
+    (void)river_cloud_xiaozhi_request_close_session();
     g_river_cloud.xiaozhi_session_id[0] = '\0';
     RIVER_LOGI("xiaozhi conversation window closed: reason=%s",
                reason != NULL ? reason : "-");
@@ -260,22 +260,12 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
 {
     river_status_t status;
 
-    if (!river_xiaozhi_session_open()) {
-        status = river_xiaozhi_open_session();
-        if (status != RIVER_OK) {
-            return status;
-        }
+    status = river_cloud_xiaozhi_request_open_and_listen("auto");
+    if (status != RIVER_OK) {
+        return status;
     }
-
     river_cloud_xiaozhi_copy_session_id_from_transport();
-    g_river_cloud.xiaozhi_listen_stop_pending = false;
-    if (!g_river_cloud.xiaozhi_listening) {
-        status = river_xiaozhi_send_listen_start("auto");
-        if (status != RIVER_OK) {
-            return status;
-        }
-        g_river_cloud.xiaozhi_listening = true;
-    }
+
     /*
      * A fresh follow-up listen/asr round must re-arm the conversation window.
      * Otherwise the shorter post-TTS tail timer can expire while the user has
@@ -293,6 +283,7 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
 {
     river_status_t status;
     const char *reason = (source != NULL && source[0] != '\0') ? source : "-";
+    bool was_listening;
 
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
         return RIVER_ERR_UNSUPPORTED;
@@ -324,31 +315,28 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
                g_river_cloud.xiaozhi_window_active ? "open" : "closed",
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
 
-    if (!river_xiaozhi_session_open()) {
-        status = river_xiaozhi_open_session();
-        if (status != RIVER_OK) {
+    was_listening = g_river_cloud.xiaozhi_listening;
+    status = river_cloud_xiaozhi_request_open_and_listen("auto");
+    if (status != RIVER_OK) {
+        if (!river_xiaozhi_session_open()) {
             RIVER_LOGW("xiaozhi wake admission open_session failed: source=%s status=%d last_err=%s",
                        reason,
                        (int)status,
                        river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
-            return status;
-        }
-    }
-    river_cloud_xiaozhi_copy_session_id_from_transport();
-    RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
-               reason,
-               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
-    if (!g_river_cloud.xiaozhi_listening) {
-        status = river_xiaozhi_send_listen_start("auto");
-        if (status != RIVER_OK) {
+        } else {
             RIVER_LOGW("xiaozhi wake admission listen_start failed: source=%s status=%d sid=%s last_err=%s",
                        reason,
                        (int)status,
                        river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-",
                        river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
-            return status;
         }
-        g_river_cloud.xiaozhi_listening = true;
+        return status;
+    }
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+    RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
+               reason,
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+    if (!was_listening && g_river_cloud.xiaozhi_listening) {
         RIVER_LOGI("xiaozhi wake admission listen_start sent: source=%s sid=%s",
                    reason,
                    river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
