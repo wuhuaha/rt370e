@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.149
+- Reduced Codex-facing context drift across the repository entry points:
+  - [AGENTS.md](/root/ameba-river/AGENTS.md)
+  - [README.md](/root/ameba-river/README.md)
+  - [build.md](/root/ameba-river/build.md)
+  - [plan.md](/root/ameba-river/plan.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+  - [tools/diag/check_codex_harness.py](/root/ameba-river/tools/diag/check_codex_harness.py)
+- Added a canonical volatile-context file for Codex work:
+  - `.codex/active_context.md` now records the current branch, default SDK
+    baseline, active build/flash/monitor commands, and the latest landed step
+- Tightened the root entry files to stay low-entropy:
+  - `README.md` is now branch-agnostic and points readers to
+    `.codex/active_context.md`
+  - `build.md` now matches the repository default SDK policy:
+    - `/root/ameba-rtos`
+    - `AMEBA_SDK_ROOT`
+  - root `plan.md` is explicitly marked as a historical `refactor`-branch
+    snapshot instead of looking like the active plan for today's branch
+- Added a mechanical harness check:
+  - `python3 tools/diag/check_codex_harness.py`
+  - it fails fast when the Codex-facing entry points drift on:
+    - active-context pointer
+    - default SDK baseline
+    - current git branch
+    - root-plan historical marker
+- Reason for the change:
+  - the repository had multiple contradictory "current" contexts at once
+  - concrete drift existed across:
+    - current branch labels
+    - default SDK path
+    - active-vs-historical root docs
+  - that raises prompt entropy for Codex and makes the first read of the repo
+    less reliable than it needs to be
+- Ran the new harness check after the cleanup:
+  - `python3 tools/diag/check_codex_harness.py`
+  - result: `all checks passed`
+
 ## Step 5.148
 - Tightened XiaoZhi follow-up reopen behavior for the current `no_ref` playback
   profile:

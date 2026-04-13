@@ -14,6 +14,15 @@
   2. update `.codex/verification.md` with the exact build/run check for the user
   3. commit the step with a focused git message
 
+## Codex Harness Hygiene
+- Treat `.codex/active_context.md` as the canonical volatile context for the current branch, active objective, SDK baseline, and latest verified step.
+- Keep `README.md` and `build.md` low-entropy:
+  - they should stay stable and point to the active context instead of embedding fast-stale branch snapshots
+  - historical branch-specific plans, status snapshots, and dated investigations belong under `doc/`
+- For multi-step work that spans multiple modules or multiple sessions, keep an execution plan in `doc/` and link it from `.codex/active_context.md` instead of overloading the root entry files.
+- After changing repo-level Codex harness files (`AGENTS.md`, `README.md`, `build.md`, `plan.md`, `.codex/active_context.md`), run:
+  - `python3 tools/diag/check_codex_harness.py`
+
 ## User-Owned Review Files
 - Treat these files as user-owned review inputs, not developer worklogs:
   - `TIPS.md`

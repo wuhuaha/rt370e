@@ -1,12 +1,14 @@
 # ameba-river 构建说明
 
-这份文档只记录当前项目实际使用、已经验证过的构建方法，供后续开发直接参考。
+这份文档只记录当前项目稳定、低熵、已经验证过的构建和烧录入口。
+活动分支、当前目标和最新验证步骤请看 `.codex/active_context.md`。
 
 ## 1. 环境
 
-- SDK 根目录：`/root/ameba-rtos-1.2`
+- 默认 SDK 根目录：`/root/ameba-rtos`
 - 项目目录：`/root/ameba-river`
 - 当前目标芯片：`RTL8730E`
+- 环境覆盖变量：`AMEBA_SDK_ROOT`
 
 进入项目后，先加载环境：
 
@@ -20,14 +22,15 @@ source env.sh
 当前推荐直接使用：
 
 ```bash
-python3 /root/ameba-rtos-1.2/ameba.py build -p
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 "$AMEBA_SDK_ROOT/ameba.py" build -p
 ```
 
 说明：
 
 - `-p` 会并行编译
-- 该命令会自动使用项目里的外部工程配置
-- 当前已按 `RTL8730E` 工程布局验证通过
+- `env.sh` 默认会回退到 `/root/ameba-rtos`
+- 如果某个实验明确要求别的 SDK checkout，再单独覆盖 `AMEBA_SDK_ROOT`
 
 ## 3. 生成产物
 
@@ -45,24 +48,24 @@ python3 /root/ameba-rtos-1.2/ameba.py build -p
 
 ## 4. 推荐烧录命令
 
-项目当前使用自定义烧录脚本，不建议直接手敲 SDK 默认 flash 命令。
+项目当前使用自定义烧录脚本，不建议直接手敲 SDK 默认 `flash`
+命令。
 
 ```bash
 cd /root/ameba-river
-source env.sh
-python3 tools/river_flash.py -p /dev/ttyUSB0
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
 ```
 
 串口监视：
 
 ```bash
-ameba.py monitor -p /dev/ttyUSB0 -b 1500000
+python3 "$AMEBA_SDK_ROOT/tools/ameba/Monitor/monitor.py" -p /dev/ttyUSB0 -b 1500000
 ```
 
 补充说明：
 
-- 当前 `DS-CNN` 分支主应用镜像已验证可编译，但仍然超过 SDK stock `RTL8730E` app 区间上限。
-- 因此继续要求使用项目自定义 profile：
+- 当前应用镜像继续要求使用项目自定义 profile：
   - `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 - 如果使用官方 GUI 下载工具，也必须加载上面的项目 profile，而不是工具自带的默认 `RTL8730E` profile。
 
@@ -74,8 +77,9 @@ ameba.py monitor -p /dev/ttyUSB0 -b 1500000
 
 ```bash
 cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
 source env.sh
-python3 /root/ameba-rtos-1.2/ameba.py build -p
+python3 "$AMEBA_SDK_ROOT/ameba.py" build -p
 ```
 
 ### 重新配置后构建
@@ -98,5 +102,5 @@ Start to build RTL8730E ...
 
 ## 7. 说明
 
-- 当前项目不建议把临时调试命令散落在聊天记录里，后续统一以这份文档为准。
+- 当前项目不建议把临时调试命令散落在聊天记录里，后续统一以这份文档和 `.codex/active_context.md` 为准。
 - 如果后续增加新的 SoC、不同 flash profile 或 CI 构建流程，再单独补充到本文件。

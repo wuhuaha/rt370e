@@ -1,4 +1,9 @@
-# Runtime Performance Optimization Plan
+# Archived Runtime Performance Optimization Plan
+
+> Status: historical snapshot.
+> Canonical active context lives in `.codex/active_context.md`.
+> The remainder of this file is a 2026-04-01 `refactor`-branch plan kept for
+> traceability and should not be treated as today's branch/objective.
 
 Date: 2026-04-01
 Branch: `refactor`

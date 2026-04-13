@@ -2,44 +2,42 @@
 
 External Ameba RTOS project for `RTL8730E`, focused on a board-side voice pipeline for wake word, VAD, cloud interaction, and smart-home control.
 
-## Current Status
+## Start Here
 
-Current working branch:
-- `DS-CNN`
+Canonical entry points for Codex and human collaborators:
 
-Current engineering objective:
-- keep the branch `build-stable`
-- verify the board runtime with the newly landed experimental `DS-CNN` wake model
-- keep the target business flow as `wake word -> XiaoZhi realtime session`, with VAD-assisted audio uplink
-- do board smoke before any further model iteration
+- [AGENTS.md](/root/ameba-river/AGENTS.md)
+- [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- [build.md](/root/ameba-river/build.md)
+- [doc/README.md](/root/ameba-river/doc/README.md)
 
-Current default local wake path on this branch:
-- `capture -> fixed_dsb -> silero_vad(gate) -> dscnn_kws`
+After changing repo-level harness files, run:
 
-Current KWS runtime state:
-- baseline model fallback is still retained
-- the default experimental model variant is `round6_targeted_experimental`
-- `PAD` op support has already been added to the board TFLM resolver for this model
-- local interaction debug router and direct cloud text/TTS debug injection are now compile-time gated and disabled by default on this branch
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
 
-Externalized workspaces:
-- training / TTS / host recording lab assets are maintained in `/root/river-openwakeword-lab`
-- repo-side paths such as `tools/openwakeword`, `tools/tts`, `tools/recording_lab`, `artifacts/openwakeword`, and `artifacts/recording_lab` are preserved as symlinks for compatibility
+Notes:
+
+- `README.md` and `build.md` are kept branch-agnostic on purpose.
+- Active branch, current objective, and the latest verified step live in
+  `.codex/active_context.md`.
+- Historical design notes, status snapshots, and dated investigations live
+  under `doc/`.
 
 ## Build
 
 ```bash
 cd /root/ameba-river
-source env.sh
-python3 /root/ameba-rtos-1.2/ameba.py build -p
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source env.sh; python3 /root/ameba-rtos/ameba.py build -p'
 ```
 
-Latest verified output sizes on this branch:
-- `build_RTL8730E/km4_boot_all.bin` = `51872`
-- `build_RTL8730E/km0_km4_ca32_app.bin` = `3564896`
-- `build_RTL8730E/ota_all.bin` = `3564928`
+The default SDK baseline is `/root/ameba-rtos`. `env.sh` also honors
+`AMEBA_SDK_ROOT` if a task explicitly needs another checkout.
 
-See [build.md](/root/ameba-river/build.md) for the validated build and flash path.
+See [build.md](/root/ameba-river/build.md) for the stable build, flash, and
+monitor commands.
 
 ## Flash
 
@@ -47,43 +45,36 @@ Use the project flash path, not the SDK stock `flash` command:
 
 ```bash
 cd /root/ameba-river
-source env.sh
-python3 tools/river_flash.py -p /dev/ttyUSB0
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
 ```
 
 Important note:
-- the current app image still exceeds the SDK stock `RTL8730E` app window
-- continue using the project custom flash profile under `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
+- continue using the project custom flash profile under
+  `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 
-## Current Validation Focus
+## Repository Layout
 
-Board smoke target for this branch:
-- boot the board successfully
-- confirm startup log contains `variant=round6_targeted_experimental`
-- confirm status logs show `interaction_diag=compiled=no`
-- confirm local `VAD + KWS` chain starts normally
-- confirm wakeup can enter the XiaoZhi realtime conversation window with VAD-assisted audio flow
-- then decide whether the experimental runtime should remain the default lab profile
+- `app/`: Ameba entrypoint only
+- `components/river_core`: orchestration and runtime state
+- `components/river_voice`: capture, VAD, KWS, and future local speech modules
+- `components/river_cloud`: XiaoZhi / cloud transport and online integrations
+- `components/river_diag`: monitor commands and diagnostics
 
-## Repository Entry Files
+User-owned review inputs:
 
-Files kept at repository root for ongoing work:
-- `README.md`
-- `plan.md`
-- `build.md`
-- `AGENTS.md`
 - `TIPS.md`
 - `REVIEW.md`
 
-Summary / report / design notes have been moved into [doc/README.md](/root/ameba-river/doc/README.md).
+Process records:
+
+- [.codex/changes.md](/root/ameba-river/.codex/changes.md)
+- [.codex/verification.md](/root/ameba-river/.codex/verification.md)
 
 ## Recommended Reading
 
-- [plan.md](/root/ameba-river/plan.md)
+- [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
 - [build.md](/root/ameba-river/build.md)
 - [doc/PROJECT_STATUS_ZH.md](/root/ameba-river/doc/PROJECT_STATUS_ZH.md)
 - [doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md](/root/ameba-river/doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md)
 - [doc/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md](/root/ameba-river/doc/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md)
 - [doc/VOICE_FRONTEND_CHAIN_STATUS_ZH.md](/root/ameba-river/doc/VOICE_FRONTEND_CHAIN_STATUS_ZH.md)
-
-Process records are maintained under `.codex/`.

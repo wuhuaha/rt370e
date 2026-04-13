@@ -1,5 +1,24 @@
 # Verification
 
+## Step 5.149
+Validate the Codex harness entry points after the context cleanup:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully
+- output contains:
+  - `Current branch: kws`
+  - `check_codex_harness: all checks passed`
+- no `FAIL` lines are printed
+- this confirms the current Codex-facing entry points agree on:
+  - the canonical active-context file
+  - the default SDK baseline `/root/ameba-rtos`
+  - the current git branch
+  - the historical status of root `plan.md`
+
 ## Step 5.148
 Rebuild the latest-SDK image after tightening `no_ref` follow-up reopen:
 ```bash
