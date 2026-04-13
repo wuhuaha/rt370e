@@ -1,5 +1,24 @@
 # Verification
 
+## Step 5.150
+Validate the active-plan workflow after adding the new plan index and template:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully
+- output contains:
+  - `Current branch: kws`
+  - `check_codex_harness: all checks passed`
+- no `FAIL` lines are printed
+- this confirms the Codex-facing entry points now also agree on:
+  - the active-plan index `.codex/active_plans.md`
+  - the execution-plan template `doc/EXECUTION_PLAN_TEMPLATE_ZH.md`
+  - the active-context to active-plan linkage
+  - the README / AGENTS / doc index exposure of the plan workflow
+
 ## Step 5.149
 Validate the Codex harness entry points after the context cleanup:
 ```bash

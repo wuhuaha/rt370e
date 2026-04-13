@@ -12,6 +12,9 @@
 
 ## 当前优先阅读
 
+- `../.codex/active_context.md`
+- `../.codex/active_plans.md`
+- `EXECUTION_PLAN_TEMPLATE_ZH.md`
 - `PROJECT_STATUS_ZH.md`
 - `PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md`
 - `RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md`
@@ -39,6 +42,7 @@
 
 ## 架构与实现
 
+- `EXECUTION_PLAN_TEMPLATE_ZH.md`
 - `XIAOZHI_REALTIME_INTERACTION_ARCHITECTURE_ZH.md`
 - `XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN_ZH.md`
 - `VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH.md`
@@ -80,3 +84,4 @@
 说明：
 - 本次整理未删除这些沉淀文档，因为它们仍然具备追溯和对照价值。
 - 如果后续确认某些文档已经被更高质量版本完全替代，再单独做归档或删除。
+- 新的多步任务应先在 `doc/` 中建执行计划，再登记到 `../.codex/active_plans.md`。

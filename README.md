@@ -8,6 +8,7 @@ Canonical entry points for Codex and human collaborators:
 
 - [AGENTS.md](/root/ameba-river/AGENTS.md)
 - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
 - [build.md](/root/ameba-river/build.md)
 - [doc/README.md](/root/ameba-river/doc/README.md)
 
@@ -23,6 +24,7 @@ Notes:
 - `README.md` and `build.md` are kept branch-agnostic on purpose.
 - Active branch, current objective, and the latest verified step live in
   `.codex/active_context.md`.
+- Active multi-step execution plans live in `.codex/active_plans.md`.
 - Historical design notes, status snapshots, and dated investigations live
   under `doc/`.
 
@@ -73,6 +75,7 @@ Process records:
 ## Recommended Reading
 
 - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
 - [build.md](/root/ameba-river/build.md)
 - [doc/PROJECT_STATUS_ZH.md](/root/ameba-river/doc/PROJECT_STATUS_ZH.md)
 - [doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md](/root/ameba-river/doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md)

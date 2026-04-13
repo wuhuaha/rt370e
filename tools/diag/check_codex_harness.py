@@ -43,12 +43,19 @@ def main() -> int:
     build = read_text("build.md")
     plan = read_text("plan.md")
     active_context = read_text(".codex/active_context.md")
+    active_plans = read_text(".codex/active_plans.md")
+    execution_plan_template = read_text("doc/EXECUTION_PLAN_TEMPLATE_ZH.md")
 
     checks = [
         (
             "AGENTS points to the canonical active context",
             ".codex/active_context.md" in agents,
             "Add the active-context pointer to AGENTS.md.",
+        ),
+        (
+            "AGENTS points to the canonical active-plan index",
+            ".codex/active_plans.md" in agents,
+            "Add the active-plan index pointer to AGENTS.md.",
         ),
         (
             "AGENTS documents the harness check command",
@@ -59,6 +66,11 @@ def main() -> int:
             "README points to the canonical active context",
             ".codex/active_context.md" in readme,
             "README.md should send readers to .codex/active_context.md.",
+        ),
+        (
+            "README points to the canonical active-plan index",
+            ".codex/active_plans.md" in readme,
+            "README.md should send readers to .codex/active_plans.md.",
         ),
         (
             "README documents the harness check command",
@@ -89,6 +101,21 @@ def main() -> int:
             "active context tracks the canonical SDK baseline",
             f"Active SDK baseline: `{CANONICAL_SDK}`" in active_context,
             ".codex/active_context.md should name /root/ameba-rtos as the baseline.",
+        ),
+        (
+            "active context points to the active-plan index",
+            ".codex/active_plans.md" in active_context,
+            ".codex/active_context.md should point to .codex/active_plans.md.",
+        ),
+        (
+            "active-plan index points to the execution-plan template",
+            "doc/EXECUTION_PLAN_TEMPLATE_ZH.md" in active_plans,
+            ".codex/active_plans.md should reference the execution-plan template.",
+        ),
+        (
+            "execution-plan template is clearly labeled",
+            "# 执行计划模板" in execution_plan_template,
+            "doc/EXECUTION_PLAN_TEMPLATE_ZH.md should contain the execution-plan template header.",
         ),
         (
             "plan.md is marked as historical",

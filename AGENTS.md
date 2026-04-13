@@ -16,11 +16,14 @@
 
 ## Codex Harness Hygiene
 - Treat `.codex/active_context.md` as the canonical volatile context for the current branch, active objective, SDK baseline, and latest verified step.
+- Treat `.codex/active_plans.md` as the canonical index of currently active multi-step execution plans.
 - Keep `README.md` and `build.md` low-entropy:
   - they should stay stable and point to the active context instead of embedding fast-stale branch snapshots
   - historical branch-specific plans, status snapshots, and dated investigations belong under `doc/`
-- For multi-step work that spans multiple modules or multiple sessions, keep an execution plan in `doc/` and link it from `.codex/active_context.md` instead of overloading the root entry files.
-- After changing repo-level Codex harness files (`AGENTS.md`, `README.md`, `build.md`, `plan.md`, `.codex/active_context.md`), run:
+- For multi-step work that spans multiple modules or multiple sessions:
+  - create or update an execution plan in `doc/`, starting from `doc/EXECUTION_PLAN_TEMPLATE_ZH.md`
+  - register that plan in `.codex/active_plans.md`
+- After changing repo-level Codex harness files (`AGENTS.md`, `README.md`, `build.md`, `plan.md`, `.codex/active_context.md`, `.codex/active_plans.md`, `doc/EXECUTION_PLAN_TEMPLATE_ZH.md`), run:
   - `python3 tools/diag/check_codex_harness.py`
 
 ## User-Owned Review Files

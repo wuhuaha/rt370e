@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.149 Codex harness context cleanup`
+  - `5.150 Codex active-plan workflow`
 
 ## Current Runtime Focus
 
@@ -29,6 +29,7 @@ or top-of-tree verification target changes.
 - `AGENTS.md`
 - `README.md`
 - `build.md`
+- `.codex/active_plans.md`
 - the latest sections at the top of `.codex/changes.md` and `.codex/verification.md`
 - `doc/README.md` for historical design and investigation documents
 
@@ -38,7 +39,7 @@ or top-of-tree verification target changes.
   `build.md`; those files should stay stable.
 - Root `plan.md` is currently a historical `refactor`-branch snapshot, not the
   canonical active plan for today's branch.
-- For larger work items, add or update an execution plan in `doc/` and link it
-  here.
+- For larger work items, add or update an execution plan in `doc/` and
+  register it in `.codex/active_plans.md`.
 - After changing repo-level Codex harness files, run:
   - `python3 tools/diag/check_codex_harness.py`

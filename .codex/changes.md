@@ -1,5 +1,47 @@
 # Change Log
 
+## Step 5.150
+- Added a canonical active-plan workflow for multi-step Codex work:
+  - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
+  - [doc/EXECUTION_PLAN_TEMPLATE_ZH.md](/root/ameba-river/doc/EXECUTION_PLAN_TEMPLATE_ZH.md)
+  - [AGENTS.md](/root/ameba-river/AGENTS.md)
+  - [README.md](/root/ameba-river/README.md)
+  - [doc/README.md](/root/ameba-river/doc/README.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+  - [tools/diag/check_codex_harness.py](/root/ameba-river/tools/diag/check_codex_harness.py)
+- New Codex-facing plan surfaces:
+  - `.codex/active_plans.md` is now the single low-entropy index for active
+    multi-step execution plans
+  - `doc/EXECUTION_PLAN_TEMPLATE_ZH.md` provides the required plan structure:
+    - current background
+    - goals / non-goals
+    - guardrails
+    - facts / risks
+    - step slices
+    - exact verification commands
+- Tightened the repository harness rules so larger work now has an explicit
+  workflow:
+  - create the plan under `doc/`
+  - register it in `.codex/active_plans.md`
+  - point `.codex/active_context.md` at it when it becomes the main active
+    objective
+- Extended the harness checker to fail fast if the new plan workflow drifts:
+  - `AGENTS.md` must point to `.codex/active_plans.md`
+  - `README.md` must point to `.codex/active_plans.md`
+  - `.codex/active_context.md` must point to `.codex/active_plans.md`
+  - `.codex/active_plans.md` must point to `doc/EXECUTION_PLAN_TEMPLATE_ZH.md`
+- Reason for the change:
+  - after step `5.149`, the repository had a stable active context but still no
+    canonical place to answer:
+    - which long-running plan is active right now
+    - where a new multi-step plan should live
+    - what shape that plan should take
+  - that gap would push Codex back toward scanning old plan-like documents
+    under `doc/` and guessing which one matters
+- Ran the updated harness check after wiring in the active-plan workflow:
+  - `python3 tools/diag/check_codex_harness.py`
+  - result: `all checks passed`
+
 ## Step 5.149
 - Reduced Codex-facing context drift across the repository entry points:
   - [AGENTS.md](/root/ameba-river/AGENTS.md)
