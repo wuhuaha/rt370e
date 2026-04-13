@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -35,6 +36,19 @@ def report(label: str, ok: bool, detail: str) -> None:
         print(f"       {detail}")
 
 
+def extract_primary_active_plan(active_plans: str) -> str | None:
+    match = re.search(
+        r"Primary active execution plan:\s*\n\s*-\s*`([^`]+)`",
+        active_plans,
+        flags=re.MULTILINE,
+    )
+    if match:
+        return match.group(1)
+    if "none pinned right now" in active_plans:
+        return None
+    raise RuntimeError("unable to parse primary active execution plan")
+
+
 def main() -> int:
     branch = current_branch()
 
@@ -45,6 +59,10 @@ def main() -> int:
     active_context = read_text(".codex/active_context.md")
     active_plans = read_text(".codex/active_plans.md")
     execution_plan_template = read_text("doc/EXECUTION_PLAN_TEMPLATE_ZH.md")
+    primary_active_plan = extract_primary_active_plan(active_plans)
+    primary_active_plan_exists = True
+    if primary_active_plan is not None:
+        primary_active_plan_exists = (ROOT / primary_active_plan).exists()
 
     checks = [
         (
@@ -111,6 +129,16 @@ def main() -> int:
             "active-plan index points to the execution-plan template",
             "doc/EXECUTION_PLAN_TEMPLATE_ZH.md" in active_plans,
             ".codex/active_plans.md should reference the execution-plan template.",
+        ),
+        (
+            "primary active plan exists",
+            primary_active_plan_exists,
+            "The primary plan listed in .codex/active_plans.md should exist on disk.",
+        ),
+        (
+            "active context points to the primary active plan",
+            primary_active_plan is None or primary_active_plan in active_context,
+            ".codex/active_context.md should point to the primary active plan.",
         ),
         (
             "execution-plan template is clearly labeled",

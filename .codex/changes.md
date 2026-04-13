@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.151
+- Pinned the first live multi-step execution plan into the Codex harness:
+  - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+  - [doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md)
+  - [doc/README.md](/root/ameba-river/doc/README.md)
+  - [tools/diag/check_codex_harness.py](/root/ameba-river/tools/diag/check_codex_harness.py)
+- The new primary active plan is now:
+  - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
+- This plan turns the current XiaoZhi work into a bounded execution surface:
+  - validate the `no_ref` reopen guard from step `5.148`
+  - if needed, tighten local follow-up policy separately
+  - only after follow-up is stable, isolate any remaining uplink quality work
+- The active-context file now links directly to the primary active plan so
+  Codex no longer has to guess between:
+  - old `XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN`
+  - old root `plan.md`
+  - recent `.codex` step history
+- Extended the harness checker so the new plan workflow is not just advisory:
+  - it now parses `.codex/active_plans.md`
+  - verifies the primary active plan exists on disk
+  - verifies `.codex/active_context.md` points to that same plan
+- Reason for the change:
+  - after step `5.150`, the repository had a plan workflow but still no pinned
+    live plan
+  - without one, Codex still had to infer the active long-running task from
+    historical XiaoZhi docs and recent step logs
+- Ran the updated harness check after pinning the live plan:
+  - `python3 tools/diag/check_codex_harness.py`
+  - result: `all checks passed`
+
 ## Step 5.150
 - Added a canonical active-plan workflow for multi-step Codex work:
   - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)

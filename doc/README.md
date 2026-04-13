@@ -14,6 +14,7 @@
 
 - `../.codex/active_context.md`
 - `../.codex/active_plans.md`
+- `XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - `EXECUTION_PLAN_TEMPLATE_ZH.md`
 - `PROJECT_STATUS_ZH.md`
 - `PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md`

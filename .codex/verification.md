@@ -1,5 +1,24 @@
 # Verification
 
+## Step 5.151
+Validate the first pinned live active plan and its harness linkage:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully
+- output contains:
+  - `Current branch: kws`
+  - `check_codex_harness: all checks passed`
+- no traceback or `FAIL` lines are printed
+- this confirms:
+  - `.codex/active_plans.md` has a parseable primary active plan
+  - the primary active plan file exists on disk
+  - `.codex/active_context.md` points to that same live plan
+  - the rest of the Codex harness entry points still agree
+
 ## Step 5.150
 Validate the active-plan workflow after adding the new plan index and template:
 ```bash

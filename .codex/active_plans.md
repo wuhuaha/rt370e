@@ -7,7 +7,7 @@ of encoding long plan content directly in root entry files.
 ## Active Plans
 
 - Primary active execution plan:
-  - none pinned right now
+  - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - Secondary active execution plans:
   - none
 
