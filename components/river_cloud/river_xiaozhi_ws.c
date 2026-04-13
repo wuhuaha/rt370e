@@ -114,8 +114,10 @@ typedef struct {
     uint32_t send_backpressure_reserve_events;
     uint32_t send_backpressure_full_events;
     uint32_t send_queue_high_watermark;
+    bool bootstrap_config_owned;
     bool activation_code_present;
     uint64_t bootstrap_retry_after_ms;
+    uint64_t bootstrap_cache_expire_at_ms;
     uint64_t last_backpressure_log_ms;
     char url[RIVER_XIAOZHI_URL_MAX];
     char ota_url[RIVER_XIAOZHI_OTA_URL_MAX];
@@ -395,6 +397,15 @@ static void river_xiaozhi_update_activation_from_text(const char *text, const ch
                g_river_xiaozhi.activation_message);
 }
 
+static void river_xiaozhi_clear_activation_state(void)
+{
+    g_river_xiaozhi.activation_code[0] = '\0';
+    g_river_xiaozhi.activation_message[0] = '\0';
+    g_river_xiaozhi.activation_challenge[0] = '\0';
+    g_river_xiaozhi.activation_timeout_ms = 0U;
+    g_river_xiaozhi.activation_code_present = false;
+}
+
 static void river_xiaozhi_set_last_type(const char *type_text)
 {
     river_xiaozhi_copy_string(g_river_xiaozhi.last_type,
@@ -653,6 +664,52 @@ static void river_xiaozhi_refresh_identifiers(void)
 {
     river_xiaozhi_build_device_id(g_river_xiaozhi.device_id, sizeof(g_river_xiaozhi.device_id));
     river_xiaozhi_build_client_id(g_river_xiaozhi.client_id, sizeof(g_river_xiaozhi.client_id));
+}
+
+static uint32_t river_xiaozhi_bootstrap_cache_remaining_ms(void)
+{
+    uint64_t now_ms;
+
+    if (!g_river_xiaozhi.bootstrap_config_owned ||
+        g_river_xiaozhi.bootstrap_cache_expire_at_ms == 0U) {
+        return 0U;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (now_ms >= g_river_xiaozhi.bootstrap_cache_expire_at_ms) {
+        return 0U;
+    }
+
+    return (uint32_t)(g_river_xiaozhi.bootstrap_cache_expire_at_ms - now_ms);
+}
+
+static bool river_xiaozhi_bootstrap_cache_valid(void)
+{
+    return g_river_xiaozhi.bootstrap_config_owned &&
+           g_river_xiaozhi.url[0] != '\0' &&
+           river_xiaozhi_bootstrap_cache_remaining_ms() > 0U;
+}
+
+static void river_xiaozhi_bootstrap_cache_mark_success(void)
+{
+    g_river_xiaozhi.bootstrap_config_owned = true;
+    g_river_xiaozhi.bootstrap_cache_expire_at_ms =
+        (uint64_t)rtos_time_get_current_system_time_ms() +
+        (uint64_t)RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS;
+}
+
+static void river_xiaozhi_bootstrap_cache_disable_auto_refresh(void)
+{
+    g_river_xiaozhi.bootstrap_config_owned = false;
+    g_river_xiaozhi.bootstrap_cache_expire_at_ms = 0U;
+}
+
+static void river_xiaozhi_bootstrap_cache_forget_runtime_credentials(void)
+{
+    river_xiaozhi_bootstrap_cache_disable_auto_refresh();
+    g_river_xiaozhi.url[0] = '\0';
+    g_river_xiaozhi.token[0] = '\0';
+    river_xiaozhi_clear_activation_state();
 }
 
 static uint32_t river_xiaozhi_bootstrap_retry_remaining_ms(void)
@@ -1051,6 +1108,7 @@ static river_status_t river_xiaozhi_parse_bootstrap_response(const char *json_te
                                   token_obj->valuestring :
                                   "");
 
+    river_xiaozhi_clear_activation_state();
     activation_obj = cJSON_GetObjectItemCaseSensitive(root, "activation");
     if (cJSON_IsObject(activation_obj)) {
         message_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)activation_obj, "message");
@@ -1823,6 +1881,10 @@ river_status_t river_xiaozhi_get_config(river_xiaozhi_config_t *config)
 
 river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
 {
+    bool ota_changed = false;
+    bool manual_url_override = false;
+    bool manual_token_override = false;
+
     if (!g_river_xiaozhi.initialized) {
         river_status_t init_status = river_xiaozhi_init();
         if (init_status != RIVER_OK) {
@@ -1834,14 +1896,17 @@ river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
     }
 
     if (config->ota_url != NULL) {
+        ota_changed = strcmp(g_river_xiaozhi.ota_url, config->ota_url) != 0;
         river_xiaozhi_copy_string(g_river_xiaozhi.ota_url,
                                   sizeof(g_river_xiaozhi.ota_url),
                                   config->ota_url);
     }
     if (config->url != NULL) {
+        manual_url_override = true;
         river_xiaozhi_copy_string(g_river_xiaozhi.url, sizeof(g_river_xiaozhi.url), config->url);
     }
     if (config->token != NULL) {
+        manual_token_override = true;
         river_xiaozhi_copy_string(g_river_xiaozhi.token, sizeof(g_river_xiaozhi.token), config->token);
     }
     if (config->protocol_version != 0U) {
@@ -1861,6 +1926,13 @@ river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
     g_river_xiaozhi.config.ota_url = g_river_xiaozhi.ota_url;
     g_river_xiaozhi.config.url = g_river_xiaozhi.url;
     g_river_xiaozhi.config.token = g_river_xiaozhi.token;
+    if (manual_url_override || manual_token_override) {
+        river_xiaozhi_bootstrap_cache_disable_auto_refresh();
+        river_xiaozhi_clear_activation_state();
+    } else if (ota_changed && g_river_xiaozhi.bootstrap_config_owned) {
+        river_xiaozhi_bootstrap_cache_forget_runtime_credentials();
+        RIVER_LOGI("xiaozhi bootstrap cache invalidated after ota url update");
+    }
     g_river_xiaozhi.config_ready =
         (g_river_xiaozhi.url[0] != '\0') || (g_river_xiaozhi.ota_url[0] != '\0');
     river_xiaozhi_refresh_identifiers();
@@ -2006,10 +2078,12 @@ river_status_t river_xiaozhi_bootstrap(void)
     }
 
     river_xiaozhi_clear_bootstrap_backoff();
-    RIVER_LOGI("xiaozhi ota bootstrap ok: ota=%s ws=%s token_set=%s device_id=%s client_id=%s activation_code=%s challenge_set=%s",
+    river_xiaozhi_bootstrap_cache_mark_success();
+    RIVER_LOGI("xiaozhi ota bootstrap ok: ota=%s ws=%s token_set=%s cache_ttl_ms=%lu device_id=%s client_id=%s activation_code=%s challenge_set=%s",
                g_river_xiaozhi.ota_url,
                g_river_xiaozhi.url,
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
+               (unsigned long)RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS,
                g_river_xiaozhi.device_id,
                g_river_xiaozhi.client_id,
                g_river_xiaozhi.activation_code[0] != '\0' ?
@@ -2030,6 +2104,8 @@ river_status_t river_xiaozhi_open_session(void)
     int port;
     river_status_t status;
     uint32_t waited_ms = 0U;
+    uint32_t bootstrap_cache_remaining_ms = 0U;
+    bool bootstrap_refresh_needed = false;
 
     if (!g_river_xiaozhi.initialized) {
         status = river_xiaozhi_init();
@@ -2041,21 +2117,37 @@ river_status_t river_xiaozhi_open_session(void)
         river_xiaozhi_set_last_error("wifi_not_connected");
         return RIVER_ERR_BUSY;
     }
+    if (g_river_xiaozhi.session_open &&
+        g_river_xiaozhi.wsclient != NULL &&
+        g_river_xiaozhi.wsclient->readyState == WSC_OPEN) {
+        return RIVER_OK;
+    }
     river_xiaozhi_reclaim_heap_before_connect();
     if (g_river_xiaozhi.ota_url[0] != '\0') {
-        status = river_xiaozhi_bootstrap();
-        if (status != RIVER_OK && g_river_xiaozhi.url[0] == '\0') {
-            return status;
+        bootstrap_cache_remaining_ms = river_xiaozhi_bootstrap_cache_remaining_ms();
+        bootstrap_refresh_needed =
+            (g_river_xiaozhi.url[0] == '\0') ||
+            (g_river_xiaozhi.bootstrap_config_owned && !river_xiaozhi_bootstrap_cache_valid());
+        if (!bootstrap_refresh_needed && river_xiaozhi_bootstrap_cache_valid()) {
+            RIVER_LOGI("xiaozhi bootstrap cache hit: refresh_in_ms=%lu device_id=%s client_id=%s",
+                       (unsigned long)bootstrap_cache_remaining_ms,
+                       g_river_xiaozhi.device_id[0] != '\0' ? g_river_xiaozhi.device_id : "-",
+                       g_river_xiaozhi.client_id[0] != '\0' ? g_river_xiaozhi.client_id : "-");
+        } else if (bootstrap_refresh_needed) {
+            status = river_xiaozhi_bootstrap();
+            if (status != RIVER_OK && g_river_xiaozhi.url[0] == '\0') {
+                return status;
+            }
+            if (status != RIVER_OK) {
+                RIVER_LOGW("xiaozhi bootstrap refresh failed; using stale ws config: status=%d last_err=%s",
+                           (int)status,
+                           river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+            }
         }
     }
     if (g_river_xiaozhi.url[0] == '\0') {
         river_xiaozhi_set_last_error("xiaozhi_url_not_configured");
         return RIVER_ERR_UNSUPPORTED;
-    }
-    if (g_river_xiaozhi.session_open &&
-        g_river_xiaozhi.wsclient != NULL &&
-        g_river_xiaozhi.wsclient->readyState == WSC_OPEN) {
-        return RIVER_OK;
     }
 
     river_xiaozhi_close_context(false);
@@ -2315,6 +2407,7 @@ void river_xiaozhi_dump_status(void)
     uint32_t recycle = 0U;
     uint32_t max = 0U;
     uint32_t stable = 0U;
+    uint32_t bootstrap_refresh_in_ms = 0U;
     uint32_t audio_soft_limit = 0U;
     bool locked = false;
 
@@ -2330,8 +2423,9 @@ void river_xiaozhi_dump_status(void)
     }
     audio_soft_limit = river_xiaozhi_send_queue_soft_limit(max,
                                                            RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE);
+    bootstrap_refresh_in_ms = river_xiaozhi_bootstrap_cache_remaining_ms();
 
-    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
+    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu bootstrap_owned=%s bootstrap_refresh_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.session_open),
                river_xiaozhi_bool_text(g_river_xiaozhi.server_hello_received),
                river_xiaozhi_bool_text(g_river_xiaozhi.config_ready),
@@ -2344,6 +2438,8 @@ void river_xiaozhi_dump_status(void)
                g_river_xiaozhi.device_id[0] != '\0' ? g_river_xiaozhi.device_id : "-",
                g_river_xiaozhi.client_id[0] != '\0' ? g_river_xiaozhi.client_id : "-",
                (unsigned long)river_xiaozhi_bootstrap_retry_remaining_ms(),
+               river_xiaozhi_bool_text(g_river_xiaozhi.bootstrap_config_owned),
+               (unsigned long)bootstrap_refresh_in_ms,
                (unsigned long)g_river_xiaozhi.server_sample_rate,
                (unsigned long)g_river_xiaozhi.server_frame_duration_ms,
                (unsigned long)g_river_xiaozhi.text_messages_rx,

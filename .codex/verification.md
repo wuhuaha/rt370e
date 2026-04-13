@@ -9645,3 +9645,76 @@ Expected result:
   - `full_bp` remains `0` or materially lower
 - only `reason=hard_full` or a rising `full_bp` means the SDK send queue is
   actually reaching `16/16`
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image after the XiaoZhi bootstrap cache
+change:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the bootstrap cache logic is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS|bootstrap cache hit|bootstrap_owned|bootstrap_refresh_in_ms|cache_ttl_ms" \
+  include/river/river_xiaozhi_credentials.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- the credentials header defines `RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS`
+- `river_xiaozhi_ws.c` contains:
+  - `xiaozhi bootstrap cache hit: refresh_in_ms=...`
+  - `cache_ttl_ms`
+  - `bootstrap_owned`
+  - `bootstrap_refresh_in_ms`
+- the active XiaoZhi execution-plan document records the new cache-based
+  connection assumption
+
+Post-flash board validation for "skip per-wake bootstrap":
+```text
+river xiaozhi status
+```
+
+Expected result:
+- the XiaoZhi status line now includes:
+  - `bootstrap_owned=yes|no`
+  - `bootstrap_refresh_in_ms=...`
+
+Wake the device twice within the `10 min` bootstrap cache TTL and compare the
+logs:
+```text
+1st wake:
+  wakeword hit ...
+  xiaozhi ota bootstrap ok: ... cache_ttl_ms=600000 ...
+  xiaozhi connecting: ...
+
+2nd wake within TTL:
+  wakeword hit ...
+  xiaozhi bootstrap cache hit: refresh_in_ms=...
+  xiaozhi connecting: ...
+```
+
+Expected result:
+- the first wake after boot or after cache expiry may still log
+  `xiaozhi ota bootstrap ok`
+- a later wake inside the TTL should log
+  `xiaozhi bootstrap cache hit: refresh_in_ms=...`
+- that later wake should not need another synchronous OTA bootstrap before
+  `xiaozhi connecting`

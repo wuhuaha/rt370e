@@ -50,6 +50,7 @@
  * the SDK to release excess buffers once traffic calms down.
  */
 #define RIVER_XIAOZHI_WS_STABLE_BUF_NUM         ((RIVER_XIAOZHI_WS_QUEUE_MAX * 3U) / 4U)
+#define RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS    (10U * 60U * 1000U)
 #define RIVER_XIAOZHI_OPEN_READY_WAIT_MS        10000U
 #define RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC      10U
 

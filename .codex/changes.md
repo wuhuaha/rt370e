@@ -5712,3 +5712,41 @@
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against
     `/root/ameba-rtos`
+
+## Step 5.121
+- Removed the unconditional per-wake synchronous XiaoZhi bootstrap from the
+  normal `open_session()` path:
+  - `open_session()` now returns immediately if the websocket session is already
+    open instead of re-running OTA/bootstrap first
+  - when `ota_url` is configured, it now refreshes bootstrap only if:
+    - no websocket URL is currently available, or
+    - the current websocket URL/token came from bootstrap and the local cache
+      TTL has expired
+- Added bootstrap cache state to the XiaoZhi transport context:
+  - bootstrap-derived websocket credentials are now tagged as bootstrap-owned
+  - successful bootstrap stores a local TTL-based cache expiry
+  - current TTL is `RIVER_XIAOZHI_BOOTSTRAP_CACHE_TTL_MS = 10 min`
+- Preserved safe fallback behavior when refresh fails:
+  - if a refresh attempt fails but an older cached websocket URL still exists,
+    the session open path logs the refresh failure and continues using the stale
+    URL instead of hard-failing immediately
+- Added explicit cache invalidation rules for config changes:
+  - manual `url/token` overrides disable automatic bootstrap refresh
+  - changing `ota_url` invalidates bootstrap-owned cached credentials so the
+    next session re-fetches from the new OTA endpoint
+- Extended diagnostics for board-side timing analysis:
+  - bootstrap success log now prints `cache_ttl_ms`
+  - cache hits now log `xiaozhi bootstrap cache hit: refresh_in_ms=...`
+  - `river xiaozhi status` now prints:
+    - `bootstrap_owned`
+    - `bootstrap_refresh_in_ms`
+- Updated the active XiaoZhi stability plan document to record the new default
+  assumption for future latency analysis:
+  - the system should no longer be analyzed as "every wake always blocks on
+    synchronous bootstrap"
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against
+    `/root/ameba-rtos`
+  - static grep confirmed the new cache TTL, cache-hit log, and
+    `bootstrap_owned/bootstrap_refresh_in_ms` status fields

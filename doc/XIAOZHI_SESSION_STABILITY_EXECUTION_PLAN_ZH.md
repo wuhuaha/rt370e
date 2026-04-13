@@ -100,12 +100,23 @@ Branch: `kws`
     - `xiaozhi local close deferred: wait_ms=2000`
     - `xiaozhi local close resolved: trigger=...`
     - `river xiaozhi status` 中的 `close_pending` / `close_left_ms`
+- 2026-04-13 的最新建连时延优化已经加入：
+  - `open_session()` 不再在每次唤醒时无条件同步执行 HTTP bootstrap
+  - 成功 bootstrap 后会缓存 `ws url/token`，默认 TTL 为 `10 min`
+  - 只在以下情况才会重新同步 bootstrap：
+    - 当前没有可用 `ws url`
+    - 当前 `ws url/token` 来自 bootstrap 且缓存已过期
+  - 板端新增观察点：
+    - `xiaozhi bootstrap cache hit: refresh_in_ms=...`
+    - `river xiaozhi status` 中的
+      `bootstrap_owned=... bootstrap_refresh_in_ms=...`
 
 ## 6. 风险与未知项
 
 - `no_ref` guard 可能仍然不够严格，尾音/残留近端语音仍可能触发空 round
 - `no_ref` guard 也可能过严，导致真实 follow-up 被明显延迟或漏开
 - 即使 follow-up reopen 正常，uplink `busy / stale_drop` 仍可能单独影响体验
+- bootstrap cache TTL 也可能和服务端 token 生命周期不完全一致
 - 某些问题只能在真实板端时序下出现，单靠代码阅读无法排除
 
 ## 7. 执行切片
