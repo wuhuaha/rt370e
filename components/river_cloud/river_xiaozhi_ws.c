@@ -57,7 +57,6 @@
 #define RIVER_XIAOZHI_WS_QUEUE_LOG_INTERVAL_MS 1000U
 #define RIVER_XIAOZHI_POLL_LOCK_SLICE_MS   5U
 #define RIVER_XIAOZHI_CONNECT_HEAP_RECLAIM_THRESHOLD (64U * 1024U)
-
 typedef struct {
     uint16_t version;
     uint16_t type;
@@ -1544,6 +1543,9 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
 
         if (data_len < sizeof(*bp2)) {
             river_xiaozhi_set_last_error("binary_v2_short");
+            RIVER_LOGW("xiaozhi rx binary reject: protocol=2 reason=short len=%lu need>=%lu",
+                       (unsigned long)data_len,
+                       (unsigned long)sizeof(*bp2));
             return;
         }
         bp2 = (const river_xiaozhi_binary_v2_t *)data;
@@ -1552,6 +1554,10 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
         payload_len = (size_t)ntohl(bp2->payload_size);
         if ((sizeof(*bp2) + payload_len) > data_len) {
             river_xiaozhi_set_last_error("binary_v2_payload_invalid");
+            RIVER_LOGW("xiaozhi rx binary reject: protocol=2 reason=payload_invalid len=%lu payload=%lu type=%u",
+                       (unsigned long)data_len,
+                       (unsigned long)payload_len,
+                       (unsigned int)binary_type);
             return;
         }
         payload = bp2->payload;
@@ -1560,6 +1566,9 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
 
         if (data_len < sizeof(*bp3)) {
             river_xiaozhi_set_last_error("binary_v3_short");
+            RIVER_LOGW("xiaozhi rx binary reject: protocol=3 reason=short len=%lu need>=%lu",
+                       (unsigned long)data_len,
+                       (unsigned long)sizeof(*bp3));
             return;
         }
         bp3 = (const river_xiaozhi_binary_v3_t *)data;
@@ -1567,6 +1576,10 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
         payload_len = (size_t)ntohs(bp3->payload_size);
         if ((sizeof(*bp3) + payload_len) > data_len) {
             river_xiaozhi_set_last_error("binary_v3_payload_invalid");
+            RIVER_LOGW("xiaozhi rx binary reject: protocol=3 reason=payload_invalid len=%lu payload=%lu type=%u",
+                       (unsigned long)data_len,
+                       (unsigned long)payload_len,
+                       (unsigned int)binary_type);
             return;
         }
         payload = bp3->payload;
@@ -1594,11 +1607,36 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
                              binary_type);
 }
 
+static bool river_xiaozhi_payload_looks_like_json(const uint8_t *data, size_t data_len)
+{
+    size_t index = 0U;
+
+    if (data == NULL || data_len == 0U) {
+        return false;
+    }
+
+    while (index < data_len) {
+        uint8_t ch = data[index];
+
+        if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+            index++;
+            continue;
+        }
+
+        return ch == '{' || ch == '[';
+    }
+
+    return false;
+}
+
 static void river_xiaozhi_ws_message_cb(wsclient_context **wsclient,
                                         int data_len,
                                         enum opcode_type opcode,
                                         void *user_data)
 {
+    const uint8_t *data;
+    bool json_guess;
+
     (void)wsclient;
     (void)user_data;
 
@@ -1608,9 +1646,23 @@ static void river_xiaozhi_ws_message_cb(wsclient_context **wsclient,
         return;
     }
 
+    data = (const uint8_t *)g_river_xiaozhi.wsclient->receivedData;
+    json_guess = river_xiaozhi_payload_looks_like_json(data, (size_t)data_len);
+
     if (opcode == BINARY_FRAME) {
-        river_xiaozhi_handle_binary_message((const uint8_t *)g_river_xiaozhi.wsclient->receivedData,
-                                            (size_t)data_len);
+        river_xiaozhi_handle_binary_message(data, (size_t)data_len);
+        return;
+    }
+
+    /*
+     * Ameba wsclient reports the opcode of the final fragment when a server
+     * message is reassembled. For fragmented XiaoZhi audio, that means the
+     * callback may receive the full binary payload with final opcode
+     * CONTINUATION instead of BINARY_FRAME. Distinguish reassembled JSON from
+     * reassembled binary by looking at the payload prefix.
+     */
+    if (opcode == CONTINUATION && !json_guess) {
+        river_xiaozhi_handle_binary_message(data, (size_t)data_len);
         return;
     }
 

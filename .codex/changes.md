@@ -1,5 +1,54 @@
 # Change Log
 
+## Step 5.153
+- Fixed XiaoZhi downlink websocket receive classification for fragmented server
+  messages:
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Project-side websocket receive handling now distinguishes reassembled JSON from
+  reassembled binary payloads:
+  - `BINARY_FRAME` still goes directly to the binary handler
+  - `CONTINUATION` now also goes to the binary handler when the reassembled
+    payload prefix does not look like JSON
+- Added low-noise malformed-frame warnings in the XiaoZhi binary decoder:
+  - `binary_v2_short`
+  - `binary_v2_payload_invalid`
+  - `binary_v3_short`
+  - `binary_v3_payload_invalid`
+- Rebuilt the latest-SDK image against `/root/ameba-rtos` after the websocket
+  receive fix:
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+  - result: `Build done`
+- Board validation executed on 2026-04-13:
+  - flash:
+    - `bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"`
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'`
+  - monitor:
+    - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
+  - runtime commands:
+    - `river xiaozhi connect`
+    - `river xiaozhi listen detect 今天天气怎么样`
+    - `river xiaozhi status`
+- Observed results:
+  - `server hello: sid=29fefc9e sample_rate=24000 frame_duration=20ms mcp=yes`
+  - during the board validation pass, transient local tracing confirmed repeated
+    protocol-v3 downlink binary frames were reaching the project-side binary
+    handler; that tracing was removed before landing this step
+  - `playback start: stream=xiaozhi_tts ...`
+  - `playback stop: stream=xiaozhi_tts epoch=3`
+  - `xiaozhi no_ref reopen guard armed: tail_ms=480 silence_frames=6`
+  - runtime status after reconnect showed downlink audio is now live:
+    - `audio_rx=280`
+    - `server_audio=24000Hz/20ms`
+    - `sample=24000Hz frame=20ms`
+- Conclusion:
+  - the remaining blocker is no longer `audio_rx=0` / missing playback
+  - the fragmented-downlink receive path is now working on board
+  - the remaining Step-A validation gap is narrower:
+    - this automated run still did not capture
+      `xiaozhi no_ref reopen rearmed after silence: ...`
+    - follow-up validation can now focus on the silence-rearm leg rather than
+      on downlink transport
+
 ## Step 5.152
 - Ran the current XiaoZhi Step-A board validation against the live execution
   plan:

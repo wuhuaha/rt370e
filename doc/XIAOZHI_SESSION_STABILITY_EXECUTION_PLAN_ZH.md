@@ -76,6 +76,18 @@ Branch: `kws`
   - 所以当前结论是：
     - Step A 已部分完成
     - 最终 guard 行为仍需要真实语音/音频下行交互再验证
+- 2026-04-13 的后续板端验证已经进一步确认：
+  - fragmented websocket downlink 修复后，`river xiaozhi connect` /
+    `listen detect` 已能得到真实下行音频
+  - 已观察到：
+    - `playback start: stream=xiaozhi_tts ...`
+    - `playback stop: stream=xiaozhi_tts ...`
+    - `xiaozhi no_ref reopen guard armed: tail_ms=480 silence_frames=6`
+    - `audio_rx > 0`
+  - 因而当前 Step A 的剩余问题已缩小为：
+    - 还需要继续确认
+      `xiaozhi no_ref reopen rearmed after silence: ...`
+    - 而不是继续排查下行 transport / playback 是否工作
 
 ## 6. 风险与未知项
 
@@ -126,9 +138,14 @@ python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 15000
 - `Finished PASS`
 - `no_ref` reopen guard 按 step `5.148` 的日志设计工作
 - 当前结果：
-  - 已确认 build / flash / status / bootstrap / connect / detect 路径可用
-  - 尚未确认真实 playback-stop 后的 guard 行为，因为本轮自动 `detect`
-    交互没有得到 `audio_rx`
+  - 已确认 build / flash / connect / detect 路径可用
+  - 已确认真实 downlink playback 与 guard arm：
+    - `audio_rx > 0`
+    - `playback start`
+    - `playback stop`
+    - `xiaozhi no_ref reopen guard armed`
+  - 尚未确认：
+    - `xiaozhi no_ref reopen rearmed after silence`
 
 ### Step B: 若仍有假 reopen，最小化收紧本地 follow-up policy
 

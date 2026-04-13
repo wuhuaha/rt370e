@@ -1,5 +1,50 @@
 # Verification
 
+## Step 5.153
+Validate the fragmented XiaoZhi downlink receive fix against the latest SDK:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Then run these monitor commands:
+- `river xiaozhi connect`
+- `river xiaozhi listen detect 今天天气怎么样`
+- `river xiaozhi status`
+
+Expected result:
+- build output ends with `Build done`
+- flash output ends with `Finished PASS`
+- `connect` reaches:
+  - `server hello: sid=...`
+- `listen detect` now reaches actual downlink playback rather than text-only
+  TTS state changes:
+  - `playback start: stream=xiaozhi_tts ...`
+  - `playback stop: stream=xiaozhi_tts ...`
+- playback stop arms the current Step `5.148` guard:
+  - `xiaozhi no_ref reopen guard armed: tail_ms=480 silence_frames=6`
+- `river xiaozhi status` reports live downlink audio counters and runtime audio
+  format:
+  - `audio_rx=...` with a value greater than `0`
+  - `server_audio=24000Hz/20ms`
+  - `sample=24000Hz frame=20ms`
+
+Observed result on 2026-04-13:
+- all items above passed
+- the validated run showed:
+  - `server hello: sid=29fefc9e sample_rate=24000 frame_duration=20ms mcp=yes`
+  - `playback start: stream=xiaozhi_tts ...`
+  - `playback stop: stream=xiaozhi_tts epoch=3`
+  - `xiaozhi no_ref reopen guard armed: tail_ms=480 silence_frames=6`
+  - `audio_rx=280`
+- this automated run still did not print:
+  - `xiaozhi no_ref reopen rearmed after silence: ...`
+- so the next runtime check should focus specifically on silence rearm after
+  playback, not on downlink transport bring-up
+
 ## Step 5.152
 Run the current XiaoZhi Step-A board validation and classify the remaining
 blocker precisely:
