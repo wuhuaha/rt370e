@@ -88,6 +88,18 @@ Branch: `kws`
     - 还需要继续确认
       `xiaozhi no_ref reopen rearmed after silence: ...`
     - 而不是继续排查下行 transport / playback 是否工作
+- 2026-04-13 的最新本地收尾修复已经加入：
+  - 保持现有 `listen_stop` 触发时机不变
+  - 把本地 `session_closed` / per-round finish 延后到：
+    - `post_stop_result`
+    - `llm`
+    - `tts_start`
+    - `timeout`
+    - `reopen_overlap`
+  - 新增板端观察点：
+    - `xiaozhi local close deferred: wait_ms=2000`
+    - `xiaozhi local close resolved: trigger=...`
+    - `river xiaozhi status` 中的 `close_pending` / `close_left_ms`
 
 ## 6. 风险与未知项
 

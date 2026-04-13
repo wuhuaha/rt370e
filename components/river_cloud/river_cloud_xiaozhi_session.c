@@ -157,11 +157,13 @@ void river_cloud_xiaozhi_emit_session_started(void)
 
 void river_cloud_xiaozhi_emit_session_closed(void)
 {
-    if (!g_river_cloud.xiaozhi_listening) {
+    if (!g_river_cloud.xiaozhi_listening && !g_river_cloud.xiaozhi_local_close_pending) {
         return;
     }
 
     g_river_cloud.xiaozhi_listening = false;
+    g_river_cloud.xiaozhi_local_close_pending = false;
+    g_river_cloud.xiaozhi_local_close_deadline_ms = 0U;
     river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED,
                                 NULL,
                                 river_cloud_xiaozhi_current_sid(),
@@ -246,6 +248,8 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
     g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
     g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
+    g_river_cloud.xiaozhi_local_close_pending = false;
+    g_river_cloud.xiaozhi_local_close_deadline_ms = 0U;
     river_audio_frame_ring_reset(&g_river_cloud.xiaozhi_uplink_ring);
     river_cloud_xiaozhi_reset_downlink_state();
     river_cloud_xiaozhi_clear_pending_text();

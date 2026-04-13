@@ -1,5 +1,53 @@
 # Verification
 
+## Step 5.154
+Validate the XiaoZhi local `post_roll/close` defer path against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Then perform a real two-turn interaction on board:
+- first wake/query to get TTS playback, for example:
+  - `小欧管家，今天周几`
+- after TTS ends and the follow-up window stays open, speak a second query with a
+  natural pause, for example:
+  - `帮我开灯`
+- optionally inspect runtime state between turns:
+  - `river xiaozhi status`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- when a round reaches local `post_roll` before cloud semantics are ready, logs
+  show:
+  - `xiaozhi local close deferred: wait_ms=2000`
+- after `listen_stop` is actually finalized, the same round settles through one
+  of these triggers:
+  - `xiaozhi local close resolved: trigger=post_stop_result ...`
+  - `xiaozhi local close resolved: trigger=llm ...`
+  - `xiaozhi local close resolved: trigger=tts_start ...`
+  - `xiaozhi local close resolved: trigger=timeout ...`
+  - `xiaozhi local close resolved: trigger=reopen_overlap ...`
+- `river xiaozhi status` exposes the new state when relevant:
+  - `close_pending=yes`
+  - `close_left_ms=...`
+- compared with the pre-step logs, genuine follow-up rounds should no longer
+  fall back to an obviously premature local close without any explanation; if an
+  empty round still happens, the new deferred-close logs should identify whether
+  it was settled by timeout or by overlap with the next reopen
+
+Observed result on 2026-04-13:
+- `python3 tools/diag/check_codex_harness.py` passed
+- the latest-SDK build passed with `Build done`
+- board validation is still pending for this step
+
 ## Step 5.153
 Validate the fragmented XiaoZhi downlink receive fix against the latest SDK:
 ```bash

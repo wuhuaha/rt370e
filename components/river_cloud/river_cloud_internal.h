@@ -65,6 +65,7 @@
 #define RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
+#define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
@@ -134,6 +135,7 @@ typedef struct {
     bool xiaozhi_playback_active;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
+    bool xiaozhi_local_close_pending;
     bool xiaozhi_io_started;
     bool xiaozhi_downlink_started;
     rtos_mutex_t xiaozhi_control_lock;
@@ -161,6 +163,7 @@ typedef struct {
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
+    uint64_t xiaozhi_local_close_deadline_ms;
     uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
     uint32_t xiaozhi_control_read_index;
     uint32_t xiaozhi_control_write_index;

@@ -15,15 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.153 Fragmented XiaoZhi downlink routing fix`
+  - `5.154 XiaoZhi local post-roll close defer`
 - Primary active execution plan:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
 ## Current Runtime Focus
 
 - Keep the board-side `wake -> VAD/KWS -> XiaoZhi realtime session` path usable.
-- Reconfirm the remaining `no_ref` silence-rearm leg now that XiaoZhi downlink
-  audio and playback are live again.
+- Reconfirm the remaining local `post_roll/close` timing on real board logs now
+  that XiaoZhi downlink audio and playback are live again.
+- Use the new `close_pending` / deferred-close logs to separate:
+  - premature local close timing
+  - reopen overlap
+  - remaining `no_ref` silence-rearm gaps
 - Drive current multi-step work from:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - Preserve the project flash profile:

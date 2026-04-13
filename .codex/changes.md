@@ -1,5 +1,48 @@
 # Change Log
 
+## Step 5.154
+- Tightened XiaoZhi local `post_roll/close` settlement without delaying the
+  existing `listen_stop` trigger:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- The local runtime now distinguishes:
+  - transport stop intent (`listen_stop_pending`)
+  - deferred local close settlement (`close_pending`)
+- Added a bounded XiaoZhi local-close defer window:
+  - `RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS = 2000`
+- When a round reaches local `post_roll` before cloud semantics are ready, the
+  adapter now:
+  - arms `xiaozhi local close deferred: wait_ms=2000`
+  - waits until `listen_stop` is fully finalized
+  - settles local `session_closed` / per-round finish on:
+    - `post_stop_result`
+    - `llm`
+    - `tts_start`
+    - `tts_stop`
+    - `timeout`
+    - `reopen_overlap`
+- Added new runtime observability for board triage:
+  - `xiaozhi local close deferred: ...`
+  - `xiaozhi local close resolved: trigger=... partial=... final=...`
+  - `river xiaozhi status` now prints:
+    - `close_pending=...`
+    - `close_left_ms=...`
+- Validation executed on 2026-04-13:
+  - harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+    - result: `check_codex_harness: all checks passed`
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+    - result: `Build done`
+- Current conclusion:
+  - this step is compile-verified on `/root/ameba-rtos`
+  - the next board pass should verify whether genuine follow-up rounds stop
+    producing premature local close / empty-round accounting
+  - if empties remain, the new `close_pending` and local-close resolution logs
+    should now show whether the remaining issue is timeout-driven or reopen-driven
+
 ## Step 5.153
 - Fixed XiaoZhi downlink websocket receive classification for fragmented server
   messages:
