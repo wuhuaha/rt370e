@@ -44,6 +44,12 @@
  * under sustained congestion.
  */
 #define RIVER_XIAOZHI_WS_QUEUE_MAX              16
+/*
+ * Keep most send buffers warm in the SDK recycle queue so short bursty speech
+ * does not repeatedly pay malloc/free churn while still leaving some slack for
+ * the SDK to release excess buffers once traffic calms down.
+ */
+#define RIVER_XIAOZHI_WS_STABLE_BUF_NUM         ((RIVER_XIAOZHI_WS_QUEUE_MAX * 3U) / 4U)
 #define RIVER_XIAOZHI_OPEN_READY_WAIT_MS        10000U
 #define RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC      10U
 

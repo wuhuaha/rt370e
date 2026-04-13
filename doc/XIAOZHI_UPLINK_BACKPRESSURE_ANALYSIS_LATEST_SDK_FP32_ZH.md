@@ -32,13 +32,15 @@
   - `playback start: stream=xiaozhi_tts`
   - `playback stop: stream=xiaozhi_tts`
 - 但同一会话中反复出现：
-  - `xiaozhi ws backpressure: kind=audio ready=6 recycle=0 max=8 reserve=2`
+  - `xiaozhi ws backpressure: kind=audio reason=soft_reserve ready=14 recycle=0 max=16 stable=12 reserve=2 free=2 soft_limit=14`
   - `xiaozhi uplink backpressure: queued=.../64 busy=... streak=... backoff=... stale_drop=...`
   - `last_err=send_queue_busy`
 
 同时，状态快照仍显示：
 
 - `xiaozhi session=yes hello=yes`
+- `txq=14/16 recycle=0 stable=12 audio_soft_limit=14`
+- `reserve_bp` 持续增长，而 `full_bp` 可以保持为 `0`
 - `audio_rx` 非零
 - `playback_service ... starts=6 stops=6`
 
@@ -47,11 +49,11 @@
 
 ## 机制拆解
 
-### 1. websocket 发送队列在 `ready >= 6` 时就会主动拒绝继续入队
+### 1. websocket 音频上行在 `ready >= 14` 时会触发项目侧软限流
 
-项目侧 websocket 队列最大深度是 `8`，音频发送保留 `2` 个槽位：
+项目侧 websocket 队列最大深度已是 `16`，音频发送仍保留 `2` 个槽位：
 
-- `RIVER_XIAOZHI_WS_QUEUE_MAX = 8`
+- `RIVER_XIAOZHI_WS_QUEUE_MAX = 16`
 - `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE = 2`
 
 发送前会检查：
@@ -59,31 +61,58 @@
 - 如果 `(ready + reserve) >= max`，则直接判定 backpressure
 - 此时设置 `last_error = "send_queue_busy"`
 - 并打印：
-  - `xiaozhi ws backpressure: kind=audio ready=%lu recycle=%lu max=%lu reserve=%lu`
+  - `xiaozhi ws backpressure: kind=audio reason=%s ready=%lu recycle=%lu max=%lu stable=%lu reserve=%lu free=%lu soft_limit=%lu`
 
-因此，对于音频上行来说，真正的软阈值不是 `8`，而是 `6`。
-这也解释了为什么现场状态里会看到：
+因此，对于音频上行来说，真正的软阈值不是 `16`，而是：
 
-- `q_peak=6`
-- `bp=42`
+- `soft_limit = max - reserve = 14`
 
-`q_peak=6` 不是偶然，而是当前设计下的主动钳制上限。
+这意味着：
 
-### 2. 当前发送策略是非阻塞优先，不等队列腾挪
+- `ready=14/16` 时，并不是 websocket 队列已经“硬满”
+- 而是项目主动为 JSON/control/MCP 保留 `2` 个槽位，不再让音频继续挤占
+- 只有 `ready=16/16` 时，才属于真正的 `hard_full`
+
+所以用户现场看到的 `ready=14/16` 高水位，本质上首先是
+`soft_reserve` 命中，而不是 SDK 队列彻底塞满。
+
+### 2. `ready` / `recycle` / `stable` 三个数的语义不能混看
+
+结合 latest SDK websocket 实现，当前几个计数分别代表：
+
+- `ready`
+  - 已经排队等待发送的 buffer 数量
+- `recycle`
+  - 已发送完成、可被复用的空 buffer 数量
+- `stable`
+  - SDK 希望保留在 recycle 池里的空 buffer 上限
+
+因此：
+
+- `ready=14 recycle=0` 的直接含义是“当前有 14 个待发送 buffer，暂时没有空闲可复用 buffer”
+- 它不等于“队列已经 16/16 全占满”
+- `stable=12` 也不等于“允许 ready 到 12 就停”
+
+`stable` 只影响 SDK 在发送完成后，是把 buffer 留在 recycle 池里，还是直接
+`free` 掉；它不改变项目侧的音频软限流阈值 `14`。
+
+### 3. 当前发送策略是非阻塞优先，不等队列腾挪
 
 连接建立后，项目显式设置了：
 
 - `ws_set_senddata_block_time(0)`
-- `ws_multisend_opts(..., 1)`
+- `ws_multisend_opts(..., 12)`
 
 代码注释写得很明确：
 
 - 一旦发送队列接近满，项目侧宁可尽早返回 `BUSY`
 - 也不愿在 transport mutex 上长时间阻塞
 
-所以当前策略的核心目标不是“尽量把音频都塞进去”，而是“保持实时性，宁可丢旧数据”。
+这里的 `12` 不是 backpressure 阈值，而是“预热并保留多少个可回收发送
+buffer”。此前 `1` 的策略更容易在 burst speech 下反复 `malloc/free`；现在把
+它调到 `12`，是为了先收敛 allocator 抖动，再继续观察真正的拥塞位置。
 
-### 3. uplink worker 在 `BUSY` 时会退避，并主动裁掉旧帧
+### 4. uplink worker 在 `BUSY` 时会退避，并主动裁掉旧帧
 
 当 `river_xiaozhi_send_audio()` 返回 `RIVER_ERR_BUSY` 后，
 `river_cloud_xiaozhi_uplink_task()` 会做三件事：
@@ -99,7 +128,7 @@
 这意味着当前实现优先保证“新鲜语音”，而不是“完整语音”。
 一旦链路一段时间发不出去，就会通过 `stale_drop` 丢弃旧音频。
 
-### 4. `16 ms` 采集桥接到 `20 ms` Opus，上线瞬间存在启动突发
+### 5. `16 ms` 采集桥接到 `20 ms` Opus，上线瞬间存在启动突发
 
 当前 ASR bridge 输入是 `16 ms` 帧，而 XiaoZhi 上行 Opus 编码是 `20 ms` 帧。
 因此项目先把 `16 ms` PCM 累积到 `20 ms` 再编码发送。
@@ -117,16 +146,31 @@
 - 还会残留 `512 B` 累积尾巴等待下一帧补齐
 
 这不是 websocket 队列直接爆掉，因为中间还有项目自己的 `64` 帧 uplink ring；
-但它会显著增加“会话刚打开的前几百毫秒内，发送端持续贴近 backpressure 阈值”的概率。
+但它会显著增加“会话刚打开的前几百毫秒内，发送端持续贴近 `14/16`
+音频软阈值”的概率。
+
+换句话说，`ready=14/16` 的高水位，通常是几件事叠加后的结果：
+
+1. 会话打开瞬间先回灌 pre-roll
+2. `16 ms` 采集帧需要聚合成 `20 ms` Opus 帧
+3. WLAN/TLS 某个短窗口里发送排空速度慢于生产速度
+4. 项目为了给控制消息保留 `2` 个槽位，在 `ready=14` 就主动拒绝继续塞音频
 
 ## 结论
 
 当前 latest-SDK FP32 上看到的 `send_queue_busy`，更准确地说是：
 
 - 发生在 `wakeword` 之后、`云端实时上行` 这一层
-- 是项目显式设计的“新鲜度优先”限流机制被触发
+- 是项目显式设计的“新鲜度优先”限流机制在 `soft_reserve(14/16)` 处被触发
 - 不是 KWS 模型部署错误
-- 也不是 websocket 队列彻底溢出失控
+- 大多数情况下也不是 websocket 队列彻底溢出失控
+
+新增诊断项后，可以更明确地区分两类情况：
+
+- `reserve_bp` 增长而 `full_bp=0`
+  - 说明压力主要停在项目预留的 `2` 个控制槽位之前
+- `full_bp` 也持续增长
+  - 才说明 SDK send queue 真正跑到了 `16/16` 的硬满状态
 
 从已观察到的行为看，它目前属于：
 
@@ -152,22 +196,21 @@
 
 建议按风险从低到高评估：
 
-1. 先增强观测，而不是直接改大队列。
-   先按 session 统计：
+1. 先看新增计数，而不是继续猜。
+   重点观察：
+   - `audio_soft_limit`
    - `q_peak`
-   - `bp`
+   - `reserve_bp`
+   - `full_bp`
    - `stale_drop`
-   - `busy_count`
-   - 首次 `playback start` 前的累积 busy 次数
-2. 优先考虑削峰，而不是盲目扩容。
+2. 先削峰，再决定是否改 reserve。
    最值得优先验证的是：
    - pre-roll 不要一次性全部灌入 uplink，而是按 `20 ms` 节拍平滑释放
-3. 再评估 websocket 队列参数。
-   例如：
-   - `RIVER_XIAOZHI_WS_QUEUE_MAX`
-   - `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE`
-   但这类改动会改变“控制消息 vs 音频消息”的竞争关系，不能盲改。
-4. 最后再看 transport 调度。
+3. 当前先不动 `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE = 2`。
+   原因是：
+   - 这 `2` 个槽位目前承担的是 JSON/control/MCP 留白
+   - 如果没证明 `full_bp` 真在增长，贸然降 reserve 只会把控制消息也拖进竞争
+4. 如果 `reserve_bp` 仍高，再看 transport 调度。
    当前 `pump` 侧 `ws_poll(20 ms)` 与 uplink 发送共享 transport lock，
    若后续数据证明真正瓶颈在 poll/发送调度，再评估更细的拆分方案。
 

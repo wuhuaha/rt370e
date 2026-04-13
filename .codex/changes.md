@@ -5675,3 +5675,40 @@
   - AP shell now has materially more stack headroom for heavy serial/KWS debug
     flows
   - SDK sources remain untouched
+
+## Step 5.120
+- Refined XiaoZhi uplink websocket pressure handling so the board can
+  distinguish "soft headroom exhausted for audio" from true queue saturation:
+  - added `send_backpressure_reserve_events`
+  - added `send_backpressure_full_events`
+  - backpressure logs now print `reason=soft_reserve|hard_full` together with
+    `ready/recycle/max/stable/free/soft_limit`
+- Made the queue model explicit in both code and diagnostics:
+  - current websocket queue depth stays `16`
+  - audio still reserves `2` slots for control traffic
+  - the effective audio soft limit is therefore `14`, not `16`
+  - `ready=14/16` is now reported as a project-side `soft_reserve` event rather
+    than being conflated with hard queue exhaustion
+- Reduced SDK-side send-buffer allocator churn without changing the audio soft
+  limit:
+  - introduced `RIVER_XIAOZHI_WS_STABLE_BUF_NUM`
+  - set it to `12` (`3/4` of the queue depth)
+  - switched XiaoZhi from `ws_multisend_opts(..., 1)` to
+    `ws_multisend_opts(..., 12)` so short uplink bursts can reuse warmed send
+    buffers instead of repeatedly malloc/free'ing them
+- Extended `river xiaozhi status` / boot logs to expose the real runtime queue
+  model:
+  - connect log now prints `txq`, `stable`, and `reserve`
+  - status dump now prints `stable`, `audio_soft_limit`, `reserve_bp`, and
+    `full_bp`
+- Updated the latest-SDK XiaoZhi uplink analysis document to reflect the
+  current behavior:
+  - the previously documented `max=8`, `ready>=6`, and
+    `ws_multisend_opts(..., 1)` interpretation is superseded here
+  - the current `ready=14/16` high watermark is documented as the combined
+    effect of the `soft_reserve` policy, `16 ms -> 20 ms` uplink cadence
+    bridging, and session-open pre-roll burst
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against
+    `/root/ameba-rtos`

@@ -9579,3 +9579,69 @@ Expected result:
 - no obvious shell stack crash/reset appears while running normal debug flows
 - this step only validates debug stability and headroom; it does not change KWS
   model behavior
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image after the XiaoZhi uplink queue
+diagnostic changes:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the new queue model is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_XIAOZHI_WS_STABLE_BUF_NUM|soft_reserve|hard_full|audio_soft_limit|reserve_bp|full_bp" \
+  include/river/river_xiaozhi_credentials.h \
+  components/river_cloud/river_xiaozhi_ws.c
+```
+
+Expected result:
+- `include/river/river_xiaozhi_credentials.h` defines
+  `RIVER_XIAOZHI_WS_STABLE_BUF_NUM`
+- `components/river_cloud/river_xiaozhi_ws.c` contains:
+  - `reason=soft_reserve`
+  - `reason=hard_full`
+  - `audio_soft_limit`
+  - `reserve_bp`
+  - `full_bp`
+
+Post-flash board validation for the `ready=14/16` high-water mark:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- the XiaoZhi status line now includes:
+  - `txq=.../16`
+  - `stable=12`
+  - `audio_soft_limit=14`
+  - `reserve_bp=...`
+  - `full_bp=...`
+
+During a wakeword -> ASR session, watch serial for:
+```text
+xiaozhi ws backpressure: kind=audio reason=soft_reserve ready=14 ... max=16 stable=12 reserve=2 free=2 soft_limit=14
+```
+
+Expected result:
+- `ready=14/16` is now explicitly labeled `reason=soft_reserve`
+- if the pressure is mostly due to the project-side audio reserve, then:
+  - `reserve_bp` increases
+  - `full_bp` remains `0` or materially lower
+- only `reason=hard_full` or a rising `full_bp` means the SDK send queue is
+  actually reaching `16/16`

@@ -111,6 +111,8 @@ typedef struct {
     uint32_t activation_timeout_ms;
     uint32_t bootstrap_failures;
     uint32_t send_backpressure_events;
+    uint32_t send_backpressure_reserve_events;
+    uint32_t send_backpressure_full_events;
     uint32_t send_queue_high_watermark;
     bool activation_code_present;
     uint64_t bootstrap_retry_after_ms;
@@ -187,11 +189,13 @@ static void river_xiaozhi_set_last_error(const char *error_text)
 
 static void river_xiaozhi_send_queue_snapshot_locked(uint32_t *ready_out,
                                                      uint32_t *recycle_out,
-                                                     uint32_t *max_out)
+                                                     uint32_t *max_out,
+                                                     uint32_t *stable_out)
 {
     uint32_t ready = 0U;
     uint32_t recycle = 0U;
     uint32_t max = 0U;
+    uint32_t stable = 0U;
 
     if (g_river_xiaozhi.wsclient != NULL) {
         if (g_river_xiaozhi.wsclient->ready_send_buf_num > 0) {
@@ -203,6 +207,9 @@ static void river_xiaozhi_send_queue_snapshot_locked(uint32_t *ready_out,
         if (g_river_xiaozhi.wsclient->max_queue_size > 0) {
             max = (uint32_t)g_river_xiaozhi.wsclient->max_queue_size;
         }
+        if (g_river_xiaozhi.wsclient->stable_buf_num > 0) {
+            stable = (uint32_t)g_river_xiaozhi.wsclient->stable_buf_num;
+        }
     }
 
     if (max != 0U) {
@@ -211,6 +218,9 @@ static void river_xiaozhi_send_queue_snapshot_locked(uint32_t *ready_out,
         }
         if (recycle > max) {
             recycle = max;
+        }
+        if (stable > max) {
+            stable = max;
         }
         if (ready > g_river_xiaozhi.send_queue_high_watermark) {
             g_river_xiaozhi.send_queue_high_watermark = ready;
@@ -226,6 +236,20 @@ static void river_xiaozhi_send_queue_snapshot_locked(uint32_t *ready_out,
     if (max_out != NULL) {
         *max_out = max;
     }
+    if (stable_out != NULL) {
+        *stable_out = stable;
+    }
+}
+
+static uint32_t river_xiaozhi_send_queue_soft_limit(uint32_t max, uint32_t reserve_slots)
+{
+    if (max == 0U) {
+        return 0U;
+    }
+    if (reserve_slots >= max) {
+        reserve_slots = max - 1U;
+    }
+    return max - reserve_slots;
 }
 
 static bool river_xiaozhi_send_queue_backpressured_locked(uint32_t reserve_slots,
@@ -234,9 +258,13 @@ static bool river_xiaozhi_send_queue_backpressured_locked(uint32_t reserve_slots
     uint32_t ready;
     uint32_t recycle;
     uint32_t max;
+    uint32_t stable;
+    uint32_t free_slots;
+    uint32_t soft_limit;
     uint64_t now_ms;
+    const char *reason = "hard_full";
 
-    river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max);
+    river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max, &stable);
     if (max == 0U) {
         return false;
     }
@@ -244,8 +272,17 @@ static bool river_xiaozhi_send_queue_backpressured_locked(uint32_t reserve_slots
     if (reserve_slots >= max) {
         reserve_slots = max - 1U;
     }
+    soft_limit = river_xiaozhi_send_queue_soft_limit(max, reserve_slots);
     if ((ready + reserve_slots) < max) {
         return false;
+    }
+
+    free_slots = ready < max ? (max - ready) : 0U;
+    if (ready < max) {
+        reason = "soft_reserve";
+        g_river_xiaozhi.send_backpressure_reserve_events++;
+    } else {
+        g_river_xiaozhi.send_backpressure_full_events++;
     }
 
     g_river_xiaozhi.send_backpressure_events++;
@@ -256,12 +293,16 @@ static bool river_xiaozhi_send_queue_backpressured_locked(uint32_t reserve_slots
         (now_ms - g_river_xiaozhi.last_backpressure_log_ms) >=
             RIVER_XIAOZHI_WS_QUEUE_LOG_INTERVAL_MS) {
         g_river_xiaozhi.last_backpressure_log_ms = now_ms;
-        RIVER_LOGW("xiaozhi ws backpressure: kind=%s ready=%lu recycle=%lu max=%lu reserve=%lu",
+        RIVER_LOGW("xiaozhi ws backpressure: kind=%s reason=%s ready=%lu recycle=%lu max=%lu stable=%lu reserve=%lu free=%lu soft_limit=%lu",
                    kind != NULL ? kind : "-",
+                   reason,
                    (unsigned long)ready,
                    (unsigned long)recycle,
                    (unsigned long)max,
-                   (unsigned long)reserve_slots);
+                   (unsigned long)stable,
+                   (unsigned long)reserve_slots,
+                   (unsigned long)free_slots,
+                   (unsigned long)soft_limit);
     }
     return true;
 }
@@ -2021,6 +2062,8 @@ river_status_t river_xiaozhi_open_session(void)
     g_river_xiaozhi.session_id[0] = '\0';
     g_river_xiaozhi.last_error[0] = '\0';
     g_river_xiaozhi.send_backpressure_events = 0U;
+    g_river_xiaozhi.send_backpressure_reserve_events = 0U;
+    g_river_xiaozhi.send_backpressure_full_events = 0U;
     g_river_xiaozhi.send_queue_high_watermark = 0U;
     g_river_xiaozhi.last_backpressure_log_ms = 0U;
     memset(g_river_xiaozhi.open_base_url, 0, sizeof(g_river_xiaozhi.open_base_url));
@@ -2096,12 +2139,15 @@ river_status_t river_xiaozhi_open_session(void)
                           RIVER_XIAOZHI_WS_SEND_TIMEOUT_MS,
                           RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS);
     ws_set_senddata_block_time(RIVER_XIAOZHI_WS_SEND_BLOCK_MS);
-    ws_multisend_opts(g_river_xiaozhi.wsclient, 1);
-    RIVER_LOGI("xiaozhi connecting: url=%s protocol=%u device_id=%s client_id=%s",
+    ws_multisend_opts(g_river_xiaozhi.wsclient, RIVER_XIAOZHI_WS_STABLE_BUF_NUM);
+    RIVER_LOGI("xiaozhi connecting: url=%s protocol=%u device_id=%s client_id=%s txq=%u stable=%u reserve=%u",
                g_river_xiaozhi.url,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                g_river_xiaozhi.open_device_id,
-               g_river_xiaozhi.open_client_id);
+               g_river_xiaozhi.open_client_id,
+               (unsigned int)RIVER_XIAOZHI_WS_QUEUE_MAX,
+               (unsigned int)RIVER_XIAOZHI_WS_STABLE_BUF_NUM,
+               (unsigned int)RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE);
     if (ws_connect_url(g_river_xiaozhi.wsclient) < 0) {
         river_xiaozhi_set_last_error("xiaozhi_ws_connect_failed");
         river_xiaozhi_close_context(false);
@@ -2268,6 +2314,8 @@ void river_xiaozhi_dump_status(void)
     uint32_t ready = 0U;
     uint32_t recycle = 0U;
     uint32_t max = 0U;
+    uint32_t stable = 0U;
+    uint32_t audio_soft_limit = 0U;
     bool locked = false;
 
     if (!g_river_xiaozhi.initialized) {
@@ -2277,11 +2325,13 @@ void river_xiaozhi_dump_status(void)
 
     locked = river_xiaozhi_transport_lock();
     if (locked) {
-        river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max);
+        river_xiaozhi_send_queue_snapshot_locked(&ready, &recycle, &max, &stable);
         river_xiaozhi_transport_unlock(locked);
     }
+    audio_soft_limit = river_xiaozhi_send_queue_soft_limit(max,
+                                                           RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE);
 
-    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu q_peak=%lu bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
+    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.session_open),
                river_xiaozhi_bool_text(g_river_xiaozhi.server_hello_received),
                river_xiaozhi_bool_text(g_river_xiaozhi.config_ready),
@@ -2308,8 +2358,12 @@ void river_xiaozhi_dump_status(void)
                (unsigned long)ready,
                (unsigned long)max,
                (unsigned long)recycle,
+               (unsigned long)stable,
+               (unsigned long)audio_soft_limit,
                (unsigned long)g_river_xiaozhi.send_queue_high_watermark,
                (unsigned long)g_river_xiaozhi.send_backpressure_events,
+               (unsigned long)g_river_xiaozhi.send_backpressure_reserve_events,
+               (unsigned long)g_river_xiaozhi.send_backpressure_full_events,
                g_river_xiaozhi.activation_code[0] != '\0' ? g_river_xiaozhi.activation_code : "-",
                g_river_xiaozhi.last_type[0] != '\0' ? g_river_xiaozhi.last_type : "-",
                g_river_xiaozhi.last_state[0] != '\0' ? g_river_xiaozhi.last_state : "-",
