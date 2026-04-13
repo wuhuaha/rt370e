@@ -1,5 +1,49 @@
 # Verification
 
+## Step 5.152
+Run the current XiaoZhi Step-A board validation and classify the remaining
+blocker precisely:
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Then run these monitor commands:
+- `river xiaozhi status`
+- `river xiaozhi bootstrap`
+- `river xiaozhi connect`
+- `river xiaozhi listen detect 你好`
+- `river xiaozhi listen detect 今天天气怎么样`
+
+Expected result:
+- build output ends with `Build done`
+- flash output ends with `Finished PASS`
+- `river xiaozhi status` prints the Step `5.148` no-ref reopen status line:
+  - `xiaozhi no_ref reopen rearm=... silence=... guard_left_ms=... open_hold_frames=...`
+- `bootstrap` and `connect` reach:
+  - `xiaozhi ota bootstrap ok`
+  - `server hello: sid=...`
+- `listen detect` reaches text/event flow:
+  - `stt ...`
+  - `llm ...`
+  - `tts sid=... state=start`
+  - `tts sid=... state=stop`
+
+Current observed result on 2026-04-13:
+- all items above passed
+- but both automated detect runs still showed:
+  - `audio_rx=0`
+  - no `playback start`
+  - no `playback stop`
+- therefore this step does not yet prove the final target logs:
+  - `xiaozhi no_ref reopen guard armed: ...`
+  - `xiaozhi no_ref reopen rearmed after silence: ...`
+- next verification must use a real interaction that produces actual downlink
+  audio or manual wake/speak/follow-up speech on board
+
 ## Step 5.151
 Validate the first pinned live active plan and its harness linkage:
 ```bash

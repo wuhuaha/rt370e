@@ -59,6 +59,23 @@ Branch: `kws`
   - 若不再错误 reopen，真实 follow-up 是否还能正常开始新 round
 - 现有 backpressure 分析已说明：
   - `send_queue_busy` 更像实时 freshness 保护，不是 KWS 部署错误
+- 2026-04-13 的 Step A 自动验证已经确认：
+  - latest SDK `/root/ameba-rtos` 构建通过
+  - `river_flash.py` 刷板通过，结果为 `Finished PASS`
+  - `river xiaozhi status` 已能稳定打印：
+    - `xiaozhi no_ref reopen rearm=... silence=... guard_left_ms=... open_hold_frames=...`
+  - `river xiaozhi bootstrap` / `connect` / `listen detect` 已能走到：
+    - `server hello`
+    - `stt partial/final`
+    - `tts state=start/stop`
+  - 但这轮自动验证里 `audio_rx` 仍为 `0`，没有拿到真实：
+    - `playback start`
+    - `playback stop`
+    - `xiaozhi no_ref reopen guard armed`
+    - `xiaozhi no_ref reopen rearmed after silence`
+  - 所以当前结论是：
+    - Step A 已部分完成
+    - 最终 guard 行为仍需要真实语音/音频下行交互再验证
 
 ## 6. 风险与未知项
 
@@ -108,6 +125,10 @@ python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 15000
 - `Build done`
 - `Finished PASS`
 - `no_ref` reopen guard 按 step `5.148` 的日志设计工作
+- 当前结果：
+  - 已确认 build / flash / status / bootstrap / connect / detect 路径可用
+  - 尚未确认真实 playback-stop 后的 guard 行为，因为本轮自动 `detect`
+    交互没有得到 `audio_rx`
 
 ### Step B: 若仍有假 reopen，最小化收紧本地 follow-up policy
 

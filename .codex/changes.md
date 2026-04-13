@@ -1,5 +1,53 @@
 # Change Log
 
+## Step 5.152
+- Ran the current XiaoZhi Step-A board validation against the live execution
+  plan:
+  - [doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+  - [.codex/verification.md](/root/ameba-river/.codex/verification.md)
+- Validation commands executed:
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+  - flash:
+    - `bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"`
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'`
+  - live monitor checks:
+    - `river xiaozhi status`
+    - `river xiaozhi bootstrap`
+    - `river xiaozhi connect`
+    - `river xiaozhi listen detect 你好`
+    - `river xiaozhi listen detect 今天天气怎么样`
+- Observed results:
+  - build completed successfully with `Build done`
+  - flash completed successfully with `Finished PASS`
+  - the board monitor reached the project CLI prompt `#`
+  - `river xiaozhi status` confirmed the new Step `5.148` status surface is
+    present on device:
+    - `xiaozhi no_ref reopen rearm=no silence=0/6 guard_left_ms=0 open_hold_frames=2`
+  - `bootstrap` and `connect` succeeded:
+    - `xiaozhi ota bootstrap ok`
+    - `server hello: sid=...`
+  - `listen detect` succeeded for text/event flow:
+    - `stt`
+    - `llm`
+    - `tts state=start/stop`
+- Current blocker:
+  - both automated `listen detect` runs kept:
+    - `audio_rx=0`
+    - no `playback start`
+    - no `playback stop`
+  - because of that, this step could not yet prove the target `no_ref`
+    follow-up guard logs:
+    - `xiaozhi no_ref reopen guard armed`
+    - `xiaozhi no_ref reopen rearmed after silence`
+- Conclusion:
+  - Step A is partially validated
+  - software path, flash path, status path, bootstrap path, and text-event
+    session path are healthy
+  - the remaining unverified part is specifically the real playback-stop /
+    follow-up behavior under actual voice or audio-downlink interaction
+
 ## Step 5.151
 - Pinned the first live multi-step execution plan into the Codex harness:
   - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
