@@ -1,5 +1,46 @@
 # Verification
 
+## Step 5.157
+Validate the WebSocket handshake fix against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify the board-side native realtime upgrade again:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, verify:
+- `小欧管家，今天周几`
+- or:
+  - `river xiaozhi connect`
+  - `river xiaozhi status`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- board log still targets:
+  - `xiaozhi connecting: url=ws://101.33.235.154:8080/v1/realtime/ws ...`
+- but the old handshake failure should disappear:
+  - no `Got bad status connecting to HTTP/1.1 400 Bad Request`
+  - no `Response header is wrong`
+- instead, the websocket should upgrade and continue into native session logs:
+  - `xiaozhi transport ready: ...`
+  - `xiaozhi session.start sent: ...`
+
+Observed result on 2026-04-14:
+- `python3 tools/diag/check_codex_harness.py` passed
+- the latest-SDK build passed with `Build done`
+- board validation is still pending for this step
+
 ## Step 5.156
 Validate the cloud deployment shape first, then rebuild the board image with
 the corrected default endpoint:

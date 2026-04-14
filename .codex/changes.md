@@ -1,5 +1,48 @@
 # Change Log
 
+## Step 5.157
+- Fixed the native realtime WebSocket handshake on Ameba so the SDK no longer
+  sends an invalid / conflicting subprotocol header:
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause analysis from the latest board log:
+  - TCP and plain `ws://101.33.235.154:8080` reachability were already healthy
+  - the failure moved to handshake time:
+    - `HTTP/1.1 400 Bad Request`
+  - River was manually appending:
+    - `Sec-WebSocket-Protocol: agent-server.realtime.v0`
+  - but the Ameba SDK websocket client also auto-generates its own
+    `Sec-WebSocket-Protocol` header and falls back to:
+    - `chat, superchat`
+  - inference:
+    - the board request could carry conflicting or duplicated subprotocol
+      headers, which is consistent with the cloud server rejecting the upgrade
+- The fix changes handshake ownership to the SDK-native path:
+  - removed `Sec-WebSocket-Protocol` from the custom `header_fields`
+  - now calls `ws_handshake_header_set_protocol()` with
+    `agent-server.realtime.v0`
+  - `header_fields` now only carry the custom device metadata / auth headers
+- Expected runtime change on board after this step:
+  - the old handshake failure should disappear:
+    - no `Got bad status connecting to HTTP/1.1 400 Bad Request`
+  - wake admission should move forward into native transport/session logs:
+    - `xiaozhi transport ready: ...`
+    - `xiaozhi session.start sent: ...`
+- Validation executed on 2026-04-14:
+  - harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+    - result: `check_codex_harness: all checks passed`
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+    - result: `Build done`
+- Current conclusion:
+  - the remaining blocker has been reduced from network reachability to a pure
+    handshake-header issue
+  - this step fixes the most likely cause in the project-side client
+  - next board validation should confirm whether the websocket upgrade now
+    reaches `101 Switching Protocols`
+
 ## Step 5.156
 - Added a reusable local cloud-debug toolkit for the self-hosted agent-server
   deployment:

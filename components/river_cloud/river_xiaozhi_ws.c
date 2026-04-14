@@ -1003,11 +1003,9 @@ static river_status_t river_xiaozhi_build_headers(char *buffer,
     written = snprintf(buffer,
                        buffer_size,
                        "%s"
-                       "Sec-WebSocket-Protocol: %s\r\n"
                        "Device-Id: %s\r\n"
                        "Client-Id: %s\r\n",
                        auth_header,
-                       RIVER_XIAOZHI_REALTIME_SUBPROTOCOL,
                        device_id,
                        client_id);
     if (written < 0 || (size_t)written >= buffer_size) {
@@ -2394,6 +2392,7 @@ river_status_t river_xiaozhi_open_session(void)
     river_status_t status;
     uint32_t bootstrap_cache_remaining_ms = 0U;
     bool bootstrap_refresh_needed = false;
+    char handshake_protocol[] = RIVER_XIAOZHI_REALTIME_SUBPROTOCOL;
 
     if (!g_river_xiaozhi.initialized) {
         status = river_xiaozhi_init();
@@ -2498,6 +2497,14 @@ river_status_t river_xiaozhi_open_session(void)
     if (g_river_xiaozhi.wsclient == NULL) {
         river_xiaozhi_set_last_error("xiaozhi_wsclient_create_failed");
         return RIVER_ERR_NO_MEMORY;
+    }
+
+    if (ws_handshake_header_set_protocol(g_river_xiaozhi.wsclient,
+                                         handshake_protocol,
+                                         (int)sizeof(handshake_protocol)) != 0) {
+        river_xiaozhi_set_last_error("xiaozhi_protocol_set_failed");
+        river_xiaozhi_close_context(false);
+        return RIVER_ERR_IO;
     }
 
     if (ws_handshake_set_header_fields(g_river_xiaozhi.wsclient,
