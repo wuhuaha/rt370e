@@ -2055,9 +2055,12 @@ static void river_xiaozhi_ws_message_cb(wsclient_context **wsclient,
 
 static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_data)
 {
+    char closed_sid[RIVER_XIAOZHI_SESSION_ID_MAX];
+
     (void)wsclient;
     (void)user_data;
 
+    river_xiaozhi_copy_string(closed_sid, sizeof(closed_sid), g_river_xiaozhi.session_id);
     g_river_xiaozhi.ws_closed = true;
     g_river_xiaozhi.session_open = false;
     g_river_xiaozhi.server_hello_received = false;
@@ -2066,7 +2069,7 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
     g_river_xiaozhi.sessions_closed++;
     river_xiaozhi_set_last_type("closed");
     RIVER_LOGI("xiaozhi websocket closed sid=%s",
-               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-");
+               closed_sid[0] != '\0' ? closed_sid : "-");
     river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_SESSION_CLOSED,
                              NULL,
                              NULL,
@@ -2077,6 +2080,7 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
                              NULL,
                              0U,
                              0U);
+    g_river_xiaozhi.session_id[0] = '\0';
 }
 
 static void river_xiaozhi_close_context(bool reset_session_id)
@@ -2088,6 +2092,18 @@ static void river_xiaozhi_close_context(bool reset_session_id)
         river_ws_dispatch_unregister(g_river_xiaozhi.wsclient);
         if (g_river_xiaozhi.wsclient->readyState == WSC_OPEN) {
             ws_close(&g_river_xiaozhi.wsclient);
+        }
+        /*
+         * Ameba ws_close() only sends a CLOSE frame and flips the state to
+         * CLOSING. The actual socket / queue / mutex teardown still lives in
+         * client_close(), so call it here before releasing the outer context.
+         * When the peer already closed first, ws_poll()/ws_connect_url() have
+         * already run client_close() and readyState is WSC_CLOSED, so skip it.
+         */
+        if (g_river_xiaozhi.wsclient->readyState == WSC_OPEN ||
+            g_river_xiaozhi.wsclient->readyState == WSC_CONNECTING ||
+            g_river_xiaozhi.wsclient->readyState == WSC_CLOSING) {
+            g_river_xiaozhi.wsclient->fun_ops.client_close(g_river_xiaozhi.wsclient);
         }
     }
     if (locked && g_river_xiaozhi.wsclient != NULL) {

@@ -1,5 +1,61 @@
 # Change Log
 
+## Step 5.160
+- Fixed a real websocket-lifecycle cleanup bug in the River native realtime
+  client and tightened transport-close state reset:
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause analysis from the latest board log on `2026-04-14`:
+  - the first wake now reaches:
+    - `Connected to websocket server`
+    - `xiaozhi transport ready`
+    - `xiaozhi session.start sent`
+    - `xiaozhi session.update: ... state=active`
+  - but the socket then drops unexpectedly about `1.9s` later:
+    - `xiaozhi websocket closed sid=sess_...`
+    - `ws_poll: ERROR: Read data failed!`
+  - a host-side reproduction against the same cloud server using the same
+    `session.start` payload plus `51` raw `pcm16le/16k/mono` frames stayed open
+    for multiple seconds and did not get server-closed
+  - inference:
+    - the remaining issue is on the board-side websocket lifecycle, not the
+      server's normal realtime policy
+  - the project close path also had a concrete local bug:
+    - `river_xiaozhi_close_context()` called `ws_close()` for `WSC_OPEN`
+      sockets, but `ws_close()` only sends CLOSE and flips state to `CLOSING`
+    - River then immediately `ws_free()`'d the outer `wsclient_context`
+      without running SDK `client_close()` teardown
+    - that skips the real socket / queue / mutex cleanup and can poison later
+      reconnect behavior
+- This step fixes the local cleanup path directly:
+  - after optional `ws_close()`, River now calls SDK `client_close()` for
+    `WSC_OPEN`, `WSC_CONNECTING`, and `WSC_CLOSING` contexts before freeing the
+    outer `wsclient_context`
+  - transport-close callback now clears the local `session_id` after emitting
+    the close event so the next wake does not inherit stale session identity
+- Expected runtime change on board after this step:
+  - explicit local close / reopen paths should no longer leave half-torn-down
+    websocket resources behind
+  - after an unexpected transport close, the next wake should start from a
+    clean local session context
+  - wake-admission logs after a transport close should no longer show the
+    previous session id
+- Validation executed on 2026-04-14:
+  - host-side server behavior check:
+    - realtime websocket upgrade succeeded with subprotocol
+      `agent-server.realtime.v0`
+    - a simulated `session.start + 51 PCM frames` run stayed connected and did
+      not reproduce the board's ~`1.9s` drop
+  - repo harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+- Current conclusion:
+  - cloud service reachability and native session start are now both verified
+  - this step removes a real board-side wsclient teardown defect that could
+    corrupt follow-up reconnects after transport loss
+
 ## Step 5.159
 - Added a repo-tracked SDK patch tool to fix misleading websocket-open failures
   during the native realtime migration:

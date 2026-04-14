@@ -1,5 +1,63 @@
 # Verification
 
+## Step 5.160
+Validate the River websocket lifecycle cleanup fix against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Optional host-side control check against the deployed realtime server:
+```bash
+cd /root/ameba-river
+python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 8080 --schemes ws http
+```
+
+Then flash and verify the board-side native realtime path again:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, verify:
+- `小欧管家，今天天气怎么样`
+- or:
+  - `river xiaozhi connect`
+  - `river xiaozhi status`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- host-side probe still shows:
+  - `ws://101.33.235.154:8080/v1/realtime/ws` -> `101 Switching Protocols`
+- on board, the first wake should still reach:
+  - `Connected to websocket server`
+  - `xiaozhi transport ready`
+  - `xiaozhi session.start sent`
+- if a transport close still happens, the next wake should begin from a clean
+  local session context:
+  - avoid reusing the old `sid=...` in the next `wake admission begin` log
+- reconnect behavior should improve because the old wsclient socket / queue /
+  mutex teardown now runs before the outer context is freed
+
+Observed result on 2026-04-14:
+- `python3 tools/diag/check_codex_harness.py` passed
+- latest-SDK build passed and ended with `Build done`
+- `python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 8080 --schemes ws http` passed:
+  - `ws://101.33.235.154:8080/v1/realtime/ws` returned
+    `101 Switching Protocols`
+  - `http://101.33.235.154:8080/v1/realtime` returned `200 OK`
+- manual websocket replay already showed:
+  - the server accepts `session.start`
+  - the server remains open across `51` raw PCM uplink frames in the same
+    native profile
+- post-flash board validation remains pending for this step
+
 ## Step 5.159
 Validate the SDK websocket connect-error patch and current cloud reachability:
 ```bash
