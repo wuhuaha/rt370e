@@ -1,5 +1,65 @@
 # Verification
 
+## Step 5.159
+Validate the SDK websocket connect-error patch and current cloud reachability:
+```bash
+cd /root/ameba-river
+python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 443 8080 80 --schemes ws wss http https
+python3 tools/sdk/apply_wsclient_connect_error_patch.py --sdk-root /root/ameba-rtos
+python3 tools/sdk/apply_wsclient_connect_error_patch.py --sdk-root /root/ameba-rtos --check
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify the board-side native realtime open path again:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, verify:
+- `小欧管家，今天周几`
+- or:
+  - `river xiaozhi connect`
+  - `river xiaozhi status`
+
+Expected result:
+- the local probe reflects the real server state on the current day:
+  - if the service is still down, `probe_realtime.py` reports `Connection refused`
+  - if the service has recovered, it should show `101 Switching Protocols`
+- the patch tool output includes:
+  - `status=changed` on first apply or `status=unchanged` if already patched
+  - `applied` on `--check`
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- on board, a raw TCP reachability failure should now surface explicitly as one
+  of:
+  - `Connect failed after select: so_error=...`
+  - `Connect timeout after ... ms`
+  - `Connect select failed ret(...) errno(...)`
+  - `connect failed ret(...) errno(...)`
+- the old ambiguous failure should no longer be the only signal:
+  - avoid relying on bare `ws_connect_url: ERROR: Sending handshake failed`
+
+Observed result on 2026-04-14:
+- local probe from `/root/ameba-river` showed:
+  - `101.33.235.154:443` `Connection refused`
+  - `101.33.235.154:8080` `Connection refused`
+  - `101.33.235.154:80` `Connection refused`
+- `python3 tools/sdk/apply_wsclient_connect_error_patch.py --sdk-root /root/ameba-rtos`
+  returned:
+  - `status=changed`
+- `python3 tools/sdk/apply_wsclient_connect_error_patch.py --sdk-root /root/ameba-rtos --check`
+  returned:
+  - `applied`
+- `python3 tools/diag/check_codex_harness.py` passed
+- the latest-SDK build passed with `Build done`
+- post-flash board validation is still pending for this step
+
 ## Step 5.158
 Validate the SDK handshake string-termination fix against the latest SDK:
 ```bash

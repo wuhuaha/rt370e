@@ -1,5 +1,55 @@
 # Change Log
 
+## Step 5.159
+- Added a repo-tracked SDK patch tool to fix misleading websocket-open failures
+  during the native realtime migration:
+  - [tools/sdk/apply_wsclient_connect_error_patch.py](/root/ameba-river/tools/sdk/apply_wsclient_connect_error_patch.py)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause analysis from the latest board log on `2026-04-14`:
+  - repeated wake attempts still stopped at:
+    - `ws_connect_url: ERROR: Sending handshake failed`
+  - but an external probe from the same day against the deployed server showed:
+    - `101.33.235.154:8080` `Connection refused`
+    - `101.33.235.154:443` `Connection refused`
+    - `101.33.235.154:80` `Connection refused`
+  - the Ameba SDK `ws_hostname_connect()` uses nonblocking `connect()` plus
+    `select()`, but treats any writable socket as success and never checks
+    `getsockopt(... SO_ERROR ...)`
+  - inference:
+    - a real TCP connect failure can be misreported downstream as
+      `Sending handshake failed`
+    - that makes board logs ambiguous exactly when cloud reachability changes
+- This step adds a reproducible SDK-side patch from inside the repo:
+  - after `select_ret == 1`, the patch now verifies `SO_ERROR == 0` before
+    declaring the socket connected
+  - failed connects now log the real reason:
+    - `Connect failed after select: so_error=...`
+    - `Connect timeout after ... ms`
+    - `Connect select failed ret(...) errno(...)`
+    - `connect failed ret(...) errno(...)`
+- Expected runtime change on board after this step:
+  - when the cloud port is actually down, the old ambiguous failure should be
+    replaced by an explicit connect-stage error instead of
+    `ws_connect_url: ERROR: Sending handshake failed`
+  - when the cloud service comes back, any remaining failure will stay in the
+    HTTP/WebSocket handshake layer and can be debugged separately
+- Validation executed on 2026-04-14:
+  - realtime server reachability probe:
+    - `python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 443 8080 80 --schemes ws wss http https`
+    - result:
+      - all probed ports returned `Connection refused`
+  - repo harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+  - latest-SDK build after applying the patch:
+    - `bash -lc 'cd /root/ameba-river && python3 tools/sdk/apply_wsclient_connect_error_patch.py --sdk-root /root/ameba-rtos && export AMEBA_SDK_ROOT=/root/ameba-rtos && source /root/ameba-river/env.sh && python3 /root/ameba-rtos/ameba.py build -p'`
+- Current conclusion:
+  - the latest cloud deployment is not reachable from this machine at
+    `2026-04-14`
+  - this step hardens the board-side diagnostics so the next flash will say
+    whether the remaining blocker is still raw TCP reachability or a true
+    websocket-handshake defect
+
 ## Step 5.158
 - Fixed a second Ameba SDK websocket handshake integration bug exposed after
   removing the duplicate subprotocol header:
