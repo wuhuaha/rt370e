@@ -1,5 +1,48 @@
 # Change Log
 
+## Step 5.158
+- Fixed a second Ameba SDK websocket handshake integration bug exposed after
+  removing the duplicate subprotocol header:
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause analysis from the latest board log:
+  - the previous `400 Bad Request` disappeared
+  - the new failure moved earlier to:
+    - `ws_connect_url: ERROR: Sending handshake failed`
+  - the Ameba SDK `ws_handshake_header_set_protocol()` and
+    `ws_handshake_set_header_fields()` helpers allocate `len + 1` bytes but only
+    `memcpy(len)` and do not append a terminator
+  - River was passing:
+    - `strlen(...)`
+  - inference:
+    - the copied strings inside `wsclient` were not guaranteed to be
+      NUL-terminated
+    - later SDK `sprintf("%s ... %s")` handshake assembly could read beyond the
+      copied buffers and corrupt the outbound handshake request
+- The fix now passes explicit NUL-inclusive lengths to the SDK helpers:
+  - `strlen(handshake_protocol) + 1`
+  - `strlen(open_header_fields) + 1`
+- Expected runtime change on board after this step:
+  - the old send failure should disappear:
+    - no `ws_connect_url: ERROR: Sending handshake failed`
+  - the upgrade should proceed into either:
+    - `Connected to websocket server`
+    - or a later server-side protocol log if another issue remains
+- Validation executed on 2026-04-14:
+  - harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+    - result: `check_codex_harness: all checks passed`
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+    - result: `Build done`
+- Current conclusion:
+  - the remaining websocket-open blocker was still on the project-side client
+    integration, not on the cloud deployment
+  - this step fixes the SDK string-lifetime / terminator mismatch directly at
+    the handshake boundary
+  - next board validation should show whether the native upgrade now completes
+
 ## Step 5.157
 - Fixed the native realtime WebSocket handshake on Ameba so the SDK no longer
   sends an invalid / conflicting subprotocol header:

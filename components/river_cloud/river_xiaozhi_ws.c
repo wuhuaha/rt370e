@@ -2501,7 +2501,7 @@ river_status_t river_xiaozhi_open_session(void)
 
     if (ws_handshake_header_set_protocol(g_river_xiaozhi.wsclient,
                                          handshake_protocol,
-                                         (int)sizeof(handshake_protocol)) != 0) {
+                                         (int)(strlen(handshake_protocol) + 1U)) != 0) {
         river_xiaozhi_set_last_error("xiaozhi_protocol_set_failed");
         river_xiaozhi_close_context(false);
         return RIVER_ERR_IO;
@@ -2509,7 +2509,7 @@ river_status_t river_xiaozhi_open_session(void)
 
     if (ws_handshake_set_header_fields(g_river_xiaozhi.wsclient,
                                        g_river_xiaozhi.open_header_fields,
-                                       (int)strlen(g_river_xiaozhi.open_header_fields)) != 0) {
+                                       (int)(strlen(g_river_xiaozhi.open_header_fields) + 1U)) != 0) {
         river_xiaozhi_set_last_error("xiaozhi_header_fields_set_failed");
         river_xiaozhi_close_context(false);
         return RIVER_ERR_IO;
