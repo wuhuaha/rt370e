@@ -11,7 +11,7 @@
  * still being renamed.
  */
 #define RIVER_XIAOZHI_OTA_URL                   ""
-#define RIVER_XIAOZHI_URL                       "wss://101.33.235.154/v1/realtime/ws"
+#define RIVER_XIAOZHI_URL                       "ws://101.33.235.154:8080/v1/realtime/ws"
 #define RIVER_XIAOZHI_TOKEN                     ""
 #define RIVER_XIAOZHI_REALTIME_SUBPROTOCOL      "agent-server.realtime.v0"
 #define RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION "rtos-ws-v0"

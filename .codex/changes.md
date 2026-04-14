@@ -1,5 +1,57 @@
 # Change Log
 
+## Step 5.156
+- Added a reusable local cloud-debug toolkit for the self-hosted agent-server
+  deployment:
+  - [tools/agent_server_debug/README.md](/root/ameba-river/tools/agent_server_debug/README.md)
+  - [tools/agent_server_debug/probe_realtime.py](/root/ameba-river/tools/agent_server_debug/probe_realtime.py)
+- `probe_realtime.py` uses only Python standard library and now covers:
+  - raw TCP reachability
+  - HTTP/HTTPS discovery probing for `/v1/realtime`
+  - WS/WSS upgrade probing for `/v1/realtime/ws`
+  - optional TLS SNI / Host override for future reverse-proxy debugging
+- Ran the new probe from the host network against the deployed cloud server
+  `101.33.235.154` and classified the current failure precisely:
+  - `101.33.235.154:443` is closed:
+    - TCP connect failed with `Connection refused`
+  - `101.33.235.154:8080` is open but serves plain HTTP/WS, not TLS:
+    - `http://101.33.235.154:8080/v1/realtime` returned `200 OK`
+    - `ws://101.33.235.154:8080/v1/realtime/ws` completed `101 Switching Protocols`
+    - `https://101.33.235.154:8080/...` and `wss://101.33.235.154:8080/...`
+      failed with TLS record-layer errors because the endpoint is not HTTPS
+- Based on the verified cloud probe, updated the board-side default native
+  realtime endpoint:
+  - [include/river/river_xiaozhi_credentials.h](/root/ameba-river/include/river/river_xiaozhi_credentials.h)
+  - from: `wss://101.33.235.154/v1/realtime/ws`
+  - to: `ws://101.33.235.154:8080/v1/realtime/ws`
+- This explains the earlier board log exactly:
+  - `net_connect -68` / `xiaozhi_ws_connect_failed` was caused by trying
+    `wss` on `443`, where the cloud server is not listening
+- Probe output also showed the current discovery surface is still bootstrap-like
+  on the cloud deployment:
+  - `voice_provider":"funasr_http"`
+  - `tts_provider":"none"`
+  - inference: transport bring-up should work after the URL fix, but native
+    audio reply playback may still be absent until cloud-side TTS is enabled
+- Validation executed on 2026-04-14:
+  - syntax check:
+    - `cd /root/ameba-river`
+    - `python3 -m py_compile tools/agent_server_debug/probe_realtime.py`
+  - host-network probe:
+    - `cd /root/ameba-river`
+    - `python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154`
+    - observed:
+      - `443`: refused
+      - `8080/http`: `200 OK`
+      - `8080/ws`: `101 Switching Protocols`
+      - `8080/https` and `8080/wss`: TLS record-layer failure
+- Current conclusion:
+  - the correct current debug-branch target is plain
+    `ws://101.33.235.154:8080/v1/realtime/ws`
+  - if `wss` is required later, that must be added on the server or via an
+    external TLS reverse proxy first
+  - after this step, the next board pass should recheck plain-WS session bring-up
+
 ## Step 5.155
 - Swapped the debug-branch realtime transport from XiaoZhi wire compatibility
   to direct self-hosted `agent-server` `rtos-ws-v0` while keeping the current

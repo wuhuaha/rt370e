@@ -1,5 +1,56 @@
 # Verification
 
+## Step 5.156
+Validate the cloud deployment shape first, then rebuild the board image with
+the corrected default endpoint:
+```bash
+cd /root/ameba-river
+python3 -m py_compile tools/agent_server_debug/probe_realtime.py
+python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify the board now opens plain WS to the cloud deployment:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, verify:
+- `小欧管家，今天周几`
+- or:
+  - `river xiaozhi connect`
+  - `river xiaozhi status`
+
+Expected result:
+- probe output shows:
+  - `443` refused
+  - `http://101.33.235.154:8080/v1/realtime` returns `200 OK`
+  - `ws://101.33.235.154:8080/v1/realtime/ws` returns `101 Switching Protocols`
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- board log no longer attempts:
+  - `wss://101.33.235.154/v1/realtime/ws`
+- board log instead shows:
+  - `xiaozhi connecting: url=ws://101.33.235.154:8080/v1/realtime/ws ...`
+- the old transport-open failure should disappear:
+  - no `net_connect -68`
+  - no `xiaozhi_ws_connect_failed` caused by `443`
+
+Observed result on 2026-04-14:
+- `python3 -m py_compile tools/agent_server_debug/probe_realtime.py` passed
+- host-network probe confirmed:
+  - `443` refused
+  - `8080/http` works
+  - `8080/ws` works
+  - `8080/https` and `8080/wss` do not work
+- board rebuild / flash / runtime validation is still pending for this step
+
 ## Step 5.155
 Validate the first native realtime transport slice against the latest SDK:
 ```bash
