@@ -1,5 +1,57 @@
 # Verification
 
+## Step 5.155
+Validate the first native realtime transport slice against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify a real board interaction:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, verify both text and voice entry paths:
+- `river xiaozhi connect`
+- `river xiaozhi listen detect 今天周几`
+- then do a real wakeword + spoken question, for example:
+  - `小欧管家，今天天气怎么样`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- `connect` no longer needs OTA/bootstrap before websocket open:
+  - no `xiaozhi ota bootstrap ok` log is required on this branch
+  - websocket open reaches:
+    - `xiaozhi transport ready: sample_rate=16000 frame_duration=20ms subprotocol=agent-server.realtime.v0`
+- realtime control flow uses native events:
+  - `xiaozhi session.start sent: ... codec=pcm16le`
+  - `xiaozhi session.update: ... state=active`
+  - `xiaozhi response.start: ...`
+  - `xiaozhi response.chunk: ...`
+  - after `xiaozhi session.end: ...`, the next follow-up turn should emit a new
+    `xiaozhi session.start sent: ...` on the same websocket rather than a fresh
+    `xiaozhi connecting: ...`
+- downlink playback now comes from native PCM binary frames:
+  - `playback start: stream=xiaozhi_tts ...`
+  - `playback stop: stream=xiaozhi_tts ...`
+- for spoken turns, runtime accounting should stay healthy:
+  - `xiaozhi asr round begin: ...`
+  - `xiaozhi asr round finish: ...`
+  - `busy=0 fail=0`
+
+Observed result on 2026-04-14:
+- `python3 tools/diag/check_codex_harness.py` passed
+- the latest-SDK build passed with `Build done`
+- board validation is still pending for this step
+
 ## Step 5.154
 Validate the XiaoZhi local `post_roll/close` defer path against the latest SDK:
 ```bash

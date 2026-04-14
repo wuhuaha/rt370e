@@ -1,5 +1,72 @@
 # Change Log
 
+## Step 5.155
+- Swapped the debug-branch realtime transport from XiaoZhi wire compatibility
+  to direct self-hosted `agent-server` `rtos-ws-v0` while keeping the current
+  upper `river_xiaozhi_*` / cloud state-machine surface intact:
+  - [include/river/river_xiaozhi_credentials.h](/root/ameba-river/include/river/river_xiaozhi_credentials.h)
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Default realtime credentials now target the deployed native server directly:
+  - websocket URL: `wss://101.33.235.154/v1/realtime/ws`
+  - websocket subprotocol: `agent-server.realtime.v0`
+  - protocol version string: `rtos-ws-v0`
+  - uplink format: `pcm16le`
+  - legacy OTA/bootstrap is disabled by default on this branch
+- `river_xiaozhi_ws.c` now speaks native realtime control semantics:
+  - handshake adds `Sec-WebSocket-Protocol: agent-server.realtime.v0`
+  - `open_session()` now only opens the websocket and marks transport ready
+  - `listen_start()` maps to `session.start`
+  - `listen_stop()` maps to `audio.in.commit`
+  - `listen.detect()` auto-starts a session if needed, then sends `text.in`
+  - `abort()` maps to `session.update { interrupt: true }`
+  - `close_session()` sends `session.end` before closing the socket
+  - websocket binary send/receive now uses raw frames with no XiaoZhi v2/v3
+    binary header
+- The native text-frame parser now translates realtime events back into the
+  existing upper-layer event contract so the current cloud adapter keeps working
+  during the migration:
+  - `response.start` -> synthetic compat `tts state=start`
+  - `response.chunk[text]` -> synthetic compat `tts state=sentence_start`
+  - `session.update(state=active)` after a response -> synthetic compat
+    `tts state=stop`
+  - `session.end` -> compat `session_closed`
+  - `error` -> compat transport error event
+  - `session.end` now clears only the dialog state and ended `session_id`; the
+    websocket transport stays reusable so follow-up rounds can send a fresh
+    `session.start` without forcing a reconnect
+- `river_cloud_adapter.c` now uses PCM rather than Opus for the native path:
+  - uplink keeps the existing 16 ms capture -> 20 ms accumulator, but sends raw
+    640-byte `pcm16le/16k/mono` frames
+  - downlink accepts native PCM16 binary frames directly into the playback ring
+  - the legacy Opus decoder path is retained only as a fallback for non-native
+    binary types during the transition
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX` is raised to the native 20 ms PCM
+    frame size
+- Updated the Codex volatile context to the actual working branch:
+  - `agent-server-v2`
+- Validation executed on 2026-04-14:
+  - harness:
+    - `cd /root/ameba-river`
+    - `python3 tools/diag/check_codex_harness.py`
+    - result: `check_codex_harness: all checks passed`
+  - latest-SDK build:
+    - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+    - result: `Build done`
+- Current conclusion:
+  - this first migration slice is compile-verified on `/root/ameba-rtos`
+  - the upper runtime still uses compat event names, but transport and audio
+    framing are now native realtime/PCM
+  - the next board pass should verify:
+    - wakeword admission connects straight to `101.33.235.154`
+    - no per-wake OTA/bootstrap log remains
+    - `session.start` / `audio.in.commit` / PCM playback all work on board
+    - a follow-up turn reuses the existing websocket and issues a fresh
+      `session.start` instead of reconnecting
+
 ## Step 5.154
 - Tightened XiaoZhi local `post_roll/close` settlement without delaying the
   existing `listen_stop` trigger:

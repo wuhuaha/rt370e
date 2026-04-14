@@ -6,7 +6,7 @@ or top-of-tree verification target changes.
 
 ## Active Working Set
 
-- Current working branch: `kws`
+- Current working branch: `agent-server-v2`
 - Active SDK baseline: `/root/ameba-rtos`
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
@@ -15,19 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.154 XiaoZhi local post-roll close defer`
+  - `5.155 Native realtime transport swap-in`
 - Primary active execution plan:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
 ## Current Runtime Focus
 
-- Keep the board-side `wake -> VAD/KWS -> XiaoZhi realtime session` path usable.
-- Reconfirm the remaining local `post_roll/close` timing on real board logs now
-  that XiaoZhi downlink audio and playback are live again.
-- Use the new `close_pending` / deferred-close logs to separate:
-  - premature local close timing
-  - reopen overlap
-  - remaining `no_ref` silence-rearm gaps
+- Keep the board-side `wake -> VAD/KWS -> native realtime session` path usable.
+- Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
+  keeping the existing upper cloud state machine temporarily stable.
+- Validate the first migration slice on board:
+  - websocket subprotocol `agent-server.realtime.v0`
+  - `session.start` / `audio.in.commit` / `text.in`
+  - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - Preserve the project flash profile:

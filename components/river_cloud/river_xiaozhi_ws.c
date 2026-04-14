@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "httpc/httpc.h"
@@ -92,11 +93,14 @@ typedef struct {
     bool server_hello_received;
     bool ws_closed;
     bool config_ready;
+    bool dialog_started;
+    bool response_started;
     river_xiaozhi_config_t config;
     wsclient_context *wsclient;
     rtos_mutex_t lock;
     river_xiaozhi_event_handler_t event_handler;
     void *event_handler_user;
+    uint32_t next_sequence;
     uint32_t server_sample_rate;
     uint32_t server_frame_duration_ms;
     uint32_t text_messages_rx;
@@ -446,6 +450,113 @@ static void river_xiaozhi_set_last_emotion(const char *emotion_text)
                               emotion_text);
 }
 
+static void river_xiaozhi_reset_dialog_state(void)
+{
+    g_river_xiaozhi.dialog_started = false;
+    g_river_xiaozhi.response_started = false;
+    g_river_xiaozhi.session_id[0] = '\0';
+}
+
+static void river_xiaozhi_reset_runtime_state(void)
+{
+    g_river_xiaozhi.session_open = false;
+    g_river_xiaozhi.server_hello_received = false;
+    g_river_xiaozhi.ws_closed = true;
+    g_river_xiaozhi.next_sequence = 1U;
+    river_xiaozhi_reset_dialog_state();
+}
+
+static void river_xiaozhi_format_timestamp(char *buffer, size_t buffer_size)
+{
+    time_t now;
+    struct tm tm_utc;
+    struct tm *tm_ptr = NULL;
+
+    if (buffer == NULL || buffer_size == 0U) {
+        return;
+    }
+
+    now = time(NULL);
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS)
+    if (gmtime_r(&now, &tm_utc) != NULL) {
+        tm_ptr = &tm_utc;
+    }
+#else
+    {
+        struct tm *tmp = gmtime(&now);
+        if (tmp != NULL) {
+            tm_utc = *tmp;
+            tm_ptr = &tm_utc;
+        }
+    }
+#endif
+
+    if (tm_ptr == NULL) {
+        snprintf(buffer, buffer_size, "1970-01-01T00:00:00Z");
+        return;
+    }
+
+    snprintf(buffer,
+             buffer_size,
+             "%04d-%02d-%02dT%02d:%02d:%02dZ",
+             tm_ptr->tm_year + 1900,
+             tm_ptr->tm_mon + 1,
+             tm_ptr->tm_mday,
+             tm_ptr->tm_hour,
+             tm_ptr->tm_min,
+             tm_ptr->tm_sec);
+}
+
+static uint32_t river_xiaozhi_next_sequence(void)
+{
+    uint32_t sequence = g_river_xiaozhi.next_sequence;
+
+    if (sequence == 0U) {
+        sequence = 1U;
+    }
+    g_river_xiaozhi.next_sequence = sequence + 1U;
+    if (g_river_xiaozhi.next_sequence == 0U) {
+        g_river_xiaozhi.next_sequence = 1U;
+    }
+    return sequence;
+}
+
+static cJSON *river_xiaozhi_create_control_event(const char *type, cJSON **payload_out)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+    char timestamp[32];
+
+    if (type == NULL) {
+        return NULL;
+    }
+
+    root = cJSON_CreateObject();
+    payload = cJSON_CreateObject();
+    if (root == NULL || payload == NULL) {
+        if (payload != NULL) {
+            cJSON_Delete(payload);
+        }
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return NULL;
+    }
+
+    river_xiaozhi_format_timestamp(timestamp, sizeof(timestamp));
+    cJSON_AddStringToObject(root, "type", type);
+    if (g_river_xiaozhi.session_id[0] != '\0') {
+        cJSON_AddStringToObject(root, "session_id", g_river_xiaozhi.session_id);
+    }
+    cJSON_AddNumberToObject(root, "seq", river_xiaozhi_next_sequence());
+    cJSON_AddStringToObject(root, "ts", timestamp);
+    cJSON_AddItemToObject(root, "payload", payload);
+    if (payload_out != NULL) {
+        *payload_out = payload;
+    }
+    return root;
+}
+
 static void river_xiaozhi_update_session_id_from_root(const cJSON *root)
 {
     const cJSON *session_id_obj;
@@ -501,23 +612,12 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
                                                       size_t payload_bytes,
                                                       uint32_t timestamp_ms)
 {
-    uint8_t *buffer = (uint8_t *)payload;
-    size_t total_bytes = payload_bytes;
     river_status_t status = RIVER_ERR_IO;
     bool locked = false;
-    uint16_t protocol_version = g_river_xiaozhi.config.protocol_version;
+    (void)type;
+    (void)timestamp_ms;
 
     if (payload == NULL || payload_bytes == 0U) {
-        return RIVER_ERR_BUSY;
-    }
-
-    if ((protocol_version == 2U || protocol_version == 3U) &&
-        payload_bytes > RIVER_XIAOZHI_BINARY_PAYLOAD_MAX) {
-        river_xiaozhi_set_last_error("binary_payload_too_large");
-        RIVER_LOGW("xiaozhi binary payload too large: protocol=%u payload=%luB max=%uB",
-                   (unsigned int)protocol_version,
-                   (unsigned long)payload_bytes,
-                   (unsigned int)RIVER_XIAOZHI_BINARY_PAYLOAD_MAX);
         return RIVER_ERR_ARG;
     }
 
@@ -534,31 +634,7 @@ static river_status_t river_xiaozhi_send_binary_frame(uint16_t type,
         goto exit;
     }
 
-    if (protocol_version == 2U) {
-        river_xiaozhi_binary_v2_t *bp2;
-
-        total_bytes = RIVER_XIAOZHI_BINARY_V2_HEADER_BYTES + payload_bytes;
-        buffer = g_river_xiaozhi.binary_frame;
-        bp2 = (river_xiaozhi_binary_v2_t *)buffer;
-        bp2->version = htons(protocol_version);
-        bp2->type = htons(type);
-        bp2->reserved = 0U;
-        bp2->timestamp = htonl(timestamp_ms);
-        bp2->payload_size = htonl((uint32_t)payload_bytes);
-        memcpy(bp2->payload, payload, payload_bytes);
-    } else if (protocol_version == 3U) {
-        river_xiaozhi_binary_v3_t *bp3;
-
-        total_bytes = RIVER_XIAOZHI_BINARY_V3_HEADER_BYTES + payload_bytes;
-        buffer = g_river_xiaozhi.binary_frame;
-        bp3 = (river_xiaozhi_binary_v3_t *)buffer;
-        bp3->type = (uint8_t)type;
-        bp3->reserved = 0U;
-        bp3->payload_size = htons((uint16_t)payload_bytes);
-        memcpy(bp3->payload, payload, payload_bytes);
-    }
-
-    if (ws_sendBinary(buffer, (int)total_bytes, 1, g_river_xiaozhi.wsclient) == 0) {
+    if (ws_sendBinary((uint8_t *)payload, (int)payload_bytes, 1, g_river_xiaozhi.wsclient) == 0) {
         g_river_xiaozhi.audio_messages_tx++;
         status = RIVER_OK;
     } else {
@@ -927,11 +1003,11 @@ static river_status_t river_xiaozhi_build_headers(char *buffer,
     written = snprintf(buffer,
                        buffer_size,
                        "%s"
-                       "Protocol-Version: %u\r\n"
+                       "Sec-WebSocket-Protocol: %s\r\n"
                        "Device-Id: %s\r\n"
                        "Client-Id: %s\r\n",
                        auth_header,
-                       (unsigned int)g_river_xiaozhi.config.protocol_version,
+                       RIVER_XIAOZHI_REALTIME_SUBPROTOCOL,
                        device_id,
                        client_id);
     if (written < 0 || (size_t)written >= buffer_size) {
@@ -1203,135 +1279,13 @@ static void river_xiaozhi_add_session_id(cJSON *root)
     }
 }
 
-static river_status_t river_xiaozhi_send_hello(void)
+static void river_xiaozhi_emit_transport_ready(void)
 {
-    cJSON *root = NULL;
-    cJSON *features = NULL;
-    cJSON *audio_params = NULL;
-
-    root = cJSON_CreateObject();
-    features = cJSON_CreateObject();
-    audio_params = cJSON_CreateObject();
-    if (root == NULL || features == NULL || audio_params == NULL) {
-        if (audio_params != NULL) {
-            cJSON_Delete(audio_params);
-        }
-        if (features != NULL) {
-            cJSON_Delete(features);
-        }
-        if (root != NULL) {
-            cJSON_Delete(root);
-        }
-        return RIVER_ERR_NO_MEMORY;
-    }
-
-    cJSON_AddStringToObject(root, "type", "hello");
-    cJSON_AddNumberToObject(root, "version", g_river_xiaozhi.config.protocol_version);
-    cJSON_AddBoolToObject(features, "mcp", g_river_xiaozhi.config.enable_mcp);
-    cJSON_AddItemToObject(root, "features", features);
-    cJSON_AddStringToObject(root, "transport", "websocket");
-
-    cJSON_AddStringToObject(audio_params, "format", RIVER_XIAOZHI_UPLINK_FORMAT);
-    cJSON_AddNumberToObject(audio_params, "sample_rate", g_river_xiaozhi.config.uplink_sample_rate);
-    cJSON_AddNumberToObject(audio_params, "channels", g_river_xiaozhi.config.uplink_channels);
-    cJSON_AddNumberToObject(audio_params,
-                            "frame_duration",
-                            g_river_xiaozhi.config.uplink_frame_duration_ms);
-    cJSON_AddItemToObject(root, "audio_params", audio_params);
-
-    return river_xiaozhi_send_json_root(root);
-}
-
-static river_status_t river_xiaozhi_send_listen_internal(const char *state,
-                                                         const char *mode,
-                                                         const char *text)
-{
-    cJSON *root;
-
-    if (state == NULL) {
-        return RIVER_ERR_ARG;
-    }
-
-    root = cJSON_CreateObject();
-    if (root == NULL) {
-        return RIVER_ERR_NO_MEMORY;
-    }
-
-    river_xiaozhi_add_session_id(root);
-    cJSON_AddStringToObject(root, "type", "listen");
-    cJSON_AddStringToObject(root, "state", state);
-    if (mode != NULL && mode[0] != '\0') {
-        cJSON_AddStringToObject(root, "mode", mode);
-    }
-    if (text != NULL && text[0] != '\0') {
-        cJSON_AddStringToObject(root, "text", text);
-    }
-
-    return river_xiaozhi_send_json_root(root);
-}
-
-static river_status_t river_xiaozhi_parse_server_hello(const cJSON *root)
-{
-    const cJSON *session_id_obj;
-    const cJSON *transport_obj;
-    const cJSON *audio_params_obj;
-    const cJSON *format_obj;
-    const cJSON *sample_rate_obj;
-    const cJSON *channels_obj;
-    const cJSON *frame_duration_obj;
-
-    transport_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "transport");
-    if (!cJSON_IsString(transport_obj) ||
-        transport_obj->valuestring == NULL ||
-        strcmp(transport_obj->valuestring, "websocket") != 0) {
-        const char *transport_text =
-            (cJSON_IsString(transport_obj) && transport_obj->valuestring != NULL) ?
-                transport_obj->valuestring :
-                "-";
-        river_xiaozhi_set_last_error("server_hello_transport_invalid");
-        RIVER_LOGW("server hello transport invalid: %s", transport_text);
-        return RIVER_ERR_UNSUPPORTED;
-    }
-
-    session_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "session_id");
-    if (cJSON_IsString(session_id_obj) && session_id_obj->valuestring != NULL) {
-        river_xiaozhi_copy_string(g_river_xiaozhi.session_id,
-                                  sizeof(g_river_xiaozhi.session_id),
-                                  session_id_obj->valuestring);
-    }
-
-    audio_params_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "audio_params");
-    format_obj = cJSON_IsObject(audio_params_obj) ?
-                 cJSON_GetObjectItemCaseSensitive((cJSON *)audio_params_obj, "format") :
-                 NULL;
-    sample_rate_obj = cJSON_IsObject(audio_params_obj) ?
-                      cJSON_GetObjectItemCaseSensitive((cJSON *)audio_params_obj, "sample_rate") :
-                      NULL;
-    channels_obj = cJSON_IsObject(audio_params_obj) ?
-                   cJSON_GetObjectItemCaseSensitive((cJSON *)audio_params_obj, "channels") :
-                   NULL;
-    frame_duration_obj = cJSON_IsObject(audio_params_obj) ?
-                         cJSON_GetObjectItemCaseSensitive((cJSON *)audio_params_obj, "frame_duration") :
-                         NULL;
-
-    if (cJSON_IsString(format_obj) && format_obj->valuestring != NULL &&
-        strcmp(format_obj->valuestring, "opus") != 0) {
-        RIVER_LOGW("server hello audio format unexpected: %s", format_obj->valuestring);
-        river_xiaozhi_set_last_error("server_audio_format_unexpected");
-    }
-    if (cJSON_IsNumber(channels_obj) && ((uint32_t)channels_obj->valuedouble) != 1U) {
-        RIVER_LOGW("server hello audio channels=%lu; current runtime expects mono downlink",
-                   (unsigned long)((uint32_t)channels_obj->valuedouble));
-        river_xiaozhi_set_last_error("server_audio_channels_unexpected");
-    }
-
-    if (cJSON_IsNumber(sample_rate_obj)) {
-        g_river_xiaozhi.server_sample_rate = (uint32_t)sample_rate_obj->valuedouble;
-    }
-    if (cJSON_IsNumber(frame_duration_obj)) {
-        g_river_xiaozhi.server_frame_duration_ms = (uint32_t)frame_duration_obj->valuedouble;
-    }
-
+    g_river_xiaozhi.server_sample_rate = 16000U;
+    g_river_xiaozhi.server_frame_duration_ms =
+        g_river_xiaozhi.config.uplink_frame_duration_ms != 0U ?
+            g_river_xiaozhi.config.uplink_frame_duration_ms :
+            RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
     g_river_xiaozhi.server_hello_received = true;
     g_river_xiaozhi.session_open = true;
     g_river_xiaozhi.ws_closed = false;
@@ -1339,11 +1293,10 @@ static river_status_t river_xiaozhi_parse_server_hello(const cJSON *root)
     g_river_xiaozhi.sessions_opened++;
     river_xiaozhi_set_last_type("hello");
 
-    RIVER_LOGI("server hello: sid=%s sample_rate=%lu frame_duration=%lums mcp=%s",
-               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+    RIVER_LOGI("xiaozhi transport ready: sample_rate=%lu frame_duration=%lums subprotocol=%s",
                (unsigned long)g_river_xiaozhi.server_sample_rate,
                (unsigned long)g_river_xiaozhi.server_frame_duration_ms,
-               river_xiaozhi_bool_text(g_river_xiaozhi.config.enable_mcp));
+               RIVER_XIAOZHI_REALTIME_SUBPROTOCOL);
     river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_SERVER_HELLO,
                              NULL,
                              NULL,
@@ -1354,7 +1307,368 @@ static river_status_t river_xiaozhi_parse_server_hello(const cJSON *root)
                              NULL,
                              0U,
                              0U);
-    return RIVER_OK;
+}
+
+static river_status_t river_xiaozhi_send_session_start_internal(const char *wake_reason)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+    cJSON *device = NULL;
+    cJSON *audio = NULL;
+    cJSON *session = NULL;
+    cJSON *capabilities = NULL;
+    river_status_t status;
+
+    root = river_xiaozhi_create_control_event("session.start", &payload);
+    device = cJSON_CreateObject();
+    audio = cJSON_CreateObject();
+    session = cJSON_CreateObject();
+    capabilities = cJSON_CreateObject();
+    if (root == NULL || payload == NULL || device == NULL || audio == NULL ||
+        session == NULL || capabilities == NULL) {
+        if (device != NULL) {
+            cJSON_Delete(device);
+        }
+        if (audio != NULL) {
+            cJSON_Delete(audio);
+        }
+        if (session != NULL) {
+            cJSON_Delete(session);
+        }
+        if (capabilities != NULL) {
+            cJSON_Delete(capabilities);
+        }
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "protocol_version", RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION);
+
+    cJSON_AddStringToObject(device, "device_id", g_river_xiaozhi.device_id);
+    cJSON_AddStringToObject(device, "client_type", RIVER_XIAOZHI_REALTIME_CLIENT_TYPE);
+    cJSON_AddItemToObject(payload, "device", device);
+
+    cJSON_AddStringToObject(audio, "codec", RIVER_XIAOZHI_UPLINK_FORMAT);
+    cJSON_AddNumberToObject(audio,
+                            "sample_rate_hz",
+                            g_river_xiaozhi.config.uplink_sample_rate);
+    cJSON_AddNumberToObject(audio, "channels", g_river_xiaozhi.config.uplink_channels);
+    cJSON_AddItemToObject(payload, "audio", audio);
+
+    cJSON_AddStringToObject(session, "mode", "voice");
+    cJSON_AddStringToObject(session,
+                            "wake_reason",
+                            (wake_reason != NULL && wake_reason[0] != '\0') ?
+                                wake_reason :
+                                "keyword");
+    cJSON_AddBoolToObject(session, "client_can_end", true);
+    cJSON_AddBoolToObject(session, "server_can_end", true);
+    cJSON_AddItemToObject(payload, "session", session);
+
+    cJSON_AddBoolToObject(capabilities, "text_input", true);
+    cJSON_AddBoolToObject(capabilities, "image_input", false);
+    cJSON_AddBoolToObject(capabilities, "half_duplex", true);
+    cJSON_AddBoolToObject(capabilities, "local_wake_word", true);
+    cJSON_AddItemToObject(payload, "capabilities", capabilities);
+
+    status = river_xiaozhi_send_json_root(root);
+    if (status == RIVER_OK) {
+        g_river_xiaozhi.dialog_started = true;
+        g_river_xiaozhi.response_started = false;
+        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s",
+                   (wake_reason != NULL && wake_reason[0] != '\0') ? wake_reason : "keyword",
+                   g_river_xiaozhi.device_id,
+                   g_river_xiaozhi.client_id,
+                   RIVER_XIAOZHI_UPLINK_FORMAT);
+    }
+    return status;
+}
+
+static river_status_t river_xiaozhi_ensure_dialog_started(const char *wake_reason)
+{
+    if (!river_xiaozhi_session_open()) {
+        river_xiaozhi_set_last_error("xiaozhi_transport_not_open");
+        return RIVER_ERR_BUSY;
+    }
+    if (g_river_xiaozhi.dialog_started) {
+        return RIVER_OK;
+    }
+    return river_xiaozhi_send_session_start_internal(wake_reason);
+}
+
+static river_status_t river_xiaozhi_send_audio_commit_internal(const char *reason)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!g_river_xiaozhi.dialog_started) {
+        return RIVER_OK;
+    }
+
+    root = river_xiaozhi_create_control_event("audio.in.commit", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload,
+                            "reason",
+                            (reason != NULL && reason[0] != '\0') ? reason : "end_of_speech");
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_text_input_internal(const char *text)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (text == NULL || text[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = river_xiaozhi_create_control_event("text.in", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "text", text);
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_session_update_interrupt(void)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!g_river_xiaozhi.dialog_started) {
+        return RIVER_OK;
+    }
+
+    root = river_xiaozhi_create_control_event("session.update", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddBoolToObject(payload, "interrupt", true);
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_session_end_internal(const char *reason,
+                                                              const char *message)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!g_river_xiaozhi.dialog_started || !river_xiaozhi_session_open()) {
+        return RIVER_OK;
+    }
+
+    root = river_xiaozhi_create_control_event("session.end", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload,
+                            "reason",
+                            (reason != NULL && reason[0] != '\0') ? reason : "client_stop");
+    if (message != NULL && message[0] != '\0') {
+        cJSON_AddStringToObject(payload, "message", message);
+    }
+    return river_xiaozhi_send_json_root(root);
+}
+
+static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
+{
+    river_xiaozhi_set_last_type("tts");
+    river_xiaozhi_set_last_state(state);
+    if (text != NULL && text[0] != '\0') {
+        river_xiaozhi_set_last_text(text);
+    }
+    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_TTS,
+                             text,
+                             state,
+                             NULL,
+                             0U,
+                             0U,
+                             0U,
+                             NULL,
+                             0U,
+                             0U);
+}
+
+static void river_xiaozhi_handle_realtime_session_update(const cJSON *payload)
+{
+    const cJSON *state_obj;
+    const char *state = NULL;
+
+    state_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "state");
+    if (cJSON_IsString(state_obj) && state_obj->valuestring != NULL) {
+        state = state_obj->valuestring;
+    }
+
+    river_xiaozhi_set_last_type("session.update");
+    river_xiaozhi_set_last_state(state);
+    RIVER_LOGI("xiaozhi session.update: sid=%s state=%s response_started=%s",
+               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+               state != NULL ? state : "-",
+               river_xiaozhi_bool_text(g_river_xiaozhi.response_started));
+
+    if (state != NULL && strcmp(state, "active") == 0 &&
+        g_river_xiaozhi.response_started) {
+        g_river_xiaozhi.response_started = false;
+        river_xiaozhi_emit_tts_event("stop", NULL);
+    }
+}
+
+static void river_xiaozhi_handle_realtime_response_start(const cJSON *payload)
+{
+    const cJSON *response_id_obj;
+    const char *response_id = NULL;
+
+    response_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "response_id");
+    if (cJSON_IsString(response_id_obj) && response_id_obj->valuestring != NULL) {
+        response_id = response_id_obj->valuestring;
+    }
+
+    g_river_xiaozhi.response_started = true;
+    river_xiaozhi_set_last_type("response.start");
+    RIVER_LOGI("xiaozhi response.start: sid=%s response_id=%s",
+               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+               response_id != NULL ? response_id : "-");
+    river_xiaozhi_emit_tts_event("start", NULL);
+}
+
+static void river_xiaozhi_handle_realtime_response_chunk(const cJSON *payload)
+{
+    const cJSON *delta_type_obj;
+    const cJSON *text_obj;
+    const char *delta_type = NULL;
+    const char *text = NULL;
+
+    delta_type_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "delta_type");
+    text_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "text");
+    if (cJSON_IsString(delta_type_obj) && delta_type_obj->valuestring != NULL) {
+        delta_type = delta_type_obj->valuestring;
+    }
+    if (cJSON_IsString(text_obj) && text_obj->valuestring != NULL) {
+        text = text_obj->valuestring;
+    }
+
+    river_xiaozhi_set_last_type("response.chunk");
+    if (delta_type != NULL && strcmp(delta_type, "text") != 0) {
+        RIVER_LOGI("xiaozhi response.chunk ignore: sid=%s delta_type=%s",
+                   g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+                   delta_type);
+        return;
+    }
+    if (text == NULL || text[0] == '\0') {
+        return;
+    }
+
+    if (!g_river_xiaozhi.response_started) {
+        g_river_xiaozhi.response_started = true;
+        river_xiaozhi_emit_tts_event("start", NULL);
+    }
+
+    RIVER_LOGI("xiaozhi response.chunk: sid=%s text=%s",
+               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+               text);
+    river_xiaozhi_emit_tts_event("sentence_start", text);
+}
+
+static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
+{
+    const cJSON *reason_obj;
+    const cJSON *message_obj;
+    char ended_sid[RIVER_XIAOZHI_SESSION_ID_MAX];
+    const char *reason = NULL;
+    const char *message = NULL;
+
+    river_xiaozhi_copy_string(ended_sid, sizeof(ended_sid), g_river_xiaozhi.session_id);
+
+    reason_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "reason");
+    message_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "message");
+    if (cJSON_IsString(reason_obj) && reason_obj->valuestring != NULL) {
+        reason = reason_obj->valuestring;
+    }
+    if (cJSON_IsString(message_obj) && message_obj->valuestring != NULL) {
+        message = message_obj->valuestring;
+    }
+
+    river_xiaozhi_set_last_type("session.end");
+    river_xiaozhi_set_last_state(reason);
+    if (message != NULL && message[0] != '\0') {
+        river_xiaozhi_set_last_text(message);
+    }
+    if (g_river_xiaozhi.response_started) {
+        g_river_xiaozhi.response_started = false;
+        river_xiaozhi_emit_tts_event("stop", NULL);
+    }
+    g_river_xiaozhi.dialog_started = false;
+    g_river_xiaozhi.session_id[0] = '\0';
+
+    RIVER_LOGI("xiaozhi session.end: sid=%s reason=%s message=%s",
+               ended_sid[0] != '\0' ? ended_sid : "-",
+               reason != NULL ? reason : "-",
+               message != NULL ? message : "-");
+    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_SESSION_CLOSED,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
+                             0U,
+                             0U,
+                             NULL,
+                             0U,
+                             0U);
+}
+
+static void river_xiaozhi_handle_realtime_error(const cJSON *payload)
+{
+    const cJSON *code_obj;
+    const cJSON *message_obj;
+    const char *code = NULL;
+    const char *message = NULL;
+
+    code_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "code");
+    message_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "message");
+    if (cJSON_IsString(code_obj) && code_obj->valuestring != NULL) {
+        code = code_obj->valuestring;
+    }
+    if (cJSON_IsString(message_obj) && message_obj->valuestring != NULL) {
+        message = message_obj->valuestring;
+    }
+
+    river_xiaozhi_set_last_type("error");
+    river_xiaozhi_set_last_state(code);
+    river_xiaozhi_set_last_error(message != NULL ? message : code);
+    RIVER_LOGW("xiaozhi error: sid=%s code=%s message=%s",
+               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+               code != NULL ? code : "-",
+               message != NULL ? message : "-");
+    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_ERROR,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
+                             0U,
+                             0U,
+                             NULL,
+                             0U,
+                             0U);
 }
 
 static void river_xiaozhi_handle_stt_message(const cJSON *root)
@@ -1564,6 +1878,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
 {
     cJSON *root;
     cJSON *type_obj;
+    cJSON *payload_obj;
     const char *type_text;
 
     root = cJSON_ParseWithLength(json_text, (size_t)json_len);
@@ -1583,6 +1898,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
     }
 
     type_obj = cJSON_GetObjectItemCaseSensitive(root, "type");
+    payload_obj = cJSON_GetObjectItemCaseSensitive(root, "payload");
     type_text = cJSON_IsString(type_obj) ? type_obj->valuestring : NULL;
     g_river_xiaozhi.text_messages_rx++;
 
@@ -1604,8 +1920,18 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
 
     river_xiaozhi_update_session_id_from_root(root);
 
-    if (strcmp(type_text, "hello") == 0) {
-        (void)river_xiaozhi_parse_server_hello(root);
+    if (strcmp(type_text, "session.update") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_session_update(payload_obj);
+    } else if (strcmp(type_text, "response.start") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_response_start(payload_obj);
+    } else if (strcmp(type_text, "response.chunk") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_response_chunk(payload_obj);
+    } else if (strcmp(type_text, "session.end") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_session_end(payload_obj);
+    } else if (strcmp(type_text, "error") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_error(payload_obj);
+    } else if (strcmp(type_text, "hello") == 0) {
+        river_xiaozhi_emit_transport_ready();
     } else if (strcmp(type_text, "stt") == 0) {
         river_xiaozhi_handle_stt_message(root);
     } else if (strcmp(type_text, "llm") == 0) {
@@ -1628,67 +1954,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
 
 static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data_len)
 {
-    const uint8_t *payload = NULL;
-    size_t payload_len = 0U;
-    uint16_t binary_type = RIVER_XIAOZHI_BINARY_OPUS;
-    uint32_t timestamp_ms = 0U;
-
     if (data == NULL || data_len == 0U) {
-        return;
-    }
-
-    if (g_river_xiaozhi.config.protocol_version == 2U) {
-        const river_xiaozhi_binary_v2_t *bp2;
-
-        if (data_len < sizeof(*bp2)) {
-            river_xiaozhi_set_last_error("binary_v2_short");
-            RIVER_LOGW("xiaozhi rx binary reject: protocol=2 reason=short len=%lu need>=%lu",
-                       (unsigned long)data_len,
-                       (unsigned long)sizeof(*bp2));
-            return;
-        }
-        bp2 = (const river_xiaozhi_binary_v2_t *)data;
-        binary_type = ntohs(bp2->type);
-        timestamp_ms = ntohl(bp2->timestamp);
-        payload_len = (size_t)ntohl(bp2->payload_size);
-        if ((sizeof(*bp2) + payload_len) > data_len) {
-            river_xiaozhi_set_last_error("binary_v2_payload_invalid");
-            RIVER_LOGW("xiaozhi rx binary reject: protocol=2 reason=payload_invalid len=%lu payload=%lu type=%u",
-                       (unsigned long)data_len,
-                       (unsigned long)payload_len,
-                       (unsigned int)binary_type);
-            return;
-        }
-        payload = bp2->payload;
-    } else if (g_river_xiaozhi.config.protocol_version == 3U) {
-        const river_xiaozhi_binary_v3_t *bp3;
-
-        if (data_len < sizeof(*bp3)) {
-            river_xiaozhi_set_last_error("binary_v3_short");
-            RIVER_LOGW("xiaozhi rx binary reject: protocol=3 reason=short len=%lu need>=%lu",
-                       (unsigned long)data_len,
-                       (unsigned long)sizeof(*bp3));
-            return;
-        }
-        bp3 = (const river_xiaozhi_binary_v3_t *)data;
-        binary_type = bp3->type;
-        payload_len = (size_t)ntohs(bp3->payload_size);
-        if ((sizeof(*bp3) + payload_len) > data_len) {
-            river_xiaozhi_set_last_error("binary_v3_payload_invalid");
-            RIVER_LOGW("xiaozhi rx binary reject: protocol=3 reason=payload_invalid len=%lu payload=%lu type=%u",
-                       (unsigned long)data_len,
-                       (unsigned long)payload_len,
-                       (unsigned int)binary_type);
-            return;
-        }
-        payload = bp3->payload;
-    } else {
-        payload = data;
-        payload_len = data_len;
-    }
-
-    if (binary_type == RIVER_XIAOZHI_BINARY_JSON) {
-        river_xiaozhi_handle_text_message((const char *)payload, (int)payload_len);
         return;
     }
 
@@ -1700,10 +1966,10 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
                              NULL,
                              g_river_xiaozhi.server_sample_rate,
                              g_river_xiaozhi.server_frame_duration_ms,
-                             timestamp_ms,
-                             payload,
-                             payload_len,
-                             binary_type);
+                             0U,
+                             data,
+                             data_len,
+                             RIVER_XIAOZHI_BINARY_PCM16);
 }
 
 static bool river_xiaozhi_payload_looks_like_json(const uint8_t *data, size_t data_len)
@@ -1726,6 +1992,23 @@ static bool river_xiaozhi_payload_looks_like_json(const uint8_t *data, size_t da
     }
 
     return false;
+}
+
+static bool river_xiaozhi_payload_is_valid_json(const uint8_t *data, size_t data_len)
+{
+    cJSON *root;
+
+    if (!river_xiaozhi_payload_looks_like_json(data, data_len)) {
+        return false;
+    }
+
+    root = cJSON_ParseWithLength((const char *)data, data_len);
+    if (root == NULL) {
+        return false;
+    }
+
+    cJSON_Delete(root);
+    return true;
 }
 
 static void river_xiaozhi_ws_message_cb(wsclient_context **wsclient,
@@ -1760,12 +2043,16 @@ static void river_xiaozhi_ws_message_cb(wsclient_context **wsclient,
      * CONTINUATION instead of BINARY_FRAME. Distinguish reassembled JSON from
      * reassembled binary by looking at the payload prefix.
      */
-    if (opcode == CONTINUATION && !json_guess) {
-        river_xiaozhi_handle_binary_message(data, (size_t)data_len);
+    if (opcode == CONTINUATION) {
+        if (json_guess && river_xiaozhi_payload_is_valid_json(data, (size_t)data_len)) {
+            river_xiaozhi_handle_text_message((const char *)data, data_len);
+        } else {
+            river_xiaozhi_handle_binary_message(data, (size_t)data_len);
+        }
         return;
     }
 
-    river_xiaozhi_handle_text_message((const char *)g_river_xiaozhi.wsclient->receivedData, data_len);
+    river_xiaozhi_handle_text_message((const char *)data, data_len);
 }
 
 static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_data)
@@ -1776,6 +2063,8 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
     g_river_xiaozhi.ws_closed = true;
     g_river_xiaozhi.session_open = false;
     g_river_xiaozhi.server_hello_received = false;
+    g_river_xiaozhi.dialog_started = false;
+    g_river_xiaozhi.response_started = false;
     g_river_xiaozhi.sessions_closed++;
     river_xiaozhi_set_last_type("closed");
     RIVER_LOGI("xiaozhi websocket closed sid=%s",
@@ -1809,9 +2098,7 @@ static void river_xiaozhi_close_context(bool reset_session_id)
     }
     river_xiaozhi_transport_unlock(locked);
 
-    g_river_xiaozhi.session_open = false;
-    g_river_xiaozhi.server_hello_received = false;
-    g_river_xiaozhi.ws_closed = true;
+    river_xiaozhi_reset_runtime_state();
     if (reset_session_id) {
         g_river_xiaozhi.session_id[0] = '\0';
     }
@@ -1828,7 +2115,7 @@ river_status_t river_xiaozhi_init(void)
         return RIVER_ERR_NO_MEMORY;
     }
 
-    g_river_xiaozhi.server_sample_rate = 24000U;
+    g_river_xiaozhi.server_sample_rate = 16000U;
     g_river_xiaozhi.server_frame_duration_ms = RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
     g_river_xiaozhi.config.protocol_version = (uint16_t)RIVER_XIAOZHI_PROTOCOL_VERSION;
     g_river_xiaozhi.config.enable_mcp = (RIVER_XIAOZHI_ENABLE_MCP != 0);
@@ -1848,10 +2135,11 @@ river_status_t river_xiaozhi_init(void)
     river_xiaozhi_refresh_identifiers();
     g_river_xiaozhi.initialized = true;
 
-    RIVER_LOGI("xiaozhi init: ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s device_id=%s client_id=%s",
+    RIVER_LOGI("xiaozhi init: ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u mcp=%s device_id=%s client_id=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
+               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                river_xiaozhi_bool_text(g_river_xiaozhi.config.enable_mcp),
                g_river_xiaozhi.device_id,
@@ -1937,10 +2225,11 @@ river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
         (g_river_xiaozhi.url[0] != '\0') || (g_river_xiaozhi.ota_url[0] != '\0');
     river_xiaozhi_refresh_identifiers();
 
-    RIVER_LOGI("xiaozhi config updated: ota_set=%s url_set=%s token_set=%s protocol=%u uplink=%luHz/%luch/%lums mcp=%s",
+    RIVER_LOGI("xiaozhi config updated: ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u uplink=%luHz/%luch/%lums mcp=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
+               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                (unsigned long)g_river_xiaozhi.config.uplink_sample_rate,
                (unsigned long)g_river_xiaozhi.config.uplink_channels,
@@ -2103,7 +2392,6 @@ river_status_t river_xiaozhi_open_session(void)
 {
     int port;
     river_status_t status;
-    uint32_t waited_ms = 0U;
     uint32_t bootstrap_cache_remaining_ms = 0U;
     bool bootstrap_refresh_needed = false;
 
@@ -2175,6 +2463,7 @@ river_status_t river_xiaozhi_open_session(void)
         return status;
     }
 
+    river_xiaozhi_reset_runtime_state();
     status = river_xiaozhi_build_headers(g_river_xiaozhi.open_header_fields,
                                          sizeof(g_river_xiaozhi.open_header_fields),
                                          g_river_xiaozhi.open_device_id,
@@ -2185,6 +2474,12 @@ river_status_t river_xiaozhi_open_session(void)
         river_xiaozhi_set_last_error("xiaozhi_headers_build_failed");
         return status;
     }
+    river_xiaozhi_copy_string(g_river_xiaozhi.device_id,
+                              sizeof(g_river_xiaozhi.device_id),
+                              g_river_xiaozhi.open_device_id);
+    river_xiaozhi_copy_string(g_river_xiaozhi.client_id,
+                              sizeof(g_river_xiaozhi.client_id),
+                              g_river_xiaozhi.open_client_id);
 
     status = river_ws_dispatch_init();
     if (status != RIVER_OK) {
@@ -2232,8 +2527,9 @@ river_status_t river_xiaozhi_open_session(void)
                           RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS);
     ws_set_senddata_block_time(RIVER_XIAOZHI_WS_SEND_BLOCK_MS);
     ws_multisend_opts(g_river_xiaozhi.wsclient, RIVER_XIAOZHI_WS_STABLE_BUF_NUM);
-    RIVER_LOGI("xiaozhi connecting: url=%s protocol=%u device_id=%s client_id=%s txq=%u stable=%u reserve=%u",
+    RIVER_LOGI("xiaozhi connecting: url=%s wire=%s protocol=%u device_id=%s client_id=%s txq=%u stable=%u reserve=%u",
                g_river_xiaozhi.url,
+               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                g_river_xiaozhi.open_device_id,
                g_river_xiaozhi.open_client_id,
@@ -2246,31 +2542,7 @@ river_status_t river_xiaozhi_open_session(void)
         return RIVER_ERR_IO;
     }
 
-    g_river_xiaozhi.ws_closed = false;
-    g_river_xiaozhi.server_hello_received = false;
-    status = river_xiaozhi_send_hello();
-    if (status != RIVER_OK) {
-        river_xiaozhi_set_last_error("xiaozhi_hello_send_failed");
-        river_xiaozhi_close_context(false);
-        return status;
-    }
-
-    while (!g_river_xiaozhi.server_hello_received &&
-           g_river_xiaozhi.wsclient != NULL &&
-           g_river_xiaozhi.wsclient->readyState == WSC_OPEN &&
-           waited_ms < RIVER_XIAOZHI_OPEN_READY_WAIT_MS) {
-        if (river_xiaozhi_poll(50U) != RIVER_OK) {
-            break;
-        }
-        waited_ms += 50U;
-    }
-
-    if (!g_river_xiaozhi.server_hello_received) {
-        river_xiaozhi_set_last_error("xiaozhi_server_hello_timeout");
-        river_xiaozhi_close_context(false);
-        return RIVER_ERR_IO;
-    }
-
+    river_xiaozhi_emit_transport_ready();
     return RIVER_OK;
 }
 
@@ -2280,6 +2552,7 @@ void river_xiaozhi_close_session(void)
         return;
     }
 
+    (void)river_xiaozhi_send_session_end_internal("client_stop", NULL);
     river_xiaozhi_close_context(false);
 }
 
@@ -2335,40 +2608,37 @@ river_status_t river_xiaozhi_poll(uint32_t timeout_ms)
 
 river_status_t river_xiaozhi_send_listen_start(const char *mode)
 {
-    return river_xiaozhi_send_listen_internal("start",
-                                              (mode != NULL && mode[0] != '\0') ? mode : "realtime",
-                                              NULL);
+    (void)mode;
+    return river_xiaozhi_ensure_dialog_started("keyword");
 }
 
 river_status_t river_xiaozhi_send_listen_stop(void)
 {
-    return river_xiaozhi_send_listen_internal("stop", NULL, NULL);
+    return river_xiaozhi_send_audio_commit_internal("end_of_speech");
 }
 
 river_status_t river_xiaozhi_send_listen_detect(const char *text)
 {
-    return river_xiaozhi_send_listen_internal("detect", NULL, text);
+    river_status_t status;
+
+    status = river_xiaozhi_ensure_dialog_started("text");
+    if (status != RIVER_OK) {
+        return status;
+    }
+    return river_xiaozhi_send_text_input_internal(text);
 }
 
 river_status_t river_xiaozhi_send_abort(const char *reason)
 {
-    cJSON *root = cJSON_CreateObject();
-
-    if (root == NULL) {
-        return RIVER_ERR_NO_MEMORY;
-    }
-
-    river_xiaozhi_add_session_id(root);
-    cJSON_AddStringToObject(root, "type", "abort");
-    cJSON_AddStringToObject(root, "reason", (reason != NULL && reason[0] != '\0') ? reason : "barge_in");
-    return river_xiaozhi_send_json_root(root);
+    (void)reason;
+    return river_xiaozhi_send_session_update_interrupt();
 }
 
 river_status_t river_xiaozhi_send_audio(const uint8_t *payload,
                                         size_t bytes,
                                         uint32_t timestamp_ms)
 {
-    return river_xiaozhi_send_binary_frame(RIVER_XIAOZHI_BINARY_OPUS,
+    return river_xiaozhi_send_binary_frame(RIVER_XIAOZHI_BINARY_PCM16,
                                            payload,
                                            bytes,
                                            timestamp_ms);
@@ -2425,13 +2695,14 @@ void river_xiaozhi_dump_status(void)
                                                            RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE);
     bootstrap_refresh_in_ms = river_xiaozhi_bootstrap_cache_remaining_ms();
 
-    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu bootstrap_owned=%s bootstrap_refresh_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
+    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu bootstrap_owned=%s bootstrap_refresh_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.session_open),
                river_xiaozhi_bool_text(g_river_xiaozhi.server_hello_received),
                river_xiaozhi_bool_text(g_river_xiaozhi.config_ready),
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
+               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                river_xiaozhi_bool_text(g_river_xiaozhi.config.enable_mcp),
                g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",

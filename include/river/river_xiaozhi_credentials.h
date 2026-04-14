@@ -3,25 +3,29 @@
 #define AMEBA_RIVER_XIAOZHI_CREDENTIALS_H
 
 /*
- * XiaoZhi realtime websocket configuration.
+ * Native agent-server realtime websocket configuration.
  *
- * Keep URL/TOKEN empty by default so the current flashable Iflytek path remains
- * the active baseline until XiaoZhi server details are intentionally provided.
+ * This debug branch now targets the self-hosted agent-server native RTOS
+ * contract directly. Keep the legacy ota/token fields empty so the old
+ * XiaoZhi bootstrap path is effectively disabled while the higher layers are
+ * still being renamed.
  */
-#define RIVER_XIAOZHI_OTA_URL                   "https://api.tenclass.net/xiaozhi/ota/"
-#define RIVER_XIAOZHI_URL                       ""
+#define RIVER_XIAOZHI_OTA_URL                   ""
+#define RIVER_XIAOZHI_URL                       "wss://101.33.235.154/v1/realtime/ws"
 #define RIVER_XIAOZHI_TOKEN                     ""
+#define RIVER_XIAOZHI_REALTIME_SUBPROTOCOL      "agent-server.realtime.v0"
+#define RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION "rtos-ws-v0"
+#define RIVER_XIAOZHI_REALTIME_CLIENT_TYPE      "rtos"
 #define RIVER_XIAOZHI_PROTOCOL_VERSION          3U
 #define RIVER_XIAOZHI_ENABLE_MCP                1
 
-#define RIVER_XIAOZHI_UPLINK_FORMAT             "opus"
+#define RIVER_XIAOZHI_UPLINK_FORMAT             "pcm16le"
 #define RIVER_XIAOZHI_UPLINK_SAMPLE_RATE        16000U
 #define RIVER_XIAOZHI_UPLINK_CHANNELS           1U
 /*
- * Official docs and ESP reference commonly use 60 ms, but py-xiaozhi falls
- * back to 20 ms on non-ESP clients. Ameba currently uses the SDK libopus
- * directly, and 20 ms is materially safer here while remaining protocol-
- * compatible with the XiaoZhi server.
+ * The native RTOS websocket profile recommends 20 ms pcm16le chunks for the
+ * first bring-up pass. River's local capture path still runs at 16 ms, so the
+ * cloud adapter will continue bundling frames into 20 ms uplink packets.
  */
 #define RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS  20U
 

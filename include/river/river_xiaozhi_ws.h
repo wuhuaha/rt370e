@@ -21,7 +21,8 @@ typedef enum {
 
 typedef enum {
     RIVER_XIAOZHI_BINARY_OPUS = 0,
-    RIVER_XIAOZHI_BINARY_JSON = 1
+    RIVER_XIAOZHI_BINARY_JSON = 1,
+    RIVER_XIAOZHI_BINARY_PCM16 = 2
 } river_xiaozhi_binary_type_t;
 
 typedef struct {
