@@ -1,5 +1,22 @@
 # Verification
 
+## Step 5.163
+Validate the new full-duplex execution plan registration and Codex harness
+consistency:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- the new document exists:
+  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+- `.codex/active_plans.md` lists it as a secondary active execution plan
+
 ## Step 5.162
 Validate the post-commit response-wait extension against the latest SDK:
 ```bash

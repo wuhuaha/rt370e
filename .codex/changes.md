@@ -1,5 +1,49 @@
 # Change Log
 
+## Step 5.163
+- Added a dedicated cross-repo full-duplex voice execution plan and registered
+  it as a secondary active plan:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- The new document records the current judgement that the system is not yet
+  true full duplex, even though both sides already have important building
+  blocks:
+  - device side:
+    - bidirectional realtime audio transport
+    - barge-in detection / interrupt hooks
+    - playback ducking API
+  - server side:
+    - `StreamingTranscriber`
+    - `InputPreview`
+    - adaptive barge-in
+    - `StreamingResponder`
+    - `SpeechPlanner`
+    - heard-text persistence
+- The plan also captures the current blocking facts that make the system still
+  turn-oriented:
+  - device side still advertises:
+    - `half_duplex=true`
+  - device side still closes the local input round on:
+    - `tts_start`
+  - service discovery still defaults to:
+    - `turn_mode=client_wakeup_client_commit`
+  - service input preview still primarily drives:
+    - `commitSuggested`
+  - service session core is still a single state machine:
+    - `active`
+    - `thinking`
+    - `speaking`
+- The execution plan is deliberately split into:
+  - service-side task blocks `S1..S4`
+  - device-side task blocks `D1..D4`
+  - joint / protocol task blocks `J1..J2`
+- The current top-level recommendation is now documented explicitly:
+  - first make AEC / playback reference truly usable on device side
+  - in parallel, thicken the server-side `Voice Orchestration Core`
+  - only after both are stable should discovery / public protocol wording move
+    from `client_commit` semantics toward a true duplex contract
+
 ## Step 5.162
 - Extended the XiaoZhi post-commit response wait so the board does not close
   the follow-up window too soon after a longer utterance:

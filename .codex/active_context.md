@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.162 post-commit response wait window`
+  - `5.163 full-duplex voice execution plan`
 - Primary active execution plan:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
@@ -35,6 +35,8 @@ or top-of-tree verification target changes.
   - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
+- Track the cross-repo full-duplex evolution separately in:
+  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 - Preserve the project flash profile:
   - `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 
@@ -45,6 +47,7 @@ or top-of-tree verification target changes.
 - `build.md`
 - `.codex/active_plans.md`
 - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
+- `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 - the latest sections at the top of `.codex/changes.md` and `.codex/verification.md`
 - `doc/README.md` for historical design and investigation documents
 
