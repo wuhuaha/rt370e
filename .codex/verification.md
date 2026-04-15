@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.161
+Validate the server-response-synced local round close against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify the native realtime timing on board:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, say:
+- `小欧管家，今天周几啊`
+- or another short natural utterance with a small pause in the middle
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- on board:
+  - `response.start` or `tts sentence_start` should be followed by a local ASR
+    round close without waiting for the old 2s timeout path
+  - avoid a late extra `session.update: state=thinking` caused by a delayed
+    client-side close after the response has already started
+  - the finished round reason should prefer the server-response trigger path
+    over `timeout` for this case
+
 ## Step 5.160
 Validate the River websocket lifecycle cleanup fix against the latest SDK:
 ```bash

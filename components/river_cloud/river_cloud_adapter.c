@@ -342,6 +342,45 @@ static void river_cloud_xiaozhi_resolve_local_close(const char *trigger)
     river_runtime_stats_snapshot("asr_stream_finish");
 }
 
+static void river_cloud_xiaozhi_close_round_on_server_response(const char *trigger)
+{
+    bool had_local_round;
+    const char *reason;
+
+    had_local_round = g_river_cloud.stream_active ||
+                      g_river_cloud.xiaozhi_listen_stop_pending ||
+                      g_river_cloud.xiaozhi_local_close_pending;
+    if (!had_local_round) {
+        return;
+    }
+
+    reason = (trigger != NULL && trigger[0] != '\0') ?
+                 trigger :
+                 "server_response_started";
+    RIVER_LOGI("xiaozhi server response closes local round: trigger=%s stream=%s stop_pending=%s close_pending=%s",
+               reason,
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
+               g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no");
+
+    g_river_cloud.stream_active = false;
+    g_river_cloud.silence_frames = 0U;
+    g_river_cloud.stream_started_ms = 0U;
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_listen_stop_pending = false;
+    g_river_cloud.xiaozhi_local_close_pending = false;
+    g_river_cloud.xiaozhi_local_close_deadline_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
+    g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
+    river_audio_frame_ring_reset(&g_river_cloud.xiaozhi_uplink_ring);
+    river_cloud_pre_roll_reset();
+
+    river_cloud_xiaozhi_emit_session_closed();
+    river_cloud_xiaozhi_round_finish(reason);
+    river_runtime_stats_snapshot("asr_stream_finish");
+}
+
 static void river_cloud_xiaozhi_check_local_close_timeout(void)
 {
     uint64_t now_ms;
@@ -1749,7 +1788,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
             river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                              "tts_start");
             river_cloud_xiaozhi_finalize_pending_text();
-            river_cloud_xiaozhi_resolve_local_close("tts_start");
+            river_cloud_xiaozhi_close_round_on_server_response("tts_start");
             river_cloud_xiaozhi_cancel_playback_stop();
         } else if (event->state != NULL && strcmp(event->state, "sentence_start") == 0) {
             river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,

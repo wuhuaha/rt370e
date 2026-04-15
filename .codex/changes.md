@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.161
+- Tightened the native realtime round-close state machine so River stops the
+  local ASR round as soon as the server begins responding:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause from the latest board logs on `2026-04-15`:
+  - the cloud session and audio uplink were already healthy:
+    - `response.start`
+    - `response.chunk: agent-server received text input: 今天周几啊？`
+    - `packets=141 busy=0 fail=0 stale_drop=0 ring_drop=0`
+  - but River sometimes kept the local ASR round open after the server had
+    already started its response
+  - when local VAD later reached post-roll, River still executed its own
+    delayed close path and sent a late `audio.in.commit`
+  - that created misaligned state transitions like:
+    - `local close deferred`
+    - `session.update: state=thinking`
+    - `reason=reopen_overlap`
+- This step adds a focused local fix:
+  - when the realtime transport emits `tts/start` (currently driven by
+    `response.start`, including `tts_provider=none` mode), River now closes the
+    active local ASR round immediately
+  - the helper clears pending local close / pending listen-stop state, resets
+    queued uplink tail audio, emits local session-closed, and finishes the
+    round with reason `tts_start`
+  - this avoids a late client-side `audio.in.commit` after the server has
+    already auto-endpointed and begun generating the response
+- Expected board-side change:
+  - once `response.start` arrives, River should stop waiting for the old
+    local-close timeout for that round
+  - the log sequence should stop showing a second local `thinking` transition
+    caused by a late close after the response has already started
+  - `reopen_overlap` caused by overlap with a still-pending local close should
+    reduce for this server-response-started path
+
 ## Step 5.160
 - Fixed a real websocket-lifecycle cleanup bug in the River native realtime
   client and tightened transport-close state reset:
