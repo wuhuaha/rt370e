@@ -46,6 +46,17 @@ config RIVER_CLOUD_TEXT_DEBUG_EN
       realtime product flow to avoid carrying text/TTS debug helpers in the
       firmware image.
 
+config RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
+    bool "Advertise XiaoZhi full-duplex experiment capability"
+    default n
+    depends on RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
+    help
+      Experimental gate for the XiaoZhi realtime full-duplex rollout.
+      In the current device-side slice this only changes the advertised
+      session capability contract and related diagnostics; the runtime
+      close/listen behavior stays on the conservative half-duplex baseline
+      until later full-duplex steps are verified on board.
+
 config RIVER_INTERACTION_DIAG_EN
     bool "Enable local interaction diagnostic router"
     default n

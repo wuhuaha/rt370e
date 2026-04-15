@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.164
+- Added a device-side XiaoZhi duplex capability experiment gate so the
+  websocket `session.start` contract is no longer hardcoded to
+  `half_duplex=true`:
+  - [Kconfig](/root/ameba-river/Kconfig)
+  - [prj.conf](/root/ameba-river/prj.conf)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- New build-time gate:
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN`
+- Current scope of this step is intentionally narrow and board-safe:
+  - default profile remains on the conservative half-duplex baseline
+  - runtime listen / commit / local-close behavior is unchanged
+  - only the advertised XiaoZhi session capability and diagnostics change
+- Device-side behavior after this step:
+  - default build still advertises:
+    - `capabilities.half_duplex=true`
+  - an explicit experiment build can now advertise:
+    - `capabilities.half_duplex=false`
+  - `session.start` log now also prints:
+    - `duplex=...`
+    - `half_duplex=yes|no`
+- Why this slice lands first:
+  - current logs still show missing AEC/reference readiness on board:
+    - `echo:0B`
+    - `ref_peak=0`
+  - the service side is also still evolving toward a real duplex contract
+  - so the safest first device change is to separate:
+    - capability negotiation
+    - later behavior changes such as simultaneous capture/playback policy
+
 ## Step 5.163
 - Added a dedicated cross-repo full-duplex voice execution plan and registered
   it as a secondary active plan:

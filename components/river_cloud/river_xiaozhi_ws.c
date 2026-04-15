@@ -177,6 +177,23 @@ static const char *river_xiaozhi_bool_text(bool value)
     return value ? "yes" : "no";
 }
 
+static bool river_xiaozhi_half_duplex_capability_enabled(void)
+{
+#if defined(CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN) && \
+    CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
+    return false;
+#else
+    return true;
+#endif
+}
+
+static const char *river_xiaozhi_duplex_mode_name(void)
+{
+    return river_xiaozhi_half_duplex_capability_enabled() ?
+               "half_duplex" :
+               "full_duplex_experiment";
+}
+
 static void river_xiaozhi_copy_string(char *dst, size_t dst_size, const char *src)
 {
     if (dst == NULL || dst_size == 0U) {
@@ -1316,6 +1333,7 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     cJSON *session = NULL;
     cJSON *capabilities = NULL;
     river_status_t status;
+    bool half_duplex = river_xiaozhi_half_duplex_capability_enabled();
 
     root = river_xiaozhi_create_control_event("session.start", &payload);
     device = cJSON_CreateObject();
@@ -1367,7 +1385,7 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
 
     cJSON_AddBoolToObject(capabilities, "text_input", true);
     cJSON_AddBoolToObject(capabilities, "image_input", false);
-    cJSON_AddBoolToObject(capabilities, "half_duplex", true);
+    cJSON_AddBoolToObject(capabilities, "half_duplex", half_duplex);
     cJSON_AddBoolToObject(capabilities, "local_wake_word", true);
     cJSON_AddItemToObject(payload, "capabilities", capabilities);
 
@@ -1375,11 +1393,13 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     if (status == RIVER_OK) {
         g_river_xiaozhi.dialog_started = true;
         g_river_xiaozhi.response_started = false;
-        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s",
+        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s duplex=%s half_duplex=%s",
                    (wake_reason != NULL && wake_reason[0] != '\0') ? wake_reason : "keyword",
                    g_river_xiaozhi.device_id,
                    g_river_xiaozhi.client_id,
-                   RIVER_XIAOZHI_UPLINK_FORMAT);
+                   RIVER_XIAOZHI_UPLINK_FORMAT,
+                   river_xiaozhi_duplex_mode_name(),
+                   river_xiaozhi_bool_text(half_duplex));
     }
     return status;
 }
