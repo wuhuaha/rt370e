@@ -21,6 +21,16 @@ static bool river_cloud_xiaozhi_profile_supports_playback_reference(void)
            river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF);
 }
 
+bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void)
+{
+#if defined(CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN) && \
+    CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 {
 #if defined(CONFIG_RIVER_VOICE_CAPABILITY_KWS) && CONFIG_RIVER_VOICE_CAPABILITY_KWS
@@ -33,6 +43,12 @@ bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     return river_cloud_xiaozhi_profile_supports_playback_reference();
+}
+
+bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
+{
+    return river_cloud_xiaozhi_full_duplex_experiment_enabled() &&
+           river_cloud_xiaozhi_playback_allows_vad_open();
 }
 
 void river_cloud_xiaozhi_clear_pending_text(void)

@@ -231,7 +231,9 @@ void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  int code,
                                  bool is_final);
 bool river_cloud_xiaozhi_idle_requires_wakeword(void);
+bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void);
 bool river_cloud_xiaozhi_playback_allows_vad_open(void);
+bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
 void river_cloud_xiaozhi_window_close(const char *reason);
 void river_cloud_xiaozhi_window_abort_local(const char *reason);

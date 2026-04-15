@@ -1,5 +1,44 @@
 # Verification
 
+## Step 5.165
+Validate the `tts_start` local-round policy gate against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Default-profile smoke check on board:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, say:
+- `小欧管家，今天周几`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- default profile remains on the conservative baseline:
+  - wake -> asr -> response still works as before
+  - server `tts_start` still closes the local round
+
+Optional experiment checks:
+- if only `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y` is enabled but
+  the active profile still lacks playback reference support, `tts_start` should
+  log:
+  - `xiaozhi tts_start falls back to round close: duplex_experiment=yes playback_ref=no`
+- if both the duplex experiment and a playback-reference-capable profile are
+  enabled, `tts_start` should log:
+  - `xiaozhi tts_start keeps local round open: duplex_experiment=yes playback_ref=yes`
+  - and the old unconditional `tts_start -> close local round` path should no
+    longer run for that case
+
 ## Step 5.164
 Validate the new XiaoZhi duplex capability gate against the latest SDK:
 ```bash

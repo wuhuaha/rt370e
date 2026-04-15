@@ -1,5 +1,42 @@
 # Change Log
 
+## Step 5.165
+- Added the next device-side full-duplex experiment slice for XiaoZhi
+  `tts_start` handling:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- This step moves one hardcoded turn-taking behavior behind an explicit policy:
+  - before:
+    - server `tts_start` always forced a local round close
+  - after:
+    - default build still closes the local round exactly as before
+    - full-duplex experiment builds now decide `tts_start` behavior from:
+      - experiment gate enabled or not
+      - whether the active voice profile exposes playback-reference support
+- New XiaoZhi session helpers now expose:
+  - `river_cloud_xiaozhi_full_duplex_experiment_enabled()`
+  - `river_cloud_xiaozhi_keep_local_round_on_tts_start()`
+- Runtime policy after this step:
+  - if duplex experiment is off:
+    - keep the old conservative `tts_start -> close local round` behavior
+  - if duplex experiment is on but playback reference is still unavailable:
+    - fall back to the old close behavior
+    - log:
+      - `xiaozhi tts_start falls back to round close: duplex_experiment=yes playback_ref=no`
+  - if duplex experiment is on and playback reference is available:
+    - do not hard-close the local round on `tts_start`
+    - log:
+      - `xiaozhi tts_start keeps local round open: duplex_experiment=yes playback_ref=yes ...`
+- Why this slice is still conservative:
+  - it does not globally enable overlapping capture/playback
+  - it only removes one hard stop when both of these are true:
+    - the duplex experiment was enabled intentionally
+    - the active board profile can already provide playback reference to VAD/AEC
+  - this keeps the default branch stable while creating a board-visible
+    stepping stone toward true duplex behavior
+
 ## Step 5.164
 - Added a device-side XiaoZhi duplex capability experiment gate so the
   websocket `session.start` contract is no longer hardcoded to

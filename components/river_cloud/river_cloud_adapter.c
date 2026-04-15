@@ -381,6 +381,27 @@ static void river_cloud_xiaozhi_close_round_on_server_response(const char *trigg
     river_runtime_stats_snapshot("asr_stream_finish");
 }
 
+static void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
+{
+    const bool duplex_experiment = river_cloud_xiaozhi_full_duplex_experiment_enabled();
+    const bool playback_ref = river_cloud_xiaozhi_playback_allows_vad_open();
+    const bool keep_round_open = river_cloud_xiaozhi_keep_local_round_on_tts_start();
+
+    if (keep_round_open) {
+        RIVER_LOGI("xiaozhi tts_start keeps local round open: duplex_experiment=yes playback_ref=yes stream=%s stop_pending=%s close_pending=%s",
+                   g_river_cloud.stream_active ? "yes" : "no",
+                   g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
+                   g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no");
+        return;
+    }
+
+    if (duplex_experiment) {
+        RIVER_LOGI("xiaozhi tts_start falls back to round close: duplex_experiment=yes playback_ref=%s",
+                   playback_ref ? "yes" : "no");
+    }
+    river_cloud_xiaozhi_close_round_on_server_response("tts_start");
+}
+
 static void river_cloud_xiaozhi_check_local_close_timeout(void)
 {
     uint64_t now_ms;
@@ -1792,7 +1813,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
             river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                              "tts_start");
             river_cloud_xiaozhi_finalize_pending_text();
-            river_cloud_xiaozhi_close_round_on_server_response("tts_start");
+            river_cloud_xiaozhi_apply_tts_start_round_policy();
             river_cloud_xiaozhi_cancel_playback_stop();
         } else if (event->state != NULL && strcmp(event->state, "sentence_start") == 0) {
             river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
