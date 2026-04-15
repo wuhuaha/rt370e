@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.162
+Validate the post-commit response-wait extension against the latest SDK:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+Then flash and verify on board:
+```bash
+cd /root/ameba-river
+bash -lc "printf 'reboot uartburn\r' > /dev/ttyUSB0"
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+In the monitor, say a slightly longer utterance such as:
+- `小欧管家，帮我把客厅的灯打开`
+- or another natural sentence lasting around `3~5s`
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- on board:
+  - after post-roll / commit, logs should include:
+    - `xiaozhi response wait armed after commit: timeout_ms=6000`
+  - if the server is only moderately slower, avoid the old pattern where:
+    - `state=thinking`
+    - then only a few seconds later
+    - `xiaozhi conversation window closed: reason=followup_timeout`
+  - successful cases should now have more time to reach:
+    - `response.start`
+    - `response.chunk`
+    - audio playback
+
 ## Step 5.161
 Validate the server-response-synced local round close against the latest SDK:
 ```bash

@@ -1717,6 +1717,10 @@ static void river_cloud_xiaozhi_finish_active_stream(void)
     river_cloud_xiaozhi_round_request_finish("post_roll");
     g_river_cloud.xiaozhi_listen_stop_pending = true;
     river_cloud_xiaozhi_finalize_pending_text();
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS,
+                                     "post_commit_wait");
+    RIVER_LOGI("xiaozhi response wait armed after commit: timeout_ms=%u",
+               (unsigned int)RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS);
     if (river_cloud_xiaozhi_should_defer_local_close()) {
         river_cloud_xiaozhi_arm_local_close_defer();
     } else {

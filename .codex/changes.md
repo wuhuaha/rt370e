@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.162
+- Extended the XiaoZhi post-commit response wait so the board does not close
+  the follow-up window too soon after a longer utterance:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Root cause from the latest board logs on `2026-04-15`:
+  - wake, websocket connect, `session.start`, and uplink all still succeeded:
+    - `xiaozhi session.start sent`
+    - `xiaozhi asr round begin: ... packets=129 ... busy=0 fail=0`
+  - the server did acknowledge turn-end and entered:
+    - `xiaozhi session.update: ... state=thinking`
+  - but there were still no downstream:
+    - `stt`
+    - `response.start`
+    - `response.chunk`
+    - audio frames
+  - the board then closed the conversation window only about `3s` after commit:
+    - `xiaozhi local close deferred: wait_ms=2000`
+    - `xiaozhi local close resolved: trigger=timeout`
+    - `xiaozhi conversation window closed: reason=followup_timeout`
+  - inference:
+    - the fixed `8s` follow-up window was being measured from wake admission,
+      not from end-of-speech
+    - on longer utterances, that left too little time for server-side
+      `thinking -> response.start`
+- This step adds a focused timing fix:
+  - when River finishes the active uplink stream and sends commit, it now
+    refreshes the conversation window for an additional bounded
+    post-commit response wait
+  - the board also logs:
+    - `xiaozhi response wait armed after commit: timeout_ms=6000`
+- Expected board-side change:
+  - after `state=thinking`, the websocket should stay alive long enough for a
+    legitimate delayed `response.start` / audio response to arrive
+  - avoid the current pattern where `followup_timeout` closes the session only
+    a few seconds after commit on longer utterances
+
 ## Step 5.161
 - Tightened the native realtime round-close state machine so River stops the
   local ASR round as soon as the server begins responding:
