@@ -1,5 +1,44 @@
 # Change Log
 
+## Step C1
+- Implemented the device-side XiaoZhi collaboration negotiation baseline in
+  [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  so future duplex protocol slices can be enabled by discovery instead of hard
+  coding capability bits.
+- Added a non-fatal discovery fetch before websocket connect:
+  - derives `GET /v1/realtime` from the configured realtime websocket URL
+  - parses `turn_mode`, `server_endpoint`, and
+    `voice_collaboration.preview_events/playback_ack`
+  - caches the server-advertised collaboration profile in the XiaoZhi transport
+    context
+- Added explicit discovery cache invalidation on credential changes:
+  - runtime bootstrap credential reset now clears discovery state
+  - websocket URL changes from bootstrap now clear discovery state
+  - manual `url` / `token` overrides also clear discovery state when changed
+- `session.start.capabilities` now negotiates collaboration fields instead of
+  assuming them:
+  - `preview_events=true` is only declared when both server discovery and local
+    client support say yes
+  - `playback_ack.mode=segment_mark_v1` is only declared when both sides agree
+  - current local support remains intentionally disabled, so the shipped default
+    path still falls back to the old compatibility baseline
+- Extended logs and status dumping so board-side validation can see both the
+  advertised server abilities and the actually declared client abilities:
+  - `xiaozhi discovery ready: ...`
+  - `xiaozhi session.start sent: ... preview_events=... playback_ack=...`
+  - `river xiaozhi status` now prints a discovery/collaboration summary line
+- Updated the active full-duplex execution context to record that `C1` is now
+  the latest landed collaboration slice and that `C2` is the next protocol
+  implementation step:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+  - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against
+    `/root/ameba-rtos`
+
 ## Plan Sync 2026-04-16
 - Re-read the latest `/root/agent-server` protocol and architecture docs and
   aligned the device-side duplex roadmap to the new server-driven collaboration

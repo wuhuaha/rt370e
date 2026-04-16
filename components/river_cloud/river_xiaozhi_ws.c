@@ -43,6 +43,8 @@
 #define RIVER_XIAOZHI_LAST_TURN_ID_MAX     96U
 #define RIVER_XIAOZHI_LAST_ACCEPT_REASON_MAX 32U
 #define RIVER_XIAOZHI_LAST_EMOTION_MAX     32U
+#define RIVER_XIAOZHI_TURN_MODE_MAX        48U
+#define RIVER_XIAOZHI_COLLAB_MODE_MAX      32U
 #define RIVER_XIAOZHI_ACTIVATION_CODE_MAX  16U
 #define RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX 192U
 #define RIVER_XIAOZHI_ACTIVATION_CHALLENGE_MAX 192U
@@ -50,6 +52,7 @@
 #define RIVER_XIAOZHI_HTTP_RESPONSE_MAX    4096U
 
 #define RIVER_XIAOZHI_HTTP_USER_AGENT      "ameba-river/xiaozhi"
+#define RIVER_XIAOZHI_DISCOVERY_PATH_DEFAULT "/v1/realtime"
 #define RIVER_XIAOZHI_OTA_RETRY_MIN_MS     5000U
 #define RIVER_XIAOZHI_OTA_RETRY_MAX_MS     30000U
 #define RIVER_XIAOZHI_WS_RECV_TIMEOUT_MS   10000U
@@ -124,6 +127,18 @@ typedef struct {
     bool activation_code_present;
     bool last_barge_in_enabled;
     bool last_barge_in_enabled_known;
+    bool discovery_voice_collaboration_advertised;
+    bool discovery_server_endpoint_available;
+    bool discovery_server_endpoint_enabled;
+    bool discovery_preview_events_enabled;
+    bool discovery_preview_speech_start;
+    bool discovery_preview_partial;
+    bool discovery_preview_endpoint_candidate;
+    bool discovery_playback_ack_enabled;
+    bool discovery_playback_ack_started;
+    bool discovery_playback_ack_mark;
+    bool discovery_playback_ack_cleared;
+    bool discovery_playback_ack_completed;
     uint64_t bootstrap_retry_after_ms;
     uint64_t bootstrap_cache_expire_at_ms;
     uint64_t last_backpressure_log_ms;
@@ -143,6 +158,10 @@ typedef struct {
     char last_turn_id[RIVER_XIAOZHI_LAST_TURN_ID_MAX];
     char last_accept_reason[RIVER_XIAOZHI_LAST_ACCEPT_REASON_MAX];
     char last_emotion[RIVER_XIAOZHI_LAST_EMOTION_MAX];
+    char discovery_turn_mode[RIVER_XIAOZHI_TURN_MODE_MAX];
+    char discovery_server_endpoint_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
+    char discovery_preview_events_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
+    char discovery_playback_ack_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
     char activation_code[RIVER_XIAOZHI_ACTIVATION_CODE_MAX];
     char activation_message[RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX];
     char activation_challenge[RIVER_XIAOZHI_ACTIVATION_CHALLENGE_MAX];
@@ -532,6 +551,26 @@ static void river_xiaozhi_set_last_barge_in_enabled(bool known, bool enabled)
     g_river_xiaozhi.last_barge_in_enabled = known && enabled;
 }
 
+static void river_xiaozhi_clear_discovery_profile(void)
+{
+    g_river_xiaozhi.discovery_voice_collaboration_advertised = false;
+    g_river_xiaozhi.discovery_server_endpoint_available = false;
+    g_river_xiaozhi.discovery_server_endpoint_enabled = false;
+    g_river_xiaozhi.discovery_preview_events_enabled = false;
+    g_river_xiaozhi.discovery_preview_speech_start = false;
+    g_river_xiaozhi.discovery_preview_partial = false;
+    g_river_xiaozhi.discovery_preview_endpoint_candidate = false;
+    g_river_xiaozhi.discovery_playback_ack_enabled = false;
+    g_river_xiaozhi.discovery_playback_ack_started = false;
+    g_river_xiaozhi.discovery_playback_ack_mark = false;
+    g_river_xiaozhi.discovery_playback_ack_cleared = false;
+    g_river_xiaozhi.discovery_playback_ack_completed = false;
+    g_river_xiaozhi.discovery_turn_mode[0] = '\0';
+    g_river_xiaozhi.discovery_server_endpoint_mode[0] = '\0';
+    g_river_xiaozhi.discovery_preview_events_mode[0] = '\0';
+    g_river_xiaozhi.discovery_playback_ack_mode[0] = '\0';
+}
+
 static void river_xiaozhi_clear_last_session_update_fields(void)
 {
     g_river_xiaozhi.last_session_state[0] = '\0';
@@ -890,6 +929,7 @@ static void river_xiaozhi_bootstrap_cache_forget_runtime_credentials(void)
     river_xiaozhi_bootstrap_cache_disable_auto_refresh();
     g_river_xiaozhi.url[0] = '\0';
     g_river_xiaozhi.token[0] = '\0';
+    river_xiaozhi_clear_discovery_profile();
     river_xiaozhi_clear_activation_state();
 }
 
@@ -945,6 +985,56 @@ static void river_xiaozhi_clear_bootstrap_backoff(void)
 {
     g_river_xiaozhi.bootstrap_failures = 0U;
     g_river_xiaozhi.bootstrap_retry_after_ms = 0U;
+}
+
+static bool river_xiaozhi_client_supports_preview_events(void)
+{
+    return false;
+}
+
+static const char *river_xiaozhi_client_supported_playback_ack_mode(void)
+{
+    return NULL;
+}
+
+static bool river_xiaozhi_discovery_preview_events_supported(void)
+{
+    return g_river_xiaozhi.discovery_preview_events_enabled &&
+           strcmp(g_river_xiaozhi.discovery_preview_events_mode, "preview_v1") == 0;
+}
+
+static const char *river_xiaozhi_discovery_playback_ack_mode(void)
+{
+    if (!g_river_xiaozhi.discovery_playback_ack_enabled) {
+        return NULL;
+    }
+    if (strcmp(g_river_xiaozhi.discovery_playback_ack_mode, "segment_mark_v1") != 0) {
+        return NULL;
+    }
+    return g_river_xiaozhi.discovery_playback_ack_mode;
+}
+
+static bool river_xiaozhi_negotiated_preview_events_enabled(void)
+{
+    return river_xiaozhi_client_supports_preview_events() &&
+           river_xiaozhi_discovery_preview_events_supported();
+}
+
+static const char *river_xiaozhi_negotiated_playback_ack_mode(void)
+{
+    const char *client_mode;
+    const char *server_mode;
+
+    client_mode = river_xiaozhi_client_supported_playback_ack_mode();
+    server_mode = river_xiaozhi_discovery_playback_ack_mode();
+    if (client_mode == NULL || client_mode[0] == '\0' || server_mode == NULL ||
+        server_mode[0] == '\0') {
+        return NULL;
+    }
+    if (strcmp(client_mode, server_mode) != 0) {
+        return NULL;
+    }
+    return client_mode;
 }
 
 static river_status_t river_xiaozhi_parse_http_url(const char *url,
@@ -1243,6 +1333,372 @@ exit:
     return status;
 }
 
+static river_status_t river_xiaozhi_http_get_json(const char *url,
+                                                  const char *auth_token,
+                                                  const char *device_id,
+                                                  const char *client_id,
+                                                  char *response_out,
+                                                  size_t response_out_size,
+                                                  int *status_code_out)
+{
+    struct httpc_conn *conn = NULL;
+    char host[RIVER_XIAOZHI_HTTP_HOST_MAX];
+    char resource[RIVER_XIAOZHI_HTTP_RESOURCE_MAX];
+    char auth_header[320];
+    uint16_t port = 0U;
+    uint8_t secure = HTTPC_SECURE_NONE;
+    size_t total_read = 0U;
+    river_status_t status = RIVER_ERR_IO;
+
+    if (url == NULL || device_id == NULL || client_id == NULL || response_out == NULL ||
+        response_out_size == 0U) {
+        return RIVER_ERR_ARG;
+    }
+
+    status = river_xiaozhi_parse_http_url(url,
+                                          host,
+                                          sizeof(host),
+                                          &port,
+                                          resource,
+                                          sizeof(resource),
+                                          &secure);
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    response_out[0] = '\0';
+    auth_header[0] = '\0';
+    if (status_code_out != NULL) {
+        *status_code_out = 0;
+    }
+    if (auth_token != NULL && auth_token[0] != '\0') {
+        if (strchr(auth_token, ' ') == NULL) {
+            snprintf(auth_header, sizeof(auth_header), "Bearer %s", auth_token);
+        } else {
+            snprintf(auth_header, sizeof(auth_header), "%s", auth_token);
+        }
+    }
+
+    conn = httpc_conn_new(secure, NULL, NULL, NULL);
+    if (conn == NULL) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    if (httpc_conn_connect(conn,
+                           host,
+                           port,
+                           (uint32_t)RIVER_XIAOZHI_OTA_HTTP_TIMEOUT_SEC) != 0) {
+        goto exit;
+    }
+
+    if (httpc_request_write_header_start(conn, (char *)"GET", resource, NULL, 0U) != 0) {
+        goto exit;
+    }
+    if (httpc_request_write_header(conn, (char *)"Connection", (char *)"close") != 0 ||
+        httpc_request_write_header(conn, (char *)"Device-Id", (char *)device_id) != 0 ||
+        httpc_request_write_header(conn, (char *)"Client-Id", (char *)client_id) != 0 ||
+        httpc_request_write_header(conn, (char *)"User-Agent", (char *)RIVER_XIAOZHI_HTTP_USER_AGENT) != 0 ||
+        httpc_request_write_header(conn, (char *)"Accept", (char *)"application/json") != 0) {
+        goto exit;
+    }
+    if (auth_header[0] != '\0' &&
+        httpc_request_write_header(conn, (char *)"Authorization", auth_header) != 0) {
+        goto exit;
+    }
+    if (httpc_request_write_header_finish(conn) <= 0) {
+        goto exit;
+    }
+    if (httpc_response_read_header(conn) != 0) {
+        goto exit;
+    }
+
+    if (status_code_out != NULL && conn->response.status != NULL) {
+        *status_code_out = atoi(conn->response.status);
+    }
+
+    while (total_read < (response_out_size - 1U)) {
+        int read_size;
+
+        read_size = httpc_response_read_data(conn,
+                                             (uint8_t *)(response_out + total_read),
+                                             response_out_size - total_read - 1U);
+        if (read_size <= 0) {
+            break;
+        }
+        total_read += (size_t)read_size;
+        response_out[total_read] = '\0';
+
+        if (conn->response.content_len != 0U &&
+            total_read >= conn->response.content_len) {
+            break;
+        }
+    }
+
+    status = RIVER_OK;
+
+exit:
+    if (conn != NULL) {
+        httpc_conn_close(conn);
+        httpc_conn_free(conn);
+    }
+    return status;
+}
+
+static river_status_t river_xiaozhi_build_discovery_url(const char *ws_url,
+                                                        char *url_out,
+                                                        size_t url_out_size)
+{
+    char base_url[RIVER_XIAOZHI_BASE_URL_MAX];
+    char path[RIVER_XIAOZHI_PATH_MAX];
+    char discovery_path[RIVER_XIAOZHI_PATH_MAX];
+    const char *scheme_prefix = NULL;
+    const char *host_start = NULL;
+    int port = 0;
+    int default_port = 0;
+    size_t path_len;
+    river_status_t status;
+
+    if (ws_url == NULL || url_out == NULL || url_out_size == 0U) {
+        return RIVER_ERR_ARG;
+    }
+
+    status = river_xiaozhi_parse_url(ws_url,
+                                     base_url,
+                                     sizeof(base_url),
+                                     &port,
+                                     path,
+                                     sizeof(path));
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    if (strncmp(base_url, "wss://", 6U) == 0) {
+        scheme_prefix = "https://";
+        host_start = base_url + 6U;
+        default_port = 443;
+    } else if (strncmp(base_url, "ws://", 5U) == 0) {
+        scheme_prefix = "http://";
+        host_start = base_url + 5U;
+        default_port = 80;
+    } else {
+        return RIVER_ERR_ARG;
+    }
+
+    snprintf(discovery_path, sizeof(discovery_path), "%s",
+             RIVER_XIAOZHI_DISCOVERY_PATH_DEFAULT);
+    if (path[0] != '\0') {
+        snprintf(discovery_path, sizeof(discovery_path), "/%s", path);
+        path_len = strlen(discovery_path);
+        if (path_len > 3U && strcmp(discovery_path + path_len - 3U, "/ws") == 0) {
+            discovery_path[path_len - 3U] = '\0';
+            if (discovery_path[0] == '\0') {
+                snprintf(discovery_path, sizeof(discovery_path), "%s",
+                         RIVER_XIAOZHI_DISCOVERY_PATH_DEFAULT);
+            }
+        } else {
+            snprintf(discovery_path, sizeof(discovery_path), "%s",
+                     RIVER_XIAOZHI_DISCOVERY_PATH_DEFAULT);
+        }
+    }
+
+    if (port == default_port || port == 0) {
+        if (snprintf(url_out, url_out_size, "%s%s%s",
+                     scheme_prefix,
+                     host_start,
+                     discovery_path) >= (int)url_out_size) {
+            return RIVER_ERR_IO;
+        }
+    } else {
+        if (snprintf(url_out, url_out_size, "%s%s:%d%s",
+                     scheme_prefix,
+                     host_start,
+                     port,
+                     discovery_path) >= (int)url_out_size) {
+            return RIVER_ERR_IO;
+        }
+    }
+
+    return RIVER_OK;
+}
+
+static river_status_t river_xiaozhi_parse_discovery_response(const char *json_text)
+{
+    cJSON *root = NULL;
+    const cJSON *turn_mode_obj;
+    const cJSON *server_endpoint_obj;
+    const cJSON *voice_collaboration_obj;
+    const cJSON *preview_events_obj;
+    const cJSON *playback_ack_obj;
+    const cJSON *available_obj;
+    const cJSON *enabled_obj;
+    const cJSON *mode_obj;
+    const cJSON *speech_start_obj;
+    const cJSON *partial_obj;
+    const cJSON *endpoint_candidate_obj;
+    const cJSON *started_obj;
+    const cJSON *mark_obj;
+    const cJSON *cleared_obj;
+    const cJSON *completed_obj;
+
+    if (json_text == NULL || json_text[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = cJSON_Parse(json_text);
+    if (root == NULL) {
+        return RIVER_ERR_IO;
+    }
+
+    river_xiaozhi_clear_discovery_profile();
+
+    turn_mode_obj = cJSON_GetObjectItemCaseSensitive(root, "turn_mode");
+    if (cJSON_IsString(turn_mode_obj) && turn_mode_obj->valuestring != NULL) {
+        river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_turn_mode,
+                                           sizeof(g_river_xiaozhi.discovery_turn_mode),
+                                           turn_mode_obj->valuestring);
+    }
+
+    server_endpoint_obj = cJSON_GetObjectItemCaseSensitive(root, "server_endpoint");
+    if (cJSON_IsObject(server_endpoint_obj)) {
+        available_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)server_endpoint_obj, "available");
+        enabled_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)server_endpoint_obj, "enabled");
+        mode_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)server_endpoint_obj, "mode");
+        if (cJSON_IsBool(available_obj)) {
+            g_river_xiaozhi.discovery_server_endpoint_available = cJSON_IsTrue(available_obj);
+        }
+        if (cJSON_IsBool(enabled_obj)) {
+            g_river_xiaozhi.discovery_server_endpoint_enabled = cJSON_IsTrue(enabled_obj);
+        }
+        if (cJSON_IsString(mode_obj) && mode_obj->valuestring != NULL) {
+            river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_server_endpoint_mode,
+                                               sizeof(g_river_xiaozhi.discovery_server_endpoint_mode),
+                                               mode_obj->valuestring);
+        }
+    }
+
+    voice_collaboration_obj = cJSON_GetObjectItemCaseSensitive(root, "voice_collaboration");
+    if (cJSON_IsObject(voice_collaboration_obj)) {
+        g_river_xiaozhi.discovery_voice_collaboration_advertised = true;
+
+        preview_events_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)voice_collaboration_obj,
+                                                              "preview_events");
+        if (cJSON_IsObject(preview_events_obj)) {
+            enabled_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj, "enabled");
+            speech_start_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj,
+                                                                "speech_start");
+            partial_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj, "partial");
+            endpoint_candidate_obj =
+                cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj,
+                                                 "endpoint_candidate");
+            mode_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj, "mode");
+
+            if (cJSON_IsBool(enabled_obj)) {
+                g_river_xiaozhi.discovery_preview_events_enabled = cJSON_IsTrue(enabled_obj);
+            }
+            if (cJSON_IsBool(speech_start_obj)) {
+                g_river_xiaozhi.discovery_preview_speech_start = cJSON_IsTrue(speech_start_obj);
+            }
+            if (cJSON_IsBool(partial_obj)) {
+                g_river_xiaozhi.discovery_preview_partial = cJSON_IsTrue(partial_obj);
+            }
+            if (cJSON_IsBool(endpoint_candidate_obj)) {
+                g_river_xiaozhi.discovery_preview_endpoint_candidate =
+                    cJSON_IsTrue(endpoint_candidate_obj);
+            }
+            if (cJSON_IsString(mode_obj) && mode_obj->valuestring != NULL) {
+                river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_preview_events_mode,
+                                                   sizeof(g_river_xiaozhi.discovery_preview_events_mode),
+                                                   mode_obj->valuestring);
+            }
+        }
+
+        playback_ack_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)voice_collaboration_obj,
+                                                            "playback_ack");
+        if (cJSON_IsObject(playback_ack_obj)) {
+            enabled_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj, "enabled");
+            started_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj, "started");
+            mark_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj, "mark");
+            cleared_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj, "cleared");
+            completed_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj,
+                                                             "completed");
+            mode_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)playback_ack_obj, "mode");
+
+            if (cJSON_IsBool(enabled_obj)) {
+                g_river_xiaozhi.discovery_playback_ack_enabled = cJSON_IsTrue(enabled_obj);
+            }
+            if (cJSON_IsBool(started_obj)) {
+                g_river_xiaozhi.discovery_playback_ack_started = cJSON_IsTrue(started_obj);
+            }
+            if (cJSON_IsBool(mark_obj)) {
+                g_river_xiaozhi.discovery_playback_ack_mark = cJSON_IsTrue(mark_obj);
+            }
+            if (cJSON_IsBool(cleared_obj)) {
+                g_river_xiaozhi.discovery_playback_ack_cleared = cJSON_IsTrue(cleared_obj);
+            }
+            if (cJSON_IsBool(completed_obj)) {
+                g_river_xiaozhi.discovery_playback_ack_completed = cJSON_IsTrue(completed_obj);
+            }
+            if (cJSON_IsString(mode_obj) && mode_obj->valuestring != NULL) {
+                river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_playback_ack_mode,
+                                                   sizeof(g_river_xiaozhi.discovery_playback_ack_mode),
+                                                   mode_obj->valuestring);
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    return RIVER_OK;
+}
+
+static river_status_t river_xiaozhi_refresh_discovery_profile(void)
+{
+    char discovery_url[RIVER_XIAOZHI_URL_MAX];
+    int status_code = 0;
+    river_status_t status;
+
+    if (g_river_xiaozhi.url[0] == '\0') {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    status = river_xiaozhi_build_discovery_url(g_river_xiaozhi.url,
+                                               discovery_url,
+                                               sizeof(discovery_url));
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    status = river_xiaozhi_http_get_json(discovery_url,
+                                         g_river_xiaozhi.token,
+                                         g_river_xiaozhi.open_device_id,
+                                         g_river_xiaozhi.open_client_id,
+                                         g_river_xiaozhi.bootstrap_response,
+                                         sizeof(g_river_xiaozhi.bootstrap_response),
+                                         &status_code);
+    if (status != RIVER_OK) {
+        return status;
+    }
+    if (status_code != 200) {
+        return RIVER_ERR_IO;
+    }
+
+    status = river_xiaozhi_parse_discovery_response(g_river_xiaozhi.bootstrap_response);
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    RIVER_LOGI("xiaozhi discovery ready: url=%s turn_mode=%s server_endpoint=%s/%s voice_collaboration=%s preview_events=%s mode=%s playback_ack=%s mode=%s",
+               discovery_url,
+               river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_turn_mode),
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_available),
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_enabled),
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_voice_collaboration_advertised),
+               river_xiaozhi_bool_text(river_xiaozhi_discovery_preview_events_supported()),
+               river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_preview_events_mode),
+               river_xiaozhi_bool_text(river_xiaozhi_discovery_playback_ack_mode() != NULL),
+               river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_playback_ack_mode));
+    return RIVER_OK;
+}
+
 static river_status_t river_xiaozhi_parse_bootstrap_response(const char *json_text)
 {
     cJSON *root = NULL;
@@ -1254,6 +1710,8 @@ static river_status_t river_xiaozhi_parse_bootstrap_response(const char *json_te
     const cJSON *code_obj;
     const cJSON *challenge_obj;
     const cJSON *timeout_obj;
+    const char *new_url = NULL;
+    bool ws_url_changed = false;
 
     if (json_text == NULL || json_text[0] == '\0') {
         return RIVER_ERR_ARG;
@@ -1280,12 +1738,17 @@ static river_status_t river_xiaozhi_parse_bootstrap_response(const char *json_te
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    river_xiaozhi_copy_string(g_river_xiaozhi.url, sizeof(g_river_xiaozhi.url), url_obj->valuestring);
+    new_url = url_obj->valuestring;
+    ws_url_changed = (strcmp(g_river_xiaozhi.url, new_url) != 0);
+    river_xiaozhi_copy_string(g_river_xiaozhi.url, sizeof(g_river_xiaozhi.url), new_url);
     river_xiaozhi_copy_string(g_river_xiaozhi.token,
                               sizeof(g_river_xiaozhi.token),
                               cJSON_IsString(token_obj) && token_obj->valuestring != NULL ?
                                   token_obj->valuestring :
                                   "");
+    if (ws_url_changed) {
+        river_xiaozhi_clear_discovery_profile();
+    }
 
     river_xiaozhi_clear_activation_state();
     activation_obj = cJSON_GetObjectItemCaseSensitive(root, "activation");
@@ -1420,16 +1883,25 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     cJSON *audio = NULL;
     cJSON *session = NULL;
     cJSON *capabilities = NULL;
+    cJSON *playback_ack = NULL;
+    const char *playback_ack_mode = NULL;
     river_status_t status;
     bool half_duplex = river_xiaozhi_half_duplex_capability_enabled();
+    bool preview_events = river_xiaozhi_negotiated_preview_events_enabled();
+
+    playback_ack_mode = river_xiaozhi_negotiated_playback_ack_mode();
 
     root = river_xiaozhi_create_control_event("session.start", &payload);
     device = cJSON_CreateObject();
     audio = cJSON_CreateObject();
     session = cJSON_CreateObject();
     capabilities = cJSON_CreateObject();
+    if (playback_ack_mode != NULL) {
+        playback_ack = cJSON_CreateObject();
+    }
     if (root == NULL || payload == NULL || device == NULL || audio == NULL ||
-        session == NULL || capabilities == NULL) {
+        session == NULL || capabilities == NULL ||
+        (playback_ack_mode != NULL && playback_ack == NULL)) {
         if (device != NULL) {
             cJSON_Delete(device);
         }
@@ -1441,6 +1913,9 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
         }
         if (capabilities != NULL) {
             cJSON_Delete(capabilities);
+        }
+        if (playback_ack != NULL) {
+            cJSON_Delete(playback_ack);
         }
         if (root != NULL) {
             cJSON_Delete(root);
@@ -1475,19 +1950,30 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     cJSON_AddBoolToObject(capabilities, "image_input", false);
     cJSON_AddBoolToObject(capabilities, "half_duplex", half_duplex);
     cJSON_AddBoolToObject(capabilities, "local_wake_word", true);
+    if (preview_events) {
+        cJSON_AddBoolToObject(capabilities, "preview_events", true);
+    }
+    if (playback_ack_mode != NULL && playback_ack_mode[0] != '\0') {
+        cJSON_AddStringToObject(playback_ack, "mode", playback_ack_mode);
+        cJSON_AddItemToObject(capabilities, "playback_ack", playback_ack);
+        playback_ack = NULL;
+    }
     cJSON_AddItemToObject(payload, "capabilities", capabilities);
 
     status = river_xiaozhi_send_json_root(root);
     if (status == RIVER_OK) {
         g_river_xiaozhi.dialog_started = true;
         g_river_xiaozhi.response_started = false;
-        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s duplex=%s half_duplex=%s",
+        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s duplex=%s half_duplex=%s preview_events=%s playback_ack=%s discovery_voice_collaboration=%s",
                    (wake_reason != NULL && wake_reason[0] != '\0') ? wake_reason : "keyword",
                    g_river_xiaozhi.device_id,
                    g_river_xiaozhi.client_id,
                    RIVER_XIAOZHI_UPLINK_FORMAT,
                    river_xiaozhi_duplex_mode_name(),
-                   river_xiaozhi_bool_text(half_duplex));
+                   river_xiaozhi_bool_text(half_duplex),
+                   river_xiaozhi_bool_text(preview_events),
+                   playback_ack_mode != NULL ? playback_ack_mode : "-",
+                   river_xiaozhi_bool_text(g_river_xiaozhi.discovery_voice_collaboration_advertised));
     }
     return status;
 }
@@ -2362,10 +2848,16 @@ river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
     }
     if (config->url != NULL) {
         manual_url_override = true;
+        if (strcmp(g_river_xiaozhi.url, config->url) != 0) {
+            river_xiaozhi_clear_discovery_profile();
+        }
         river_xiaozhi_copy_string(g_river_xiaozhi.url, sizeof(g_river_xiaozhi.url), config->url);
     }
     if (config->token != NULL) {
         manual_token_override = true;
+        if (strcmp(g_river_xiaozhi.token, config->token) != 0) {
+            river_xiaozhi_clear_discovery_profile();
+        }
         river_xiaozhi_copy_string(g_river_xiaozhi.token, sizeof(g_river_xiaozhi.token), config->token);
     }
     if (config->protocol_version != 0U) {
@@ -2703,6 +3195,12 @@ river_status_t river_xiaozhi_open_session(void)
     river_xiaozhi_copy_string(g_river_xiaozhi.client_id,
                               sizeof(g_river_xiaozhi.client_id),
                               g_river_xiaozhi.open_client_id);
+    status = river_xiaozhi_refresh_discovery_profile();
+    if (status != RIVER_OK) {
+        RIVER_LOGW("xiaozhi discovery refresh failed; using compatibility baseline: status=%d ws=%s",
+                   (int)status,
+                   g_river_xiaozhi.url);
+    }
 
     status = river_ws_dispatch_init();
     if (status != RIVER_OK) {
@@ -2985,6 +3483,24 @@ void river_xiaozhi_dump_status(void)
                    "-",
                g_river_xiaozhi.last_accept_reason[0] != '\0' ?
                    g_river_xiaozhi.last_accept_reason :
+                   "-");
+    RIVER_LOGI("xiaozhi discovery turn_mode=%s server_endpoint=%s/%s mode=%s voice_collaboration=%s preview_events=%s declared_preview=%s playback_ack=%s declared_playback_ack=%s",
+               g_river_xiaozhi.discovery_turn_mode[0] != '\0' ?
+                   g_river_xiaozhi.discovery_turn_mode :
+                   "-",
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_available),
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_enabled),
+               g_river_xiaozhi.discovery_server_endpoint_mode[0] != '\0' ?
+                   g_river_xiaozhi.discovery_server_endpoint_mode :
+                   "-",
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_voice_collaboration_advertised),
+               river_xiaozhi_discovery_preview_events_supported() ? "yes" : "no",
+               river_xiaozhi_negotiated_preview_events_enabled() ? "yes" : "no",
+               river_xiaozhi_discovery_playback_ack_mode() != NULL ?
+                   river_xiaozhi_discovery_playback_ack_mode() :
+                   "-",
+               river_xiaozhi_negotiated_playback_ack_mode() != NULL ?
+                   river_xiaozhi_negotiated_playback_ack_mode() :
                    "-");
     if (g_river_xiaozhi.activation_message[0] != '\0') {
         RIVER_LOGI("xiaozhi activation_message=%s challenge_set=%s timeout_ms=%lu",

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.167 consume richer realtime session.update fields`
+  - `C1 negotiate xiaozhi collaboration capabilities`
 - Latest planning sync:
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
@@ -37,14 +37,15 @@ or top-of-tree verification target changes.
   - SDK handshake strings remain NUL-terminated after copy into wsclient
   - SDK plain-`ws` connect path reports real `connect` errors instead of
     collapsing them into `Sending handshake failed`
+  - discovery-backed `session.start.capabilities` negotiation
   - `session.start` / `audio.in.commit` / `text.in`
   - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
-  - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
-- Track the cross-repo full-duplex evolution separately in:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+- Keep the XiaoZhi stability plan as a supporting baseline while duplex work
+  continues:
+  - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `C1` discovery + `session.start` collaboration negotiation baseline
   - `C2` preview-aware input-event consumption baseline
   - `C3` playback-truth metadata and ACK baseline
   - `C4` accepted-turn / playback-truth / fallback semantics alignment

@@ -1,5 +1,58 @@
 # Verification
 
+## Step C1
+Validate that the device now negotiates XiaoZhi collaboration capabilities from
+discovery without advertising unimplemented preview/ACK features by default:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n "RIVER_XIAOZHI_DISCOVERY_PATH_DEFAULT|river_xiaozhi_refresh_discovery_profile|voice_collaboration|preview_events|playback_ack|declared_preview|declared_playback_ack" \
+  components/river_cloud/river_xiaozhi_ws.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the transport now contains a discovery refresh path before session open
+  - `voice_collaboration.preview_events` and `playback_ack` are parsed and
+    cached
+  - status/log output exposes `declared_preview` and
+    `declared_playback_ack`
+  - the active context and execution plan both record `C1` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints an extra discovery line similar to:
+  - `xiaozhi discovery turn_mode=... server_endpoint=yes|no/... voice_collaboration=yes|no preview_events=yes|no declared_preview=yes|no playback_ack=segment_mark_v1|- declared_playback_ack=segment_mark_v1|-`
+- with the current default client support baseline, `declared_preview` should
+  still be `no` and `declared_playback_ack` should still be `-` even if the
+  server advertises those abilities
+
+Wake the board once and inspect the connect logs:
+```text
+wakeword hit ...
+xiaozhi discovery ready: ...
+xiaozhi session.start sent: ... preview_events=no playback_ack=-
+```
+
+Expected result:
+- discovery is attempted before websocket open and logs its parsed result
+- the default session-start path remains compatibility-safe:
+  - `preview_events=no`
+  - `playback_ack=-`
+
 ## Plan Sync 2026-04-16
 Validate that the device-side duplex plan now reflects the new 2026-04-16
 server-side collaboration docs and exposes the added protocol-collaboration

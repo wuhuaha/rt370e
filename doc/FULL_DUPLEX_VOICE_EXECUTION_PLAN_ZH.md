@@ -518,6 +518,8 @@ go test ./internal/gateway
 - `5.164` 已把 duplex capability advertisement 放到显式实验闸门后
 - `5.165` 已把 `tts_start -> close local round` 放到显式策略闸门后
 - `5.167` 已把服务侧 richer `session.update` 字段接入端侧本地缓存与日志
+- `C1` 已建立 discovery + `session.start.capabilities` 协商基线，但当前默认
+  仍不会声明本地尚未实现的 `preview_events` / `playback_ack`
 
 从下一步代码提交开始，端侧按下面的连续切片继续推进。
 
@@ -551,6 +553,15 @@ go test ./internal/gateway
 运行时与声学收口。
 
 ### 10.1B Step C1: discovery + session.start 协商基线
+
+状态：
+
+- 已落地设备侧 baseline：
+  - `GET /v1/realtime` discovery 已接入端侧 transport
+  - `session.start.capabilities` 已改为“服务端声明 + 本端支持”的协商逻辑
+  - 当前本端仍故意不声明 `preview_events` / `playback_ack`，以保持默认兼容
+    fallback
+  - 下一步由 `C2` / `C3` 继续把本端真实能力补齐后再放开声明
 
 目标：
 
