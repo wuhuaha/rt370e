@@ -114,21 +114,22 @@ Branch: `agent-server-v2`
     - 声学前提是否成立
     - 本地 round / uplink / playback 的并行编排是否收口
     - 是否能消费服务侧新增 lane-state 信号
-- 基于新云侧文档反看端侧现状，当前还缺一个完整的“协作协议层”：
-  - 还没有消费 `GET /v1/realtime` discovery 中的 `voice_collaboration`
-  - `session.start.capabilities` 还没声明：
+- 基于新云侧文档反看端侧现状，协作协议层已经完成前两步基线，但仍未收口完整闭环：
+  - 已消费 `GET /v1/realtime` discovery 中的 `voice_collaboration`
+  - `session.start.capabilities` 已能按协商结果声明：
     - `preview_events`
-    - `playback_ack.mode=segment_mark_v1`
-  - 还没有解析：
+  - 端侧已解析并缓存观察事件：
     - `input.speech.start`
     - `input.preview`
     - `input.endpoint`
+  - 仍未解析：
     - `audio.out.meta`
-  - 还没有发送：
+  - 仍未发送：
     - `audio.out.started`
     - `audio.out.mark`
     - `audio.out.cleared`
     - `audio.out.completed`
+  - `playback_ack.mode=segment_mark_v1` 仍待 `C3`
   - `response.start` 目前也还没有把 `turn_id/trace_id` 收进端侧播放上下文
 
 ## 6. 风险与未知项
@@ -483,12 +484,9 @@ go test ./internal/gateway
 ## 8. 当前建议执行顺序
 
 - 第一优先：
-  - `5.167` 端侧消费 richer `session.update`，先把状态观测补齐
-  - `C1` 端侧补 discovery + `session.start.capabilities` 协商基线
-  - `C2` 端侧补 preview-aware 输入事件消费基线
   - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
-- 第二优先：
   - `C3` 端侧补 `audio.out.meta` 与 playback fact ACK 基线
+- 第二优先：
   - `5.169` 端侧 speaking-time local endpoint / round close 软化
   - `5.170` 端侧 speaking-time uplink continuation
 - 第三优先：
@@ -519,7 +517,9 @@ go test ./internal/gateway
 - `5.165` 已把 `tts_start -> close local round` 放到显式策略闸门后
 - `5.167` 已把服务侧 richer `session.update` 字段接入端侧本地缓存与日志
 - `C1` 已建立 discovery + `session.start.capabilities` 协商基线，但当前默认
-  仍不会声明本地尚未实现的 `preview_events` / `playback_ack`
+  仍不会声明本地尚未实现的 `playback_ack`
+- `C2` 已建立 preview-aware 输入观察事件消费基线，当前只做 hint-only
+  解析 / 缓存 / 日志，不改变现有 commit / local-close 语义
 
 从下一步代码提交开始，端侧按下面的连续切片继续推进。
 
@@ -559,9 +559,9 @@ go test ./internal/gateway
 - 已落地设备侧 baseline：
   - `GET /v1/realtime` discovery 已接入端侧 transport
   - `session.start.capabilities` 已改为“服务端声明 + 本端支持”的协商逻辑
-  - 当前本端仍故意不声明 `preview_events` / `playback_ack`，以保持默认兼容
-    fallback
-  - 下一步由 `C2` / `C3` 继续把本端真实能力补齐后再放开声明
+  - `preview_events` 现已随 `C2` 的本端能力补齐而变为可真实声明
+  - `playback_ack` 仍未实现，继续保持兼容 fallback
+  - 下一步由 `C3` 继续把播放事实协作能力补齐
 
 目标：
 
@@ -596,6 +596,18 @@ go test ./internal/gateway
 - 默认兼容路径不被破坏
 
 ### 10.1C Step C2: preview-aware 输入事件消费
+
+状态：
+
+- 已落地设备侧 baseline：
+  - 端侧已解析并缓存：
+    - `input.speech.start`
+    - `input.preview`
+    - `input.endpoint`
+  - 端侧 transport 与 cloud adapter 都新增了 preview observation 状态日志
+  - `session.start.capabilities.preview_events` 现在会在 discovery 支持时如实声明
+  - 当前范围仍保持 observation-only，不改变 commit / local-close / accept 语义
+  - 下一步由 `C3` 补 `audio.out.meta` 与 playback ACK 基线
 
 目标：
 

@@ -1,5 +1,65 @@
 # Verification
 
+## Step C2
+Validate that the device now consumes XiaoZhi preview-observation events
+without changing the current commit/local-close control path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n "RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START|RIVER_XIAOZHI_EVENT_INPUT_PREVIEW|RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT|preview_state=|xiaozhi preview preview_id=|input\\.speech\\.start|input\\.preview|input\\.endpoint|client_supports_preview_events" \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the XiaoZhi event contract now includes the three preview-observation event
+    types
+  - the transport parses `input.speech.start`, `input.preview`, and
+    `input.endpoint`
+  - status output includes both the transport-side `preview_state=...` line and
+    the cloud-side `xiaozhi preview preview_id=...` line
+  - the active context and duplex plan both record `C2` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints a preview observation line similar to:
+  - `xiaozhi preview_state=preview_id=... speech_started=yes|no text=... stable_prefix=... is_final=yes|no endpoint_candidate=yes|no endpoint_reason=... source=... audio_offset_ms=...`
+- the cloud adapter status also prints:
+  - `xiaozhi preview preview_id=... speech_started=... text=...`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi session.start sent: ... preview_events=yes|no playback_ack=-
+xiaozhi input.speech.start: ...
+xiaozhi input.preview: ...
+xiaozhi input.endpoint: ...
+```
+
+Expected result:
+- when discovery advertises preview collaboration, `session.start` now declares:
+  - `preview_events=yes`
+- the three preview-observation events are parsed and logged
+- runtime behavior remains conservative:
+  - no preview event forces commit
+  - no preview text is treated as accepted-turn
+
 ## Step C1
 Validate that the device now negotiates XiaoZhi collaboration capabilities from
 discovery without advertising unimplemented preview/ACK features by default:

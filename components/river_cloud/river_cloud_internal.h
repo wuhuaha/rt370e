@@ -29,6 +29,9 @@
 #define RIVER_CLOUD_XIAOZHI_PROVIDER_NAME    "xiaozhi_realtime"
 #define RIVER_CLOUD_XIAOZHI_TEXT_MAX         256U
 #define RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX   96U
+#define RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX   64U
+#define RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX 32U
+#define RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
@@ -135,6 +138,9 @@ typedef struct {
     bool xiaozhi_window_active;
     bool xiaozhi_pending_text_valid;
     bool xiaozhi_pending_text_finalized;
+    bool xiaozhi_preview_speech_started;
+    bool xiaozhi_preview_endpoint_candidate;
+    bool xiaozhi_preview_final;
     bool xiaozhi_playback_active;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
@@ -206,6 +212,12 @@ typedef struct {
     char xiaozhi_session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     char xiaozhi_asr_round_close_reason[32];
     char xiaozhi_pending_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char xiaozhi_preview_id[RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX];
+    char xiaozhi_preview_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char xiaozhi_preview_stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char xiaozhi_preview_source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
+    char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
+    uint32_t xiaozhi_preview_audio_offset_ms;
 #endif
     char last_text[192];
     char last_error[128];
@@ -240,6 +252,7 @@ void river_cloud_xiaozhi_window_abort_local(const char *reason);
 void river_cloud_xiaozhi_copy_session_id_from_transport(void);
 const char *river_cloud_xiaozhi_current_sid(void);
 void river_cloud_xiaozhi_clear_pending_text(void);
+void river_cloud_xiaozhi_clear_preview_state(void);
 void river_cloud_xiaozhi_finalize_pending_text(void);
 void river_cloud_xiaozhi_emit_session_started(void);
 void river_cloud_xiaozhi_emit_session_closed(void);

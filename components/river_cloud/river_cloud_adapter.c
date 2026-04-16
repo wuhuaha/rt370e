@@ -70,6 +70,75 @@ static int16_t river_cloud_xiaozhi_sat16(int32_t value)
     return (int16_t)value;
 }
 
+static void river_cloud_xiaozhi_copy_optional_text(char *dst,
+                                                   size_t dst_size,
+                                                   const char *src)
+{
+    if (dst == NULL || dst_size == 0U) {
+        return;
+    }
+    if (src == NULL || src[0] == '\0') {
+        dst[0] = '\0';
+        return;
+    }
+
+    snprintf(dst, dst_size, "%s", src);
+}
+
+static void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    if (event->preview_id != NULL && event->preview_id[0] != '\0' &&
+        strcmp(g_river_cloud.xiaozhi_preview_id, event->preview_id) != 0) {
+        river_cloud_xiaozhi_clear_preview_state();
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_id,
+                                           sizeof(g_river_cloud.xiaozhi_preview_id),
+                                           event->preview_id);
+    if (event->text != NULL && event->text[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_text,
+                                               sizeof(g_river_cloud.xiaozhi_preview_text),
+                                               event->text);
+    }
+    if (event->stable_prefix != NULL && event->stable_prefix[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_stable_prefix,
+                                               sizeof(g_river_cloud.xiaozhi_preview_stable_prefix),
+                                               event->stable_prefix);
+    }
+    if (event->source != NULL && event->source[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_source,
+                                               sizeof(g_river_cloud.xiaozhi_preview_source),
+                                               event->source);
+    }
+    if (event->reason != NULL && event->reason[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(
+            g_river_cloud.xiaozhi_preview_endpoint_reason,
+            sizeof(g_river_cloud.xiaozhi_preview_endpoint_reason),
+            event->reason);
+    }
+    if (event->audio_offset_ms != 0U) {
+        g_river_cloud.xiaozhi_preview_audio_offset_ms = event->audio_offset_ms;
+    }
+
+    switch (event->type) {
+    case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
+        g_river_cloud.xiaozhi_preview_speech_started = true;
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
+        g_river_cloud.xiaozhi_preview_final = event->is_final;
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
+        g_river_cloud.xiaozhi_preview_endpoint_candidate = event->candidate;
+        break;
+    default:
+        break;
+    }
+}
+
 static bool river_cloud_xiaozhi_transport_active(void)
 {
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
@@ -1797,6 +1866,21 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
             }
         }
         break;
+    case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "input_speech_start");
+        river_cloud_xiaozhi_note_preview_observation(event);
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "input_preview");
+        river_cloud_xiaozhi_note_preview_observation(event);
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "input_endpoint");
+        river_cloud_xiaozhi_note_preview_observation(event);
+        break;
     case RIVER_XIAOZHI_EVENT_LLM:
         river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                          "llm");
@@ -2780,6 +2864,26 @@ void river_cloud_adapter_dump_status(void)
                    river_cloud_xiaozhi_idle_requires_wakeword() ? "wakeword" : "legacy_vad",
                    g_river_cloud.xiaozhi_session_id[0] != '\0' ? g_river_cloud.xiaozhi_session_id : "-",
                    g_river_cloud.xiaozhi_pending_text_valid ? g_river_cloud.xiaozhi_pending_text : "-");
+        RIVER_LOGI("xiaozhi preview preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s endpoint_candidate=%s reason=%s source=%s audio_offset_ms=%lu",
+                   g_river_cloud.xiaozhi_preview_id[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_id :
+                       "-",
+                   g_river_cloud.xiaozhi_preview_speech_started ? "yes" : "no",
+                   g_river_cloud.xiaozhi_preview_text[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_text :
+                       "-",
+                   g_river_cloud.xiaozhi_preview_stable_prefix[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_stable_prefix :
+                       "-",
+                   g_river_cloud.xiaozhi_preview_final ? "yes" : "no",
+                   g_river_cloud.xiaozhi_preview_endpoint_candidate ? "yes" : "no",
+                   g_river_cloud.xiaozhi_preview_endpoint_reason[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_endpoint_reason :
+                       "-",
+                   g_river_cloud.xiaozhi_preview_source[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_source :
+                       "-",
+                   (unsigned long)g_river_cloud.xiaozhi_preview_audio_offset_ms);
         RIVER_LOGI("xiaozhi no_ref reopen rearm=%s silence=%lu/%u guard_left_ms=%lu open_hold_frames=%u",
                    g_river_cloud.xiaozhi_no_ref_reopen_rearm ? "yes" : "no",
                    (unsigned long)g_river_cloud.xiaozhi_no_ref_reopen_silence_frames,

@@ -16,7 +16,10 @@ typedef enum {
     RIVER_XIAOZHI_EVENT_MCP = 4,
     RIVER_XIAOZHI_EVENT_AUDIO = 5,
     RIVER_XIAOZHI_EVENT_SESSION_CLOSED = 6,
-    RIVER_XIAOZHI_EVENT_ERROR = 7
+    RIVER_XIAOZHI_EVENT_ERROR = 7,
+    RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START = 8,
+    RIVER_XIAOZHI_EVENT_INPUT_PREVIEW = 9,
+    RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT = 10
 } river_xiaozhi_event_type_t;
 
 typedef enum {
@@ -42,12 +45,19 @@ typedef struct {
     const char *text;
     const char *state;
     const char *emotion;
+    const char *preview_id;
+    const char *stable_prefix;
+    const char *reason;
+    const char *source;
     uint32_t sample_rate;
     uint32_t frame_duration_ms;
     uint32_t timestamp_ms;
+    uint32_t audio_offset_ms;
     const uint8_t *binary_data;
     size_t binary_bytes;
     uint16_t binary_type;
+    bool candidate;
+    bool is_final;
 } river_xiaozhi_event_t;
 
 typedef void (*river_xiaozhi_event_handler_t)(const river_xiaozhi_event_t *event,

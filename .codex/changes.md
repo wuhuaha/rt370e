@@ -1,5 +1,57 @@
 # Change Log
 
+## Step C2
+- Implemented the device-side XiaoZhi preview-observation baseline so the
+  transport now truthfully consumes the server's preview-aware input events:
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Extended the XiaoZhi event contract with preview-observation metadata:
+  - new event types:
+    - `RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START`
+    - `RIVER_XIAOZHI_EVENT_INPUT_PREVIEW`
+    - `RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT`
+  - new per-event fields:
+    - `preview_id`
+    - `stable_prefix`
+    - `reason`
+    - `source`
+    - `audio_offset_ms`
+    - `candidate`
+    - `is_final`
+- The websocket transport now parses, caches, logs, and exposes:
+  - `input.speech.start`
+  - `input.preview`
+  - `input.endpoint`
+- Added preview runtime state on both transport and cloud-adapter sides so
+  board validation can inspect the most recent preview observation window from
+  status output:
+  - transport status now prints:
+    - `xiaozhi preview_state=...`
+  - cloud adapter status now prints:
+    - `xiaozhi preview preview_id=...`
+- `session.start.capabilities.preview_events` negotiation is now truthful:
+  - local preview-event support is marked available
+  - actual declaration still depends on discovery advertising
+  - `playback_ack` remains untouched and deferred to `C3`
+- Kept the scope intentionally observation-only:
+  - preview events only refresh logs, cached observation state, and follow-up
+    window bookkeeping
+  - preview text is not emitted as existing ASR partial/final callbacks
+  - `input.endpoint` does not force commit or local close
+  - accepted-turn semantics still stay on `session.update.accept_reason`
+- Updated the active duplex execution context to record that `C2` is now the
+  latest landed collaboration slice and that `C3` is next:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against
+    `/root/ameba-rtos`
+
 ## Step C1
 - Implemented the device-side XiaoZhi collaboration negotiation baseline in
   [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
