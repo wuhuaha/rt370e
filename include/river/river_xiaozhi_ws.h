@@ -19,7 +19,8 @@ typedef enum {
     RIVER_XIAOZHI_EVENT_ERROR = 7,
     RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START = 8,
     RIVER_XIAOZHI_EVENT_INPUT_PREVIEW = 9,
-    RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT = 10
+    RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT = 10,
+    RIVER_XIAOZHI_EVENT_AUDIO_OUT_META = 11
 } river_xiaozhi_event_type_t;
 
 typedef enum {
@@ -49,15 +50,20 @@ typedef struct {
     const char *stable_prefix;
     const char *reason;
     const char *source;
+    const char *response_id;
+    const char *playback_id;
+    const char *segment_id;
     uint32_t sample_rate;
     uint32_t frame_duration_ms;
     uint32_t timestamp_ms;
     uint32_t audio_offset_ms;
+    uint32_t expected_duration_ms;
     const uint8_t *binary_data;
     size_t binary_bytes;
     uint16_t binary_type;
     bool candidate;
     bool is_final;
+    bool is_last_segment;
 } river_xiaozhi_event_t;
 
 typedef void (*river_xiaozhi_event_handler_t)(const river_xiaozhi_event_t *event,
@@ -93,6 +99,11 @@ river_status_t river_xiaozhi_send_listen_start(const char *mode);
 river_status_t river_xiaozhi_send_listen_stop(void);
 river_status_t river_xiaozhi_send_listen_detect(const char *text);
 river_status_t river_xiaozhi_send_abort(const char *reason);
+river_status_t river_xiaozhi_send_audio_out_started(const char *response_id,
+                                                    const char *playback_id,
+                                                    const char *segment_id);
+river_status_t river_xiaozhi_send_audio_out_completed(const char *response_id,
+                                                      const char *playback_id);
 river_status_t river_xiaozhi_send_audio(const uint8_t *payload,
                                         size_t bytes,
                                         uint32_t timestamp_ms);

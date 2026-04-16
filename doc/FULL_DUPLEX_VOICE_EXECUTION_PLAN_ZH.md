@@ -114,22 +114,23 @@ Branch: `agent-server-v2`
     - 声学前提是否成立
     - 本地 round / uplink / playback 的并行编排是否收口
     - 是否能消费服务侧新增 lane-state 信号
-- 基于新云侧文档反看端侧现状，协作协议层已经完成前两步基线，但仍未收口完整闭环：
+- 基于新云侧文档反看端侧现状，协作协议层已经完成前三步基线，但仍未收口完整闭环：
   - 已消费 `GET /v1/realtime` discovery 中的 `voice_collaboration`
   - `session.start.capabilities` 已能按协商结果声明：
     - `preview_events`
+    - `playback_ack.mode=segment_mark_v1`
   - 端侧已解析并缓存观察事件：
     - `input.speech.start`
     - `input.preview`
     - `input.endpoint`
-  - 仍未解析：
+  - 端侧已解析并缓存播放上下文：
     - `audio.out.meta`
-  - 仍未发送：
+  - 端侧已发送最小 playback fact ACK：
     - `audio.out.started`
+    - `audio.out.completed`
+  - 仍未发送：
     - `audio.out.mark`
     - `audio.out.cleared`
-    - `audio.out.completed`
-  - `playback_ack.mode=segment_mark_v1` 仍待 `C3`
   - `response.start` 目前也还没有把 `turn_id/trace_id` 收进端侧播放上下文
 
 ## 6. 风险与未知项
@@ -485,12 +486,11 @@ go test ./internal/gateway
 
 - 第一优先：
   - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
-  - `C3` 端侧补 `audio.out.meta` 与 playback fact ACK 基线
+  - `C4` 端侧把 accepted-turn / playback-truth / fallback 语义和新协议对齐
 - 第二优先：
   - `5.169` 端侧 speaking-time local endpoint / round close 软化
   - `5.170` 端侧 speaking-time uplink continuation
 - 第三优先：
-  - `C4` 端侧把 accepted-turn / playback-truth / fallback 语义和新协议对齐
   - `5.171` 端侧 duck-first interruption policy
   - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
 - 最后收口：
@@ -560,8 +560,8 @@ go test ./internal/gateway
   - `GET /v1/realtime` discovery 已接入端侧 transport
   - `session.start.capabilities` 已改为“服务端声明 + 本端支持”的协商逻辑
   - `preview_events` 现已随 `C2` 的本端能力补齐而变为可真实声明
-  - `playback_ack` 仍未实现，继续保持兼容 fallback
-  - 下一步由 `C3` 继续把播放事实协作能力补齐
+  - `playback_ack=segment_mark_v1` 现已随 `C3` 的本端能力补齐而可真实声明
+  - 下一步由 `C4` 与 `5.168` 分别推进语义对齐与本地运行时收口
 
 目标：
 
@@ -607,7 +607,7 @@ go test ./internal/gateway
   - 端侧 transport 与 cloud adapter 都新增了 preview observation 状态日志
   - `session.start.capabilities.preview_events` 现在会在 discovery 支持时如实声明
   - 当前范围仍保持 observation-only，不改变 commit / local-close / accept 语义
-  - 下一步由 `C3` 补 `audio.out.meta` 与 playback ACK 基线
+  - 下一步由 `C4` 继续把 accepted-turn / playback-truth 边界和 fallback 语义收口
 
 目标：
 
@@ -648,6 +648,23 @@ go test ./internal/gateway
 
 ### 10.1D Step C3: playback-truth 上下文与 ACK 基线
 
+状态：
+
+- 已落地设备侧 baseline：
+  - 端侧已解析并缓存：
+    - `audio.out.meta`
+  - 端侧 transport 与 cloud adapter 都新增了 playback meta 状态日志
+  - `session.start.capabilities.playback_ack` 现在会在 discovery 支持时如实声明：
+    - `segment_mark_v1`
+  - 当前已落最小 ACK：
+    - `audio.out.started`
+    - `audio.out.completed`
+  - 当前仍刻意保留后续收口项：
+    - `audio.out.mark`
+    - `audio.out.cleared`
+  - ACK 发送走现有 XiaoZhi IO task / control queue 的异步低优先级路径，不阻塞本地播放
+  - 下一步由 `C4` 继续把 accepted-turn / playback-truth / fallback 语义和端侧状态机对齐
+
 目标：
 
 - 让端侧先具备最小 Tier-1 播放事实回报能力，给服务端的 heard-text /
@@ -657,10 +674,10 @@ go test ./internal/gateway
 
 - `components/river_cloud/river_xiaozhi_ws.c`
 - `components/river_cloud/river_cloud_adapter.c`
-- `components/river_voice/river_playback_service.c`
 - 必要时：
   - `include/river/river_xiaozhi_ws.h`
-  - `include/river/river_playback_service.h`
+  - `components/river_cloud/river_cloud_internal.h`
+  - `components/river_cloud/river_cloud_xiaozhi_session.c`
 
 实施内容：
 

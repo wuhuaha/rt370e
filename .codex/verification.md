@@ -1,5 +1,69 @@
 # Verification
 
+## Step C3
+Validate that the device now consumes XiaoZhi playback-truth metadata and
+reports the minimal started/completed playback facts without blocking local
+playback:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RIVER_XIAOZHI_EVENT_AUDIO_OUT_META|audio\.out\.meta|send_audio_out_started|send_audio_out_completed|segment_mark_v1|playback_meta' \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the XiaoZhi event contract now includes `RIVER_XIAOZHI_EVENT_AUDIO_OUT_META`
+  - the transport parses `audio.out.meta`
+  - `session.start` can now declare `playback_ack=segment_mark_v1`
+  - the transport and cloud adapter both expose `playback_meta` status lines
+  - the active context and duplex plan both record `C3` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints a playback context line similar to:
+  - `xiaozhi playback_meta=response_id=... playback_id=... segment_id=... expected_duration_ms=... is_last_segment=yes|no valid=yes|no`
+- the cloud adapter status also prints:
+  - `xiaozhi playback_meta response_id=... playback_id=... segment_id=... text=... expected_duration_ms=... started_ack=yes|no completed_ack=yes|no valid=yes|no`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi session.start sent: ... preview_events=yes|no playback_ack=segment_mark_v1
+xiaozhi audio.out.meta: ...
+xiaozhi playback ack started queued: ...
+xiaozhi playback ack started sent: ...
+xiaozhi playback ack completed queued: ...
+xiaozhi playback ack completed sent: ...
+```
+
+Expected result:
+- when discovery advertises playback collaboration, `session.start` now
+  declares:
+  - `playback_ack=segment_mark_v1`
+- `audio.out.meta` is parsed and logged before the ACK path is used
+- `audio.out.started` and `audio.out.completed` are queued and sent on the
+  async control path
+- runtime behavior remains conservative:
+  - `audio.out.mark` and `audio.out.cleared` are still absent
+  - ACK queue/send failures only warn and do not block playback
+
 ## Step C2
 Validate that the device now consumes XiaoZhi preview-observation events
 without changing the current commit/local-close control path:

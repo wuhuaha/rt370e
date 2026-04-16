@@ -46,6 +46,9 @@
 #define RIVER_XIAOZHI_LAST_PREVIEW_ID_MAX  64U
 #define RIVER_XIAOZHI_LAST_PREVIEW_SOURCE_MAX 32U
 #define RIVER_XIAOZHI_LAST_PREVIEW_REASON_MAX 64U
+#define RIVER_XIAOZHI_LAST_RESPONSE_ID_MAX 96U
+#define RIVER_XIAOZHI_LAST_PLAYBACK_ID_MAX 96U
+#define RIVER_XIAOZHI_LAST_SEGMENT_ID_MAX  96U
 #define RIVER_XIAOZHI_TURN_MODE_MAX        48U
 #define RIVER_XIAOZHI_COLLAB_MODE_MAX      32U
 #define RIVER_XIAOZHI_ACTIVATION_CODE_MAX  16U
@@ -133,6 +136,8 @@ typedef struct {
     bool last_preview_speech_started;
     bool last_preview_endpoint_candidate;
     bool last_preview_final;
+    bool last_playback_meta_valid;
+    bool last_playback_is_last_segment;
     bool discovery_voice_collaboration_advertised;
     bool discovery_server_endpoint_available;
     bool discovery_server_endpoint_enabled;
@@ -170,6 +175,10 @@ typedef struct {
     char last_preview_source[RIVER_XIAOZHI_LAST_PREVIEW_SOURCE_MAX];
     char last_preview_reason[RIVER_XIAOZHI_LAST_PREVIEW_REASON_MAX];
     uint32_t last_preview_audio_offset_ms;
+    char last_response_id[RIVER_XIAOZHI_LAST_RESPONSE_ID_MAX];
+    char last_playback_id[RIVER_XIAOZHI_LAST_PLAYBACK_ID_MAX];
+    char last_segment_id[RIVER_XIAOZHI_LAST_SEGMENT_ID_MAX];
+    uint32_t last_playback_expected_duration_ms;
     char discovery_turn_mode[RIVER_XIAOZHI_TURN_MODE_MAX];
     char discovery_server_endpoint_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
     char discovery_preview_events_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
@@ -611,6 +620,37 @@ static void river_xiaozhi_set_last_preview_reason(const char *reason)
                                        reason);
 }
 
+static void river_xiaozhi_clear_last_playback_fields(void)
+{
+    g_river_xiaozhi.last_playback_meta_valid = false;
+    g_river_xiaozhi.last_playback_is_last_segment = false;
+    g_river_xiaozhi.last_playback_expected_duration_ms = 0U;
+    g_river_xiaozhi.last_response_id[0] = '\0';
+    g_river_xiaozhi.last_playback_id[0] = '\0';
+    g_river_xiaozhi.last_segment_id[0] = '\0';
+}
+
+static void river_xiaozhi_set_last_response_id(const char *response_id)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_response_id,
+                                       sizeof(g_river_xiaozhi.last_response_id),
+                                       response_id);
+}
+
+static void river_xiaozhi_set_last_playback_id(const char *playback_id)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_id,
+                                       sizeof(g_river_xiaozhi.last_playback_id),
+                                       playback_id);
+}
+
+static void river_xiaozhi_set_last_segment_id(const char *segment_id)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_segment_id,
+                                       sizeof(g_river_xiaozhi.last_segment_id),
+                                       segment_id);
+}
+
 static void river_xiaozhi_clear_discovery_profile(void)
 {
     g_river_xiaozhi.discovery_voice_collaboration_advertised = false;
@@ -660,6 +700,7 @@ static void river_xiaozhi_reset_dialog_state(void)
     g_river_xiaozhi.session_id[0] = '\0';
     river_xiaozhi_clear_last_session_update_fields();
     river_xiaozhi_clear_last_preview_fields();
+    river_xiaozhi_clear_last_playback_fields();
 }
 
 static void river_xiaozhi_reset_runtime_state(void)
@@ -787,15 +828,20 @@ static void river_xiaozhi_emit_event(river_xiaozhi_event_type_t type,
                                      const char *stable_prefix,
                                      const char *reason,
                                      const char *source,
+                                     const char *response_id,
+                                     const char *playback_id,
+                                     const char *segment_id,
                                      uint32_t sample_rate,
                                      uint32_t frame_duration_ms,
                                      uint32_t timestamp_ms,
                                      uint32_t audio_offset_ms,
+                                     uint32_t expected_duration_ms,
                                      const uint8_t *binary_data,
                                      size_t binary_bytes,
                                      uint16_t binary_type,
                                      bool candidate,
-                                     bool is_final)
+                                     bool is_final,
+                                     bool is_last_segment)
 {
     river_xiaozhi_event_t event;
 
@@ -813,15 +859,20 @@ static void river_xiaozhi_emit_event(river_xiaozhi_event_type_t type,
     event.stable_prefix = stable_prefix;
     event.reason = reason;
     event.source = source;
+    event.response_id = response_id;
+    event.playback_id = playback_id;
+    event.segment_id = segment_id;
     event.sample_rate = sample_rate;
     event.frame_duration_ms = frame_duration_ms;
     event.timestamp_ms = timestamp_ms;
     event.audio_offset_ms = audio_offset_ms;
+    event.expected_duration_ms = expected_duration_ms;
     event.binary_data = binary_data;
     event.binary_bytes = binary_bytes;
     event.binary_type = binary_type;
     event.candidate = candidate;
     event.is_final = is_final;
+    event.is_last_segment = is_last_segment;
 
     g_river_xiaozhi.event_handler(&event, g_river_xiaozhi.event_handler_user);
 }
@@ -1069,7 +1120,7 @@ static bool river_xiaozhi_client_supports_preview_events(void)
 
 static const char *river_xiaozhi_client_supported_playback_ack_mode(void)
 {
-    return NULL;
+    return "segment_mark_v1";
 }
 
 static bool river_xiaozhi_discovery_preview_events_supported(void)
@@ -1110,6 +1161,18 @@ static const char *river_xiaozhi_negotiated_playback_ack_mode(void)
         return NULL;
     }
     return client_mode;
+}
+
+static bool river_xiaozhi_playback_ack_started_enabled(void)
+{
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           g_river_xiaozhi.discovery_playback_ack_started;
+}
+
+static bool river_xiaozhi_playback_ack_completed_enabled(void)
+{
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           g_river_xiaozhi.discovery_playback_ack_completed;
 }
 
 static void river_xiaozhi_prepare_preview_window(const char *preview_id)
@@ -1958,13 +2021,18 @@ static void river_xiaozhi_emit_transport_ready(void)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
                              g_river_xiaozhi.server_sample_rate,
                              g_river_xiaozhi.server_frame_duration_ms,
+                             0U,
                              0U,
                              0U,
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2176,6 +2244,68 @@ static river_status_t river_xiaozhi_send_session_end_internal(const char *reason
     return river_xiaozhi_send_json_root(root);
 }
 
+static river_status_t river_xiaozhi_send_audio_out_started_internal(const char *response_id,
+                                                                    const char *playback_id,
+                                                                    const char *segment_id)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!river_xiaozhi_playback_ack_started_enabled()) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!g_river_xiaozhi.dialog_started || !river_xiaozhi_session_open()) {
+        return RIVER_ERR_BUSY;
+    }
+    if (response_id == NULL || response_id[0] == '\0' || playback_id == NULL ||
+        playback_id[0] == '\0' || segment_id == NULL || segment_id[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = river_xiaozhi_create_control_event("audio.out.started", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "response_id", response_id);
+    cJSON_AddStringToObject(payload, "playback_id", playback_id);
+    cJSON_AddStringToObject(payload, "segment_id", segment_id);
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_audio_out_completed_internal(const char *response_id,
+                                                                      const char *playback_id)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!river_xiaozhi_playback_ack_completed_enabled()) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!g_river_xiaozhi.dialog_started || !river_xiaozhi_session_open()) {
+        return RIVER_ERR_BUSY;
+    }
+    if (response_id == NULL || response_id[0] == '\0' || playback_id == NULL ||
+        playback_id[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = river_xiaozhi_create_control_event("audio.out.completed", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "response_id", response_id);
+    cJSON_AddStringToObject(payload, "playback_id", playback_id);
+    return river_xiaozhi_send_json_root(root);
+}
+
 static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
 {
     river_xiaozhi_set_last_type("tts");
@@ -2191,6 +2321,10 @@ static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2198,6 +2332,7 @@ static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2319,13 +2454,18 @@ static void river_xiaozhi_handle_realtime_input_speech_start(const cJSON *payloa
                              NULL,
                              NULL,
                              source,
+                             NULL,
+                             NULL,
+                             NULL,
                              0U,
                              0U,
                              0U,
                              audio_offset_ms,
+                             0U,
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2390,15 +2530,20 @@ static void river_xiaozhi_handle_realtime_input_preview(const cJSON *payload)
                              stable_prefix,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
                              0U,
                              0U,
                              0U,
                              audio_offset_ms,
+                             0U,
                              NULL,
                              0U,
                              0U,
                              false,
-                             is_final);
+                             is_final,
+                             false);
 }
 
 static void river_xiaozhi_handle_realtime_input_endpoint(const cJSON *payload)
@@ -2452,15 +2597,109 @@ static void river_xiaozhi_handle_realtime_input_endpoint(const cJSON *payload)
                              NULL,
                              reason,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
                              0U,
                              0U,
                              0U,
                              audio_offset_ms,
+                             0U,
                              NULL,
                              0U,
                              0U,
                              candidate,
+                             false,
                              false);
+}
+
+static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
+{
+    const cJSON *response_id_obj;
+    const cJSON *playback_id_obj;
+    const cJSON *segment_id_obj;
+    const cJSON *text_obj;
+    const cJSON *expected_duration_ms_obj;
+    const cJSON *is_last_segment_obj;
+    const char *response_id = NULL;
+    const char *playback_id = NULL;
+    const char *segment_id = NULL;
+    const char *text = NULL;
+    uint32_t expected_duration_ms = 0U;
+    bool is_last_segment = false;
+
+    response_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "response_id");
+    playback_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "playback_id");
+    segment_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "segment_id");
+    text_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "text");
+    expected_duration_ms_obj =
+        cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "expected_duration_ms");
+    is_last_segment_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload,
+                                                           "is_last_segment");
+    if (cJSON_IsString(response_id_obj) && response_id_obj->valuestring != NULL &&
+        response_id_obj->valuestring[0] != '\0') {
+        response_id = response_id_obj->valuestring;
+    }
+    if (cJSON_IsString(playback_id_obj) && playback_id_obj->valuestring != NULL &&
+        playback_id_obj->valuestring[0] != '\0') {
+        playback_id = playback_id_obj->valuestring;
+    }
+    if (cJSON_IsString(segment_id_obj) && segment_id_obj->valuestring != NULL &&
+        segment_id_obj->valuestring[0] != '\0') {
+        segment_id = segment_id_obj->valuestring;
+    }
+    if (cJSON_IsString(text_obj) && text_obj->valuestring != NULL &&
+        text_obj->valuestring[0] != '\0') {
+        text = text_obj->valuestring;
+    }
+    if (cJSON_IsNumber(expected_duration_ms_obj) &&
+        expected_duration_ms_obj->valuedouble > 0.0) {
+        expected_duration_ms = (uint32_t)expected_duration_ms_obj->valuedouble;
+    }
+    if (cJSON_IsBool(is_last_segment_obj)) {
+        is_last_segment = cJSON_IsTrue(is_last_segment_obj);
+    }
+
+    river_xiaozhi_set_last_type("audio.out.meta");
+    river_xiaozhi_clear_last_playback_fields();
+    river_xiaozhi_set_last_response_id(response_id);
+    river_xiaozhi_set_last_playback_id(playback_id);
+    river_xiaozhi_set_last_segment_id(segment_id);
+    g_river_xiaozhi.last_playback_expected_duration_ms = expected_duration_ms;
+    g_river_xiaozhi.last_playback_is_last_segment = is_last_segment;
+    g_river_xiaozhi.last_playback_meta_valid = response_id != NULL && playback_id != NULL &&
+                                               segment_id != NULL;
+
+    RIVER_LOGI("xiaozhi audio.out.meta: sid=%s response_id=%s playback_id=%s segment_id=%s expected_duration_ms=%lu is_last_segment=%s text=%s",
+               g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
+               river_xiaozhi_dash_if_empty(response_id),
+               river_xiaozhi_dash_if_empty(playback_id),
+               river_xiaozhi_dash_if_empty(segment_id),
+               (unsigned long)expected_duration_ms,
+               river_xiaozhi_bool_text(is_last_segment),
+               river_xiaozhi_dash_if_empty(text));
+    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_AUDIO_OUT_META,
+                             text,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             response_id,
+                             playback_id,
+                             segment_id,
+                             0U,
+                             0U,
+                             0U,
+                             0U,
+                             expected_duration_ms,
+                             NULL,
+                             0U,
+                             0U,
+                             false,
+                             false,
+                             is_last_segment);
 }
 
 static void river_xiaozhi_handle_realtime_response_start(const cJSON *payload)
@@ -2549,6 +2788,7 @@ static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
     }
     g_river_xiaozhi.dialog_started = false;
     river_xiaozhi_clear_last_preview_fields();
+    river_xiaozhi_clear_last_playback_fields();
     g_river_xiaozhi.session_id[0] = '\0';
 
     RIVER_LOGI("xiaozhi session.end: sid=%s reason=%s message=%s",
@@ -2563,6 +2803,10 @@ static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2570,6 +2814,7 @@ static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2605,6 +2850,10 @@ static void river_xiaozhi_handle_realtime_error(const cJSON *payload)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2612,6 +2861,7 @@ static void river_xiaozhi_handle_realtime_error(const cJSON *payload)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2640,6 +2890,10 @@ static void river_xiaozhi_handle_stt_message(const cJSON *root)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2647,6 +2901,7 @@ static void river_xiaozhi_handle_stt_message(const cJSON *root)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2683,6 +2938,10 @@ static void river_xiaozhi_handle_llm_message(const cJSON *root)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2690,6 +2949,7 @@ static void river_xiaozhi_handle_llm_message(const cJSON *root)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2726,6 +2986,10 @@ static void river_xiaozhi_handle_tts_message(const cJSON *root)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2733,6 +2997,7 @@ static void river_xiaozhi_handle_tts_message(const cJSON *root)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 }
@@ -2806,6 +3071,10 @@ static void river_xiaozhi_handle_mcp_message(const cJSON *root)
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -2813,6 +3082,7 @@ static void river_xiaozhi_handle_mcp_message(const cJSON *root)
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
 
@@ -2865,6 +3135,10 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
                                  NULL,
                                  NULL,
                                  NULL,
+                                 NULL,
+                                 NULL,
+                                 NULL,
+                                 0U,
                                  0U,
                                  0U,
                                  0U,
@@ -2872,6 +3146,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
                                  NULL,
                                  0U,
                                  0U,
+                                 false,
                                  false,
                                  false);
         return;
@@ -2893,6 +3168,10 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
                                  NULL,
                                  NULL,
                                  NULL,
+                                 NULL,
+                                 NULL,
+                                 NULL,
+                                 0U,
                                  0U,
                                  0U,
                                  0U,
@@ -2900,6 +3179,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
                                  NULL,
                                  0U,
                                  0U,
+                                 false,
                                  false,
                                  false);
         return;
@@ -2915,6 +3195,8 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
         river_xiaozhi_handle_realtime_input_preview(payload_obj);
     } else if (strcmp(type_text, "input.endpoint") == 0 && cJSON_IsObject(payload_obj)) {
         river_xiaozhi_handle_realtime_input_endpoint(payload_obj);
+    } else if (strcmp(type_text, "audio.out.meta") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_audio_out_meta(payload_obj);
     } else if (strcmp(type_text, "response.start") == 0 && cJSON_IsObject(payload_obj)) {
         river_xiaozhi_handle_realtime_response_start(payload_obj);
     } else if (strcmp(type_text, "response.chunk") == 0 && cJSON_IsObject(payload_obj)) {
@@ -2961,13 +3243,18 @@ static void river_xiaozhi_handle_binary_message(const uint8_t *data, size_t data
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
                              g_river_xiaozhi.server_sample_rate,
                              g_river_xiaozhi.server_frame_duration_ms,
+                             0U,
                              0U,
                              0U,
                              data,
                              data_len,
                              RIVER_XIAOZHI_BINARY_PCM16,
+                             false,
                              false,
                              false);
 }
@@ -3071,6 +3358,7 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
     g_river_xiaozhi.sessions_closed++;
     river_xiaozhi_set_last_type("closed");
     river_xiaozhi_clear_last_preview_fields();
+    river_xiaozhi_clear_last_playback_fields();
     RIVER_LOGI("xiaozhi websocket closed sid=%s",
                closed_sid[0] != '\0' ? closed_sid : "-");
     river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_SESSION_CLOSED,
@@ -3081,6 +3369,10 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
                              NULL,
                              NULL,
                              NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             0U,
                              0U,
                              0U,
                              0U,
@@ -3088,6 +3380,7 @@ static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_dat
                              NULL,
                              0U,
                              0U,
+                             false,
                              false,
                              false);
     g_river_xiaozhi.session_id[0] = '\0';
@@ -3730,6 +4023,21 @@ river_status_t river_xiaozhi_send_abort(const char *reason)
     return river_xiaozhi_send_session_update_interrupt();
 }
 
+river_status_t river_xiaozhi_send_audio_out_started(const char *response_id,
+                                                    const char *playback_id,
+                                                    const char *segment_id)
+{
+    return river_xiaozhi_send_audio_out_started_internal(response_id,
+                                                         playback_id,
+                                                         segment_id);
+}
+
+river_status_t river_xiaozhi_send_audio_out_completed(const char *response_id,
+                                                      const char *playback_id)
+{
+    return river_xiaozhi_send_audio_out_completed_internal(response_id, playback_id);
+}
+
 river_status_t river_xiaozhi_send_audio(const uint8_t *payload,
                                         size_t bytes,
                                         uint32_t timestamp_ms)
@@ -3871,6 +4179,19 @@ void river_xiaozhi_dump_status(void)
                    g_river_xiaozhi.last_preview_source :
                    "-",
                (unsigned long)g_river_xiaozhi.last_preview_audio_offset_ms);
+    RIVER_LOGI("xiaozhi playback_meta=response_id=%s playback_id=%s segment_id=%s expected_duration_ms=%lu is_last_segment=%s valid=%s",
+               g_river_xiaozhi.last_response_id[0] != '\0' ?
+                   g_river_xiaozhi.last_response_id :
+                   "-",
+               g_river_xiaozhi.last_playback_id[0] != '\0' ?
+                   g_river_xiaozhi.last_playback_id :
+                   "-",
+               g_river_xiaozhi.last_segment_id[0] != '\0' ?
+                   g_river_xiaozhi.last_segment_id :
+                   "-",
+               (unsigned long)g_river_xiaozhi.last_playback_expected_duration_ms,
+               river_xiaozhi_bool_text(g_river_xiaozhi.last_playback_is_last_segment),
+               river_xiaozhi_bool_text(g_river_xiaozhi.last_playback_meta_valid));
     RIVER_LOGI("xiaozhi discovery turn_mode=%s server_endpoint=%s/%s mode=%s voice_collaboration=%s preview_events=%s declared_preview=%s playback_ack=%s declared_playback_ack=%s",
                g_river_xiaozhi.discovery_turn_mode[0] != '\0' ?
                    g_river_xiaozhi.discovery_turn_mode :

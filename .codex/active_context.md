@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `C2 consume xiaozhi preview observation events`
+  - `C3 add xiaozhi playback meta and ack baseline`
 - Latest planning sync:
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
@@ -39,6 +39,7 @@ or top-of-tree verification target changes.
     collapsing them into `Sending handshake failed`
   - discovery-backed `session.start.capabilities` negotiation
   - preview-aware input observation parsing and status exposure
+  - playback-truth metadata parsing and `segment_mark_v1` ACK baseline
   - `session.start` / `audio.in.commit` / `text.in`
   - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
@@ -47,7 +48,6 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `C3` playback-truth metadata and ACK baseline
   - `C4` accepted-turn / playback-truth / fallback semantics alignment
   - `5.168` runtime-ready duplex gate
   - `5.169` speaking-time local endpoint softening

@@ -1,5 +1,59 @@
 # Change Log
 
+## Step C3
+- Implemented the device-side XiaoZhi playback-truth baseline so the transport
+  and cloud adapter now consume the server's playback context and report the
+  first playback facts back asynchronously:
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Extended the XiaoZhi event contract with playback-truth metadata:
+  - new event type:
+    - `RIVER_XIAOZHI_EVENT_AUDIO_OUT_META`
+  - new per-event fields:
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+    - `expected_duration_ms`
+    - `is_last_segment`
+- The websocket transport now parses, caches, logs, and exposes:
+  - `audio.out.meta`
+- `session.start.capabilities.playback_ack` negotiation is now truthful for the
+  implemented baseline:
+  - local playback ACK support is advertised as `segment_mark_v1`
+  - actual declaration still depends on discovery advertising the same mode
+- Added the minimal async playback-fact ACK path on the existing XiaoZhi
+  control queue:
+  - `audio.out.started` is queued after the first successful local playback
+    write for the active segment
+  - `audio.out.completed` is queued from the natural last-segment playback stop
+    path
+  - ACK sending failures only log warnings and do not block playback
+- Added playback-meta runtime state on both transport and cloud-adapter sides so
+  board validation can inspect the last playback context directly from status
+  output:
+  - transport status now prints:
+    - `xiaozhi playback_meta=response_id=...`
+  - cloud adapter status now prints:
+    - `xiaozhi playback_meta response_id=...`
+- Kept the scope intentionally minimal:
+  - `audio.out.mark` and `audio.out.cleared` are still deferred to later work
+  - no new playback listener plumbing was introduced; the existing XiaoZhi IO
+    task and control queue remain the async send path
+  - playback-truth metadata is reset on session/open transport resets so stale
+    ACK context is not reused
+- Updated the active duplex execution context to record that `C3` is now the
+  latest landed collaboration slice and that `C4` is next:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `git diff --check` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed successfully against
+    `/root/ameba-rtos`
+
 ## Step C2
 - Implemented the device-side XiaoZhi preview-observation baseline so the
   transport now truthfully consumes the server's preview-aware input events:
