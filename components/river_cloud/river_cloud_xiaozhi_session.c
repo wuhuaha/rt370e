@@ -138,13 +138,23 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
 {
     g_river_cloud.xiaozhi_playback_meta_valid = false;
     g_river_cloud.xiaozhi_playback_started_reported = false;
+    g_river_cloud.xiaozhi_playback_cleared_reported = false;
     g_river_cloud.xiaozhi_playback_completed_reported = false;
     g_river_cloud.xiaozhi_playback_last_segment = false;
+    g_river_cloud.xiaozhi_playback_segment_head = 0U;
+    g_river_cloud.xiaozhi_playback_segment_count = 0U;
     g_river_cloud.xiaozhi_playback_expected_duration_ms = 0U;
     g_river_cloud.xiaozhi_playback_response_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_segment_id[0] = '\0';
+    g_river_cloud.xiaozhi_playback_last_started_segment_id[0] = '\0';
+    g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id[0] = '\0';
+    g_river_cloud.xiaozhi_playback_terminal_ack[0] = '\0';
+    g_river_cloud.xiaozhi_playback_clear_reason[0] = '\0';
     g_river_cloud.xiaozhi_playback_text[0] = '\0';
+    memset(g_river_cloud.xiaozhi_playback_segments,
+           0,
+           sizeof(g_river_cloud.xiaozhi_playback_segments));
 }
 
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason)

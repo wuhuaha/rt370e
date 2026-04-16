@@ -555,7 +555,20 @@ go test ./internal/gateway
 - 声学与本地编排线：
   - 让端侧在 duplex-ready 条件下真正具备“边播边听”的板端条件
 
-下面的 `C1`~`C4` 是新增的协议协同切片；`5.168` 之后的切片继续负责本地
+2026-04-17 服务侧最新代码更新进一步改变了端侧优先级：
+
+- 复核 `/root/agent-server` 最近的 playback-truth 相关提交后，可以确认：
+  - `segment_mark_v1` 已不再是“started/completed 够用”的轻量协作
+  - 服务侧现在明确依赖：
+    - `audio.out.started`
+    - `audio.out.mark`
+    - `audio.out.cleared`
+    - `audio.out.completed`
+  - 这些事实会继续进入 heard-text / interruption / resume 主链
+- 因此端侧必须先补齐完整播放事实链，再回到 `5.168` 的本地 duplex runtime
+  gate 收口
+
+下面的 `C1`~`C5` 是新增的协议协同切片；`5.168` 之后的切片继续负责本地
 运行时与声学收口。
 
 ### 10.1B Step C1: discovery + session.start 协商基线
@@ -567,6 +580,7 @@ go test ./internal/gateway
   - `session.start.capabilities` 已改为“服务端声明 + 本端支持”的协商逻辑
   - `preview_events` 现已随 `C2` 的本端能力补齐而变为可真实声明
   - `playback_ack=segment_mark_v1` 现已随 `C3` 的本端能力补齐而可真实声明
+  - 完整的 `segment_mark_v1` 真相链已在 `C5` 落地
   - 下一步由 `5.168` 继续推进本地 runtime-ready duplex gate 收口
 
 目标：
@@ -662,13 +676,13 @@ go test ./internal/gateway
   - 端侧 transport 与 cloud adapter 都新增了 playback meta 状态日志
   - `session.start.capabilities.playback_ack` 现在会在 discovery 支持时如实声明：
     - `segment_mark_v1`
-  - 当前已落最小 ACK：
+  - 先前最小 ACK 基线已落：
     - `audio.out.started`
     - `audio.out.completed`
-  - 当前仍刻意保留后续收口项：
+  - 后续 `C5` 已补齐剩余 ACK：
     - `audio.out.mark`
     - `audio.out.cleared`
-  - ACK 发送走现有 XiaoZhi IO task / control queue 的异步低优先级路径，不阻塞本地播放
+  - ACK 发送继续走现有 XiaoZhi IO task / control queue 的异步低优先级路径，不阻塞本地播放
   - 下一步由 `5.168` 继续推进本地 runtime-ready duplex gate 收口
 
 目标：
@@ -733,6 +747,7 @@ go test ./internal/gateway
     - `output_state`
     - `barge_in_enabled`
     - `fallback`
+  - `C5` 已在此语义边界上补齐完整 playback truth 终态链
   - 下一步由 `5.168` 继续推进 runtime-ready duplex gate 收口
 
 目标：
@@ -771,6 +786,70 @@ go test ./internal/gateway
   - `playback fact`
   - `fallback`
 - 本地状态机不会再把 preview / endpoint candidate 当成 accepted-turn
+
+### 10.1F Step C5: 补齐 segment_mark_v1 播放真相链
+
+状态：
+
+- 已落地设备侧 baseline：
+  - 基于对 `/root/agent-server` 最新 playback-truth 提交的复核，端侧优先补齐了
+    `segment_mark_v1` 的完整事实链
+  - 当前端侧已支持完整 ACK：
+    - `audio.out.started`
+    - `audio.out.mark`
+    - `audio.out.cleared`
+    - `audio.out.completed`
+  - 当前端侧已把多 segment 播放上下文收束为本地 segment 队列，并显式维护：
+    - `last_started_segment_id`
+    - `last_fully_heard_segment_id`
+    - `terminal_ack`
+    - `clear_reason`
+  - 本地 clear/interrupt/network-lost/transport-closed/write-failed 路径已统一收敛到
+    playback-truth 终态，而不是只 reset 本地播放状态
+  - `session.start.capabilities.playback_ack` 只有在本端和 discovery 都完整支持
+    四类 ACK 时才会如实声明 `segment_mark_v1`
+  - 下一步由 `5.168` 继续推进 runtime-ready duplex gate 收口
+
+目标：
+
+- 让端侧向服务侧提供可信的完整播放事实链，为 heard-text /
+  interruption / resume 提供真实边界，而不是只上报开始/结束两个稀疏点
+
+范围：
+
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_xiaozhi_ws.c`
+- `include/river/river_xiaozhi_ws.h`
+
+实施内容：
+
+- 在端侧建立 playback-level segment 队列：
+  - 同一 `response_id + playback_id` 下按 `audio.out.meta` 追加 segment
+  - response/playback 切换时才清空旧播放上下文
+- 基于实际本地播放进度推进事实：
+  - 第一次真实本地 write 成功后发送 `audio.out.started`
+  - 按 wall-clock/segment duration 周期发 `audio.out.mark`
+  - segment 满额后更新 `last_fully_heard_segment_id`
+- 对本地 clear 终态采用保守规则：
+  - 先补一条当前 segment 的最终 `mark`
+  - 仅当已知 `last_fully_heard_segment_id` 时才发 `audio.out.cleared`
+  - clear-before-start 不伪造 `cleared`
+- 对自然播放结束采用 playback-level 终态：
+  - 先补齐剩余 segment 的最终 mark
+  - 最后只发一次 `audio.out.completed`
+- 所有 ACK 保持异步、低优先级，不阻塞本地播放线程
+
+完成标准：
+
+- 板端日志能清楚区分：
+  - `started`
+  - 周期 `mark`
+  - `cleared`
+  - `completed`
+- `segment_mark_v1` 只在完整支持条件成立时声明
+- 本地异常停播不再出现“只 reset，不结算 playback truth”的旧路径
 
 ### 10.1 Step 5.167: 消费服务侧 richer session.update
 

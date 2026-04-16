@@ -1,5 +1,70 @@
 # Change Log
 
+## Step C5
+- Re-analyzed the latest `/root/agent-server` playback-truth updates and
+  reprioritized the device roadmap before resuming duplex runtime work:
+  - reviewed commits:
+    - `2a2c9cf 补强早起播链路的播放真相与续播上下文`
+    - `dd10dff 实现 segment 级 playback_ack 真相链路并补齐协议测试`
+    - `d0d81ee 实现精确续播策略并补齐 playback_ack 多段联调文档`
+    - `46aef68 深化软打断恢复与播放真相前推链路`
+    - `74a9c6d 修复实时播放收尾卡死并收紧纠错型预热门槛`
+  - conclusion:
+    - service-side `segment_mark_v1` is no longer satisfied by only
+      `audio.out.started/completed`
+    - the device must now provide a truthful
+      `started -> mark -> cleared/completed` fact chain before `5.168`
+- Completed the device-side XiaoZhi `segment_mark_v1` playback ACK chain:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+- Added a segment-queue-based local playback fact model in the cloud adapter:
+  - tracks per-segment `started`, `started_at_ms`, `last_mark_ms`,
+    `expected_duration_ms`, and `is_last_segment`
+  - keeps playback-level terminal state:
+    - `terminal_ack`
+    - `clear_reason`
+    - `last_started_segment_id`
+    - `last_fully_heard_segment_id`
+- `audio.out.meta` handling is now playback-level instead of
+  “segment switch clears everything”:
+  - response/playback identity changes reset the queue
+  - new segment metadata within the same playback is appended into the queue
+- The async XiaoZhi control lane now covers all four fact events:
+  - `audio.out.started`
+  - `audio.out.mark`
+  - `audio.out.cleared`
+  - `audio.out.completed`
+- Playback ACK negotiation is now truthful:
+  - the client only declares `playback_ack.mode=segment_mark_v1` when:
+    - local code supports all four ACK kinds
+    - discovery also advertises all four ACK kinds
+- The device now advances playback truth from actual local playback progress:
+  - first successful local playback write starts the current segment
+  - periodic wall-clock progress emits monotonic `audio.out.mark`
+  - full-duration segment completion rolls the queue and updates
+    `last_fully_heard_segment_id`
+- Local stop / clear paths now converge on one playback-truth exit:
+  - final partial `audio.out.mark` is emitted before clear when available
+  - `audio.out.cleared` uses `cleared_after_segment_id=last_fully_heard_segment_id`
+  - clear-before-start stays conservative and does not fabricate `cleared`
+  - natural drain stop emits final per-segment marks and one playback-level
+    `audio.out.completed`
+  - interrupt / network-lost / transport-closed / bridge-close /
+    playback-write-failed paths now all terminate playback truth locally
+- Status output now exposes the new playback-truth lane directly:
+  - terminal ack
+  - clear reason
+  - queued segment count
+  - last started segment
+  - last fully heard segment
+- Updated the active duplex plan/context so `C5` is recorded as landed and the
+  next implementation slice returns to `5.168`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Workflow Sync 2026-04-16
 - Persisted the repository-level git commit message convention in
   [AGENTS.md](/root/ameba-river/AGENTS.md):

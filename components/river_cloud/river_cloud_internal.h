@@ -36,6 +36,9 @@
 #define RIVER_CLOUD_XIAOZHI_ACCEPT_REASON_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_LANE_STATE_MAX   32U
 #define RIVER_CLOUD_XIAOZHI_FALLBACK_REASON_MAX 64U
+#define RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX 16U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX 48U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX 8U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX   96U
@@ -79,6 +82,7 @@
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_MARK_INTERVAL_MS 80U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
@@ -89,8 +93,24 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_CTRL_ABORT = 2,
     RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION = 3,
     RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_STARTED = 4,
-    RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED = 5
+    RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED = 5,
+    RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK = 6,
+    RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED = 7
 } river_cloud_xiaozhi_control_op_t;
+
+typedef struct {
+    bool valid;
+    bool started;
+    bool started_ack_reported;
+    bool is_last_segment;
+    uint64_t started_at_ms;
+    uint32_t expected_duration_ms;
+    uint32_t last_mark_ms;
+    char response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
+    char playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
+    char segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+} river_cloud_xiaozhi_playback_segment_t;
 
 typedef struct {
     river_cloud_xiaozhi_control_op_t op;
@@ -98,6 +118,7 @@ typedef struct {
     char response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    uint32_t played_duration_ms;
     rtos_sema_t completion;
     river_status_t *result_out;
 } river_cloud_xiaozhi_control_request_t;
@@ -158,6 +179,7 @@ typedef struct {
     bool xiaozhi_transport_barge_in_enabled;
     bool xiaozhi_playback_meta_valid;
     bool xiaozhi_playback_started_reported;
+    bool xiaozhi_playback_cleared_reported;
     bool xiaozhi_playback_completed_reported;
     bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
@@ -197,6 +219,8 @@ typedef struct {
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
+    uint32_t xiaozhi_playback_segment_head;
+    uint32_t xiaozhi_playback_segment_count;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
     size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
@@ -245,8 +269,14 @@ typedef struct {
     char xiaozhi_playback_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char xiaozhi_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char xiaozhi_playback_last_started_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char xiaozhi_playback_last_fully_heard_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char xiaozhi_playback_terminal_ack[RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX];
+    char xiaozhi_playback_clear_reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
     char xiaozhi_playback_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     uint32_t xiaozhi_playback_expected_duration_ms;
+    river_cloud_xiaozhi_playback_segment_t
+        xiaozhi_playback_segments[RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX];
 #endif
     char last_text[192];
     char last_error[128];

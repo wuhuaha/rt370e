@@ -1,5 +1,64 @@
 # Verification
 
+## Step C5
+Validate that the device now provides the full XiaoZhi
+`segment_mark_v1` playback ACK fact chain and that negotiation stays truthful:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'audio_out_(started|mark|cleared|completed)|playback_segment|last_fully_heard|terminal_ack|PLAYBACK_CLEARED|PLAYBACK_MARK|segment_mark_v1' \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - transport now exports `send_audio_out_mark()` and `send_audio_out_cleared()`
+  - cloud runtime now tracks per-segment playback state and terminal ACK state
+  - negotiation requires full `segment_mark_v1` support before declaration
+  - the active context and duplex plan both record `C5` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints lines similar to:
+  - `xiaozhi playback_ack terminal=... clear_reason=... queued_segments=... last_started=... last_fully_heard=...`
+  - `xiaozhi playback_meta response_id=... playback_id=... segment_id=...`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi playback fact observed: response_id=... playback_id=... segment_id=...
+xiaozhi playback ack started queued: ...
+xiaozhi playback ack mark sent: ...
+xiaozhi playback ack cleared queued: ...
+xiaozhi playback ack completed queued: ...
+```
+
+Expected result:
+- normal natural playback emits:
+  - `started`
+  - one or more monotonic `mark`
+  - one `completed`
+- local clear/interruption paths emit:
+  - a final partial `mark` when the current segment has started
+  - `cleared_after_segment_id=...` only when a fully heard segment exists
+- clear-before-start paths do not fabricate `audio.out.cleared`
+
 ## Workflow Sync 2026-04-16
 Validate that the repository now persists the default Chinese commit-message
 rule and that the Codex harness remains consistent:

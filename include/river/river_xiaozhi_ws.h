@@ -103,6 +103,14 @@ river_status_t river_xiaozhi_send_abort(const char *reason);
 river_status_t river_xiaozhi_send_audio_out_started(const char *response_id,
                                                     const char *playback_id,
                                                     const char *segment_id);
+river_status_t river_xiaozhi_send_audio_out_mark(const char *response_id,
+                                                 const char *playback_id,
+                                                 const char *segment_id,
+                                                 uint32_t played_duration_ms);
+river_status_t river_xiaozhi_send_audio_out_cleared(const char *response_id,
+                                                    const char *playback_id,
+                                                    const char *cleared_after_segment_id,
+                                                    const char *reason);
 river_status_t river_xiaozhi_send_audio_out_completed(const char *response_id,
                                                       const char *playback_id);
 river_status_t river_xiaozhi_send_audio(const uint8_t *payload,

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `C4 align xiaozhi accepted-turn and fallback semantics`
+  - `C5 complete xiaozhi segment_mark_v1 playback ACK fact chain`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -25,6 +25,17 @@ or top-of-tree verification target changes.
     - preview-aware input events
     - playback-truth ACKs
     - discovery + `session.start.capabilities` collaboration negotiation
+  - re-prioritized the next device slice after reviewing the latest
+    `/root/agent-server` playback-truth commits:
+    - `2a2c9cf`
+    - `dd10dff`
+    - `d0d81ee`
+    - `46aef68`
+    - `74a9c6d`
+  - conclusion:
+    - `segment_mark_v1` now depends on the full
+      `audio.out.started/mark/cleared/completed` truth chain, so device work had
+      to land `C5` before returning to `5.168`
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -49,7 +60,11 @@ or top-of-tree verification target changes.
     collapsing them into `Sending handshake failed`
   - discovery-backed `session.start.capabilities` negotiation
   - preview-aware input observation parsing and status exposure
-  - playback-truth metadata parsing and `segment_mark_v1` ACK baseline
+  - full `segment_mark_v1` playback-truth ACK chain:
+    - `audio.out.started`
+    - `audio.out.mark`
+    - `audio.out.cleared`
+    - `audio.out.completed`
   - accepted-turn / fallback semantics alignment
   - `session.start` / `audio.in.commit` / `text.in`
   - PCM16 uplink and PCM16 downlink

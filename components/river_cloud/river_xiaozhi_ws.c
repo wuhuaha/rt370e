@@ -1118,6 +1118,26 @@ static bool river_xiaozhi_client_supports_preview_events(void)
     return true;
 }
 
+static bool river_xiaozhi_client_supports_playback_ack_started(void)
+{
+    return true;
+}
+
+static bool river_xiaozhi_client_supports_playback_ack_mark(void)
+{
+    return true;
+}
+
+static bool river_xiaozhi_client_supports_playback_ack_cleared(void)
+{
+    return true;
+}
+
+static bool river_xiaozhi_client_supports_playback_ack_completed(void)
+{
+    return true;
+}
+
 static const char *river_xiaozhi_client_supported_playback_ack_mode(void)
 {
     return "segment_mark_v1";
@@ -1160,19 +1180,39 @@ static const char *river_xiaozhi_negotiated_playback_ack_mode(void)
     if (strcmp(client_mode, server_mode) != 0) {
         return NULL;
     }
+    if (!river_xiaozhi_client_supports_playback_ack_started() ||
+        !river_xiaozhi_client_supports_playback_ack_mark() ||
+        !river_xiaozhi_client_supports_playback_ack_cleared() ||
+        !river_xiaozhi_client_supports_playback_ack_completed()) {
+        return NULL;
+    }
+    if (!g_river_xiaozhi.discovery_playback_ack_started ||
+        !g_river_xiaozhi.discovery_playback_ack_mark ||
+        !g_river_xiaozhi.discovery_playback_ack_cleared ||
+        !g_river_xiaozhi.discovery_playback_ack_completed) {
+        return NULL;
+    }
     return client_mode;
 }
 
 static bool river_xiaozhi_playback_ack_started_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
-           g_river_xiaozhi.discovery_playback_ack_started;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+}
+
+static bool river_xiaozhi_playback_ack_mark_enabled(void)
+{
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+}
+
+static bool river_xiaozhi_playback_ack_cleared_enabled(void)
+{
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
 }
 
 static bool river_xiaozhi_playback_ack_completed_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
-           g_river_xiaozhi.discovery_playback_ack_completed;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
 }
 
 static void river_xiaozhi_prepare_preview_window(const char *preview_id)
@@ -2273,6 +2313,78 @@ static river_status_t river_xiaozhi_send_audio_out_started_internal(const char *
     cJSON_AddStringToObject(payload, "response_id", response_id);
     cJSON_AddStringToObject(payload, "playback_id", playback_id);
     cJSON_AddStringToObject(payload, "segment_id", segment_id);
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_audio_out_mark_internal(const char *response_id,
+                                                                 const char *playback_id,
+                                                                 const char *segment_id,
+                                                                 uint32_t played_duration_ms)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!river_xiaozhi_playback_ack_mark_enabled()) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!g_river_xiaozhi.dialog_started || !river_xiaozhi_session_open()) {
+        return RIVER_ERR_BUSY;
+    }
+    if (response_id == NULL || response_id[0] == '\0' || playback_id == NULL ||
+        playback_id[0] == '\0' || segment_id == NULL || segment_id[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = river_xiaozhi_create_control_event("audio.out.mark", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "response_id", response_id);
+    cJSON_AddStringToObject(payload, "playback_id", playback_id);
+    cJSON_AddStringToObject(payload, "segment_id", segment_id);
+    cJSON_AddNumberToObject(payload, "played_duration_ms", played_duration_ms);
+    return river_xiaozhi_send_json_root(root);
+}
+
+static river_status_t river_xiaozhi_send_audio_out_cleared_internal(
+    const char *response_id,
+    const char *playback_id,
+    const char *cleared_after_segment_id,
+    const char *reason)
+{
+    cJSON *root = NULL;
+    cJSON *payload = NULL;
+
+    if (!river_xiaozhi_playback_ack_cleared_enabled()) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!g_river_xiaozhi.dialog_started || !river_xiaozhi_session_open()) {
+        return RIVER_ERR_BUSY;
+    }
+    if (response_id == NULL || response_id[0] == '\0' || playback_id == NULL ||
+        playback_id[0] == '\0' || cleared_after_segment_id == NULL ||
+        cleared_after_segment_id[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+
+    root = river_xiaozhi_create_control_event("audio.out.cleared", &payload);
+    if (root == NULL || payload == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+
+    cJSON_AddStringToObject(payload, "response_id", response_id);
+    cJSON_AddStringToObject(payload, "playback_id", playback_id);
+    cJSON_AddStringToObject(payload, "cleared_after_segment_id", cleared_after_segment_id);
+    if (reason != NULL && reason[0] != '\0') {
+        cJSON_AddStringToObject(payload, "reason", reason);
+    }
     return river_xiaozhi_send_json_root(root);
 }
 
@@ -4039,6 +4151,28 @@ river_status_t river_xiaozhi_send_audio_out_started(const char *response_id,
     return river_xiaozhi_send_audio_out_started_internal(response_id,
                                                          playback_id,
                                                          segment_id);
+}
+
+river_status_t river_xiaozhi_send_audio_out_mark(const char *response_id,
+                                                 const char *playback_id,
+                                                 const char *segment_id,
+                                                 uint32_t played_duration_ms)
+{
+    return river_xiaozhi_send_audio_out_mark_internal(response_id,
+                                                      playback_id,
+                                                      segment_id,
+                                                      played_duration_ms);
+}
+
+river_status_t river_xiaozhi_send_audio_out_cleared(const char *response_id,
+                                                    const char *playback_id,
+                                                    const char *cleared_after_segment_id,
+                                                    const char *reason)
+{
+    return river_xiaozhi_send_audio_out_cleared_internal(response_id,
+                                                         playback_id,
+                                                         cleared_after_segment_id,
+                                                         reason);
 }
 
 river_status_t river_xiaozhi_send_audio_out_completed(const char *response_id,
