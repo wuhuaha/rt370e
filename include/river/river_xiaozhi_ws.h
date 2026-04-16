@@ -86,6 +86,7 @@ const char *river_xiaozhi_last_turn_id(void);
 const char *river_xiaozhi_last_accept_reason(void);
 bool river_xiaozhi_last_barge_in_enabled_known(void);
 bool river_xiaozhi_last_barge_in_enabled(void);
+void river_xiaozhi_clear_session_update_cache(void);
 const char *river_xiaozhi_last_emotion(void);
 const char *river_xiaozhi_last_error(void);
 const char *river_xiaozhi_activation_code(void);

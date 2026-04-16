@@ -114,11 +114,17 @@ Branch: `agent-server-v2`
     - 声学前提是否成立
     - 本地 round / uplink / playback 的并行编排是否收口
     - 是否能消费服务侧新增 lane-state 信号
-- 基于新云侧文档反看端侧现状，协作协议层已经完成前三步基线，但仍未收口完整闭环：
+- 基于新云侧文档反看端侧现状，协作协议层已经完成四步基线，但仍未收口完整闭环：
   - 已消费 `GET /v1/realtime` discovery 中的 `voice_collaboration`
   - `session.start.capabilities` 已能按协商结果声明：
     - `preview_events`
     - `playback_ack.mode=segment_mark_v1`
+  - 端侧已把 accepted-turn 语义同步进 cloud runtime：
+    - `accept_reason`
+    - `turn_id`
+    - `input_state`
+    - `output_state`
+    - `barge_in_enabled`
   - 端侧已解析并缓存观察事件：
     - `input.speech.start`
     - `input.preview`
@@ -486,7 +492,6 @@ go test ./internal/gateway
 
 - 第一优先：
   - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
-  - `C4` 端侧把 accepted-turn / playback-truth / fallback 语义和新协议对齐
 - 第二优先：
   - `5.169` 端侧 speaking-time local endpoint / round close 软化
   - `5.170` 端侧 speaking-time uplink continuation
@@ -516,12 +521,13 @@ go test ./internal/gateway
 - `5.164` 已把 duplex capability advertisement 放到显式实验闸门后
 - `5.165` 已把 `tts_start -> close local round` 放到显式策略闸门后
 - `5.167` 已把服务侧 richer `session.update` 字段接入端侧本地缓存与日志
-- `C1` 已建立 discovery + `session.start.capabilities` 协商基线，但当前默认
-  仍不会声明本地尚未实现的 `playback_ack`
+- `C1` 已建立 discovery + `session.start.capabilities` 协商基线
 - `C2` 已建立 preview-aware 输入观察事件消费基线，当前只做 hint-only
   解析 / 缓存 / 日志，不改变现有 commit / local-close 语义
+- `C3` 已让 `playback_ack=segment_mark_v1` 在 discovery 支持时可真实声明
+- `C4` 已把 accepted-turn / playback-truth / fallback 语义与新协议边界对齐
 
-从下一步代码提交开始，端侧按下面的连续切片继续推进。
+从当前代码基线起，端侧按下面的连续切片继续推进。
 
 ### 10.1A 2026-04-16 云侧协议对齐后的端侧修改面
 
@@ -561,7 +567,7 @@ go test ./internal/gateway
   - `session.start.capabilities` 已改为“服务端声明 + 本端支持”的协商逻辑
   - `preview_events` 现已随 `C2` 的本端能力补齐而变为可真实声明
   - `playback_ack=segment_mark_v1` 现已随 `C3` 的本端能力补齐而可真实声明
-  - 下一步由 `C4` 与 `5.168` 分别推进语义对齐与本地运行时收口
+  - 下一步由 `5.168` 继续推进本地 runtime-ready duplex gate 收口
 
 目标：
 
@@ -607,7 +613,7 @@ go test ./internal/gateway
   - 端侧 transport 与 cloud adapter 都新增了 preview observation 状态日志
   - `session.start.capabilities.preview_events` 现在会在 discovery 支持时如实声明
   - 当前范围仍保持 observation-only，不改变 commit / local-close / accept 语义
-  - 下一步由 `C4` 继续把 accepted-turn / playback-truth 边界和 fallback 语义收口
+  - 下一步由 `5.168` 与后续本地运行时切片继续把 duplex runtime 行为收口
 
 目标：
 
@@ -663,7 +669,7 @@ go test ./internal/gateway
     - `audio.out.mark`
     - `audio.out.cleared`
   - ACK 发送走现有 XiaoZhi IO task / control queue 的异步低优先级路径，不阻塞本地播放
-  - 下一步由 `C4` 继续把 accepted-turn / playback-truth / fallback 语义和端侧状态机对齐
+  - 下一步由 `5.168` 继续推进本地 runtime-ready duplex gate 收口
 
 目标：
 
@@ -702,6 +708,32 @@ go test ./internal/gateway
 - 默认未协商时完全不发送这些扩展事件
 
 ### 10.1E Step C4: accepted-turn / playback-truth / fallback 语义对齐
+
+状态：
+
+- 已落地设备侧 baseline：
+  - accepted-turn 只在 cloud runtime 中由 `session.update.accept_reason` 确认
+  - pending transcript 只有在 accepted-turn 成立后才会发出既有
+    `RIVER_CLOUD_ASR_EVENT_FINAL`
+  - 新 listen round / 新 wake window 打开前会显式清空 transport 侧
+    `session.update` 缓存，避免上一轮 `accept_reason` 泄漏到新一轮
+  - preview / endpoint 继续保持 observation-only，不被提升为 accepted-turn
+    或 commit 命令
+  - playback meta 日志已改为 playback fact 口径，不再伪装成策略事件
+  - half-duplex 保守路径现在会显式记录 fallback reason：
+    - `await_accept_reason`
+    - `half_duplex_experiment_disabled`
+    - `half_duplex_no_playback_reference`
+    - `half_duplex_capture_held_during_playback`
+  - transport/cloud status 现已暴露一条独立的 turn semantics 观测面：
+    - `accepted`
+    - `accept_reason`
+    - `turn_id`
+    - `input_state`
+    - `output_state`
+    - `barge_in_enabled`
+    - `fallback`
+  - 下一步由 `5.168` 继续推进 runtime-ready duplex gate 收口
 
 目标：
 

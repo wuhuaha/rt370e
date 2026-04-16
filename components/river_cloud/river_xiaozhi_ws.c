@@ -3654,6 +3654,15 @@ bool river_xiaozhi_last_barge_in_enabled(void)
            g_river_xiaozhi.last_barge_in_enabled;
 }
 
+void river_xiaozhi_clear_session_update_cache(void)
+{
+    if (!g_river_xiaozhi.initialized) {
+        return;
+    }
+
+    river_xiaozhi_clear_last_session_update_fields();
+}
+
 const char *river_xiaozhi_last_emotion(void)
 {
     return (g_river_xiaozhi.initialized && g_river_xiaozhi.last_emotion[0] != '\0') ?

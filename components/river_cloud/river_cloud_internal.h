@@ -32,6 +32,10 @@
 #define RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX   64U
 #define RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX 32U
 #define RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX 64U
+#define RIVER_CLOUD_XIAOZHI_TURN_ID_MAX      96U
+#define RIVER_CLOUD_XIAOZHI_ACCEPT_REASON_MAX 64U
+#define RIVER_CLOUD_XIAOZHI_LANE_STATE_MAX   32U
+#define RIVER_CLOUD_XIAOZHI_FALLBACK_REASON_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX   96U
@@ -149,6 +153,9 @@ typedef struct {
     bool xiaozhi_preview_speech_started;
     bool xiaozhi_preview_endpoint_candidate;
     bool xiaozhi_preview_final;
+    bool xiaozhi_turn_accepted;
+    bool xiaozhi_transport_barge_in_enabled_known;
+    bool xiaozhi_transport_barge_in_enabled;
     bool xiaozhi_playback_meta_valid;
     bool xiaozhi_playback_started_reported;
     bool xiaozhi_playback_completed_reported;
@@ -230,6 +237,11 @@ typedef struct {
     char xiaozhi_preview_source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
     char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     uint32_t xiaozhi_preview_audio_offset_ms;
+    char xiaozhi_turn_id[RIVER_CLOUD_XIAOZHI_TURN_ID_MAX];
+    char xiaozhi_accept_reason[RIVER_CLOUD_XIAOZHI_ACCEPT_REASON_MAX];
+    char xiaozhi_input_state[RIVER_CLOUD_XIAOZHI_LANE_STATE_MAX];
+    char xiaozhi_output_state[RIVER_CLOUD_XIAOZHI_LANE_STATE_MAX];
+    char xiaozhi_semantic_fallback_reason[RIVER_CLOUD_XIAOZHI_FALLBACK_REASON_MAX];
     char xiaozhi_playback_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char xiaozhi_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
@@ -270,8 +282,12 @@ void river_cloud_xiaozhi_copy_session_id_from_transport(void);
 const char *river_cloud_xiaozhi_current_sid(void);
 void river_cloud_xiaozhi_clear_pending_text(void);
 void river_cloud_xiaozhi_clear_preview_state(void);
+void river_cloud_xiaozhi_clear_turn_semantics_state(void);
 void river_cloud_xiaozhi_clear_playback_meta_state(void);
-void river_cloud_xiaozhi_finalize_pending_text(void);
+void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger);
+bool river_cloud_xiaozhi_turn_accepted(void);
+void river_cloud_xiaozhi_note_semantic_fallback(const char *reason);
+void river_cloud_xiaozhi_finalize_pending_text(const char *trigger);
 void river_cloud_xiaozhi_emit_session_started(void);
 void river_cloud_xiaozhi_emit_session_closed(void);
 void river_cloud_xiaozhi_cancel_playback_stop(void);

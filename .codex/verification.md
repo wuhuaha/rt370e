@@ -1,5 +1,66 @@
 # Verification
 
+## Step C4
+Validate that the device now keeps accepted-turn semantics aligned with
+`session.update.accept_reason`, does not leak old turn acceptance across rounds,
+and emits explicit fallback reasoning while staying on the conservative runtime
+baseline:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'clear_session_update_cache|turn accepted|await_accept_reason|turn_semantics|half_duplex_experiment_disabled|half_duplex_no_playback_reference|half_duplex_capture_held_during_playback|finalize_pending_text\("' \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - transport now exports `river_xiaozhi_clear_session_update_cache()`
+  - the cloud runtime now tracks and logs `turn_semantics`
+  - pending-text finalization callsites all pass an explicit trigger string
+  - explicit fallback reasons exist for both conservative half-duplex policy
+    and waiting for accepted-turn
+  - the active context and duplex plan both record `C4` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints a turn-semantics line similar to:
+  - `xiaozhi turn_semantics accepted=yes|no accept_reason=... turn_id=... input_state=... output_state=... barge_in_enabled=yes|no|- fallback=...`
+- opening a fresh round should not inherit the previous round's
+  `accept_reason/turn_id`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi turn accepted: trigger=... accept_reason=...
+xiaozhi pending text waits for accepted turn: trigger=...
+xiaozhi accepted turn final text: trigger=...
+xiaozhi playback fact observed: ...
+xiaozhi fallback: reason=...
+```
+
+Expected result:
+- accepted-turn is logged only after `accept_reason` becomes available
+- pending text is withheld until accepted-turn is confirmed
+- preview observation and playback-fact logs are clearly distinct from
+  accepted-turn logs
+- when the board stays on the conservative path, fallback reasons are explicit
+
 ## Step C3
 Validate that the device now consumes XiaoZhi playback-truth metadata and
 reports the minimal started/completed playback facts without blocking local

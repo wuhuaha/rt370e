@@ -51,6 +51,57 @@ bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
            river_cloud_xiaozhi_playback_allows_vad_open();
 }
 
+static void river_cloud_xiaozhi_copy_semantic_text(char *dst,
+                                                   size_t dst_size,
+                                                   const char *src)
+{
+    if (dst == NULL || dst_size == 0U) {
+        return;
+    }
+    if (src == NULL || src[0] == '\0') {
+        dst[0] = '\0';
+        return;
+    }
+
+    snprintf(dst, dst_size, "%s", src);
+}
+
+static bool river_cloud_xiaozhi_update_semantic_text(char *dst,
+                                                     size_t dst_size,
+                                                     const char *src)
+{
+    char next_value[96];
+
+    if (dst == NULL || dst_size == 0U) {
+        return false;
+    }
+
+    if (src == NULL || src[0] == '\0') {
+        if (dst[0] == '\0') {
+            return false;
+        }
+        dst[0] = '\0';
+        return true;
+    }
+
+    memset(next_value, 0, sizeof(next_value));
+    snprintf(next_value, sizeof(next_value), "%s", src);
+    if (strcmp(dst, next_value) == 0) {
+        return false;
+    }
+
+    snprintf(dst, dst_size, "%s", next_value);
+    return true;
+}
+
+static const char *river_cloud_xiaozhi_optional_bool_text(bool known, bool enabled)
+{
+    if (!known) {
+        return "-";
+    }
+    return enabled ? "yes" : "no";
+}
+
 void river_cloud_xiaozhi_clear_pending_text(void)
 {
     g_river_cloud.xiaozhi_pending_text_valid = false;
@@ -69,6 +120,18 @@ void river_cloud_xiaozhi_clear_preview_state(void)
     g_river_cloud.xiaozhi_preview_stable_prefix[0] = '\0';
     g_river_cloud.xiaozhi_preview_source[0] = '\0';
     g_river_cloud.xiaozhi_preview_endpoint_reason[0] = '\0';
+}
+
+void river_cloud_xiaozhi_clear_turn_semantics_state(void)
+{
+    g_river_cloud.xiaozhi_turn_accepted = false;
+    g_river_cloud.xiaozhi_transport_barge_in_enabled_known = false;
+    g_river_cloud.xiaozhi_transport_barge_in_enabled = false;
+    g_river_cloud.xiaozhi_turn_id[0] = '\0';
+    g_river_cloud.xiaozhi_accept_reason[0] = '\0';
+    g_river_cloud.xiaozhi_input_state[0] = '\0';
+    g_river_cloud.xiaozhi_output_state[0] = '\0';
+    g_river_cloud.xiaozhi_semantic_fallback_reason[0] = '\0';
 }
 
 void river_cloud_xiaozhi_clear_playback_meta_state(void)
@@ -167,14 +230,135 @@ const char *river_cloud_xiaozhi_current_sid(void)
                river_xiaozhi_session_id();
 }
 
-void river_cloud_xiaozhi_finalize_pending_text(void)
+void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
 {
+    const char *turn_id = river_xiaozhi_last_turn_id();
+    const char *accept_reason = river_xiaozhi_last_accept_reason();
+    const char *input_state = river_xiaozhi_last_input_state();
+    const char *output_state = river_xiaozhi_last_output_state();
+    bool barge_in_known = river_xiaozhi_last_barge_in_enabled_known();
+    bool barge_in_enabled = river_xiaozhi_last_barge_in_enabled();
+    bool accepted_before = g_river_cloud.xiaozhi_turn_accepted;
+    bool accept_reason_present = accept_reason != NULL && accept_reason[0] != '\0';
+    bool turn_id_changed;
+    bool accept_reason_changed = false;
+    bool input_state_changed;
+    bool output_state_changed;
+    bool barge_in_changed;
+
+    turn_id_changed = river_cloud_xiaozhi_update_semantic_text(g_river_cloud.xiaozhi_turn_id,
+                                                               sizeof(g_river_cloud.xiaozhi_turn_id),
+                                                               turn_id);
+    if (accept_reason_present) {
+        accept_reason_changed = river_cloud_xiaozhi_update_semantic_text(
+            g_river_cloud.xiaozhi_accept_reason,
+            sizeof(g_river_cloud.xiaozhi_accept_reason),
+            accept_reason);
+        g_river_cloud.xiaozhi_turn_accepted = true;
+        if (strcmp(g_river_cloud.xiaozhi_semantic_fallback_reason,
+                   "await_accept_reason") == 0) {
+            g_river_cloud.xiaozhi_semantic_fallback_reason[0] = '\0';
+        }
+    }
+    input_state_changed = river_cloud_xiaozhi_update_semantic_text(
+        g_river_cloud.xiaozhi_input_state,
+        sizeof(g_river_cloud.xiaozhi_input_state),
+        input_state);
+    output_state_changed = river_cloud_xiaozhi_update_semantic_text(
+        g_river_cloud.xiaozhi_output_state,
+        sizeof(g_river_cloud.xiaozhi_output_state),
+        output_state);
+    barge_in_changed =
+        (g_river_cloud.xiaozhi_transport_barge_in_enabled_known != barge_in_known) ||
+        (barge_in_known &&
+         (g_river_cloud.xiaozhi_transport_barge_in_enabled != barge_in_enabled));
+    g_river_cloud.xiaozhi_transport_barge_in_enabled_known = barge_in_known;
+    g_river_cloud.xiaozhi_transport_barge_in_enabled = barge_in_known && barge_in_enabled;
+
+    if (accept_reason_present &&
+        (!accepted_before || accept_reason_changed || turn_id_changed ||
+         input_state_changed || output_state_changed || barge_in_changed)) {
+        RIVER_LOGI("xiaozhi turn accepted: trigger=%s accept_reason=%s turn_id=%s input_state=%s output_state=%s barge_in_enabled=%s",
+                   trigger != NULL ? trigger : "-",
+                   g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
+                       g_river_cloud.xiaozhi_accept_reason :
+                       "-",
+                   g_river_cloud.xiaozhi_turn_id[0] != '\0' ?
+                       g_river_cloud.xiaozhi_turn_id :
+                       "-",
+                   g_river_cloud.xiaozhi_input_state[0] != '\0' ?
+                       g_river_cloud.xiaozhi_input_state :
+                       "-",
+                   g_river_cloud.xiaozhi_output_state[0] != '\0' ?
+                       g_river_cloud.xiaozhi_output_state :
+                       "-",
+                   river_cloud_xiaozhi_optional_bool_text(
+                       g_river_cloud.xiaozhi_transport_barge_in_enabled_known,
+                       g_river_cloud.xiaozhi_transport_barge_in_enabled));
+    }
+}
+
+bool river_cloud_xiaozhi_turn_accepted(void)
+{
+    return g_river_cloud.xiaozhi_turn_accepted &&
+           g_river_cloud.xiaozhi_accept_reason[0] != '\0';
+}
+
+void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
+{
+    if (reason == NULL || reason[0] == '\0') {
+        return;
+    }
+    if (strcmp(g_river_cloud.xiaozhi_semantic_fallback_reason, reason) == 0) {
+        return;
+    }
+
+    river_cloud_xiaozhi_copy_semantic_text(g_river_cloud.xiaozhi_semantic_fallback_reason,
+                                           sizeof(g_river_cloud.xiaozhi_semantic_fallback_reason),
+                                           reason);
+    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s playback_ref=%s sid=%s",
+               g_river_cloud.xiaozhi_semantic_fallback_reason,
+               river_cloud_xiaozhi_turn_accepted() ? "yes" : "no",
+               g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
+                   g_river_cloud.xiaozhi_accept_reason :
+                   "-",
+               g_river_cloud.xiaozhi_input_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_input_state :
+                   "-",
+               g_river_cloud.xiaozhi_output_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_output_state :
+                   "-",
+               river_cloud_xiaozhi_playback_allows_vad_open() ? "yes" : "no",
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+}
+
+void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
+{
+    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
+
     if (!g_river_cloud.xiaozhi_pending_text_valid || g_river_cloud.xiaozhi_pending_text_finalized ||
         g_river_cloud.xiaozhi_pending_text[0] == '\0') {
         return;
     }
 
+    if (!river_cloud_xiaozhi_turn_accepted()) {
+        river_cloud_xiaozhi_note_semantic_fallback("await_accept_reason");
+        RIVER_LOGI("xiaozhi pending text waits for accepted turn: trigger=%s text=%s",
+                   trigger != NULL ? trigger : "-",
+                   g_river_cloud.xiaozhi_pending_text);
+        return;
+    }
+
     g_river_cloud.xiaozhi_pending_text_finalized = true;
+    RIVER_LOGI("xiaozhi accepted turn final text: trigger=%s accept_reason=%s turn_id=%s text=%s",
+               trigger != NULL ? trigger : "-",
+               g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
+                   g_river_cloud.xiaozhi_accept_reason :
+                   "-",
+               g_river_cloud.xiaozhi_turn_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_id :
+                   "-",
+               g_river_cloud.xiaozhi_pending_text);
     river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_FINAL,
                                 g_river_cloud.xiaozhi_pending_text,
                                 river_cloud_xiaozhi_current_sid(),
@@ -296,6 +480,7 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     river_cloud_xiaozhi_reset_downlink_state();
     river_cloud_xiaozhi_clear_pending_text();
     river_cloud_xiaozhi_clear_preview_state();
+    river_cloud_xiaozhi_clear_turn_semantics_state();
     river_cloud_xiaozhi_clear_playback_meta_state();
     river_cloud_pre_roll_reset();
     g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
@@ -335,6 +520,7 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
     if (status != RIVER_OK) {
         return status;
     }
+    river_xiaozhi_clear_session_update_cache();
     river_cloud_xiaozhi_copy_session_id_from_transport();
 
     /*
@@ -347,6 +533,7 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
                                      "asr_session_start");
     river_cloud_xiaozhi_clear_pending_text();
     river_cloud_xiaozhi_clear_preview_state();
+    river_cloud_xiaozhi_clear_turn_semantics_state();
     river_cloud_xiaozhi_clear_playback_meta_state();
     river_cloud_xiaozhi_emit_session_started();
     return RIVER_OK;
@@ -405,6 +592,7 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
         }
         return status;
     }
+    river_xiaozhi_clear_session_update_cache();
     river_cloud_xiaozhi_copy_session_id_from_transport();
     RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
                reason,

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `C3 add xiaozhi playback meta and ack baseline`
+  - `C4 align xiaozhi accepted-turn and fallback semantics`
 - Latest planning sync:
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
@@ -23,14 +23,21 @@ or top-of-tree verification target changes.
     - playback-truth ACKs
     - discovery + `session.start.capabilities` collaboration negotiation
 - Primary active execution plan:
-  - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
+  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
 ## Current Runtime Focus
 
 - Keep the board-side `wake -> VAD/KWS -> native realtime session` path usable.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
-- Validate the first migration slice on board:
+- Keep the landed collaboration baseline explicit and conservative:
+  - accepted-turn is confirmed only from `session.update.accept_reason`
+  - preview events remain observation-only
+  - playback metadata remains playback-fact-only
+  - stale `session.update` turn semantics are cleared before a new listen round
+  - explicit fallback reasons are logged when the device stays on the current
+    half-duplex/client-commit path
+- Validate the collaboration baseline on board:
   - websocket subprotocol `agent-server.realtime.v0`
   - `ws://101.33.235.154:8080/v1/realtime/ws`
   - SDK handshake sends only one valid `Sec-WebSocket-Protocol`
@@ -40,6 +47,7 @@ or top-of-tree verification target changes.
   - discovery-backed `session.start.capabilities` negotiation
   - preview-aware input observation parsing and status exposure
   - playback-truth metadata parsing and `segment_mark_v1` ACK baseline
+  - accepted-turn / fallback semantics alignment
   - `session.start` / `audio.in.commit` / `text.in`
   - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
@@ -48,7 +56,6 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `C4` accepted-turn / playback-truth / fallback semantics alignment
   - `5.168` runtime-ready duplex gate
   - `5.169` speaking-time local endpoint softening
   - `5.170` speaking-time uplink continuation
@@ -64,8 +71,8 @@ or top-of-tree verification target changes.
 - `README.md`
 - `build.md`
 - `.codex/active_plans.md`
-- `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+- `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - the latest sections at the top of `.codex/changes.md` and `.codex/verification.md`
 - `doc/README.md` for historical design and investigation documents
 

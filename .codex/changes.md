@@ -1,5 +1,53 @@
 # Change Log
 
+## Step C4
+- Aligned the device-side XiaoZhi accepted-turn semantics with the 2026-04-16
+  server collaboration boundary so accepted-turn, preview observations,
+  playback facts, and fallback reasons are now distinct runtime concepts:
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Added an explicit turn-semantics runtime layer inside the cloud adapter:
+  - caches `turn_id`, `accept_reason`, `input_state`, `output_state`, and
+    `barge_in_enabled`
+  - treats accepted-turn as sticky only after a real `accept_reason` arrives
+  - exposes the current turn-semantics/fallback state in
+    `river_cloud_adapter_dump_status()`
+- Tightened pending-text finalization semantics:
+  - pending XiaoZhi transcript now waits for accepted-turn before emitting the
+    existing `RIVER_CLOUD_ASR_EVENT_FINAL`
+  - when accepted-turn is not ready yet, the board logs
+    `xiaozhi pending text waits for accepted turn`
+  - once accepted-turn appears, the board logs
+    `xiaozhi accepted turn final text`
+- Fixed stale turn-semantics leakage across rounds:
+  - new public transport helper:
+    - `river_xiaozhi_clear_session_update_cache()`
+  - the cloud session layer now clears transport `session.update` cache before:
+    - opening a fresh listen round
+    - re-opening the conversation window from wake admission
+- Added explicit conservative fallback reasoning without changing the shipped
+  half-duplex baseline:
+  - `half_duplex_experiment_disabled`
+  - `half_duplex_no_playback_reference`
+  - `half_duplex_capture_held_during_playback`
+  - `await_accept_reason`
+- Reframed playback metadata as playback facts instead of strategy commands:
+  - `audio.out.meta` handling now logs
+    `xiaozhi playback fact observed: ... accepted=...`
+  - preview events remain observation-only and playback ACKs remain fact-only
+- Updated the active duplex plan/context to mark `C4` as landed and move the
+  next implementation slice to `5.168`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py`
+  - `git diff --check`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+  - `rg -n 'clear_session_update_cache|turn accepted|await_accept_reason|turn_semantics|half_duplex_experiment_disabled|half_duplex_no_playback_reference|half_duplex_capture_held_during_playback|finalize_pending_text\\(\"' include/river/river_xiaozhi_ws.h components/river_cloud/river_xiaozhi_ws.c components/river_cloud/river_cloud_internal.h components/river_cloud/river_cloud_xiaozhi_session.c components/river_cloud/river_cloud_adapter.c .codex/active_context.md doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+
 ## Step C3
 - Implemented the device-side XiaoZhi playback-truth baseline so the transport
   and cloud adapter now consume the server's playback context and report the
