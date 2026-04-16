@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.167
+- Consumed the richer native realtime `session.update` fields on the device
+  transport side without changing session-control behavior yet:
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Added explicit device-side cache/accessors for service-side split-lane hints:
+  - `last_session_state`
+  - `last_input_state`
+  - `last_output_state`
+  - `last_turn_id`
+  - `last_accept_reason`
+  - `last_barge_in_enabled` with a separate known/unknown flag
+- `session.update` handling now parses and logs:
+  - `input_state`
+  - `output_state`
+  - `barge_in_enabled`
+  - `turn_id`
+  - `accept_reason`
+  while preserving compatibility when older servers omit them.
+- Kept the scope intentionally narrow:
+  - the existing `state == active && response_started -> stop local tts marker`
+    behavior is unchanged
+  - no local round, playback, interrupt, or commit logic changed in this step
+  - this slice is observability/state-plumbing only
+- Extended `river xiaozhi status` output with a second lane-state line so board
+  validation can see the last server-reported split-lane view directly.
+
 ## Step 5.166
 - Converged the device-side full-duplex roadmap into concrete, sequential
   implementation slices instead of keeping it at a broad task-block level:

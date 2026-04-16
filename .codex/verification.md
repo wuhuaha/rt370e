@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.167
+Validate that the device now consumes and exposes the richer realtime
+`session.update` fields without changing the current control path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n "input_state|output_state|barge_in_enabled|turn_id|accept_reason|session_lane_state" \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - new accessor declarations for richer session-update fields exist in
+    `river_xiaozhi_ws.h`
+  - `river_xiaozhi_ws.c` now parses and logs
+    `input_state/output_state/barge_in_enabled/turn_id/accept_reason`
+  - `river_xiaozhi_dump_status()` now prints a `session_lane_state=...` line
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints the original transport summary line plus a second line:
+  - `xiaozhi session_lane_state=... input_state=... output_state=... barge_in_enabled=... turn_id=... accept_reason=...`
+- when connected to a newer native realtime server, runtime logs should include:
+  - `xiaozhi session.update: sid=... state=... input_state=... output_state=... barge_in_enabled=... accept_reason=... turn_id=...`
+- when connected to an older or compatibility-only server that omits those
+  fields, the same log line should still work and print `-` for missing fields
+  rather than failing parsing
+
 ## Step 5.166
 Validate that the device-side duplex roadmap is now converged into concrete
 implementation slices and that the active context points to the new sequence:

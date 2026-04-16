@@ -40,6 +40,8 @@
 #define RIVER_XIAOZHI_LAST_ERROR_MAX       128U
 #define RIVER_XIAOZHI_LAST_TYPE_MAX        32U
 #define RIVER_XIAOZHI_LAST_STATE_MAX       32U
+#define RIVER_XIAOZHI_LAST_TURN_ID_MAX     96U
+#define RIVER_XIAOZHI_LAST_ACCEPT_REASON_MAX 32U
 #define RIVER_XIAOZHI_LAST_EMOTION_MAX     32U
 #define RIVER_XIAOZHI_ACTIVATION_CODE_MAX  16U
 #define RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX 192U
@@ -120,6 +122,8 @@ typedef struct {
     uint32_t send_queue_high_watermark;
     bool bootstrap_config_owned;
     bool activation_code_present;
+    bool last_barge_in_enabled;
+    bool last_barge_in_enabled_known;
     uint64_t bootstrap_retry_after_ms;
     uint64_t bootstrap_cache_expire_at_ms;
     uint64_t last_backpressure_log_ms;
@@ -133,6 +137,11 @@ typedef struct {
     char last_error[RIVER_XIAOZHI_LAST_ERROR_MAX];
     char last_type[RIVER_XIAOZHI_LAST_TYPE_MAX];
     char last_state[RIVER_XIAOZHI_LAST_STATE_MAX];
+    char last_session_state[RIVER_XIAOZHI_LAST_STATE_MAX];
+    char last_input_state[RIVER_XIAOZHI_LAST_STATE_MAX];
+    char last_output_state[RIVER_XIAOZHI_LAST_STATE_MAX];
+    char last_turn_id[RIVER_XIAOZHI_LAST_TURN_ID_MAX];
+    char last_accept_reason[RIVER_XIAOZHI_LAST_ACCEPT_REASON_MAX];
     char last_emotion[RIVER_XIAOZHI_LAST_EMOTION_MAX];
     char activation_code[RIVER_XIAOZHI_ACTIVATION_CODE_MAX];
     char activation_message[RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX];
@@ -201,6 +210,32 @@ static void river_xiaozhi_copy_string(char *dst, size_t dst_size, const char *sr
     }
 
     snprintf(dst, dst_size, "%s", src != NULL ? src : "");
+}
+
+static void river_xiaozhi_copy_optional_string(char *dst, size_t dst_size, const char *src)
+{
+    if (dst == NULL || dst_size == 0U) {
+        return;
+    }
+    if (src == NULL || src[0] == '\0') {
+        dst[0] = '\0';
+        return;
+    }
+
+    river_xiaozhi_copy_string(dst, dst_size, src);
+}
+
+static const char *river_xiaozhi_dash_if_empty(const char *text)
+{
+    return (text != NULL && text[0] != '\0') ? text : "-";
+}
+
+static const char *river_xiaozhi_optional_bool_text(bool known, bool value)
+{
+    if (!known) {
+        return "-";
+    }
+    return river_xiaozhi_bool_text(value);
 }
 
 static void river_xiaozhi_set_last_error(const char *error_text)
@@ -456,6 +491,58 @@ static void river_xiaozhi_set_last_state(const char *state_text)
                               state_text);
 }
 
+static void river_xiaozhi_set_last_session_state(const char *state_text)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_session_state,
+                                       sizeof(g_river_xiaozhi.last_session_state),
+                                       state_text);
+}
+
+static void river_xiaozhi_set_last_input_state(const char *state_text)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_input_state,
+                                       sizeof(g_river_xiaozhi.last_input_state),
+                                       state_text);
+}
+
+static void river_xiaozhi_set_last_output_state(const char *state_text)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_output_state,
+                                       sizeof(g_river_xiaozhi.last_output_state),
+                                       state_text);
+}
+
+static void river_xiaozhi_set_last_turn_id(const char *turn_id)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_turn_id,
+                                       sizeof(g_river_xiaozhi.last_turn_id),
+                                       turn_id);
+}
+
+static void river_xiaozhi_set_last_accept_reason(const char *reason)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_accept_reason,
+                                       sizeof(g_river_xiaozhi.last_accept_reason),
+                                       reason);
+}
+
+static void river_xiaozhi_set_last_barge_in_enabled(bool known, bool enabled)
+{
+    g_river_xiaozhi.last_barge_in_enabled_known = known;
+    g_river_xiaozhi.last_barge_in_enabled = known && enabled;
+}
+
+static void river_xiaozhi_clear_last_session_update_fields(void)
+{
+    g_river_xiaozhi.last_session_state[0] = '\0';
+    g_river_xiaozhi.last_input_state[0] = '\0';
+    g_river_xiaozhi.last_output_state[0] = '\0';
+    g_river_xiaozhi.last_turn_id[0] = '\0';
+    g_river_xiaozhi.last_accept_reason[0] = '\0';
+    g_river_xiaozhi.last_barge_in_enabled_known = false;
+    g_river_xiaozhi.last_barge_in_enabled = false;
+}
+
 static void river_xiaozhi_set_last_emotion(const char *emotion_text)
 {
     if (emotion_text == NULL || emotion_text[0] == '\0') {
@@ -472,6 +559,7 @@ static void river_xiaozhi_reset_dialog_state(void)
     g_river_xiaozhi.dialog_started = false;
     g_river_xiaozhi.response_started = false;
     g_river_xiaozhi.session_id[0] = '\0';
+    river_xiaozhi_clear_last_session_update_fields();
 }
 
 static void river_xiaozhi_reset_runtime_state(void)
@@ -1530,18 +1618,67 @@ static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
 static void river_xiaozhi_handle_realtime_session_update(const cJSON *payload)
 {
     const cJSON *state_obj;
+    const cJSON *input_state_obj;
+    const cJSON *output_state_obj;
+    const cJSON *turn_id_obj;
+    const cJSON *accept_reason_obj;
+    const cJSON *barge_in_enabled_obj;
     const char *state = NULL;
+    const char *input_state = NULL;
+    const char *output_state = NULL;
+    const char *turn_id = NULL;
+    const char *accept_reason = NULL;
+    bool barge_in_enabled = false;
+    bool barge_in_enabled_known = false;
 
     state_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "state");
+    input_state_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "input_state");
+    output_state_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "output_state");
+    turn_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "turn_id");
+    accept_reason_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "accept_reason");
+    barge_in_enabled_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload,
+                                                            "barge_in_enabled");
     if (cJSON_IsString(state_obj) && state_obj->valuestring != NULL) {
         state = state_obj->valuestring;
+    }
+    if (cJSON_IsString(input_state_obj) && input_state_obj->valuestring != NULL &&
+        input_state_obj->valuestring[0] != '\0') {
+        input_state = input_state_obj->valuestring;
+    }
+    if (cJSON_IsString(output_state_obj) && output_state_obj->valuestring != NULL &&
+        output_state_obj->valuestring[0] != '\0') {
+        output_state = output_state_obj->valuestring;
+    }
+    if (cJSON_IsString(turn_id_obj) && turn_id_obj->valuestring != NULL &&
+        turn_id_obj->valuestring[0] != '\0') {
+        turn_id = turn_id_obj->valuestring;
+    }
+    if (cJSON_IsString(accept_reason_obj) && accept_reason_obj->valuestring != NULL &&
+        accept_reason_obj->valuestring[0] != '\0') {
+        accept_reason = accept_reason_obj->valuestring;
+    }
+    if (cJSON_IsBool(barge_in_enabled_obj)) {
+        barge_in_enabled_known = true;
+        barge_in_enabled = cJSON_IsTrue(barge_in_enabled_obj);
     }
 
     river_xiaozhi_set_last_type("session.update");
     river_xiaozhi_set_last_state(state);
-    RIVER_LOGI("xiaozhi session.update: sid=%s state=%s response_started=%s",
+    river_xiaozhi_clear_last_session_update_fields();
+    river_xiaozhi_set_last_session_state(state);
+    river_xiaozhi_set_last_input_state(input_state);
+    river_xiaozhi_set_last_output_state(output_state);
+    river_xiaozhi_set_last_turn_id(turn_id);
+    river_xiaozhi_set_last_accept_reason(accept_reason);
+    river_xiaozhi_set_last_barge_in_enabled(barge_in_enabled_known, barge_in_enabled);
+    RIVER_LOGI("xiaozhi session.update: sid=%s state=%s input_state=%s output_state=%s barge_in_enabled=%s accept_reason=%s turn_id=%s response_started=%s",
                g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
-               state != NULL ? state : "-",
+               river_xiaozhi_dash_if_empty(state),
+               river_xiaozhi_dash_if_empty(input_state),
+               river_xiaozhi_dash_if_empty(output_state),
+               river_xiaozhi_optional_bool_text(barge_in_enabled_known, barge_in_enabled),
+               river_xiaozhi_dash_if_empty(accept_reason),
+               river_xiaozhi_dash_if_empty(turn_id),
                river_xiaozhi_bool_text(g_river_xiaozhi.response_started));
 
     if (state != NULL && strcmp(state, "active") == 0 &&
@@ -2314,6 +2451,57 @@ const char *river_xiaozhi_last_state(void)
                NULL;
 }
 
+const char *river_xiaozhi_last_session_state(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_session_state[0] != '\0') ?
+               g_river_xiaozhi.last_session_state :
+               NULL;
+}
+
+const char *river_xiaozhi_last_input_state(void)
+{
+    return (g_river_xiaozhi.initialized && g_river_xiaozhi.last_input_state[0] != '\0') ?
+               g_river_xiaozhi.last_input_state :
+               NULL;
+}
+
+const char *river_xiaozhi_last_output_state(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_output_state[0] != '\0') ?
+               g_river_xiaozhi.last_output_state :
+               NULL;
+}
+
+const char *river_xiaozhi_last_turn_id(void)
+{
+    return (g_river_xiaozhi.initialized && g_river_xiaozhi.last_turn_id[0] != '\0') ?
+               g_river_xiaozhi.last_turn_id :
+               NULL;
+}
+
+const char *river_xiaozhi_last_accept_reason(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_accept_reason[0] != '\0') ?
+               g_river_xiaozhi.last_accept_reason :
+               NULL;
+}
+
+bool river_xiaozhi_last_barge_in_enabled_known(void)
+{
+    return g_river_xiaozhi.initialized &&
+           g_river_xiaozhi.last_barge_in_enabled_known;
+}
+
+bool river_xiaozhi_last_barge_in_enabled(void)
+{
+    return g_river_xiaozhi.initialized &&
+           g_river_xiaozhi.last_barge_in_enabled_known &&
+           g_river_xiaozhi.last_barge_in_enabled;
+}
+
 const char *river_xiaozhi_last_emotion(void)
 {
     return (g_river_xiaozhi.initialized && g_river_xiaozhi.last_emotion[0] != '\0') ?
@@ -2780,6 +2968,24 @@ void river_xiaozhi_dump_status(void)
                g_river_xiaozhi.last_emotion[0] != '\0' ? g_river_xiaozhi.last_emotion : "-",
                g_river_xiaozhi.last_text[0] != '\0' ? g_river_xiaozhi.last_text : "-",
                g_river_xiaozhi.last_error[0] != '\0' ? g_river_xiaozhi.last_error : "-");
+    RIVER_LOGI("xiaozhi session_lane_state=%s input_state=%s output_state=%s barge_in_enabled=%s turn_id=%s accept_reason=%s",
+               g_river_xiaozhi.last_session_state[0] != '\0' ?
+                   g_river_xiaozhi.last_session_state :
+                   "-",
+               g_river_xiaozhi.last_input_state[0] != '\0' ?
+                   g_river_xiaozhi.last_input_state :
+                   "-",
+               g_river_xiaozhi.last_output_state[0] != '\0' ?
+                   g_river_xiaozhi.last_output_state :
+                   "-",
+               river_xiaozhi_optional_bool_text(g_river_xiaozhi.last_barge_in_enabled_known,
+                                                g_river_xiaozhi.last_barge_in_enabled),
+               g_river_xiaozhi.last_turn_id[0] != '\0' ?
+                   g_river_xiaozhi.last_turn_id :
+                   "-",
+               g_river_xiaozhi.last_accept_reason[0] != '\0' ?
+                   g_river_xiaozhi.last_accept_reason :
+                   "-");
     if (g_river_xiaozhi.activation_message[0] != '\0') {
         RIVER_LOGI("xiaozhi activation_message=%s challenge_set=%s timeout_ms=%lu",
                    g_river_xiaozhi.activation_message,

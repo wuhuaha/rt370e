@@ -488,10 +488,19 @@ go test ./internal/gateway
 
 - `5.164` 已把 duplex capability advertisement 放到显式实验闸门后
 - `5.165` 已把 `tts_start -> close local round` 放到显式策略闸门后
+- `5.167` 已把服务侧 richer `session.update` 字段接入端侧本地缓存与日志
 
-从下一步代码提交开始，端侧按下面的连续切片推进。
+从下一步代码提交开始，端侧按下面的连续切片继续推进。
 
 ### 10.1 Step 5.167: 消费服务侧 richer session.update
+
+状态：
+
+- 已落地，当前步骤只做：
+  - richer field 解析
+  - 本地缓存
+  - transport/status 日志增强
+- 当前步骤仍不根据这些字段改变 round / playback / interrupt 行为
 
 目标：
 
