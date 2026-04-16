@@ -24,6 +24,10 @@ Branch: `agent-server-v2`
   - `/root/agent-server/docs/architecture/local-open-source-full-duplex-roadmap-zh-2026-04-10.md`
   - `/root/agent-server/docs/architecture/voice-demo-realtime-optimization-zh-2026-04-14.md`
   - `/root/agent-server/docs/adr/0009-advertise-commit-driven-turn-semantics-until-server-vad-exists.md`
+  - `/root/agent-server/docs/protocols/realtime-voice-client-implementation-guide-v0-zh-2026-04-16.md`
+  - `/root/agent-server/docs/protocols/realtime-voice-client-collaboration-proposal-v0-zh-2026-04-16.md`
+  - `/root/agent-server/docs/architecture/server-primary-hybrid-min-device-capabilities-and-interruption-zh-2026-04-16.md`
+  - `/root/agent-server/docs/architecture/voice-architecture-execution-roadmap-zh-2026-04-16.md`
 
 ## 2. 目标
 
@@ -95,6 +99,11 @@ Branch: `agent-server-v2`
   - speaking 期间 input preview、barge-in 策略和 soft ducking 已进入共享 runtime
   - native realtime 主路径已支持 early audio start，而不是必须等最终完整响应闭合后再播
   - `session.update` 协议兼容扩展已经存在
+- 2026-04-16 的服务侧新文档已经把端侧协同边界说清楚：
+  - 端侧不是第二编排层；accepted-turn 仍以 `accept_reason` 为准
+  - `input.speech.start` / `input.preview` / `input.endpoint` 都是观察事件，不是 stop/commit 指令
+  - `audio.out.started` / `mark` / `cleared` / `completed` 是播放事实回报，不是策略命令
+  - 所有新能力必须经过 discovery + `session.start.capabilities` 双向协商
 - 但服务侧 discovery / runtime 对外仍保持兼容口径：
   - `turn_mode = client_wakeup_client_commit`
   - `server_endpoint` 是否真正启用仍取决于当前部署配置
@@ -105,6 +114,22 @@ Branch: `agent-server-v2`
     - 声学前提是否成立
     - 本地 round / uplink / playback 的并行编排是否收口
     - 是否能消费服务侧新增 lane-state 信号
+- 基于新云侧文档反看端侧现状，当前还缺一个完整的“协作协议层”：
+  - 还没有消费 `GET /v1/realtime` discovery 中的 `voice_collaboration`
+  - `session.start.capabilities` 还没声明：
+    - `preview_events`
+    - `playback_ack.mode=segment_mark_v1`
+  - 还没有解析：
+    - `input.speech.start`
+    - `input.preview`
+    - `input.endpoint`
+    - `audio.out.meta`
+  - 还没有发送：
+    - `audio.out.started`
+    - `audio.out.mark`
+    - `audio.out.cleared`
+    - `audio.out.completed`
+  - `response.start` 目前也还没有把 `turn_id/trace_id` 收进端侧播放上下文
 
 ## 6. 风险与未知项
 
@@ -459,11 +484,15 @@ go test ./internal/gateway
 
 - 第一优先：
   - `5.167` 端侧消费 richer `session.update`，先把状态观测补齐
+  - `C1` 端侧补 discovery + `session.start.capabilities` 协商基线
+  - `C2` 端侧补 preview-aware 输入事件消费基线
   - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
 - 第二优先：
+  - `C3` 端侧补 `audio.out.meta` 与 playback fact ACK 基线
   - `5.169` 端侧 speaking-time local endpoint / round close 软化
   - `5.170` 端侧 speaking-time uplink continuation
 - 第三优先：
+  - `C4` 端侧把 accepted-turn / playback-truth / fallback 语义和新协议对齐
   - `5.171` 端侧 duck-first interruption policy
   - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
 - 最后收口：
@@ -491,6 +520,185 @@ go test ./internal/gateway
 - `5.167` 已把服务侧 richer `session.update` 字段接入端侧本地缓存与日志
 
 从下一步代码提交开始，端侧按下面的连续切片继续推进。
+
+### 10.1A 2026-04-16 云侧协议对齐后的端侧修改面
+
+基于 `/root/agent-server` 新增的协议/架构文档，端侧后续改造不应只盯
+“本地是否 keep local round”，而应拆成四块并行收口：
+
+- 协商层：
+  - discovery 读取 `voice_collaboration`
+  - `session.start.capabilities` 按协商结果声明 `preview_events` /
+    `playback_ack`
+- 观察层：
+  - 消费 `input.speech.start` / `input.preview` / `input.endpoint`
+  - 继续以 `accept_reason` 作为 accepted-turn 主信号
+- 播放事实层：
+  - 消费 `audio.out.meta`
+  - 回传 `audio.out.started` / `mark` / `cleared` / `completed`
+- 本地反射/兜底层：
+  - 本地仍保留 reflex VAD、duck、急停、fallback half-duplex
+  - 但不再把 preview / endpoint candidate 当成主裁决
+
+这意味着端侧后续切片需要区分两条线：
+
+- 协议协同线：
+  - 让端侧成为 preview-aware / playback-truth-aware client
+- 声学与本地编排线：
+  - 让端侧在 duplex-ready 条件下真正具备“边播边听”的板端条件
+
+下面的 `C1`~`C4` 是新增的协议协同切片；`5.168` 之后的切片继续负责本地
+运行时与声学收口。
+
+### 10.1B Step C1: discovery + session.start 协商基线
+
+目标：
+
+- 让端侧先具备 capability-gated 协作前提，而不是把 preview / playback
+  扩展字段写死启用
+
+范围：
+
+- `components/river_cloud/river_xiaozhi_ws.c`
+- 必要时：
+  - `include/river/river_xiaozhi_ws.h`
+  - `components/river_cloud/river_cloud_internal.h`
+  - `tools/agent_server_debug/probe_realtime.py`
+
+实施内容：
+
+- 在端侧建立 discovery 消费路径，至少能读取：
+  - `voice_collaboration.preview_events.*`
+  - `voice_collaboration.playback_ack.*`
+- `session.start.capabilities` 根据“服务端声明 + 本端支持”双向协商决定是否上报：
+  - `preview_events=true`
+  - `playback_ack.mode=segment_mark_v1`
+- 若 discovery 缺失、mode 未识别或服务端未开启：
+  - 自动回退到当前兼容基线
+
+完成标准：
+
+- 端侧日志能明确打印：
+  - `preview_events=yes|no`
+  - `playback_ack=segment_mark_v1|-`
+  - `discovery_voice_collaboration=yes|no`
+- 默认兼容路径不被破坏
+
+### 10.1C Step C2: preview-aware 输入事件消费
+
+目标：
+
+- 让端侧能消费服务端的 preview-aware 观察事件，但不把它们误当成 stop /
+  commit / accepted-turn 命令
+
+范围：
+
+- `components/river_cloud/river_xiaozhi_ws.c`
+- `components/river_cloud/river_cloud_adapter.c`
+- 必要时：
+  - `include/river/river_xiaozhi_ws.h`
+  - `components/river_cloud/river_cloud_internal.h`
+
+实施内容：
+
+- 解析并缓存：
+  - `input.speech.start`
+  - `input.preview`
+  - `input.endpoint`
+- 为端侧本地状态机提供：
+  - `preview_id`
+  - partial 文本
+  - endpoint candidate / reason / audio_offset_ms
+- 明确语义边界：
+  - `input.preview` 只用于观察/UI/日志
+  - `input.endpoint` 只用于 hint，不驱动本地强 commit
+  - accepted-turn 仍以 `session.update.accept_reason` 为准
+
+完成标准：
+
+- 板端日志能看到：
+  - `input.preview`
+  - `input.endpoint`
+  - `preview_id`
+  - `audio_offset_ms`
+- 现有 commit / local-close 路径默认保持不变
+
+### 10.1D Step C3: playback-truth 上下文与 ACK 基线
+
+目标：
+
+- 让端侧先具备最小 Tier-1 播放事实回报能力，给服务端的 heard-text /
+  truncate / resume 链路提供可信事实
+
+范围：
+
+- `components/river_cloud/river_xiaozhi_ws.c`
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_voice/river_playback_service.c`
+- 必要时：
+  - `include/river/river_xiaozhi_ws.h`
+  - `include/river/river_playback_service.h`
+
+实施内容：
+
+- 解析 `audio.out.meta` 并缓存：
+  - `response_id`
+  - `playback_id`
+  - `segment_id`
+  - `expected_duration_ms`
+  - `is_last_segment`
+- 先落最小 ACK：
+  - `audio.out.started`
+  - `audio.out.completed`
+- 第二阶段再补：
+  - `audio.out.mark`
+  - `audio.out.cleared`
+- ACK 发送必须异步、低优先级、不阻塞播放线程
+
+完成标准：
+
+- 端侧日志能看到播放上下文建立与 ACK 发送结果
+- ACK 发送失败时不阻塞本地播放
+- 默认未协商时完全不发送这些扩展事件
+
+### 10.1E Step C4: accepted-turn / playback-truth / fallback 语义对齐
+
+目标：
+
+- 让端侧本地状态机与 2026-04-16 云侧文档的职责边界完全一致
+
+范围：
+
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_xiaozhi_ws.c`
+- 必要时：
+  - `components/river_core/river_interaction_state.c`
+
+实施内容：
+
+- accepted-turn 只认：
+  - `session.update.accept_reason`
+- preview 事件只驱动：
+  - 本地 cue
+  - 日志
+  - hint-only 策略
+- playback fact 只表达：
+  - 已播
+  - 已清空
+  - 已完成
+  不能反向当成策略命令
+- 网络异常、协商失败、AEC/reference 不合格时明确回退到：
+  - 当前 half-duplex / client-commit 基线
+
+完成标准：
+
+- 端侧日志能清楚区分：
+  - `preview observed`
+  - `turn accepted`
+  - `playback fact`
+  - `fallback`
+- 本地状态机不会再把 preview / endpoint candidate 当成 accepted-turn
 
 ### 10.1 Step 5.167: 消费服务侧 richer session.update
 

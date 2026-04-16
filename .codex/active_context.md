@@ -16,6 +16,12 @@ or top-of-tree verification target changes.
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
   - `5.167 consume richer realtime session.update fields`
+- Latest planning sync:
+  - aligned the device-side duplex roadmap to the 2026-04-16
+    `/root/agent-server` protocol/architecture docs:
+    - preview-aware input events
+    - playback-truth ACKs
+    - discovery + `session.start.capabilities` collaboration negotiation
 - Primary active execution plan:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
@@ -38,6 +44,10 @@ or top-of-tree verification target changes.
 - Track the cross-repo full-duplex evolution separately in:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
+  - `C1` discovery + `session.start` collaboration negotiation baseline
+  - `C2` preview-aware input-event consumption baseline
+  - `C3` playback-truth metadata and ACK baseline
+  - `C4` accepted-turn / playback-truth / fallback semantics alignment
   - `5.168` runtime-ready duplex gate
   - `5.169` speaking-time local endpoint softening
   - `5.170` speaking-time uplink continuation

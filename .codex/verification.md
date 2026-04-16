@@ -1,5 +1,27 @@
 # Verification
 
+## Plan Sync 2026-04-16
+Validate that the device-side duplex plan now reflects the new 2026-04-16
+server-side collaboration docs and exposes the added protocol-collaboration
+slices in the active context:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+rg -n "realtime-voice-client-implementation-guide|realtime-voice-client-collaboration-proposal|voice-architecture-execution-roadmap|server-primary-hybrid|min-device-capabilities|Step C1|Step C2|Step C3|Step C4|preview-aware|playback-truth" \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md
+git diff --check
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `rg` output confirms:
+  - the plan now references the new 2026-04-16 `/root/agent-server` docs
+  - the device roadmap now contains `C1` through `C4`
+  - `.codex/active_context.md` includes the same new collaboration slices
+- `git diff --check` prints no whitespace or patch-format errors
+
 ## Step 5.167
 Validate that the device now consumes and exposes the richer realtime
 `session.update` fields without changing the current control path:

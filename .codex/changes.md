@@ -1,5 +1,40 @@
 # Change Log
 
+## Plan Sync 2026-04-16
+- Re-read the latest `/root/agent-server` protocol and architecture docs and
+  aligned the device-side duplex roadmap to the new server-driven collaboration
+  boundary:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Captured the key new service-side constraints that materially change the
+  device plan:
+  - the device is not a second turn-orchestration layer
+  - `accept_reason` is the accepted-turn signal
+  - `input.speech.start/input.preview/input.endpoint` are observation events
+  - `audio.out.started/mark/cleared/completed` are playback facts
+  - all of the above must be enabled through discovery +
+    `session.start.capabilities` negotiation
+- Added four device-side collaboration slices ahead of the deeper runtime
+  duplex tuning work:
+  - `C1` discovery + `session.start` collaboration negotiation baseline
+  - `C2` preview-aware input-event consumption baseline
+  - `C3` playback-truth metadata and ACK baseline
+  - `C4` accepted-turn / playback-truth / fallback semantics alignment
+- Kept the existing local-runtime duplex slices in place after the new protocol
+  baseline work:
+  - `5.168` runtime-ready duplex gate
+  - `5.169` speaking-time local endpoint softening
+  - `5.170` speaking-time uplink continuation
+  - `5.171` duck-first interruption policy
+  - `5.172` duplex-ready acoustic baseline
+  - `5.173` default-enable / fallback matrix
+- Why this planning sync matters:
+  - before reading the new server docs, the device roadmap was skewed toward
+    local keep-open / AEC / ducking work
+  - after the new docs, it is clear that the device also needs an explicit
+    protocol-collaboration track so future duplex work is negotiated and
+    observable, not hardcoded
+
 ## Step 5.167
 - Consumed the richer native realtime `session.update` fields on the device
   transport side without changing session-control behavior yet:
