@@ -1,5 +1,17 @@
 # Change Log
 
+## Workflow Sync 2026-04-16
+- Persisted the repository-level git commit message convention in
+  [AGENTS.md](/root/ameba-river/AGENTS.md):
+  - future `git commit` messages should use clear Chinese descriptions unless
+    the user explicitly asks otherwise
+- Reflected the workflow rule in the active Codex context so later sessions do
+  not fall back to English commit messages by default:
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Verification for this sync:
+  - `python3 tools/diag/check_codex_harness.py`
+  - `git diff --check`
+
 ## Step C4
 - Aligned the device-side XiaoZhi accepted-turn semantics with the 2026-04-16
   server collaboration boundary so accepted-turn, preview observations,

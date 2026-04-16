@@ -13,6 +13,8 @@
   1. update `.codex/changes.md`
   2. update `.codex/verification.md` with the exact build/run check for the user
   3. commit the step with a focused git message
+- Unless the user explicitly asks otherwise, use clear Chinese commit messages
+  for future `git commit` operations in this repository.
 
 ## Codex Harness Hygiene
 - Treat `.codex/active_context.md` as the canonical volatile context for the current branch, active objective, SDK baseline, and latest verified step.

@@ -1,5 +1,27 @@
 # Verification
 
+## Workflow Sync 2026-04-16
+Validate that the repository now persists the default Chinese commit-message
+rule and that the Codex harness remains consistent:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+rg -n "Chinese commit messages|中文 commit|clear Chinese descriptions|Latest workflow sync" \
+  AGENTS.md \
+  .codex/active_context.md \
+  .codex/changes.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- static grep confirms:
+  - `AGENTS.md` now records the default Chinese commit-message convention
+  - `.codex/active_context.md` records the workflow sync
+  - `.codex/changes.md` records this process update
+
 ## Step C4
 Validate that the device now keeps accepted-turn semantics aligned with
 `session.update.accept_reason`, does not leak old turn acceptance across rounds,
