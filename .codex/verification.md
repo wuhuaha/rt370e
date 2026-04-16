@@ -1,5 +1,26 @@
 # Verification
 
+## Step 5.166
+Validate that the device-side duplex roadmap is now converged into concrete
+implementation slices and that the active context points to the new sequence:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+rg -n "5\\.167|5\\.168|5\\.169|5\\.170|5\\.171|5\\.172|5\\.173|session.update|runtime-ready|duck-first" \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md
+git diff --check
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `rg` output confirms:
+  - the full-duplex execution plan now includes the concrete device-side slices
+    `5.167` through `5.173`
+  - `.codex/active_context.md` points to the same staged sequence
+- `git diff --check` prints no whitespace or patch-format errors
+
 ## Step 5.165
 Validate the `tts_start` local-round policy gate against the latest SDK:
 ```bash

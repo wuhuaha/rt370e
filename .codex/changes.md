@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.166
+- Converged the device-side full-duplex roadmap into concrete, sequential
+  implementation slices instead of keeping it at a broad task-block level:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Updated the plan to reflect the latest local service-side reality:
+  - `/root/agent-server` is no longer treated as "still single-state only"
+  - device work should no longer wait for a hypothetical server-side dual-track
+    refactor before moving
+  - the remaining end-to-end bottleneck is now framed more accurately as:
+    - device-side acoustic readiness
+    - device-side local round / uplink / playback orchestration
+    - consumption of richer service-side lane-state signals
+- The plan now explicitly stages the next device-side code work as:
+  - `5.167` richer `session.update` consumption
+  - `5.168` runtime-ready duplex gate
+  - `5.169` speaking-time local endpoint softening
+  - `5.170` speaking-time uplink continuation
+  - `5.171` duck-first interruption policy
+  - `5.172` board-profile duplex-ready acoustic baseline
+  - `5.173` default-enable and fallback matrix
+- Why this step exists as its own landed slice:
+  - the repository already has two narrow duplex guard steps in place:
+    - capability advertisement gate
+    - `tts_start` local-round policy gate
+  - without a concrete next-slice sequence, further duplex edits would likely
+    mix:
+    - observability
+    - runtime gating
+    - endpoint softening
+    - uplink concurrency
+    - ducking policy
+    - board acoustic validation
+  - this step defines that sequence before behavior changes resume
+
 ## Step 5.165
 - Added the next device-side full-duplex experiment slice for XiaoZhi
   `tts_start` handling:

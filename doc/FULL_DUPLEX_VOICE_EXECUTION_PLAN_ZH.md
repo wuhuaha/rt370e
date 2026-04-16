@@ -1,7 +1,7 @@
 # Full-Duplex Voice Execution Plan
 
 Status: active
-Last Updated: 2026-04-15
+Last Updated: 2026-04-16
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -60,43 +60,51 @@ Branch: `agent-server-v2`
 
 ## 5. 已知事实
 
-- 端侧当前仍主动声明 `half_duplex=true`：
-  - `components/river_cloud/river_xiaozhi_ws.c`
-- 端侧当前在服务端 `tts_start` 到来时会关闭本地 ASR round，而不是保持并行输入：
-  - `components/river_cloud/river_cloud_adapter.c`
+- 端侧最近已落地两个与全双工直接相关的保护性切片：
+  - `5.164 xiaozhi duplex capability advertisement gate`
+  - `5.165 xiaozhi tts_start local-round duplex policy gate`
+- 端侧当前默认构建仍保持保守 fallback：
+  - `session.start` 默认仍上报 `half_duplex=true`
+  - `tts_start` 默认仍会走本地 round close
+- 端侧当前已经具备最小实验闸门，但还没有形成完整 duplex 主链：
+  - 显式开启 duplex experiment 后，只有在“当前 voice profile 宣称具备 playback reference 能力”时，`tts_start` 才会保留本地 round
+  - 当前判断仍是 profile/capability 级，不是 runtime-ready 级
+  - 相关代码：
+    - `components/river_cloud/river_cloud_xiaozhi_session.c`
+    - `components/river_cloud/river_cloud_adapter.c`
 - 端侧已经有：
   - `barge_in_listening` 交互态
   - 本地 playback interrupt
   - playback ducking API
   - 但默认构建未启用 WebRTC AECM 实验路径：
     - `prj.conf`
+- 端侧当前仍缺两块关键收口：
+  - `session.update` 只消费顶层 `state`，尚未消费服务端新增的：
+    - `input_state`
+    - `output_state`
+    - `barge_in_enabled`
+    - `turn_id`
+    - `accept_reason`
+  - `near-end` barge-in 仍主要走“检测到就 interrupt TTS”的硬策略，尚未形成 `duck-first` 本地仲裁
 - 近期板端日志多次出现：
   - `echo:0B`
   - `ref_peak=0`
   - 说明全双工真正可用之前，AEC / reference 仍是显著前置条件
-- 服务侧当前 discovery / config 仍默认发布：
+- 服务侧本地代码仓 `/root/agent-server` 已经明显前进：
+  - internal session core 已支持输入/输出双轨状态
+  - speaking 期间 input preview、barge-in 策略和 soft ducking 已进入共享 runtime
+  - native realtime 主路径已支持 early audio start，而不是必须等最终完整响应闭合后再播
+  - `session.update` 协议兼容扩展已经存在
+- 但服务侧 discovery / runtime 对外仍保持兼容口径：
   - `turn_mode = client_wakeup_client_commit`
-  - `ServerEndpointEnabled = false`
-- 服务侧已经具备部分关键骨架：
-  - `StreamingTranscriber`
-  - `InputPreview`
-  - `SilenceTurnDetector`
-  - adaptive barge-in
-  - `StreamingResponder`
-  - `SpeechPlanner`
-  - heard-text persistence after interruption
-- 但服务侧当前仍存在三处关键限制：
-  - `InputPreview` 主要仍用于 `commit suggestion`
-  - `RealtimeSession` 仍是单状态机：
-    - `active`
-    - `thinking`
-    - `speaking`
-  - `AudioStream` 真正开始下发仍依赖 `RespondStream()` 返回 `TurnResponse`
-- 因此当前最准确的定位是：
-  - 传输层已经具备双工基础
-  - 打断层已有初步骨架
-  - 真正缺的是跨 ASR / endpointing / planning / TTS / interruption 的
-    `Voice Orchestration Core`
+  - `server_endpoint` 是否真正启用仍取决于当前部署配置
+  - 本地代码现状不等于线上实例行为
+- 因此当前最准确的定位已经更新为：
+  - 服务侧本地仓已经具备“真全双工前的主干骨架”
+  - 当前端到端瓶颈已更多转移到端侧：
+    - 声学前提是否成立
+    - 本地 round / uplink / playback 的并行编排是否收口
+    - 是否能消费服务侧新增 lane-state 信号
 
 ## 6. 风险与未知项
 
@@ -112,6 +120,14 @@ Branch: `agent-server-v2`
 ## 7. 双端任务块
 
 ### 7.1 服务侧任务块
+
+2026-04-16 复盘说明：
+
+- 基于 `/root/agent-server` 当前本地代码，`S2`、`S3`、`S4` 的主干能力已不再是“纯待实现”状态
+- 对端侧规划而言，这些项现在更像：
+  - 部署实例是否已具备的确认项
+  - 剩余协议 / 运行时收口项
+- 因此端侧后续切片不应再把“等待服务侧先补双轨状态机”视为阻塞前提
 
 #### S1: 把 server endpoint 从实验能力升级为主路径候选
 
@@ -442,15 +458,16 @@ go test ./internal/gateway
 ## 8. 当前建议执行顺序
 
 - 第一优先：
-  - `D1` 端侧 AEC / reference 基线
-  - `S1` 服务侧 server endpoint 主路径化
+  - `5.167` 端侧消费 richer `session.update`，先把状态观测补齐
+  - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
 - 第二优先：
-  - `S3` 增量 TTS 真正提前启动
-  - `D3` 端侧 endpointing 软化
+  - `5.169` 端侧 speaking-time local endpoint / round close 软化
+  - `5.170` 端侧 speaking-time uplink continuation
 - 第三优先：
-  - `S4` 与 `D4` 的 interruption / ducking 仲裁
+  - `5.171` 端侧 duck-first interruption policy
+  - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
 - 最后收口：
-  - `S2` 双轨 session core
+  - `5.173` 默认开启条件、回退条件和回归矩阵
   - `J2` discovery / protocol 口径升级
 
 ## 9. 当前最重要的判定
@@ -458,9 +475,318 @@ go test ./internal/gateway
 - 现阶段“能不能做全双工”的答案是：
   - 能做，但不是只改一个参数或只把 `client_commit` 改成 `server_vad`
 - 现阶段“最先该做什么”的答案是：
-  - 端侧先补声学前提
-  - 服务侧补厚 `Voice Orchestration Core`
+  - 端侧先补状态同步与 runtime-ready gate
+  - 再补 speaking-time keep-listening / ducking / reference 基线
 - 若跳过 AEC / reference 直接做逻辑全双工，结果大概率只是：
   - 更快地回声误触发
   - 更频繁地误打断
   - 更差的真实体验
+
+## 10. 端侧具体实施切片
+
+前置已完成切片：
+
+- `5.164` 已把 duplex capability advertisement 放到显式实验闸门后
+- `5.165` 已把 `tts_start -> close local round` 放到显式策略闸门后
+
+从下一步代码提交开始，端侧按下面的连续切片推进。
+
+### 10.1 Step 5.167: 消费服务侧 richer session.update
+
+目标：
+
+- 让端侧本地状态机先“看见”服务侧新增的双轨信号，而不是继续只盯顶层 `state`
+
+范围：
+
+- `components/river_cloud/river_xiaozhi_ws.c`
+- 必要时：
+  - `include/river/river_xiaozhi_ws.h`
+  - `components/river_cloud/river_cloud_adapter.c`
+
+实施内容：
+
+- 解析并记录：
+  - `input_state`
+  - `output_state`
+  - `barge_in_enabled`
+  - `turn_id`
+  - `accept_reason`
+- 保持老服务兼容：
+  - 字段缺失时仍只按顶层 `state` 工作
+- 先做“状态透传 + 日志 + 本地缓存”，不在本步引入行为变化
+
+完成标准：
+
+- 板端日志能明确区分：
+  - `state=speaking input_state=previewing output_state=speaking`
+  - `accept_reason=server_endpoint|audio_commit|text_input`
+- 不破坏现有默认交互
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n "input_state|output_state|accept_reason|barge_in_enabled|turn_id" \
+  components/river_cloud/river_xiaozhi_ws.c
+```
+
+### 10.2 Step 5.168: runtime-ready duplex gate
+
+目标：
+
+- 把当前“profile 具备 playback reference 能力”升级为“当前运行时真的 ready 才允许 duplex 路径”
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_voice/river_reference_service.c`
+- `components/river_voice/river_voice_runtime_policy.c`
+- 必要时：
+  - `include/river/river_reference_service.h`
+  - `include/river/river_voice_runtime_policy.h`
+
+实施内容：
+
+- 新增统一 `duplex_ready` 判定，至少综合：
+  - duplex experiment gate
+  - active profile capability
+  - reference service state
+  - 最近 reference activity / peak
+  - AEC gate state
+- 所有 speaking-time keep-open 行为只认这个 runtime gate，不再只认静态 profile
+
+完成标准：
+
+- 日志能明确给出：
+  - `duplex_ready=yes|no`
+  - `reason=experiment_off|profile_no_ref|ref_idle|aec_blocked|ready`
+- 默认配置行为保持不变
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+板测关注日志：
+
+- `ref_peak`
+- `echo`
+- `duplex_ready`
+- `playback_ref`
+
+### 10.3 Step 5.169: speaking-time local endpoint 软化
+
+目标：
+
+- duplex-ready 条件成立时，`tts_start` 或短时 silence 不再直接成为本地 turn 的硬终点
+
+范围：
+
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_voice/river_voice_vad_probe.c`
+
+实施内容：
+
+- 引入 `deferred close / hint-only` 路径
+- 将本地 endpoint 在 duplex 实验态下从：
+  - `hard close`
+  - 调整为：
+    - `preview hint`
+    - `interrupt hint`
+    - `deferred local close`
+
+完成标准：
+
+- half-duplex 默认配置仍是原行为
+- duplex-ready 实验路径下：
+  - `tts_start` 不强关本地 round
+  - 短 silence 不立刻强收尾
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+板测关注日志：
+
+- `tts_start keeps local round open`
+- `deferred local close`
+- `hint-only endpoint`
+
+### 10.4 Step 5.170: speaking-time uplink continuation
+
+目标：
+
+- 在 duplex-ready 实验路径下，真正做到“播的时候仍能持续上传近端语音”，但不破坏现有兼容提交边界
+
+范围：
+
+- `components/river_cloud/river_cloud_adapter.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_xiaozhi_ws.c`
+
+实施内容：
+
+- 保持 speaking 期间本地采集与 uplink 活跃
+- 避免出现：
+  - 重复 `session.start`
+  - 本地 listen / stop 抖动
+  - commit 风暴
+- 先保持兼容：
+  - 仍允许 `audio.in.commit`
+  - 不在本步直接引入端侧 server-owned turn-finalization
+
+完成标准：
+
+- duplex-ready 路径下 speaking 期间可见：
+  - 本地 listening 仍为 `yes`
+  - uplink 继续推进
+- 默认路径不变
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+板测关注日志：
+
+- `listening=yes`
+- `asr stream active`
+- `session.update state=speaking input_state=previewing`
+
+### 10.5 Step 5.171: duck-first 本地打断仲裁
+
+目标：
+
+- 让端侧从“near-end speech 一来就 interrupt”升级到“先 duck，再按阈值升级 hard interrupt”
+
+范围：
+
+- `components/river_voice/river_voice_vad_probe.c`
+- `components/river_voice/river_playback_service.c`
+- `components/river_cloud/river_cloud_adapter.c`
+
+实施内容：
+
+- 引入端侧 speaking-time 近端语音分级：
+  - 短附和 / 轻插话 -> `duck_only`
+  - 持续近端语音 -> `interrupt`
+- 与服务侧新策略对齐，但本步先保证端侧本地仲裁自洽
+
+完成标准：
+
+- 短 near-end speech 不再总是立刻 hard stop TTS
+- 日志能区分：
+  - `duck`
+  - `interrupt`
+  - `reason`
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+板测场景：
+
+- 轻声附和
+- 短插话
+- 持续插话
+
+### 10.6 Step 5.172: 做出一个 board-profile 级 duplex-ready 声学基线
+
+目标：
+
+- 不再只停留在代码逻辑实验，至少做出一个“真实 reference / AEC 能工作”的板级基线
+
+范围：
+
+- `prj.conf`
+- `board/rtl8730e/profiles/*`
+- `components/river_voice/river_voice_preproc_fixed_dsb.c`
+- `components/river_voice/river_reference_service.c`
+- 必要时：
+  - `components/river_voice/river_voice_webrtc_aecm_adapter.c`
+
+实施内容：
+
+- 选定一个实验 profile
+- 让该 profile 在 speaking 期间稳定出现：
+  - 非零 `ref_peak`
+  - 非零 echo / reference activity
+  - `duplex_ready=yes`
+
+完成标准：
+
+- 至少一个 board profile 可被明确标记为：
+  - `duplex-ready experimental`
+- 该 profile 的板测日志不再长期停留在：
+  - `echo:0B`
+  - `ref_peak=0`
+
+建议验证：
+
+```bash
+cd /root/ameba-river
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+板测关注日志：
+
+- `echo`
+- `ref_peak`
+- `aec`
+- `duplex_ready`
+
+### 10.7 Step 5.173: 默认开启条件与回退矩阵
+
+目标：
+
+- 在 experiment 路径打通后，把“什么时候仍必须 fallback half-duplex”编码成明确规则
+
+范围：
+
+- `Kconfig`
+- `prj.conf`
+- `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+- 必要时：
+  - `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+实施内容：
+
+- 明确 default-on 之前必须满足的条件：
+  - richer session state 已消费
+  - runtime-ready gate 已稳定
+  - speaking-time uplink 已稳定
+  - duck-first 策略已稳定
+  - 至少一个 board profile 的 AEC / reference 合格
+- 明确 fallback 条件：
+  - reference 丢失
+  - AEC gate blocked
+  - 板型不支持
+  - 线上服务未提供所需 lane-state / behavior
+
+完成标准：
+
+- 默认构建继续稳定
+- experiment 构建有明确进入条件和回退条件
+- 回归矩阵覆盖：
+  - wake
+  - first turn
+  - follow-up
+  - speaking-time barge-in
+  - reconnect / error fallback

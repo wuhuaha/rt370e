@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.165 xiaozhi tts_start local-round duplex policy gate`
+  - `5.166 converge device full-duplex implementation slices`
 - Primary active execution plan:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - Track the cross-repo full-duplex evolution separately in:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+- The next device-side duplex code slices are now explicitly staged as:
+  - `5.167` richer `session.update` consumption
+  - `5.168` runtime-ready duplex gate
+  - `5.169` speaking-time local endpoint softening
+  - `5.170` speaking-time uplink continuation
+  - `5.171` duck-first interruption policy
+  - `5.172` board-profile duplex-ready acoustic baseline
+  - `5.173` default-enable and fallback matrix
 - Preserve the project flash profile:
   - `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 
