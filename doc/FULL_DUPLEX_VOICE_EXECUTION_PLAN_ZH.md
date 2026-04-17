@@ -1315,3 +1315,30 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
     - server 提前发了 preview 事件
     - payload shape 不完整
     - 端侧 ACK 回写失败或连接状态异常
+
+2026-04-17 调试补充（5.173B）：
+
+- 继续保持 logging-only，不改当前 duplex 行为和 websocket contract
+- 补齐 transport 侧真正缺的时序观测：
+  - `input.speech.start`
+  - `input.preview`
+  - `input.endpoint`
+  - `session.update.accept_reason`
+  - `response.start`
+  - `audio.out.meta`
+- 新增的日志与缓存行为：
+  - `session.update` 不再在每次稀疏 payload 上清空本轮已接受语义
+  - accept 只在真正 latch 到 accepted-turn 时更新 `last_accept_at_ms`
+  - `response.start` / `audio.out.meta` 会带出：
+    - `from_accept_ms`
+    - `from_preview_start_ms`
+    - `from_preview_update_ms`
+    - `from_response_start_ms`
+- `river xiaozhi status` 现可直接看到：
+  - `timing_age_ms`
+  - `timing_chain_ms`
+- 目的：
+  - 后续服务侧联调时，可以快速区分：
+    - preview 很早到，但 accepted-turn 很晚
+    - accepted-turn 已到，但 `response.start` 慢
+    - `response.start` 已到，但首个 `audio.out.meta` 慢

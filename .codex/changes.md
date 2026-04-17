@@ -1,5 +1,44 @@
 # Change Log
 
+## Step 5.173B
+- Completed the pending XiaoZhi transport timing-observation slice so board
+  logs can correlate the server collaboration chain without changing current
+  duplex strategy or websocket contract:
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- `session.update` handling now preserves accepted-turn cache across sparse
+  updates within the same round instead of clearing it on every payload:
+  - `accept_reason`
+  - `turn_id`
+  - `input_state`
+  - `output_state`
+  - `barge_in_enabled`
+  - `last_accept_at_ms`
+  - this keeps later `response.start` / `audio.out.meta` timing correlation
+    anchored to the actual accepted turn
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Added concrete timing stamps and logs across the key collaboration path:
+  - `input.speech.start`
+  - `input.preview`
+  - `input.endpoint`
+  - `session.update` accept latch
+  - `response.start`
+  - `audio.out.meta`
+  - each log now exposes stage-to-stage elapsed time such as:
+    - `from_preview_start_ms`
+    - `from_accept_ms`
+    - `from_response_start_ms`
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Extended `river xiaozhi status` with a board-visible timing view so runtime
+  inspection can distinguish stale state from true server latency:
+  - `timing_age_ms`
+  - `timing_chain_ms`
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Updated the duplex execution plan and active context so the branch records
+  this logging-only follow-up as the latest landed step while waiting for the
+  next server/device联调 round:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.173A
 - Added collaboration-negotiation debug logs so board traces can explain why
   the current session did or did not enter the XiaoZhi duplex-ready path:

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.173A supplement XiaoZhi collaboration debug logs`
+  - `5.173B supplement XiaoZhi preview/accept/response timing traces`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -123,6 +123,25 @@ or top-of-tree verification target changes.
     - the next focus is:
       - use `5.173A` logs to validate the updated server-side collaboration
         chain once the service changes are available
+  - `5.173B` is now landed:
+    - this slice is also logging-only; no duplex policy or turn-state behavior
+      was changed
+    - XiaoZhi transport now latches and preserves accept-turn semantics across
+      sparse `session.update` payloads within a round until the explicit
+      session-update cache clear path runs for the next listen round
+    - board logs now expose timing correlation across:
+      - `input.speech.start`
+      - `input.preview`
+      - `input.endpoint`
+      - `session.update.accept_reason`
+      - `response.start`
+      - `audio.out.meta`
+    - `river xiaozhi status` now exports:
+      - `timing_age_ms`
+      - `timing_chain_ms`
+    - the next focus is:
+      - use `5.173A` + `5.173B` logs to validate the updated server-side
+        collaboration chain once the service changes are available
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -166,7 +185,8 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - board regression and log validation of the landed `5.173` / `5.173A`
+  - board regression and log validation of the landed `5.173` / `5.173A` /
+    `5.173B`
     negotiation, sparse-semantics, and playback-ack diagnostics against the
     next server-side collaboration update
 - Preserve the project flash profile:

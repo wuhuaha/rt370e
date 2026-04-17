@@ -1,5 +1,55 @@
 # Verification
 
+## Step 5.173B
+Validate that the branch now exposes a complete board-visible timing chain for
+`preview -> accept -> response.start -> audio.out.meta` without changing the
+current duplex policy:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'accept latched|timing_age_ms|timing_chain_ms|from_preview_start_ms|from_preview_update_ms|from_accept_ms|from_response_start_ms|5\.173B' \
+  components/river_cloud/river_xiaozhi_ws.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - transport logs the accept latch and stage-to-stage elapsed timings
+  - status output now includes `timing_age_ms` and `timing_chain_ms`
+  - active context and duplex plan both record `5.173B` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status output now contains lines similar to:
+  - `xiaozhi timing_age_ms session_update=... accept=...`
+  - `xiaozhi timing_chain_ms accept_from_preview_start=... response_from_accept=...`
+
+Run one wake / speak / reply round and inspect monitor logs for lines similar
+to:
+```text
+xiaozhi accept latched: ...
+xiaozhi response.start: ... from_accept_ms=...
+xiaozhi audio.out.meta: ... from_response_start_ms=...
+```
+
+Expected result:
+- board logs can directly tell whether the dominant delay happened:
+  - before accepted-turn
+  - between accepted-turn and `response.start`
+  - between `response.start` and first playback metadata
+
 ## Step 5.173A
 Validate that the branch now emits enough XiaoZhi collaboration debug logs to
 separate negotiation failure, sparse server semantics, sparse payload shape,
