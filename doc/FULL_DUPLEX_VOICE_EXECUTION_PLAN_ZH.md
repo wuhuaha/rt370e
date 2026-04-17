@@ -1298,3 +1298,20 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
   - `5.173` 的默认开启条件和回退矩阵已编码收口
   - 下一步重点转到板端回归，验证 discovery 组合、wake/first-turn/follow-up
     以及 speaking-time barge-in 下的实际默认路径是否与日志矩阵一致
+
+2026-04-17 调试补充（5.173A）：
+
+- 为等待服务侧新的 collaboration / preview / playback-ack 主链继续落地，
+  端侧先补了一轮纯调试日志，不改变当前行为策略
+- 新增的日志覆盖：
+  - discovery refresh / `session.start` / discovery 失败回退时的协商快照
+  - `preview_events` 与 `playback_ack` 的未协商原因
+  - `session.update` 语义稀疏、accept 前 turn 语义变化
+  - `input.speech.start` / `input.preview` / `input.endpoint` 稀疏载荷
+  - `audio.out.started/mark/cleared/completed` ACK 写回失败
+- 目的：
+  - 后续服务侧联调时，可以快速区分：
+    - discovery / capability 没对齐
+    - server 提前发了 preview 事件
+    - payload shape 不完整
+    - 端侧 ACK 回写失败或连接状态异常

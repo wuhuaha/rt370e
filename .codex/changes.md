@@ -1,5 +1,45 @@
 # Change Log
 
+## Step 5.173A
+- Added collaboration-negotiation debug logs so board traces can explain why
+  the current session did or did not enter the XiaoZhi duplex-ready path:
+  - discovery refresh snapshot
+  - `session.start` snapshot
+  - discovery-refresh failure fallback snapshot
+  - negotiation reasons for `preview_events` and `playback_ack`
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Extended session semantic logs to expose sparse / pre-accept server behavior
+  without changing existing state handling:
+  - `session.update semantic sparse`
+  - `turn semantics updated before accept`
+  - wake-admission policy snapshot before listen-start
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Added payload-shape warnings for collaboration-related realtime messages so
+  monitor logs can distinguish protocol sparsity from local state-machine bugs:
+  - known message type with non-object `payload`
+  - `input.speech.start` missing `preview_id`
+  - `input.preview` sparse payload
+  - `input.endpoint` sparse payload
+  - preview/input events arriving before negotiation succeeds
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+- Added playback-ack failure logs on the adapter side with enough correlation
+  to debug server/device collaboration breaks:
+  - `audio.out.started`
+  - `audio.out.mark`
+  - `audio.out.cleared`
+  - `audio.out.completed`
+  - each failure log now includes:
+    - control ids
+    - negotiated playback-ack mode
+    - current XiaoZhi last error
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Updated the duplex execution plan and active context so this logging-only
+  follow-up is recorded as landed while waiting for the next server-side
+  collaboration changes:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.173
 - Added an explicit XiaoZhi duplex `default-on` policy switch so the branch can
   distinguish:

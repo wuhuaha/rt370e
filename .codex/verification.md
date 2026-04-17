@@ -1,5 +1,60 @@
 # Verification
 
+## Step 5.173A
+Validate that the branch now emits enough XiaoZhi collaboration debug logs to
+separate negotiation failure, sparse server semantics, sparse payload shape,
+and playback-ack send failures during upcoming server bring-up:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'collaboration gate|collaboration preview|collaboration playback_ack|semantic sparse|updated before accept|wake admission policy|payload invalid|sparse payload|arrived before preview negotiation|playback ack .* send failed|5\.173A' \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - discovery / `session.start` collaboration snapshots exist
+  - sparse `session.update` and pre-accept semantic logs exist
+  - sparse preview payload / invalid payload warnings exist
+  - playback-ack failure logs exist
+  - active context and duplex plan both record `5.173A` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status output contains richer collaboration diagnostics, including:
+  - `preview_reason=...`
+  - `playback_ack_reason=...`
+- wake a session and inspect monitor logs for lines similar to:
+  - `xiaozhi collaboration gate: ...`
+  - `xiaozhi collaboration preview: ...`
+  - `xiaozhi collaboration playback_ack: ...`
+  - `xiaozhi session.update semantic sparse: ...`
+  - `xiaozhi turn semantics updated before accept: ...`
+
+If the server sends sparse collaboration events or the device cannot write back
+playback ACKs, expect warnings similar to:
+```text
+xiaozhi input.preview sparse payload: ...
+xiaozhi input.endpoint sparse payload: ...
+xiaozhi message payload invalid: ...
+xiaozhi playback ack mark send failed: ...
+```
+
 ## Step 5.173
 Validate that the branch now encodes an explicit XiaoZhi duplex default-on
 policy and a richer half-duplex fallback matrix spanning service negotiation

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.173 encode duplex default-on policy and fallback matrix`
+  - `5.173A supplement XiaoZhi collaboration debug logs`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -107,6 +107,22 @@ or top-of-tree verification target changes.
     - the next focus is:
       - board regression of the 5.173 default-on matrix on the duplex-ready
         experimental profile
+  - `5.173A` is now landed:
+    - this slice is logging-only; no duplex behavior or negotiation policy was
+      changed
+    - the device now emits explicit collaboration snapshots at:
+      - discovery refresh
+      - `session.start`
+      - discovery-refresh failure fallback
+    - the device now warns on:
+      - sparse `session.update` semantics
+      - turn semantics arriving before accept
+      - sparse / invalid preview payloads
+      - preview events arriving before negotiation
+      - playback-ack send failures with negotiated mode + last error
+    - the next focus is:
+      - use `5.173A` logs to validate the updated server-side collaboration
+        chain once the service changes are available
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -150,8 +166,9 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - board regression and log validation of the landed `5.173`
-    default-enable/fallback matrix
+  - board regression and log validation of the landed `5.173` / `5.173A`
+    negotiation, sparse-semantics, and playback-ack diagnostics against the
+    next server-side collaboration update
 - Preserve the project flash profile:
   - `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 

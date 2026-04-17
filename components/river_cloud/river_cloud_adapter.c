@@ -950,6 +950,16 @@ static river_status_t river_cloud_xiaozhi_control_execute(
                        request->response_id[0] != '\0' ? request->response_id : "-",
                        request->playback_id[0] != '\0' ? request->playback_id : "-",
                        request->segment_id[0] != '\0' ? request->segment_id : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack started send failed: status=%d response_id=%s playback_id=%s segment_id=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
         }
         return status;
     case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK:
@@ -963,6 +973,17 @@ static river_status_t river_cloud_xiaozhi_control_execute(
                        request->playback_id[0] != '\0' ? request->playback_id : "-",
                        request->segment_id[0] != '\0' ? request->segment_id : "-",
                        (unsigned long)request->played_duration_ms);
+        } else {
+            RIVER_LOGW("xiaozhi playback ack mark send failed: status=%d response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       (unsigned long)request->played_duration_ms,
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
         }
         return status;
     case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED:
@@ -976,6 +997,17 @@ static river_status_t river_cloud_xiaozhi_control_execute(
                        request->playback_id[0] != '\0' ? request->playback_id : "-",
                        request->segment_id[0] != '\0' ? request->segment_id : "-",
                        request->arg[0] != '\0' ? request->arg : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack cleared send failed: status=%d response_id=%s playback_id=%s cleared_after_segment_id=%s reason=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       request->arg[0] != '\0' ? request->arg : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
         }
         return status;
     case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED:
@@ -985,6 +1017,15 @@ static river_status_t river_cloud_xiaozhi_control_execute(
             RIVER_LOGI("xiaozhi playback ack completed sent: response_id=%s playback_id=%s",
                        request->response_id[0] != '\0' ? request->response_id : "-",
                        request->playback_id[0] != '\0' ? request->playback_id : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack completed send failed: status=%d response_id=%s playback_id=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
         }
         return status;
     default:
