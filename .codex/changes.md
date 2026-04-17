@@ -1,5 +1,37 @@
 # Change Log
 
+## Step 5.181
+- Started rebuilding XiaoZhi playback recovery semantics on top of the
+  runtime-owned media state by separating predictable upstream starvation from
+  harder local write failures:
+  - added a dedicated starvation timeout budget:
+    - `RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS`
+  - added playback-runtime-owned starvation watch state:
+    - `xiaozhi_downlink_starved_since_ms`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- The playback runtime now proactively converts sustained `queued=0` gaps into
+  controlled rebuffer instead of waiting for the AudioTrack path to fall into a
+  harder `write_failed` recovery:
+  - new runtime behavior:
+    - watch empty-downlink gaps while playback is still active
+    - skip the rebuffer path when the known last segment has already fully
+      drained locally
+    - stop the stream with `xiaozhi_playback_starved` once the gap exceeds the
+      starvation threshold, reusing the existing rebuffer bookkeeping
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Tightened the recovery bookkeeping so starvation watch state is cleared on:
+  - playback start
+  - rebuffer resume
+  - output reset
+  - downlink reset
+  - successful frame writes
+  - hard write-failure fallback
+- This is the first concrete slice of the terminal/recovery rebuild:
+  - soft upstream starvation is now a runtime-observed rebuffer cause, not
+    only an eventual AudioTrack failure side effect
+  - next focus is to continue splitting recoverable rebuffer from hard local
+    playback faults and terminal ACK completion semantics
+
 ## Step 5.180
 - Moved the remaining XiaoZhi playback reset / meta / stop helpers out of the
   session runtime and into the dedicated playback runtime so media-owned state

@@ -239,11 +239,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   reset/meta/stop helper
 - `followup_timeout` 与 XiaoZhi `interrupt` 分支现在都通过 runtime
   playback predicate 判断媒体工作量，而不是直接拼原始播放字段
+- playback runtime 已开始把“上游供给断粮”从硬 `write_failed` 恢复里拆开：
+  - 新增 starvation 超时预算：
+    - `RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS`
+  - 新增 runtime-owned starvation watch：
+    - `xiaozhi_downlink_starved_since_ms`
+  - sustained `queued=0` gap 现在会在达到阈值后主动进入
+    `xiaozhi_playback_starved` rebuffer 路径，而不是继续空跑到
+    AudioTrack 硬失败
+  - 已知最后一段已播完时不会误进入该 starvation rebuffer 路径
 
 下一步焦点：
 
-- 在已 runtime-owned 的 playback 状态基座上重建
-  `write_failed / underrun / rebuffer / cleared/completed` 终态模型
+- 继续把 recoverable rebuffer 与 hard local playback fault / terminal ACK
+  completion 语义拆开
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

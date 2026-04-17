@@ -65,6 +65,7 @@
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES 32U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES 12U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_START_FRAMES 18U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS 60U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 4U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
@@ -220,6 +221,7 @@ typedef struct {
     uint32_t xiaozhi_uplink_busy_streak;
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
+    uint64_t xiaozhi_downlink_starved_since_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
     uint64_t xiaozhi_local_close_deadline_ms;

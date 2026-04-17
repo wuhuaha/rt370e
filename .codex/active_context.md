@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.180 xiaozhi playback helper runtime ownership`
+  - `5.181 xiaozhi playback starvation rebuffer gating`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -67,6 +67,14 @@ or top-of-tree verification target changes.
       reset/meta/stop helpers
     - follow-up timeout and XiaoZhi interrupt admission now key off runtime
       playback predicates instead of direct raw playback fields
+  - sixth landed slice on that plan:
+    - playback runtime now distinguishes a sustained upstream supply gap from a
+      later hard write failure one step earlier
+    - empty-downlink starvation is converted into a controlled
+      `xiaozhi_playback_starved` rebuffer path after a bounded timeout instead
+      of waiting for the AudioTrack path to fail first
+    - starvation watch state is reset together with playback/downlink runtime
+      restart points so the recovery path stays deterministic
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -232,8 +240,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - rebuild `write_failed / underrun / rebuffer / cleared-completed`
-    semantics on top of the now runtime-owned playback state
+  - continue splitting recoverable rebuffer from hard local playback faults
+    and terminal ACK completion semantics
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

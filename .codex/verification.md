@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.181
+Validate that the playback runtime now proactively re-buffers sustained
+upstream starvation gaps before they degrade into the old write-failure
+recovery path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'STARVED_REBUFFER_MS|starved_since_ms|upstream gap rebuffer|playback_starved' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the playback runtime exposes a dedicated starvation timeout and watch state
+  - sustained empty-downlink gaps are converted into controlled
+    `xiaozhi_playback_starved` rebuffer recovery
+  - starvation watch state is explicitly cleared on playback reset/restart
+
 ## Step 5.180
 Validate that the remaining XiaoZhi playback reset/meta/stop helpers are now
 implemented in the playback runtime, and that session/adapter branches consume
