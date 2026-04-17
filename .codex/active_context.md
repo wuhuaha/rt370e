@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.171 add duck-first local barge-in arbitration for speaking-time playback`
+  - `5.172 establish duplex-ready experimental board-profile acoustic baseline`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -70,12 +70,33 @@ or top-of-tree verification target changes.
       escalates to hard interrupt after sustained evidence
     - the next implementation slice is:
       - `5.172` board-profile duplex-ready acoustic baseline
+  - `5.172` is now landed:
+    - the branch build now selects a dedicated `duplex-ready experimental`
+      board profile:
+      - `fixed_dsb_webrtc_aecm`
+      - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y`
+    - native-capture-ref duplex gating no longer trusts playback state alone;
+      it now consumes actual AECM ref telemetry:
+      - `ref_activity`
+      - `ref_peak`
+      - `ref_ratio_q15`
+      - freshness age
+    - `vad_probe` now measures `ref_peak` from capture `ch3` when the active
+      profile uses native reference, so board logs and local barge-in
+      arbitration can observe the real far-end reference source
+    - the next implementation slice is:
+      - `5.173` default-enable and fallback matrix
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
 ## Current Runtime Focus
 
 - Keep the board-side `wake -> VAD/KWS -> native realtime session` path usable.
+- The current branch build now defaults to the dedicated duplex experiment
+  profile while still preserving runtime fallback gates:
+  - `fixed_dsb_webrtc_aecm`
+  - native `2mic + ref(ch3)` capture
+  - XiaoZhi full-duplex experiment advertisement on
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Keep the landed collaboration baseline explicit and conservative:
@@ -108,7 +129,6 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `5.172` board-profile duplex-ready acoustic baseline
   - `5.173` default-enable and fallback matrix
 - Preserve the project flash profile:
   - `board/rtl8730e/profiles/RTL8730E_NOR.rdev`

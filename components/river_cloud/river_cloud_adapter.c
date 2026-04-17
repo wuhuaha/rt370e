@@ -789,11 +789,13 @@ static void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
 
     if (duplex_eval.ready) {
-        RIVER_LOGI("xiaozhi tts_start keeps local round open: duplex_ready=yes reason=%s aec=%s ref_state=%s ref_activity=%s stream=%s stop_pending=%s close_pending=%s",
+        RIVER_LOGI("xiaozhi tts_start keeps local round open: duplex_ready=yes reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u stream=%s stop_pending=%s close_pending=%s",
                    river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                    river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                    river_reference_service_state_name(duplex_eval.reference_state),
                    river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
+                   (unsigned int)duplex_eval.native_reference_peak,
+                   (unsigned int)duplex_eval.native_reference_ratio_q15,
                    g_river_cloud.stream_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
                    g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no");
@@ -802,11 +804,13 @@ static void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
 
     river_cloud_xiaozhi_note_semantic_fallback(
         river_cloud_xiaozhi_duplex_fallback_reason(&duplex_eval));
-    RIVER_LOGI("xiaozhi tts_start falls back to round close: duplex_ready=no reason=%s aec=%s ref_state=%s ref_activity=%s ref_queue=%lu/%lu ref_age_ms=%lu",
+    RIVER_LOGI("xiaozhi tts_start falls back to round close: duplex_ready=no reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                river_reference_service_state_name(duplex_eval.reference_state),
                river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
+               (unsigned int)duplex_eval.native_reference_peak,
+               (unsigned int)duplex_eval.native_reference_ratio_q15,
                (unsigned long)duplex_eval.reference_queue_frames,
                (unsigned long)duplex_eval.reference_queue_peak_frames,
                (unsigned long)duplex_eval.reference_last_write_age_ms);
@@ -3368,11 +3372,13 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
     if (!g_river_cloud.stream_active && river_playback_service_active() && !duplex_eval.ready) {
         river_cloud_xiaozhi_note_semantic_fallback(
             "half_duplex_capture_held_during_playback");
-        RIVER_LOGI("xiaozhi capture held during playback: duplex_ready=no reason=%s aec=%s ref_state=%s ref_activity=%s",
+        RIVER_LOGI("xiaozhi capture held during playback: duplex_ready=no reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u",
                    river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                    river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                    river_reference_service_state_name(duplex_eval.reference_state),
-                   river_voice_runtime_reference_activity_name(duplex_eval.reference_activity));
+                   river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
+                   (unsigned int)duplex_eval.native_reference_peak,
+                   (unsigned int)duplex_eval.native_reference_ratio_q15);
         g_river_cloud.xiaozhi_open_speech_frames = 0U;
         river_cloud_pre_roll_reset();
         return RIVER_OK;
@@ -3782,12 +3788,14 @@ void river_cloud_adapter_dump_status(void)
                    g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id[0] != '\0' ?
                        g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id :
                        "-");
-        RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_queue=%lu/%lu ref_age_ms=%lu playback_active=%s duplex_seen=%s",
+        RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu playback_active=%s duplex_seen=%s",
                    duplex_eval.ready ? "yes" : "no",
                    river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                    river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                    river_reference_service_state_name(duplex_eval.reference_state),
                    river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
+                   (unsigned int)duplex_eval.native_reference_peak,
+                   (unsigned int)duplex_eval.native_reference_ratio_q15,
                    (unsigned long)duplex_eval.reference_queue_frames,
                    (unsigned long)duplex_eval.reference_queue_peak_frames,
                    (unsigned long)duplex_eval.reference_last_write_age_ms,

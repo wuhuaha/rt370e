@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.172
+- Promoted the branch build to a dedicated `duplex-ready experimental`
+  board-profile baseline by enabling:
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y`
+  - `CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN=y`
+  - `CONFIG_RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM=y`
+  - [prj.conf](/root/ameba-river/prj.conf)
+- Replaced the old native-ref runtime shortcut with real native `ch3`
+  observation plumbing:
+  - `duplex_ready` for native-capture-ref profiles now consumes actual AECM
+    reference telemetry instead of inferring `ref_activity=active` only from
+    playback state
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+  - [include/river/river_voice_runtime_policy.h](/root/ameba-river/include/river/river_voice_runtime_policy.h)
+- Published runtime native-ref telemetry from the experimental preproc path:
+  - AECM ref `activity`
+  - `peak`
+  - `ratio_q15`
+  - freshness / frame metadata
+  - [components/river_voice/river_voice_preproc_fixed_dsb.c](/root/ameba-river/components/river_voice/river_voice_preproc_fixed_dsb.c)
+- Fixed board-side `ref_peak` observability for the native 3-channel capture
+  profile:
+  - `vad_probe` now samples `capture ch3` directly when the active profile uses
+    native capture ref, instead of only reading the software playback-ring ref
+  - board logs and local barge-in heuristics therefore observe the same
+    far-end reference source as the experimental AEC path
+  - [components/river_voice/river_voice_vad_probe.c](/root/ameba-river/components/river_voice/river_voice_vad_probe.c)
+- Extended XiaoZhi duplex runtime logs so board validation can correlate:
+  - `duplex_ready`
+  - `ref_activity`
+  - `ref_peak`
+  - `ref_ratio_q15`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Updated active context and duplex execution plan so `5.172` is recorded as
+  landed and the next slice moves to `5.173`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.171
 - Reworked the device-side speaking-time near-end arbitration from a single
   `interrupt` threshold into a local `duck_only -> release / interrupt` ladder:

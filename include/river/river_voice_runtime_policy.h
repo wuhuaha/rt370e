@@ -16,6 +16,16 @@ typedef enum {
     RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE
 } river_voice_reference_activity_t;
 
+typedef struct {
+    river_voice_reference_activity_t activity;
+    uint32_t frame_ms;
+    uint32_t last_update_ms;
+    uint32_t frames_seen;
+    uint16_t peak;
+    uint16_t active_ratio_q15;
+    bool available;
+} river_voice_native_reference_observation_t;
+
 typedef enum {
     RIVER_VOICE_AEC_GATE_DISABLED = 0,
     RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK,
@@ -58,12 +68,25 @@ typedef struct {
     uint32_t reference_queue_peak_frames;
     uint32_t reference_recent_window_ms;
     uint32_t reference_last_write_age_ms;
+    uint32_t native_reference_frames_seen;
+    uint16_t native_reference_peak;
+    uint16_t native_reference_ratio_q15;
     bool duplex_experiment_enabled;
     bool profile_supports_playback_reference;
+    bool native_reference_available;
     bool uses_native_capture_ref;
     bool ready;
 } river_voice_duplex_ready_eval_t;
 
+void river_voice_runtime_native_reference_reset(void);
+void river_voice_runtime_native_reference_publish(
+    river_voice_reference_activity_t activity,
+    uint16_t peak,
+    uint16_t active_ratio_q15,
+    uint32_t frame_ms,
+    uint32_t frames_seen);
+void river_voice_runtime_native_reference_get(
+    river_voice_native_reference_observation_t *observation);
 void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profile,
                                             river_voice_aec_gate_eval_t *eval);
 void river_voice_runtime_aec_gate_apply_reference(river_voice_aec_gate_eval_t *eval,

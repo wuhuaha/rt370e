@@ -1,5 +1,70 @@
 # Verification
 
+## Step 5.172
+Validate that the branch now builds a dedicated duplex-ready experimental board
+profile and that native `ch3` reference telemetry is wired into both runtime
+duplex evaluation and VAD-side `ref_peak` logs:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y|CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN=y|CONFIG_RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM=y|runtime_native_reference|native_reference_peak|update_interleaved_channel_peak|ref_ratio_q15|5\.172|5\.173' \
+  prj.conf \
+  components/river_voice/river_voice_runtime_policy.c \
+  include/river/river_voice_runtime_policy.h \
+  components/river_voice/river_voice_preproc_fixed_dsb.c \
+  components/river_voice/river_voice_vad_probe.c \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the branch build now enables the XiaoZhi duplex experiment and the
+    `fixed_dsb_webrtc_aecm` profile
+  - runtime duplex evaluation now carries native reference telemetry fields
+  - `vad_probe` has a dedicated native `ch3` peak path
+  - active context and duplex plan both record `5.172` as landed
+  - next slice moves to `5.173`
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status output contains a duplex line with:
+  - `ref_peak=...`
+  - `ref_ratio_q15=...`
+  - `duplex_ready=...`
+- once TTS playback is active on the experimental profile:
+  - `ref_peak` should no longer stay at `0` forever
+  - `ref_activity` can progress to `active`
+  - `duplex_ready=yes` becomes possible only after real native-ref activity is
+    observed
+
+Wake the board, trigger XiaoZhi playback, then inspect monitor logs:
+```text
+capture profile: ... +REF(native ch3)
+preproc backend: fixed_dsb + webrtc_aecm [experimental native-3ch-ref]
+webrtc_aecm ref_state=active ...
+vad state=... ref_peak=...
+xiaozhi duplex_ready=... ref_peak=... ref_ratio_q15=...
+```
+
+Expected result:
+- the experimental 3-channel capture profile is clearly selected
+- AECM logs show real native-ref state transitions instead of a permanently
+  missing/zero reference
+- `vad_probe` and duplex runtime logs observe the same far-end reference source
+
 ## Step 5.171
 Validate that local speaking-time barge-in arbitration now ducks first and only
 escalates to hard interrupt after sustained near-end speech:

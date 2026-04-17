@@ -1196,6 +1196,36 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 - `aec`
 - `duplex_ready`
 
+2026-04-17 落地记录：
+
+- 当前分支已切到专用实验 board-profile：
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y`
+  - `CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN=y`
+  - `CONFIG_RIVER_VOICE_PREPROC_PROFILE_FIXED_DSB_WEBRTC_AECM=y`
+- 端侧 `duplex_ready` 对 native-capture-ref 的判断不再只看
+  `playback_active`，而是接入了 AECM 预处理链发布的真实 reference
+  telemetry：
+  - `ref_activity`
+  - `ref_peak`
+  - `ref_ratio_q15`
+  - freshness age
+- `vad_probe` 的 `ref_peak` 观测已经补到原生采集 `ch3`：
+  - 实验 profile 下，`ref_peak` 与本地 barge-in 比较逻辑不再只依赖
+    playback-ring software ref
+  - 因而 speaking 期间的板端日志现在能直接反映原生 `mic0 + mic1 + ref`
+    输入模型里的 far-end reference
+- XiaoZhi 运行态日志已经补齐：
+  - `ref_peak`
+  - `ref_ratio_q15`
+  - 可用于和：
+    - `webrtc_aecm ref_state=...`
+    - `vad state=... ref_peak=...`
+    - `xiaozhi duplex_ready=...`
+    做同轮对照
+- 当前结论：
+  - `5.172` 的“实验 profile + 声学观测面”已经具备
+  - 下一步转入 `5.173`，把默认开启条件和 fallback matrix 编码收口
+
 ### 10.7 Step 5.173: 默认开启条件与回退矩阵
 
 目标：

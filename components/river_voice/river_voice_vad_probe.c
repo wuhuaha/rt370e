@@ -225,6 +225,39 @@ static uint16_t river_voice_vad_probe_update_peak(const uint8_t *buffer,
     return max_peak;
 }
 
+static uint16_t river_voice_vad_probe_update_interleaved_channel_peak(const uint8_t *buffer,
+                                                                      size_t bytes,
+                                                                      uint32_t channels,
+                                                                      uint32_t channel_index,
+                                                                      uint16_t *peak_out)
+{
+    const int16_t *samples;
+    size_t sample_count;
+    size_t index;
+    uint16_t max_peak = 0U;
+
+    if (buffer == 0 || bytes < 2U || channels == 0U || peak_out == 0 ||
+        channel_index >= channels) {
+        return 0U;
+    }
+
+    samples = (const int16_t *)buffer;
+    sample_count = bytes / sizeof(int16_t);
+    for (index = channel_index; index < sample_count; index += channels) {
+        uint16_t peak;
+
+        peak = river_voice_vad_probe_abs16(samples[index]);
+        if (peak > *peak_out) {
+            *peak_out = peak;
+        }
+        if (peak > max_peak) {
+            max_peak = peak;
+        }
+    }
+
+    return max_peak;
+}
+
 static void river_voice_vad_probe_reset_diag_counters(void)
 {
     uint32_t frame_ms;
@@ -713,8 +746,14 @@ static void river_voice_vad_probe_task(void *param)
     size_t bytes_read;
     size_t enhanced_bytes;
     river_voice_detector_result_t detector_result;
+    const river_voice_profile_config_t *voice_profile;
+    bool use_native_capture_ref;
 
     (void)param;
+    voice_profile = river_voice_profile_active();
+    use_native_capture_ref =
+        voice_profile->uses_native_capture_ref &&
+        g_river_voice_vad_probe.capture.channels >= 3U;
 
     while (!g_river_voice_vad_probe.stop_requested) {
         const bool use_reference = river_voice_preproc_reference_enabled(&g_river_voice_vad_probe.preproc);
@@ -740,6 +779,15 @@ static void river_voice_vad_probe_task(void *param)
                                           g_river_voice_vad_probe.capture.channels,
                                           &g_river_voice_vad_probe.diag_capture_peak_ch0,
                                           &g_river_voice_vad_probe.diag_capture_peak_ch1);
+        if (use_native_capture_ref) {
+            playback_ref_peak =
+                river_voice_vad_probe_update_interleaved_channel_peak(
+                    g_river_voice_vad_probe.capture_buffer,
+                    g_river_voice_vad_probe.capture_chunk_bytes,
+                    g_river_voice_vad_probe.capture.channels,
+                    2U,
+                    &g_river_voice_vad_probe.diag_playback_ref_peak);
+        }
         river_voice_experiment_submit_frame(RIVER_VOICE_EXPERIMENT_DOMAIN_CAPTURE_RAW,
                                             g_river_voice_vad_probe.capture_buffer,
                                             g_river_voice_vad_probe.capture_chunk_bytes,
@@ -758,7 +806,7 @@ static void river_voice_vad_probe_task(void *param)
                 g_river_voice_vad_probe.diag_ref_read_miss++;
             }
         }
-        if (!use_reference &&
+        if (!use_reference && !use_native_capture_ref &&
             g_river_voice_vad_probe.playback_ref_buffer != 0 &&
             g_river_voice_vad_probe.playback_ref_chunk_bytes > 0U &&
             river_voice_vad_probe_playback_active() &&
