@@ -43,6 +43,10 @@ typedef struct {
     uint32_t queue_peak_frames;
     uint32_t queue_capacity_frames;
     uint32_t dropped_frames;
+    uint32_t last_open_ms;
+    uint32_t last_reset_ms;
+    uint32_t last_write_ms;
+    uint32_t last_read_ms;
 } river_reference_service_stats_t;
 
 river_status_t river_reference_service_init(void);

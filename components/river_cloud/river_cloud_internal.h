@@ -11,6 +11,7 @@
 #include "river/river_audio_frame_ring.h"
 #include "river/river_cloud.h"
 #include "river/river_opus_codec.h"
+#include "river/river_voice_runtime_policy.h"
 #include "river/river_xiaozhi_credentials.h"
 #include "river/river_xiaozhi_ws.h"
 #include "river_asr_provider_internal.h"
@@ -183,6 +184,7 @@ typedef struct {
     bool xiaozhi_playback_completed_reported;
     bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
+    bool xiaozhi_playback_duplex_ready_seen;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
@@ -303,6 +305,7 @@ void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  bool is_final);
 bool river_cloud_xiaozhi_idle_requires_wakeword(void);
 bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void);
+void river_cloud_xiaozhi_get_duplex_ready_eval(river_voice_duplex_ready_eval_t *eval);
 bool river_cloud_xiaozhi_playback_allows_vad_open(void);
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);

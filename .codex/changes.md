@@ -1,5 +1,58 @@
 # Change Log
 
+## Step 5.168
+- Tightened XiaoZhi duplex admission from static profile capability to a
+  runtime-truthful `duplex_ready` gate:
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+  - [include/river/river_voice_runtime_policy.h](/root/ameba-river/include/river/river_voice_runtime_policy.h)
+  - [components/river_voice/river_reference_service.c](/root/ameba-river/components/river_voice/river_reference_service.c)
+  - [include/river/river_reference_service.h](/root/ameba-river/include/river/river_reference_service.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Added unified runtime duplex evaluation that now combines:
+  - duplex experiment switch
+  - active preproc profile capability
+  - reference service state
+  - recent reference activity / queue peak
+  - runtime AEC gate result
+- Added an explicit runtime-ready reason model:
+  - `experiment_off`
+  - `profile_no_ref`
+  - `ref_idle`
+  - `aec_blocked`
+  - `ready`
+- Extended reference-service runtime stats with timestamps so runtime policy can
+  tell whether playback reference has actually been active recently:
+  - `last_open_ms`
+  - `last_reset_ms`
+  - `last_write_ms`
+  - `last_read_ms`
+- Replaced XiaoZhi speaking-time keep-open decisions with the new runtime gate:
+  - `tts_start` keep-open vs close no longer trusts only static
+    `playback_ref=yes|no`
+  - capture-held-during-playback now also reports the runtime duplex reason
+  - adapter status output now prints one explicit duplex line with:
+    - `duplex_ready`
+    - `reason`
+    - `aec`
+    - `ref_state`
+    - `ref_activity`
+- Added a playback-epoch latch for duplex readiness:
+  - the current playback remembers whether it ever reached `duplex_ready=yes`
+  - `no_ref reopen guard` now keys off that runtime truth instead of only the
+    profile's static capability
+- Preserved the shipped conservative behavior by mapping runtime failures back
+  to explicit half-duplex fallback reasons:
+  - `half_duplex_experiment_disabled`
+  - `half_duplex_no_playback_reference`
+  - `half_duplex_ref_idle`
+  - `half_duplex_aec_blocked`
+- Updated the active duplex context so `5.168` is now recorded as landed and
+  the next slice moves to `5.169`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step C5
 - Re-analyzed the latest `/root/agent-server` playback-truth updates and
   reprioritized the device roadmap before resuming duplex runtime work:

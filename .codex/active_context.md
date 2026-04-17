@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `C5 complete xiaozhi segment_mark_v1 playback ACK fact chain`
+  - `5.168 complete runtime-ready duplex gate for XiaoZhi speaking-time policy`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -36,6 +36,16 @@ or top-of-tree verification target changes.
     - `segment_mark_v1` now depends on the full
       `audio.out.started/mark/cleared/completed` truth chain, so device work had
       to land `C5` before returning to `5.168`
+  - `5.168` is now landed:
+    - XiaoZhi speaking-time duplex decisions are gated by runtime-truthful
+      `duplex_ready`, not only static profile capability
+    - runtime duplex evaluation now combines:
+      - duplex experiment switch
+      - active profile capability
+      - reference service state / recent activity
+      - AEC gate result
+    - the next implementation slice is:
+      - `5.169` speaking-time local endpoint softening
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -74,7 +84,6 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `5.168` runtime-ready duplex gate
   - `5.169` speaking-time local endpoint softening
   - `5.170` speaking-time uplink continuation
   - `5.171` duck-first interruption policy

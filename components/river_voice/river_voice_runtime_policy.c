@@ -1,11 +1,90 @@
 /* 语音运行时策略实现：根据交互态和参考活动决定能力门控。 */
 #include "river/river_voice_runtime_policy.h"
 
+#include <string.h>
+
+#include "os_wrapper.h"
+
 static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t state)
 {
     return state == RIVER_INTERACTION_SPEAKING ||
            state == RIVER_INTERACTION_BARGE_IN_LISTENING ||
            state == RIVER_INTERACTION_ASR_STREAMING;
+}
+
+static bool river_voice_runtime_profile_supports_playback_reference(
+    river_voice_preproc_profile_t profile)
+{
+    return river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
+           river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF);
+}
+
+static uint32_t river_voice_runtime_reference_recent_window_ms(
+    const river_reference_service_stats_t *stats)
+{
+    uint32_t window_ms;
+    uint32_t frame_ms = 0U;
+
+    if (stats != NULL) {
+        frame_ms = stats->frame_ms;
+    }
+
+    window_ms = frame_ms == 0U ? 240U : frame_ms * 12U;
+    if (window_ms < 160U) {
+        window_ms = 160U;
+    }
+    if (window_ms > 480U) {
+        window_ms = 480U;
+    }
+    return window_ms;
+}
+
+static river_voice_reference_activity_t river_voice_runtime_reference_activity_from_stats(
+    const river_reference_service_stats_t *stats,
+    uint32_t *last_write_age_ms_out,
+    uint32_t *recent_window_ms_out)
+{
+    uint32_t now_ms;
+    uint32_t recent_window_ms;
+    uint32_t last_write_age_ms = 0U;
+    bool has_recent_write = false;
+
+    if (stats == NULL) {
+        if (last_write_age_ms_out != NULL) {
+            *last_write_age_ms_out = 0U;
+        }
+        if (recent_window_ms_out != NULL) {
+            *recent_window_ms_out = 0U;
+        }
+        return RIVER_VOICE_REFERENCE_ACTIVITY_MISSING;
+    }
+
+    recent_window_ms = river_voice_runtime_reference_recent_window_ms(stats);
+    now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    if (stats->last_write_ms != 0U) {
+        last_write_age_ms =
+            now_ms >= stats->last_write_ms ? (now_ms - stats->last_write_ms) : 0U;
+        has_recent_write = last_write_age_ms <= recent_window_ms;
+    }
+
+    if (last_write_age_ms_out != NULL) {
+        *last_write_age_ms_out = last_write_age_ms;
+    }
+    if (recent_window_ms_out != NULL) {
+        *recent_window_ms_out = recent_window_ms;
+    }
+
+    if (stats->state == RIVER_REFERENCE_OPEN &&
+        (stats->queue_frames > 0U || has_recent_write)) {
+        return RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE;
+    }
+
+    if (stats->write_ok == 0U && stats->queue_peak_frames == 0U &&
+        stats->last_write_ms == 0U) {
+        return RIVER_VOICE_REFERENCE_ACTIVITY_MISSING;
+    }
+
+    return RIVER_VOICE_REFERENCE_ACTIVITY_IDLE;
 }
 
 river_voice_stage_t river_voice_runtime_stage(void)
@@ -114,6 +193,80 @@ void river_voice_runtime_aec_gate_apply_reference(river_voice_aec_gate_eval_t *e
     }
 }
 
+void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
+                                           river_voice_preproc_profile_t profile,
+                                           river_voice_duplex_ready_eval_t *eval)
+{
+    river_reference_service_stats_t ref_stats;
+    river_voice_aec_gate_eval_t aec_eval;
+    river_voice_reference_activity_t ref_activity;
+
+    if (eval == NULL) {
+        return;
+    }
+
+    memset(eval, 0, sizeof(*eval));
+    memset(&ref_stats, 0, sizeof(ref_stats));
+    memset(&aec_eval, 0, sizeof(aec_eval));
+
+    river_reference_service_get_stats(&ref_stats);
+    river_voice_runtime_aec_gate_eval_base(profile, &aec_eval);
+
+    eval->profile = profile;
+    eval->duplex_experiment_enabled = duplex_experiment_enabled;
+    eval->profile_supports_playback_reference =
+        river_voice_runtime_profile_supports_playback_reference(profile);
+    eval->playback_state = aec_eval.playback_state;
+    eval->interaction_state = aec_eval.interaction_state;
+    eval->reference_state = ref_stats.state;
+    eval->reference_queue_frames = ref_stats.queue_frames;
+    eval->reference_queue_peak_frames = ref_stats.queue_peak_frames;
+    eval->uses_native_capture_ref = aec_eval.uses_native_capture_ref;
+
+    if (!duplex_experiment_enabled) {
+        eval->reason = RIVER_VOICE_DUPLEX_READY_EXPERIMENT_OFF;
+        eval->aec_reason = aec_eval.reason;
+        return;
+    }
+
+    if (!eval->profile_supports_playback_reference) {
+        eval->reason = RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF;
+        eval->aec_reason = aec_eval.reason;
+        return;
+    }
+
+    if (aec_eval.uses_native_capture_ref) {
+        ref_activity = river_playback_service_state_active(aec_eval.playback_state) ?
+                           RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE :
+                           RIVER_VOICE_REFERENCE_ACTIVITY_MISSING;
+        eval->reference_recent_window_ms = 0U;
+        eval->reference_last_write_age_ms = 0U;
+    } else {
+        ref_activity = river_voice_runtime_reference_activity_from_stats(
+            &ref_stats,
+            &eval->reference_last_write_age_ms,
+            &eval->reference_recent_window_ms);
+    }
+    eval->reference_activity = ref_activity;
+
+    river_voice_runtime_aec_gate_apply_reference(&aec_eval, ref_activity);
+    eval->aec_reason = aec_eval.reason;
+    if (aec_eval.active) {
+        eval->reason = RIVER_VOICE_DUPLEX_READY_READY;
+        eval->ready = true;
+        return;
+    }
+
+    if (!aec_eval.uses_native_capture_ref &&
+        (ref_stats.state != RIVER_REFERENCE_OPEN ||
+         ref_activity != RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE)) {
+        eval->reason = RIVER_VOICE_DUPLEX_READY_REF_IDLE;
+        return;
+    }
+
+    eval->reason = RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED;
+}
+
 const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason_t reason)
 {
     switch (reason) {
@@ -145,6 +298,25 @@ const char *river_voice_runtime_reference_activity_name(river_voice_reference_ac
         return "idle";
     case RIVER_VOICE_REFERENCE_ACTIVITY_ACTIVE:
         return "active";
+    default:
+        return "unknown";
+    }
+}
+
+const char *river_voice_runtime_duplex_ready_reason_name(
+    river_voice_duplex_ready_reason_t reason)
+{
+    switch (reason) {
+    case RIVER_VOICE_DUPLEX_READY_EXPERIMENT_OFF:
+        return "experiment_off";
+    case RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF:
+        return "profile_no_ref";
+    case RIVER_VOICE_DUPLEX_READY_REF_IDLE:
+        return "ref_idle";
+    case RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED:
+        return "aec_blocked";
+    case RIVER_VOICE_DUPLEX_READY_READY:
+        return "ready";
     default:
         return "unknown";
     }

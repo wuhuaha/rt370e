@@ -5,6 +5,7 @@
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
 #include "river/river_voice_profile.h"
+#include "river/river_voice_runtime_policy.h"
 #include "river/river_wifi_station.h"
 
 #include "river_cloud_internal.h"
@@ -13,14 +14,6 @@
 #define RIVER_LOG_TAG "river.cloud"
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
-static bool river_cloud_xiaozhi_profile_supports_playback_reference(void)
-{
-    river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
-
-    return river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
-           river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF);
-}
-
 bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void)
 {
 #if defined(CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN) && \
@@ -29,6 +22,13 @@ bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void)
 #else
     return false;
 #endif
+}
+
+void river_cloud_xiaozhi_get_duplex_ready_eval(river_voice_duplex_ready_eval_t *eval)
+{
+    river_voice_runtime_duplex_ready_eval(river_cloud_xiaozhi_full_duplex_experiment_enabled(),
+                                          river_voice_profile_active_preproc(),
+                                          eval);
 }
 
 bool river_cloud_xiaozhi_idle_requires_wakeword(void)
@@ -42,13 +42,18 @@ bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
-    return river_cloud_xiaozhi_profile_supports_playback_reference();
+    river_voice_duplex_ready_eval_t eval;
+
+    river_cloud_xiaozhi_get_duplex_ready_eval(&eval);
+    if (eval.ready && g_river_cloud.xiaozhi_playback_active) {
+        g_river_cloud.xiaozhi_playback_duplex_ready_seen = true;
+    }
+    return eval.ready;
 }
 
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
 {
-    return river_cloud_xiaozhi_full_duplex_experiment_enabled() &&
-           river_cloud_xiaozhi_playback_allows_vad_open();
+    return river_cloud_xiaozhi_playback_allows_vad_open();
 }
 
 static void river_cloud_xiaozhi_copy_semantic_text(char *dst,
@@ -144,6 +149,7 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_segment_head = 0U;
     g_river_cloud.xiaozhi_playback_segment_count = 0U;
     g_river_cloud.xiaozhi_playback_expected_duration_ms = 0U;
+    g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     g_river_cloud.xiaozhi_playback_response_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_segment_id[0] = '\0';
@@ -316,6 +322,8 @@ bool river_cloud_xiaozhi_turn_accepted(void)
 
 void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
 {
+    river_voice_duplex_ready_eval_t duplex_eval;
+
     if (reason == NULL || reason[0] == '\0') {
         return;
     }
@@ -323,10 +331,11 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
         return;
     }
 
+    river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
     river_cloud_xiaozhi_copy_semantic_text(g_river_cloud.xiaozhi_semantic_fallback_reason,
                                            sizeof(g_river_cloud.xiaozhi_semantic_fallback_reason),
                                            reason);
-    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s playback_ref=%s sid=%s",
+    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_ready=%s duplex_reason=%s sid=%s",
                g_river_cloud.xiaozhi_semantic_fallback_reason,
                river_cloud_xiaozhi_turn_accepted() ? "yes" : "no",
                g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
@@ -338,7 +347,8 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
                g_river_cloud.xiaozhi_output_state[0] != '\0' ?
                    g_river_cloud.xiaozhi_output_state :
                    "-",
-               river_cloud_xiaozhi_playback_allows_vad_open() ? "yes" : "no",
+               duplex_eval.ready ? "yes" : "no",
+               river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
 }
 
@@ -418,6 +428,7 @@ void river_cloud_xiaozhi_cancel_playback_stop(void)
 void river_cloud_xiaozhi_mark_playback_started(void)
 {
     g_river_cloud.xiaozhi_playback_active = true;
+    g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     river_cloud_xiaozhi_cancel_playback_stop();
     g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
     g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
@@ -439,23 +450,25 @@ void river_cloud_xiaozhi_reset_playback_state(void)
 {
     bool had_playback_activity =
         g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending;
+    bool duplex_ready_seen = g_river_cloud.xiaozhi_playback_duplex_ready_seen;
 
     g_river_cloud.xiaozhi_playback_active = false;
     river_cloud_xiaozhi_cancel_playback_stop();
-    if (had_playback_activity && !river_cloud_xiaozhi_playback_allows_vad_open()) {
+    if (had_playback_activity && !duplex_ready_seen) {
         g_river_cloud.xiaozhi_no_ref_reopen_rearm = true;
         g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
         g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms =
             (uint64_t)rtos_time_get_current_system_time_ms() +
             (uint64_t)RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS;
-        RIVER_LOGI("xiaozhi no_ref reopen guard armed: tail_ms=%u silence_frames=%u",
+        RIVER_LOGI("xiaozhi no_ref reopen guard armed: tail_ms=%u silence_frames=%u duplex_seen=no",
                    (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS,
                    (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES);
-    } else if (!had_playback_activity || river_cloud_xiaozhi_playback_allows_vad_open()) {
+    } else if (!had_playback_activity || duplex_ready_seen) {
         g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
         g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
         g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
     }
+    g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
 }
 
 void river_cloud_xiaozhi_reset_downlink_state(void)

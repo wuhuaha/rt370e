@@ -23,6 +23,11 @@ typedef struct {
 
 static river_reference_service_context_t g_river_reference_service;
 
+static uint32_t river_reference_service_now_ms(void)
+{
+    return (uint32_t)rtos_time_get_current_system_time_ms();
+}
+
 static void river_reference_service_copy_name(char *dst, size_t dst_size, const char *src)
 {
     if (dst == NULL || dst_size == 0U) {
@@ -55,6 +60,10 @@ static void river_reference_service_reset_config_locked(void)
     river_reference_service_copy_name(g_river_reference_service.stats.source_name,
                                       sizeof(g_river_reference_service.stats.source_name),
                                       NULL);
+    g_river_reference_service.stats.last_open_ms = 0U;
+    g_river_reference_service.stats.last_reset_ms = 0U;
+    g_river_reference_service.stats.last_write_ms = 0U;
+    g_river_reference_service.stats.last_read_ms = 0U;
 }
 
 river_status_t river_reference_service_init(void)
@@ -77,6 +86,7 @@ river_status_t river_reference_service_init(void)
 river_status_t river_reference_service_open(const river_reference_service_config_t *config)
 {
     river_status_t status;
+    uint32_t now_ms;
 
     if (config == NULL || config->sample_rate == 0U || config->frame_ms == 0U ||
         config->channels == 0U) {
@@ -111,12 +121,17 @@ river_status_t river_reference_service_open(const river_reference_service_config
     g_river_reference_service.stats.channels = config->channels;
     g_river_reference_service.stats.history_ms = config->history_ms;
     g_river_reference_service.stats.open_count++;
+    now_ms = river_reference_service_now_ms();
     river_reference_service_copy_name(g_river_reference_service.stats.stream_name,
                                       sizeof(g_river_reference_service.stats.stream_name),
                                       config->stream_name);
     river_reference_service_copy_name(g_river_reference_service.stats.source_name,
                                       sizeof(g_river_reference_service.stats.source_name),
                                       config->source_name);
+    g_river_reference_service.stats.last_open_ms = now_ms;
+    g_river_reference_service.stats.last_reset_ms = 0U;
+    g_river_reference_service.stats.last_write_ms = 0U;
+    g_river_reference_service.stats.last_read_ms = 0U;
     river_reference_service_set_state_locked(RIVER_REFERENCE_OPEN);
 
     rtos_mutex_give(g_river_reference_service.lock);
@@ -125,6 +140,8 @@ river_status_t river_reference_service_open(const river_reference_service_config
 
 void river_reference_service_reset(void)
 {
+    uint32_t now_ms;
+
     if (!g_river_reference_service.initialized) {
         return;
     }
@@ -136,6 +153,10 @@ void river_reference_service_reset(void)
     if (river_voice_ref_is_open()) {
         river_voice_ref_reset();
         g_river_reference_service.stats.reset_count++;
+        now_ms = river_reference_service_now_ms();
+        g_river_reference_service.stats.last_reset_ms = now_ms;
+        g_river_reference_service.stats.last_write_ms = 0U;
+        g_river_reference_service.stats.last_read_ms = 0U;
         river_reference_service_set_state_locked(RIVER_REFERENCE_OPEN);
     }
 
@@ -165,6 +186,7 @@ void river_reference_service_close(void)
 river_status_t river_reference_service_write(const uint8_t *data, size_t bytes)
 {
     river_status_t status;
+    uint32_t now_ms;
 
     if (data == NULL || bytes == 0U) {
         return RIVER_ERR_ARG;
@@ -185,8 +207,10 @@ river_status_t river_reference_service_write(const uint8_t *data, size_t bytes)
     }
 
     status = river_voice_ref_push(data, bytes);
+    now_ms = river_reference_service_now_ms();
     if (status == RIVER_OK) {
         g_river_reference_service.stats.write_ok++;
+        g_river_reference_service.stats.last_write_ms = now_ms;
         river_reference_service_set_state_locked(RIVER_REFERENCE_OPEN);
     } else {
         g_river_reference_service.stats.write_fail++;
@@ -200,6 +224,7 @@ river_status_t river_reference_service_write(const uint8_t *data, size_t bytes)
 river_status_t river_reference_service_read(uint8_t *data, size_t bytes)
 {
     river_status_t status;
+    uint32_t now_ms;
 
     if (data == NULL || bytes == 0U) {
         return RIVER_ERR_ARG;
@@ -221,8 +246,10 @@ river_status_t river_reference_service_read(uint8_t *data, size_t bytes)
     }
 
     status = river_voice_ref_read(data, bytes);
+    now_ms = river_reference_service_now_ms();
     if (status == RIVER_OK) {
         g_river_reference_service.stats.read_ok++;
+        g_river_reference_service.stats.last_read_ms = now_ms;
         river_reference_service_set_state_locked(RIVER_REFERENCE_OPEN);
     } else if (status == RIVER_ERR_NOT_FOUND) {
         g_river_reference_service.stats.read_miss++;

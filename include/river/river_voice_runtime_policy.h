@@ -3,6 +3,7 @@
 #define AMEBA_RIVER_VOICE_RUNTIME_POLICY_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "river/river_interaction_state.h"
 #include "river/river_playback_service.h"
@@ -37,15 +38,46 @@ typedef struct {
     bool experimental_profile;
 } river_voice_aec_gate_eval_t;
 
+typedef enum {
+    RIVER_VOICE_DUPLEX_READY_EXPERIMENT_OFF = 0,
+    RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF,
+    RIVER_VOICE_DUPLEX_READY_REF_IDLE,
+    RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED,
+    RIVER_VOICE_DUPLEX_READY_READY
+} river_voice_duplex_ready_reason_t;
+
+typedef struct {
+    river_voice_duplex_ready_reason_t reason;
+    river_voice_aec_gate_reason_t aec_reason;
+    river_playback_state_t playback_state;
+    river_interaction_state_t interaction_state;
+    river_reference_state_t reference_state;
+    river_voice_reference_activity_t reference_activity;
+    river_voice_preproc_profile_t profile;
+    uint32_t reference_queue_frames;
+    uint32_t reference_queue_peak_frames;
+    uint32_t reference_recent_window_ms;
+    uint32_t reference_last_write_age_ms;
+    bool duplex_experiment_enabled;
+    bool profile_supports_playback_reference;
+    bool uses_native_capture_ref;
+    bool ready;
+} river_voice_duplex_ready_eval_t;
+
 void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profile,
                                             river_voice_aec_gate_eval_t *eval);
 void river_voice_runtime_aec_gate_apply_reference(river_voice_aec_gate_eval_t *eval,
                                                   river_voice_reference_activity_t ref_activity);
+void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
+                                           river_voice_preproc_profile_t profile,
+                                           river_voice_duplex_ready_eval_t *eval);
 river_voice_stage_t river_voice_runtime_stage(void);
 const char *river_voice_runtime_stage_name(river_voice_stage_t stage);
 bool river_voice_runtime_stage_enabled(river_voice_preproc_profile_t profile,
                                        river_voice_stage_t stage);
 const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason_t reason);
 const char *river_voice_runtime_reference_activity_name(river_voice_reference_activity_t activity);
+const char *river_voice_runtime_duplex_ready_reason_name(
+    river_voice_duplex_ready_reason_t reason);
 
 #endif

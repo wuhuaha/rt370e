@@ -1,5 +1,65 @@
 # Verification
 
+## Step 5.168
+Validate that XiaoZhi speaking-time duplex decisions now depend on runtime
+readiness instead of only the active profile's static playback-reference
+capability:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'duplex_ready|RIVER_VOICE_DUPLEX_READY_|last_(open|reset|write|read)_ms|half_duplex_ref_idle|half_duplex_aec_blocked|xiaozhi_playback_duplex_ready_seen' \
+  include/river/river_voice_runtime_policy.h \
+  include/river/river_reference_service.h \
+  components/river_voice/river_voice_runtime_policy.c \
+  components/river_voice/river_reference_service.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - runtime policy now exports `river_voice_runtime_duplex_ready_eval()`
+  - runtime-ready reasons include `ref_idle` and `aec_blocked`
+  - reference-service stats now expose `last_open_ms/last_reset_ms/last_write_ms/last_read_ms`
+  - XiaoZhi runtime tracks `xiaozhi_playback_duplex_ready_seen`
+  - active context and duplex plan both record `5.168` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints one duplex line similar to:
+  - `xiaozhi duplex_ready=yes|no reason=... aec=... ref_state=... ref_activity=... ref_queue=... ref_age_ms=... playback_active=... duplex_seen=...`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi tts_start keeps local round open: duplex_ready=...
+xiaozhi tts_start falls back to round close: duplex_ready=no reason=...
+xiaozhi fallback: reason=... duplex_ready=... duplex_reason=...
+xiaozhi capture held during playback: duplex_ready=no reason=...
+```
+
+Expected result:
+- keep-open decisions are now explained by runtime `duplex_ready`
+- half-duplex fallback reasons clearly distinguish:
+  - experiment disabled
+  - no playback reference capability
+  - reference idle at runtime
+  - AEC blocked at runtime
+- default conservative behavior stays unchanged when runtime readiness is false
+
 ## Step C5
 Validate that the device now provides the full XiaoZhi
 `segment_mark_v1` playback ACK fact chain and that negotiation stays truthful:

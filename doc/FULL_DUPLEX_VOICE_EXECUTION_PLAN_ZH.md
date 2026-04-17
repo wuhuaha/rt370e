@@ -1,7 +1,7 @@
 # Full-Duplex Voice Execution Plan
 
 Status: active
-Last Updated: 2026-04-16
+Last Updated: 2026-04-17
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -491,12 +491,11 @@ go test ./internal/gateway
 ## 8. 当前建议执行顺序
 
 - 第一优先：
-  - `5.168` 端侧把 duplex gate 从“profile capable”收紧到“runtime ready”
-- 第二优先：
   - `5.169` 端侧 speaking-time local endpoint / round close 软化
+- 第二优先：
   - `5.170` 端侧 speaking-time uplink continuation
-- 第三优先：
   - `5.171` 端侧 duck-first interruption policy
+- 第三优先：
   - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
 - 最后收口：
   - `5.173` 默认开启条件、回退条件和回归矩阵
@@ -902,6 +901,33 @@ rg -n "input_state|output_state|accept_reason|barge_in_enabled|turn_id" \
 ```
 
 ### 10.2 Step 5.168: runtime-ready duplex gate
+
+状态：
+
+- 已落地设备侧 baseline：
+  - XiaoZhi speaking-time duplex 判定已从“profile 静态具备 playback reference
+    能力”升级为“当前运行时真实 `duplex_ready`”
+  - 新增统一 runtime duplex 评估，当前至少综合：
+    - duplex experiment gate
+    - active profile capability
+    - reference service state
+    - 最近 reference activity / queue peak
+    - AEC gate state
+  - reference service stats 现已暴露最近运行时活跃时间：
+    - `last_open_ms`
+    - `last_reset_ms`
+    - `last_write_ms`
+    - `last_read_ms`
+  - `tts_start` keep-open / close、capture-held-during-playback、status dump
+    现都统一输出：
+    - `duplex_ready=yes|no`
+    - `reason=experiment_off|profile_no_ref|ref_idle|aec_blocked|ready`
+  - 当前 playback epoch 还会记住是否曾经达到 `duplex_ready=yes`，本地
+    `no_ref reopen guard` 不再只依赖静态 profile capability
+  - 默认 half-duplex 保守行为未变化；仅补齐了更精确的 fallback reason：
+    - `half_duplex_ref_idle`
+    - `half_duplex_aec_blocked`
+  - 下一步由 `5.169` 继续推进 speaking-time local endpoint 软化
 
 目标：
 
