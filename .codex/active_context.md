@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.169 complete speaking-time local endpoint softening for XiaoZhi duplex path`
+  - `5.170 keep XiaoZhi duplex-ready speaking rounds in continued-uplink mode`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -53,6 +53,16 @@ or top-of-tree verification target changes.
       runtime status for board validation
     - the next implementation slice is:
       - `5.170` speaking-time uplink continuation
+  - `5.170` is now landed:
+    - an expired `endpoint_soft_close` no longer resolves into local
+      `audio.in.commit` while the duplex-ready output lane is still effectively
+      speaking
+    - speaking-time local silence can therefore keep `listening=yes` and the
+      uplink round alive across pause gaps without repeated local stop/reopen
+    - once output leaves the speaking lane, the pending close reuses the
+      existing commit/stop pipeline
+    - the next implementation slice is:
+      - `5.171` duck-first interruption policy
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -91,7 +101,6 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `5.170` speaking-time uplink continuation
   - `5.171` duck-first interruption policy
   - `5.172` board-profile duplex-ready acoustic baseline
   - `5.173` default-enable and fallback matrix

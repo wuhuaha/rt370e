@@ -1,5 +1,58 @@
 # Verification
 
+## Step 5.170
+Validate that duplex-ready speaking rounds now keep the local uplink alive
+across short silence while output is still speaking, and only resolve the
+pending close after the output lane leaves `speaking`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'duplex_speaking_uplink_continuation_active|endpoint_soft_close|5\.170|5\.171' \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - speaking-time endpoint soft-close timeout now checks a dedicated continued
+    uplink gate
+  - active context and duplex plan both record `5.170` as landed
+  - next slice moves to `5.171`
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- during duplex-ready speaking playback with a short user pause, status keeps:
+  - `listening=yes`
+  - `stream=yes`
+  - `endpoint_soft_close pending=yes`
+  - `left_ms=0` may already appear while output is still speaking
+
+Wake the board, wait for TTS speaking, then insert a short pause mid-barge-in
+and inspect realtime logs:
+```text
+xiaozhi hint-only endpoint: trigger=post_roll reason=local_silence ...
+xiaozhi session.update: ... state=speaking ...
+xiaozhi deferred local close resolved: trigger=endpoint_soft_close_timeout ...
+```
+
+Expected result:
+- the `hint-only endpoint` may arm during speaking-time silence
+- but the deferred local close should not resolve until the output lane leaves
+  the speaking state
+- no extra `listen_start` jitter should appear during the same speaking turn
+
 ## Step 5.169
 Validate that speaking-time duplex-ready rounds now treat short silence and
 `input.endpoint` as hint/defer signals instead of immediate hard local close:

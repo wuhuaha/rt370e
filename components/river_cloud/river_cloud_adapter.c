@@ -603,6 +603,12 @@ static bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void)
     return duplex_eval.ready && river_cloud_xiaozhi_output_speaking_active();
 }
 
+static bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void)
+{
+    return g_river_cloud.stream_active &&
+           river_cloud_xiaozhi_duplex_soft_endpoint_enabled();
+}
+
 static void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void)
 {
     g_river_cloud.xiaozhi_endpoint_soft_close_pending = false;
@@ -756,6 +762,10 @@ static void river_cloud_xiaozhi_check_endpoint_soft_close_timeout(void)
 
     if (!g_river_cloud.stream_active || g_river_cloud.xiaozhi_listen_stop_pending) {
         river_cloud_xiaozhi_clear_endpoint_soft_close_state();
+        return;
+    }
+
+    if (river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active()) {
         return;
     }
 

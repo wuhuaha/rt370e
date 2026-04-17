@@ -1040,6 +1040,20 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 
 ### 10.4 Step 5.170: speaking-time uplink continuation
 
+状态：
+
+- 已落地设备侧 baseline：
+  - duplex-ready + speaking-time 路径下，`endpoint_soft_close` 超时不再在
+    output lane 仍处于 speaking 时直接触发本地 `finish_active_stream()`
+  - speaking 期间即使本地出现短 silence / endpoint hint，端侧也会继续保持：
+    - `listening=yes`
+    - 本地 uplink round 活跃
+    - 既有 websocket / dialog 不进入 listen-stop 抖动
+  - 一旦 output lane 脱离 speaking，已经到期的 deferred close 会立即复用既有
+    `audio.in.commit` / stop pipeline 收尾
+  - half-duplex 默认路径保持不变
+  - 下一步由 `5.171` 继续推进 duck-first interruption policy
+
 目标：
 
 - 在 duplex-ready 实验路径下，真正做到“播的时候仍能持续上传近端语音”，但不破坏现有兼容提交边界

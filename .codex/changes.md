@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.170
+- Kept XiaoZhi duplex-ready speaking rounds on the device in continued-uplink
+  mode instead of letting the deferred endpoint timer hard-close the local
+  round while output is still speaking:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Refined speaking-time endpoint-soft-close resolution:
+  - `endpoint_soft_close` may still arm on short silence or server endpoint hint
+  - but while `duplex_ready=yes` and the output lane is still effectively
+    speaking, the timeout no longer resolves into `finish_active_stream()`
+  - once output leaves the speaking lane, the already-expired pending close can
+    resolve immediately and reuse the existing `audio.in.commit` / stop path
+- Resulting runtime behavior on the duplex-ready experiment path:
+  - `listening=yes` is preserved through speaking-time silence gaps
+  - uplink can continue across those gaps without repeated local stop / reopen
+  - repeated `listen_stop -> listen_start` jitter and extra commit churn are
+    reduced
+  - half-duplex baseline remains unchanged
+- Updated active context and duplex execution plan so `5.170` is recorded as
+  landed and the next slice moves to `5.171`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.169
 - Softened XiaoZhi speaking-time local endpoint handling on the device so
   duplex-ready rounds no longer hard-close immediately on short silence or
