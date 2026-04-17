@@ -1,5 +1,42 @@
 # Change Log
 
+## Step 5.178
+- Landed the first real XiaoZhi downlink / playback runtime extraction slice so
+  media playback ownership no longer lives as duplicated local logic inside
+  `river_cloud_adapter.c`:
+  - new dedicated runtime module:
+    - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - build wiring:
+    - [components/river_cloud/CMakeLists.txt](/root/ameba-river/components/river_cloud/CMakeLists.txt)
+- Moved the XiaoZhi playback media engine into the new runtime file while
+  preserving current behavior:
+  - playback metadata ingestion and segment queue ownership
+  - `audio.out.started/mark/cleared/completed` ACK progress handling
+  - rebuffer bookkeeping and retry-preserved downlink frame handling
+  - decoder preparation, downlink ring writes, playback start/restart policy,
+    and the dedicated downlink worker task
+- Exported the adapter/runtime boundary in the internal cloud contract so media
+  runtime code can use the existing control queue and shared playback helpers
+  without reaching through file-local statics:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - exported shared entrypoints now include:
+    - `river_cloud_xiaozhi_control_request_async(...)`
+    - `river_cloud_xiaozhi_playback_note_meta(...)`
+    - `river_cloud_xiaozhi_playback_check_pending_stop(...)`
+    - `river_cloud_xiaozhi_playback_finalize_cleared(...)`
+    - `river_cloud_xiaozhi_playback_start_downlink_if_needed(...)`
+    - `river_cloud_xiaozhi_playback_handle_audio_event(...)`
+    - `river_cloud_xiaozhi_playback_queued_frames()`
+- Shrunk `river_cloud_adapter.c` back toward transport/policy composition:
+  - removed the old embedded playback/downlink implementations
+  - event routing, init/config bootstrapping, close/network-loss, and capture
+    push paths now consume the dedicated playback runtime API instead
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- This closes the first concrete `Step C` extraction slice in the runtime
+  re-architecture plan and sets up the next step:
+  - rebuild playback recovery / rebuffer semantics on top of the extracted
+    media runtime instead of continuing to grow adapter-local stop/clear logic
+
 ## Step 5.177
 - Landed the first real `dialog runtime` truth-source slice so `river_core`
   now owns derived interaction state instead of letting `app` and

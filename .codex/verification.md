@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.178
+Validate that XiaoZhi downlink / playback media ownership is now extracted into
+its own runtime module and that `river_cloud_adapter.c` only consumes the new
+runtime boundary instead of keeping duplicate local implementations:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_playback_runtime|river_cloud_xiaozhi_playback_(note_meta|check_pending_stop|finalize_cleared|start_downlink_if_needed|handle_audio_event|queued_frames)|river_cloud_xiaozhi_control_request_async' \
+  components/river_cloud/CMakeLists.txt \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+rg -n 'static .*river_cloud_xiaozhi_(check_pending_playback_stop|handle_audio_event|start_playback_if_needed|prepare_decoder_if_needed|downlink_task|downlink_active)' \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the new `river_cloud_xiaozhi_playback_runtime.c` is wired into the build
+  - adapter/runtime shared playback entrypoints are declared in
+    `river_cloud_internal.h`
+  - `river_cloud_adapter.c` routes playback work through the new
+    `river_cloud_xiaozhi_playback_*` API family
+- the second `rg` prints no matches, proving the old duplicated playback /
+  downlink implementations are gone from `river_cloud_adapter.c`
+
 ## Step 5.177
 Validate that `dialog runtime` is now the only interaction-state truth source
 in `river_core`, and that cloud/provider state can be ingested through the new

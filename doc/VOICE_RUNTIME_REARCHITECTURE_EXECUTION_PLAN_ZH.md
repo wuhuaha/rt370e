@@ -185,6 +185,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 ### Step C: 拆分 XiaoZhi adapter 的 transport / protocol / runtime / media
 
+状态：
+
+- 已部分落地（2026-04-17，Step 5.178）
+
 目标：
 
 - 减少单体 `river_cloud_adapter.c` / `river_xiaozhi_ws.c`
@@ -198,6 +202,28 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 - transport 不直接操纵高层 turn policy
 - uplink/downlink 有独立 engine 文件
+
+已完成事实：
+
+- 新增独立媒体运行时：
+  - `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- XiaoZhi downlink / playback 的首个大块媒体职责已从
+  `river_cloud_adapter.c` 抽离出去：
+  - playback meta / segment queue
+  - playback ACK progress
+  - rebuffer / retry frame
+  - decoder 准备
+  - downlink worker
+  - playback start / restart
+- `river_cloud_adapter.c` 现已改为通过共享内部接口调用该媒体运行时，
+  不再保留同一套 playback/downlink 本地重复实现
+
+下一步焦点：
+
+- 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
+- 在已抽离的 playback runtime 上重建更干净的
+  `write_failed / underrun / rebuffer / cleared/completed` 终态模型
+- 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 
 ### Step D: 重建 downlink / playback 恢复模型
 

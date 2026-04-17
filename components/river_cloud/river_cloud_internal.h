@@ -309,6 +309,23 @@ void river_cloud_pre_roll_reset(void);
 void river_cloud_request_state_sync(const char *reason);
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
+void river_cloud_xiaozhi_copy_optional_text(char *dst,
+                                            size_t dst_size,
+                                            const char *src);
+river_status_t river_cloud_xiaozhi_control_request_async(
+    river_cloud_xiaozhi_control_op_t op,
+    const char *arg,
+    const char *response_id,
+    const char *playback_id,
+    const char *segment_id,
+    uint32_t played_duration_ms);
+void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
+void river_cloud_xiaozhi_playback_check_pending_stop(void);
+void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);
+void river_cloud_xiaozhi_playback_start_downlink_if_needed(void);
+river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
+    const river_xiaozhi_event_t *event);
+uint32_t river_cloud_xiaozhi_playback_queued_frames(void);
 void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  const char *text,
                                  const char *sid,

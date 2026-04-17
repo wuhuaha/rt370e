@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.177 dialog runtime truth source + cloud snapshot ingestion`
+  - `5.178 xiaozhi playback/downlink runtime extraction`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -40,6 +40,14 @@ or top-of-tree verification target changes.
     - removed the old `session_coordinator` coarse phase truth source
     - added a generic cloud runtime snapshot export so `river_core` no longer
       reaches into XiaoZhi runtime details to derive state
+  - third landed slice on that plan:
+    - extracted XiaoZhi downlink / playback media logic into a dedicated
+      `river_cloud_xiaozhi_playback_runtime.c`
+    - moved playback meta ownership, ACK progress, rebuffer/retry handling,
+      decoder/downlink worker logic, and playback start policy behind exported
+      runtime APIs
+    - `river_cloud_adapter.c` now consumes the playback runtime boundary
+      instead of embedding duplicated playback/downlink implementations
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -205,11 +213,12 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - rebuild XiaoZhi downlink / playback around runtime-owned media truth
-  - keep shrinking `river_cloud_adapter.c` by separating runtime / media /
-    protocol responsibilities
-  - preserve the already-landed `dialog runtime` as the only interaction-state
-    source while the playback rebuild moves forward
+  - rebuild the extracted XiaoZhi playback runtime into a stricter
+    runtime-owned media truth engine
+  - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
+    policy from playback/session media engines
+  - preserve the already-landed `dialog runtime` as the only
+    interaction-state source while the playback rebuild moves forward
 - Keep the landed collaboration baseline explicit and conservative:
   - accepted-turn is confirmed only from `session.update.accept_reason`
   - preview events remain observation-only
