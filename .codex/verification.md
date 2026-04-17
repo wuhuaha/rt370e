@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.179
+Validate that playback termination truth is now exposed as runtime-owned
+queries/operations and that adapter close/interrupt branches consume those
+APIs instead of rebuilding stop/reset logic locally:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_playback_(output_active|has_work|abort)\\(' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+rg -n 'transport_closed|network_lost|xiaozhi_interrupt|bridge_close' \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - playback runtime declares and implements:
+    - `playback_output_active`
+    - `playback_has_work`
+    - `playback_abort`
+  - adapter close/interrupt branches now route through `playback_abort(...)`
+    instead of manually sequencing `finalize_cleared + reset_downlink +
+    stop_stream + reset_playback`
+
 ## Step 5.178
 Validate that XiaoZhi downlink / playback media ownership is now extracted into
 its own runtime module and that `river_cloud_adapter.c` only consumes the new

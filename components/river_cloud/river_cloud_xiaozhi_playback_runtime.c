@@ -55,6 +55,18 @@ uint32_t river_cloud_xiaozhi_playback_queued_frames(void)
     return ready_frames;
 }
 
+bool river_cloud_xiaozhi_playback_output_active(void)
+{
+    return g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending;
+}
+
+bool river_cloud_xiaozhi_playback_has_work(void)
+{
+    return river_cloud_xiaozhi_playback_output_active() ||
+           river_cloud_xiaozhi_playback_queued_frames() != 0U ||
+           g_river_cloud.xiaozhi_playback_meta_valid;
+}
+
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void)
 {
     if (g_river_cloud.xiaozhi_playback_rebuffer_pending) {
@@ -588,6 +600,32 @@ void river_cloud_xiaozhi_playback_check_pending_stop(void)
     river_cloud_xiaozhi_reset_playback_state();
 }
 
+river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
+                                                  const char *stream_reason,
+                                                  bool interrupt_stream)
+{
+    river_status_t status = RIVER_OK;
+
+    if (river_cloud_xiaozhi_playback_has_work()) {
+        river_cloud_xiaozhi_playback_finalize_cleared(clear_reason);
+        river_cloud_xiaozhi_reset_downlink_state();
+    }
+
+    if (river_playback_service_active()) {
+        const char *resolved_reason =
+            (stream_reason != NULL && stream_reason[0] != '\0') ?
+                stream_reason :
+                "xiaozhi_playback_abort";
+
+        status = interrupt_stream ?
+                     river_playback_service_interrupt_stream_ex(resolved_reason) :
+                     river_playback_service_stop_stream_ex(resolved_reason);
+    }
+
+    river_cloud_xiaozhi_reset_playback_state();
+    return status;
+}
+
 static river_status_t river_cloud_xiaozhi_try_start_playback(uint32_t sample_rate,
                                                              uint32_t frame_duration_ms,
                                                              size_t mono_bytes,
@@ -823,9 +861,8 @@ static bool river_cloud_xiaozhi_downlink_active(void)
         return false;
     }
 
-    return river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) > 0U ||
-           g_river_cloud.xiaozhi_tts_stop_pending ||
-           g_river_cloud.xiaozhi_playback_active;
+    return river_cloud_xiaozhi_playback_queued_frames() > 0U ||
+           river_cloud_xiaozhi_playback_output_active();
 }
 
 static void river_cloud_xiaozhi_downlink_task(void *arg)

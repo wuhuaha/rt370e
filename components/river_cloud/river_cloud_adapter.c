@@ -140,9 +140,7 @@ static bool river_cloud_xiaozhi_transport_active(void)
         return false;
     }
 
-    return river_xiaozhi_session_open() ||
-           g_river_cloud.xiaozhi_playback_active ||
-           g_river_cloud.xiaozhi_tts_stop_pending ||
+    return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_output_active() ||
            g_river_cloud.xiaozhi_listening;
 }
 
@@ -362,7 +360,7 @@ static void river_cloud_xiaozhi_round_request_finish(const char *reason)
 
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
-    return g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
+    return river_cloud_xiaozhi_playback_output_active() ||
            (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") == 0);
 }
 
@@ -1951,15 +1949,10 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
         river_cloud_xiaozhi_finalize_pending_text("transport_closed");
         river_cloud_xiaozhi_round_finish("transport_closed");
         river_cloud_xiaozhi_window_abort_local("transport_closed");
-        if (g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
-            river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) != 0U ||
-            g_river_cloud.xiaozhi_playback_meta_valid) {
-            river_cloud_xiaozhi_playback_finalize_cleared("transport_closed");
-            river_cloud_xiaozhi_reset_downlink_state();
-            if (river_playback_service_active()) {
-                (void)river_playback_service_stop_stream_ex("xiaozhi_transport_closed");
-            }
-            river_cloud_xiaozhi_reset_playback_state();
+        if (river_cloud_xiaozhi_playback_has_work()) {
+            (void)river_cloud_xiaozhi_playback_abort("transport_closed",
+                                                     "xiaozhi_transport_closed",
+                                                     false);
         }
         river_cloud_xiaozhi_reset_transport_state(true);
         river_cloud_xiaozhi_check_window_timeout();
@@ -2231,8 +2224,8 @@ river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config
     }
 
     if (g_river_cloud.audio_bridge_open || g_river_cloud.stream_active ||
-        g_river_cloud.xiaozhi_listening || g_river_cloud.xiaozhi_playback_active ||
-        g_river_cloud.xiaozhi_tts_stop_pending || river_xiaozhi_session_open()) {
+        g_river_cloud.xiaozhi_listening || river_cloud_xiaozhi_playback_has_work() ||
+        river_xiaozhi_session_open()) {
         return RIVER_ERR_BUSY;
     }
 
@@ -2280,18 +2273,14 @@ void river_cloud_adapter_notify_network_lost(void)
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        if (g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
-            river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) != 0U ||
-            g_river_cloud.xiaozhi_playback_meta_valid) {
-            river_cloud_xiaozhi_playback_finalize_cleared("network_lost");
-        }
-        if (g_river_cloud.xiaozhi_playback_active && river_playback_service_active()) {
-            (void)river_playback_service_stop_stream_ex("xiaozhi_network_lost");
+        if (river_cloud_xiaozhi_playback_has_work()) {
+            (void)river_cloud_xiaozhi_playback_abort("network_lost",
+                                                     "xiaozhi_network_lost",
+                                                     false);
         }
 
         river_cloud_xiaozhi_round_finish("network_lost");
         river_cloud_xiaozhi_reset_transport_state(false);
-        river_cloud_xiaozhi_reset_playback_state();
         (void)river_cloud_xiaozhi_request_close_session();
         river_cloud_request_state_sync("network_lost");
         return;
@@ -2352,20 +2341,13 @@ river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason)
          g_river_cloud.xiaozhi_listening ||
          river_xiaozhi_session_open())) {
         status = RIVER_OK;
-        if (g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
-            river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) != 0U ||
-            g_river_cloud.xiaozhi_playback_meta_valid) {
-            river_cloud_xiaozhi_playback_finalize_cleared(reason != NULL ? reason :
-                                                              "xiaozhi_interrupt");
-            river_cloud_xiaozhi_reset_downlink_state();
+        if (river_cloud_xiaozhi_playback_has_work()) {
+            status = river_cloud_xiaozhi_playback_abort(reason != NULL ? reason :
+                                                            "xiaozhi_interrupt",
+                                                        reason != NULL ? reason :
+                                                            "xiaozhi_interrupt",
+                                                        true);
         }
-        if (river_playback_service_active()) {
-            if (river_playback_service_interrupt_stream_ex(reason != NULL ? reason :
-                                                               "xiaozhi_interrupt") != RIVER_OK) {
-                status = RIVER_ERR_BUSY;
-            }
-        }
-        river_cloud_xiaozhi_reset_playback_state();
         if (river_xiaozhi_session_open()) {
             (void)river_cloud_xiaozhi_request_abort(reason);
         }
@@ -2529,20 +2511,16 @@ void river_cloud_asr_audio_close(void)
         if (g_river_cloud.stream_active) {
             river_cloud_xiaozhi_finish_active_stream();
         }
-        if (g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
-            river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring) != 0U ||
-            g_river_cloud.xiaozhi_playback_meta_valid) {
-            river_cloud_xiaozhi_playback_finalize_cleared("bridge_close");
-            if (river_playback_service_active()) {
-                (void)river_playback_service_stop_stream_ex("xiaozhi_bridge_close");
-            }
+        if (river_cloud_xiaozhi_playback_has_work()) {
+            (void)river_cloud_xiaozhi_playback_abort("bridge_close",
+                                                     "xiaozhi_bridge_close",
+                                                     false);
         }
         river_cloud_xiaozhi_round_finish("bridge_close");
         (void)river_cloud_xiaozhi_request_close_session();
         river_opus_encoder_close(&g_river_cloud.xiaozhi_encoder);
         river_opus_decoder_close(&g_river_cloud.xiaozhi_decoder);
         river_cloud_xiaozhi_reset_transport_state(false);
-        river_cloud_xiaozhi_reset_playback_state();
     } else {
         river_cloud_stream_finish_active();
     }

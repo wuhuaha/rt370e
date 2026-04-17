@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.179
+- Moved XiaoZhi playback terminal ownership one step further toward a true
+  runtime-owned media source instead of leaving adapter branches to assemble
+  stop/reset logic from raw fields:
+  - new runtime queries:
+    - `river_cloud_xiaozhi_playback_output_active()`
+    - `river_cloud_xiaozhi_playback_has_work()`
+  - new runtime stop path:
+    - `river_cloud_xiaozhi_playback_abort(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Replaced adapter-local playback termination recipes with runtime-owned
+  operations so transport/lifecycle paths now express cause instead of
+  manipulating playback state piece by piece:
+  - `transport_closed`
+  - `network_lost`
+  - XiaoZhi TTS interrupt
+  - `bridge_close`
+  - config-refresh busy guard
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Tightened the internal runtime boundary:
+  - adapter `transport_active()` and speaking-lane helpers now consume
+    `playback_output_active()` instead of reading raw playback flags directly
+  - playback worker liveness in the runtime module now also flows through the
+    same runtime-owned `queued_frames + output_active` predicate
+- This turns playback termination into a typed runtime API instead of a set of
+  duplicated adapter branches, which is a concrete prerequisite for the next
+  rebuild slice:
+  - move the remaining playback reset/terminal helpers fully behind the media
+    runtime and keep shrinking adapter/session cross-ownership
+
 ## Step 5.178
 - Landed the first real XiaoZhi downlink / playback runtime extraction slice so
   media playback ownership no longer lives as duplicated local logic inside

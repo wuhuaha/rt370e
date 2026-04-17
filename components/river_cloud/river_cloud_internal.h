@@ -326,6 +326,11 @@ void river_cloud_xiaozhi_playback_start_downlink_if_needed(void);
 river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
     const river_xiaozhi_event_t *event);
 uint32_t river_cloud_xiaozhi_playback_queued_frames(void);
+bool river_cloud_xiaozhi_playback_output_active(void);
+bool river_cloud_xiaozhi_playback_has_work(void);
+river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
+                                                  const char *stream_reason,
+                                                  bool interrupt_stream);
 void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  const char *text,
                                  const char *sid,

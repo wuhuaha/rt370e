@@ -217,9 +217,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - playback start / restart
 - `river_cloud_adapter.c` 现已改为通过共享内部接口调用该媒体运行时，
   不再保留同一套 playback/downlink 本地重复实现
+- playback runtime 已继续吸收下行播放终态语义：
+  - `playback_output_active`
+  - `playback_has_work`
+  - `playback_abort`
+- adapter 中 `transport_closed / network_lost / interrupt / bridge_close`
+  已改为调用统一 playback runtime 终止入口，而不是手工拼接：
+  - finalize
+  - reset downlink
+  - stop/interrupt stream
+  - reset playback
 
 下一步焦点：
 
+- 把剩余 playback reset / clear / terminal helper 再继续收进 playback runtime
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 在已抽离的 playback runtime 上重建更干净的
   `write_failed / underrun / rebuffer / cleared/completed` 终态模型

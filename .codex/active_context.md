@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.178 xiaozhi playback/downlink runtime extraction`
+  - `5.179 xiaozhi playback termination runtime ownership`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -48,6 +48,14 @@ or top-of-tree verification target changes.
       runtime APIs
     - `river_cloud_adapter.c` now consumes the playback runtime boundary
       instead of embedding duplicated playback/downlink implementations
+  - fourth landed slice on that plan:
+    - playback runtime now owns:
+      - `output_active`
+      - `has_work`
+      - `abort`
+      terminal semantics for XiaoZhi playback
+    - adapter close/interrupt/config-refresh branches no longer assemble
+      playback stop/reset logic from raw flags and ring/meta checks
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -213,8 +221,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - rebuild the extracted XiaoZhi playback runtime into a stricter
-    runtime-owned media truth engine
+  - move the remaining playback reset/terminal helpers fully behind the
+    extracted playback runtime
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only
