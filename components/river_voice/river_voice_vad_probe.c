@@ -72,6 +72,11 @@
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_RATIO_PCT 150U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_HIT_FRAMES 1U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES 5U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_REF_MARGIN_PEAK 960U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_MIN_ENHANCED_PEAK 2200U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_RATIO_PCT 180U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_DUCK_HIT_FRAMES 3U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_INTERRUPT_HIT_FRAMES 12U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_RELEASE_FRAMES 6U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_COOLDOWN_MS 1200U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_GAIN 0.45f
@@ -493,6 +498,12 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
     river_interaction_state_t interaction_state;
     uint64_t now_ms;
     bool near_end_speech;
+    bool strict_no_ref_gate;
+    uint16_t ref_margin_peak;
+    uint16_t min_enhanced_peak;
+    uint32_t ratio_pct;
+    uint8_t duck_hit_frames;
+    uint8_t interrupt_hit_frames;
     river_status_t interrupt_status;
 
     interaction_state = river_interaction_state_get();
@@ -509,12 +520,26 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
         return;
     }
 
-    near_end_speech =
-        g_river_voice_vad_probe.diag_enhanced_peak >= RIVER_VOICE_VAD_PROBE_BARGE_IN_MIN_ENHANCED_PEAK &&
+    strict_no_ref_gate = !river_playback_service_reference_enabled();
+    ref_margin_peak = strict_no_ref_gate ? RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_REF_MARGIN_PEAK :
+                                           RIVER_VOICE_VAD_PROBE_BARGE_IN_REF_MARGIN_PEAK;
+    min_enhanced_peak =
+        strict_no_ref_gate ? RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_MIN_ENHANCED_PEAK :
+                             RIVER_VOICE_VAD_PROBE_BARGE_IN_MIN_ENHANCED_PEAK;
+    ratio_pct = strict_no_ref_gate ? RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_RATIO_PCT :
+                                     RIVER_VOICE_VAD_PROBE_BARGE_IN_RATIO_PCT;
+    duck_hit_frames =
+        strict_no_ref_gate ? RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_DUCK_HIT_FRAMES :
+                             RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_HIT_FRAMES;
+    interrupt_hit_frames =
+        strict_no_ref_gate ? RIVER_VOICE_VAD_PROBE_BARGE_IN_NOREF_INTERRUPT_HIT_FRAMES :
+                             RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES;
+
+    near_end_speech = g_river_voice_vad_probe.diag_enhanced_peak >= min_enhanced_peak &&
         g_river_voice_vad_probe.diag_enhanced_peak >
-            (uint16_t)(playback_ref_peak + RIVER_VOICE_VAD_PROBE_BARGE_IN_REF_MARGIN_PEAK) &&
+            (uint16_t)(playback_ref_peak + ref_margin_peak) &&
         ((uint32_t)g_river_voice_vad_probe.diag_enhanced_peak * 100U) >=
-            ((uint32_t)playback_ref_peak * RIVER_VOICE_VAD_PROBE_BARGE_IN_RATIO_PCT);
+            ((uint32_t)playback_ref_peak * ratio_pct);
     if (!near_end_speech) {
         river_voice_vad_probe_consider_barge_in_release("near_end_not_ready");
         return;
@@ -524,12 +549,10 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
     if (g_river_voice_vad_probe.barge_in_hit_frames < 0xFFU) {
         g_river_voice_vad_probe.barge_in_hit_frames++;
     }
-    if (g_river_voice_vad_probe.barge_in_hit_frames >=
-        RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_HIT_FRAMES) {
+    if (g_river_voice_vad_probe.barge_in_hit_frames >= duck_hit_frames) {
         river_voice_vad_probe_arm_barge_in_duck();
     }
-    if (g_river_voice_vad_probe.barge_in_hit_frames <
-        RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES) {
+    if (g_river_voice_vad_probe.barge_in_hit_frames < interrupt_hit_frames) {
         return;
     }
 
@@ -543,11 +566,12 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
     g_river_voice_vad_probe.barge_in_last_trigger_ms = now_ms;
     g_river_voice_vad_probe.barge_in_hit_frames = 0U;
     g_river_voice_vad_probe.diag_barge_in_triggered++;
-    RIVER_LOGI("barge-in interrupt: afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u reason=sustained_near_end_speech",
+    RIVER_LOGI("barge-in interrupt: mode=%s afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u reason=sustained_near_end_speech",
+               strict_no_ref_gate ? "no_ref_strict" : "normal",
                (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
                (unsigned int)playback_ref_peak,
                (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15,
-               (unsigned int)RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES);
+               (unsigned int)interrupt_hit_frames);
     interrupt_status = river_cloud_adapter_interrupt_tts_with_reason("barge_in_near_end_vad");
     if (interrupt_status == RIVER_OK) {
         g_river_voice_vad_probe.barge_in_duck_active = false;

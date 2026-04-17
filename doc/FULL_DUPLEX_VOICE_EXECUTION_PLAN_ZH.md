@@ -1342,3 +1342,32 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
     - preview 很早到，但 accepted-turn 很晚
     - accepted-turn 已到，但 `response.start` 慢
     - `response.start` 已到，但首个 `audio.out.meta` 慢
+
+2026-04-17 端侧修复（5.174）：
+
+- 基于板端日志回归，先处理当前最影响体验的两条设备侧问题，而不是继续等
+  服务侧协商链路变化：
+  - 半双工 / `no_ref` 回退下的本地 barge-in interrupt 过于激进
+  - 下行播放预缓冲和 AudioTrack buffer 太浅，容易只播一小段
+- 本轮端侧收口：
+  - `no_ref` 回退播放改用更严格的 barge-in 判定：
+    - `ref_margin_peak`: `448 -> 960`
+    - `min_enhanced_peak`: `1200 -> 2200`
+    - `ratio_pct`: `150 -> 180`
+    - duck: `1 -> 3` hit frames
+    - interrupt: `5 -> 12` hit frames
+  - XiaoZhi 下行播放缓冲加深：
+    - ring: `16 -> 32`
+    - start watermark: `8 -> 12`
+    - playback buffer: `3 -> 6`
+    - compact fallback buffer: `2 -> 4`
+  - 播放启动日志现在会直接打印：
+    - `start=...`
+    - `buffer=...`
+- 下一步重点：
+  - 必须先把 `5.174` 烧到板上，再回归用户给出的原始场景
+  - 重点看：
+    - `barge-in interrupt: mode=no_ref_strict`
+    - `xiaozhi playback start: ... start=12 ... buffer=6 ...`
+    - `underrun`
+    - `xiaozhi playback write failed`

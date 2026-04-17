@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.173B supplement XiaoZhi preview/accept/response timing traces`
+  - `5.174 tighten no-ref barge-in + deepen XiaoZhi downlink playback buffering`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -142,6 +142,21 @@ or top-of-tree verification target changes.
     - the next focus is:
       - use `5.173A` + `5.173B` logs to validate the updated server-side
         collaboration chain once the service changes are available
+  - `5.174` is now landed:
+    - `no_ref` / half-duplex fallback playback no longer uses the same
+      aggressive local barge-in thresholds as duplex-ready playback
+    - local interruption in that path now requires stronger sustained evidence:
+      - higher peak / ratio / margin gates
+      - duck `3` hit frames
+      - interrupt `12` hit frames
+    - XiaoZhi downlink/playback buffering is now biased toward continuity:
+      - ring `32`
+      - start watermark `12`
+      - playback buffer `6`
+      - compact buffer `4`
+    - the next focus is:
+      - flash `5.174` to board and regress the original "未识别到有效语音 /
+        只播片段" scenario against the current half-duplex service deployment
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -185,8 +200,9 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - board regression and log validation of the landed `5.173` / `5.173A` /
-    `5.173B`
+  - board regression and log validation of the landed `5.174` playback
+    stabilization on the current half-duplex service path
+  - after that, return to the landed `5.173` / `5.173A` / `5.173B`
     negotiation, sparse-semantics, and playback-ack diagnostics against the
     next server-side collaboration update
 - Preserve the project flash profile:

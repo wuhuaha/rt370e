@@ -1,5 +1,37 @@
 # Change Log
 
+## Step 5.174
+- Tightened local barge-in interruption while XiaoZhi playback is running in
+  the current no-reference / half-duplex fallback path so brief leakage no
+  longer escalates into an immediate hard TTS cut:
+  - `no_ref` playback now uses stricter near-end speech gates:
+    - `ref_margin_peak`: `448 -> 960`
+    - `min_enhanced_peak`: `1200 -> 2200`
+    - `ratio_pct`: `150 -> 180`
+    - duck trigger: `1 -> 3` hit frames
+    - interrupt trigger: `5 -> 12` hit frames
+  - interrupt logs now explicitly expose `mode=no_ref_strict` for board-side
+    validation
+  - [components/river_voice/river_voice_vad_probe.c](/root/ameba-river/components/river_voice/river_voice_vad_probe.c)
+- Enlarged XiaoZhi downlink/playback buffering to prioritize full-sentence
+  continuity over minimum startup latency on the currently negotiated
+  half-duplex service path:
+  - downlink ring: `16 -> 32` frames
+  - playback start watermark: `8 -> 12` frames
+  - primary playback buffer: `3 -> 6` frames
+  - compact fallback playback buffer: `2 -> 4` frames
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Extended the XiaoZhi playback-start log so board traces can directly confirm
+  the active startup watermark and playback buffer size after flashing:
+  - `start=...`
+  - `buffer=...`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Updated the active duplex plan and context so this device-side playback
+  stabilization step is recorded as the newest landed slice for upcoming board
+  regression:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.173B
 - Completed the pending XiaoZhi transport timing-observation slice so board
   logs can correlate the server collaboration chain without changing current

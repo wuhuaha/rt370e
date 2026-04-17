@@ -2266,6 +2266,7 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
                                                                    size_t mono_bytes)
 {
     river_status_t status;
+    uint32_t buffer_frames = RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES;
     const bool reference_export = river_cloud_xiaozhi_playback_allows_vad_open();
     const char *mode = reference_export ? "ref" : "no_ref";
 
@@ -2285,13 +2286,14 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
     status = river_cloud_xiaozhi_try_start_playback(sample_rate,
                                                     frame_duration_ms,
                                                     mono_bytes,
-                                                    RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES,
+                                                    buffer_frames,
                                                     reference_export,
                                                     reference_export ?
                                                         RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS :
                                                         0U);
     if (status != RIVER_OK) {
         mode = "compact";
+        buffer_frames = RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK;
         RIVER_LOGW("xiaozhi playback start retry: status=%d -> compact mode no_ref buffer_frames=%u",
                    (int)status,
                    (unsigned int)RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK);
@@ -2299,7 +2301,7 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
             sample_rate,
             frame_duration_ms,
             mono_bytes,
-            RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK,
+            buffer_frames,
             false,
             0U);
         if (status != RIVER_OK) {
@@ -2307,12 +2309,14 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
         }
     }
 
-    RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu mode=%s gain=%d/%d",
+    RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu start=%u mode=%s buffer=%u gain=%d/%d",
                (unsigned long)sample_rate,
                (unsigned long)frame_duration_ms,
                (unsigned long)mono_bytes,
                (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring),
+               (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES,
                mode,
+               (unsigned int)buffer_frames,
                RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_NUM,
                RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_DEN);
     river_cloud_xiaozhi_mark_playback_started();

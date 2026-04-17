@@ -1,5 +1,60 @@
 # Verification
 
+## Step 5.174
+Validate that the branch now favors playback continuity on the current
+half-duplex XiaoZhi path and no longer allows `no_ref` barge-in to cut TTS on
+very short evidence:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'BARGE_IN_NOREF_|DOWNLINK_RING_FRAMES 32U|DOWNLINK_START_FRAMES 12U|PLAYBACK_BUFFER_FRAMES 6U|PLAYBACK_BUFFER_FRAMES_FALLBACK 4U|mode=%s buffer=%u|no_ref_strict|5\.174' \
+  components/river_voice/river_voice_vad_probe.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_adapter.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - `river_voice_vad_probe.c` contains the stricter `BARGE_IN_NOREF_*`
+    thresholds
+  - `river_cloud_internal.h` contains the enlarged `32 / 12 / 6 / 4` buffering
+    constants
+  - `river_cloud_adapter.c` logs `start=...` and `buffer=...`
+  - active context and duplex plan both record `5.174` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- XiaoZhi downlink status now reports queue capacity `32`
+
+Reproduce the original wake -> speak -> reply scenario and inspect monitor logs
+for lines similar to:
+```text
+xiaozhi playback start: ... queued=12 ... start=12 mode=no_ref buffer=6 ...
+barge-in interrupt: mode=no_ref_strict ... hit_frames=12 ...
+```
+
+Expected result:
+- `no_ref` playback starts only after a deeper downlink pre-buffer has built
+- if local barge-in still interrupts in `no_ref` mode, it now requires the
+  stricter `mode=no_ref_strict` path instead of the old `1/5` frame behavior
+- the original scenario should show fewer:
+  - `underrun`
+  - `xiaozhi playback write failed`
+  - playback-stop resets after only a short fragment
+
 ## Step 5.173B
 Validate that the branch now exposes a complete board-visible timing chain for
 `preview -> accept -> response.start -> audio.out.meta` without changing the
