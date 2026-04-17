@@ -1,5 +1,58 @@
 # Verification
 
+## Step 5.169
+Validate that speaking-time duplex-ready rounds now treat short silence and
+`input.endpoint` as hint/defer signals instead of immediate hard local close:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'endpoint_soft_close|hint-only endpoint|interrupt hint|speech_resumed|input_endpoint_clear|RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - endpoint-soft-close state is now tracked in the cloud runtime
+  - `input.speech.start` logs an `interrupt hint`
+  - `input.endpoint` logs `hint-only endpoint`
+  - local post-roll silence can arm the deferred close path
+  - active context and duplex plan both record `5.169` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status now prints a line similar to:
+  - `xiaozhi endpoint_soft_close pending=yes|no reason=... left_ms=...`
+
+Wake the board once and inspect the realtime logs:
+```text
+xiaozhi interrupt hint: trigger=input_speech_start ...
+xiaozhi hint-only endpoint: trigger=input_endpoint ...
+xiaozhi hint-only endpoint: trigger=post_roll reason=local_silence ...
+xiaozhi deferred local close cancelled: trigger=speech_resumed ...
+xiaozhi deferred local close resolved: trigger=endpoint_soft_close_timeout ...
+```
+
+Expected result:
+- half-duplex default behavior remains unchanged when duplex-ready is false
+- duplex-ready speaking path no longer closes immediately on the first short
+  local silence or `input.endpoint`
+- speech resumption within the short defer window keeps the round alive
+
 ## Step 5.168
 Validate that XiaoZhi speaking-time duplex decisions now depend on runtime
 readiness instead of only the active profile's static playback-reference

@@ -491,14 +491,13 @@ go test ./internal/gateway
 ## 8. 当前建议执行顺序
 
 - 第一优先：
-  - `5.169` 端侧 speaking-time local endpoint / round close 软化
-- 第二优先：
   - `5.170` 端侧 speaking-time uplink continuation
+- 第二优先：
   - `5.171` 端侧 duck-first interruption policy
-- 第三优先：
   - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
-- 最后收口：
+- 第三优先：
   - `5.173` 默认开启条件、回退条件和回归矩阵
+- 最后收口：
   - `J2` discovery / protocol 口径升级
 
 ## 9. 当前最重要的判定
@@ -976,6 +975,27 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 - `playback_ref`
 
 ### 10.3 Step 5.169: speaking-time local endpoint 软化
+
+状态：
+
+- 已落地设备侧 baseline：
+  - duplex-ready + speaking-time 路径下，端侧新增了 `endpoint_soft_close`
+    运行时状态：
+    - `pending`
+    - `reason`
+    - `left_ms`
+  - `input.speech.start` 现会在 duplex-ready speaking 路径上输出显式
+    `interrupt hint`
+  - `input.endpoint(candidate=true)` 现会输出 `hint-only endpoint`，并只
+    arm 一个短的 deferred local close，而不是立刻硬收尾
+  - 本地 post-roll silence 在 duplex-ready speaking 路径上也改为：
+    - 先 arm deferred local close
+    - 若短窗口内 speech 恢复则取消
+    - 若超时仍静音才真正进入现有 `finish_active_stream()` 收尾链
+  - 相关 state 会在 session close / transport reset 时清理，避免旧 hint
+    泄漏到下一轮
+  - half-duplex 默认路径保持不变
+  - 下一步由 `5.170` 继续推进 speaking-time uplink continuation
 
 目标：
 

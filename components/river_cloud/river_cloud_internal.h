@@ -83,6 +83,7 @@
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
+#define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_MARK_INTERVAL_MS 80U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
@@ -188,6 +189,7 @@ typedef struct {
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
+    bool xiaozhi_endpoint_soft_close_pending;
     bool xiaozhi_io_started;
     bool xiaozhi_downlink_started;
     rtos_mutex_t xiaozhi_control_lock;
@@ -216,6 +218,7 @@ typedef struct {
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
     uint64_t xiaozhi_local_close_deadline_ms;
+    uint64_t xiaozhi_endpoint_soft_close_deadline_ms;
     uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
     uint32_t xiaozhi_control_read_index;
     uint32_t xiaozhi_control_write_index;
@@ -262,6 +265,7 @@ typedef struct {
     char xiaozhi_preview_stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char xiaozhi_preview_source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
     char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
+    char xiaozhi_endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     uint32_t xiaozhi_preview_audio_offset_ms;
     char xiaozhi_turn_id[RIVER_CLOUD_XIAOZHI_TURN_ID_MAX];
     char xiaozhi_accept_reason[RIVER_CLOUD_XIAOZHI_ACCEPT_REASON_MAX];

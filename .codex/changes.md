@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.169
+- Softened XiaoZhi speaking-time local endpoint handling on the device so
+  duplex-ready rounds no longer hard-close immediately on short silence or
+  `input.endpoint`:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Added a speaking-time `endpoint_soft_close` runtime lane:
+  - pending flag
+  - deadline
+  - reason
+  - status output
+- Introduced a duplex-ready-only endpoint softening gate:
+  - only activates when runtime `duplex_ready=yes`
+  - only activates while the output lane is effectively speaking
+  - keeps the shipped half-duplex baseline unchanged
+- Converted server preview milestones into hint semantics instead of local hard
+  close commands:
+  - `input.speech.start` now emits an explicit `interrupt hint` log on the
+    duplex-ready speaking path
+  - `input.endpoint(candidate=true)` now emits `hint-only endpoint` and arms a
+    short deferred local-close timer instead of immediately closing the round
+  - resumed preview / speech cancels the pending soft close
+- Softened local silence endpointing during speaking-time duplex:
+  - when local post-roll silence is reached in the duplex-ready speaking path,
+    the board now arms deferred local close instead of immediately calling
+    `finish_active_stream()`
+  - if speech resumes before the short defer window expires, the pending close
+    is canceled and the round continues
+  - if silence holds through the defer window, the board then finishes the
+    active stream and falls back to the existing close / result pipeline
+- Extended reset / session-close paths to clear the new endpoint-soft-close
+  state so stale hint timers do not leak across rounds or transports.
+- Updated the active duplex context so `5.169` is now recorded as landed and
+  the next slice moves to `5.170`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.168
 - Tightened XiaoZhi duplex admission from static profile capability to a
   runtime-truthful `duplex_ready` gate:
