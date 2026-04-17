@@ -1,5 +1,50 @@
 # Change Log
 
+## Step 5.176
+- Saved a new architecture review that captures the current root causes behind
+  slow XiaoZhi response and playback churn, then re-designed the target runtime
+  layering around a core-owned dialog runtime, explicit media engines, and
+  typed ports:
+  - [doc/VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17.md](/root/ameba-river/doc/VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17.md)
+- Created and registered a new multi-step runtime re-architecture execution
+  plan so the branch stops treating the recurring latency/playback regressions
+  as isolated local bugs:
+  - [doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+- Introduced a core-owned dialog cloud port and rewired the boot path to
+  register the concrete cloud adapter in one place:
+  - new stable port interface:
+    - [include/river/river_dialog_cloud_port.h](/root/ameba-river/include/river/river_dialog_cloud_port.h)
+  - new core implementation:
+    - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+  - boot-time port registration:
+    - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+  - build wiring:
+    - [components/river_core/CMakeLists.txt](/root/ameba-river/components/river_core/CMakeLists.txt)
+- Removed the direct `river_voice -> river_cloud` calls from the hot voice
+  path so `river_voice` now consumes the dialog port instead of provider
+  specifics:
+  - [components/river_voice/river_voice_vad_probe.c](/root/ameba-river/components/river_voice/river_voice_vad_probe.c)
+  - [components/river_voice/river_voice_segment_sink.c](/root/ameba-river/components/river_voice/river_voice_segment_sink.c)
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+- Finished the pending XiaoZhi uplink pacing fix so the media path now models
+  retry-pending in-flight frames explicitly instead of implicitly dropping them:
+  - added `ready_frames` accounting that includes the retry-pending frame
+  - `io_service_uplink()` now drains up to
+    `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` frames per invocation
+  - `BUSY` and generic send failures now preserve the current frame for retry
+    instead of consuming and losing it
+  - `listen_stop` finalization now waits for the retry-pending frame as part of
+    the ready queue
+  - round-finish logs now expose:
+    - `audio_ms`
+    - `realtime_gap_ms`
+    - `pace_pct`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+
 ## Step 5.175
 - Addressed the three device-side playback regressions exposed by the latest
   XiaoZhi board log instead of waiting on further server-side TTS changes:

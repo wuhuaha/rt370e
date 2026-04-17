@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.175 reduce XiaoZhi playback gain + duck-only no_ref barge-in + rebuffer write_failed`
+  - `5.176 core-owned dialog cloud port + XiaoZhi uplink burst retry pacing`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - created a dedicated runtime re-architecture track for the recurring
+    device-side latency / playback churn issues:
+    - architecture review:
+      - `doc/VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17.md`
+    - active execution plan:
+      - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
+  - current first landed slice on that plan:
+    - added a core-owned dialog cloud port so `river_voice` no longer calls
+      `river_cloud_*` directly
+    - hardened XiaoZhi uplink pacing with:
+      - retry-preserved in-flight frame ownership
+      - bounded burst drain
+      - round-level pacing metrics
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -172,7 +185,7 @@ or top-of-tree verification target changes.
         `write_failed` / short-playback scenario against the current
         half-duplex service deployment
 - Primary active execution plan:
-  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+  - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
 
 ## Current Runtime Focus
 
@@ -184,6 +197,10 @@ or top-of-tree verification target changes.
   - XiaoZhi full-duplex experiment advertisement on
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
+- Current highest-priority runtime cleanup is now:
+  - establish a core-owned dialog runtime boundary
+  - keep shrinking `river_voice <-> river_cloud` direct coupling
+  - fix XiaoZhi media-plane ownership before resuming larger duplex slices
 - Keep the landed collaboration baseline explicit and conservative:
   - accepted-turn is confirmed only from `session.update.accept_reason`
   - preview events remain observation-only
@@ -209,6 +226,8 @@ or top-of-tree verification target changes.
   - `session.start` / `audio.in.commit` / `text.in`
   - PCM16 uplink and PCM16 downlink
 - Drive current multi-step work from:
+  - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
+- Keep the duplex execution plan as a supporting protocol/runtime baseline:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 - Keep the XiaoZhi stability plan as a supporting baseline while duplex work
   continues:

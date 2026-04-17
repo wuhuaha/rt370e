@@ -7,8 +7,9 @@ of encoding long plan content directly in root entry files.
 ## Active Plans
 
 - Primary active execution plan:
-  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+  - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
 - Secondary active execution plans:
+  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 
 ## If A New Multi-Step Task Starts

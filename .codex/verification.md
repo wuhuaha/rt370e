@@ -1,5 +1,63 @@
 # Verification
 
+## Step 5.176
+Validate that the branch now records the runtime re-architecture direction,
+removes direct `river_voice -> river_cloud` coupling, and preserves XiaoZhi
+uplink frames across retry paths while exposing pacing metrics:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_' components/river_voice
+rg -n 'river_dialog_cloud_port|river_dialog_cloud_' \
+  include/river/river_dialog_cloud_port.h \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_core/river_app.c \
+  components/river_voice/river_voice_vad_probe.c \
+  components/river_voice/river_voice_segment_sink.c \
+  components/river_voice/river_voice_kws.cc
+rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace_pct=|VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH|VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  .codex/active_context.md \
+  .codex/active_plans.md \
+  .codex/changes.md \
+  doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md \
+  doc/VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `rg -n 'river_cloud_' components/river_voice` returns no matches
+- static grep confirms:
+  - the new dialog cloud port exists and is used by `river_voice`
+  - uplink retry/burst/pacing metrics exist in the XiaoZhi runtime path
+  - the new architecture review and execution plan are both linked from the
+    active context / plan records
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Run one wake / speak / reply round and inspect monitor logs for lines similar
+to:
+```text
+xiaozhi asr round finish: ... audio_ms=... realtime_gap_ms=... pace_pct=...
+```
+
+Expected result:
+- if the previous slow-uplink issue still reproduces, board logs can now state
+  directly how far wall-clock uplink pace drifted from audio time
+- if the uplink worker catches up correctly, `pace_pct` should move closer to
+  realtime and `realtime_gap_ms` should shrink compared with the previous logs
+
 ## Step 5.175
 Validate that the branch now removes local TTS over-gain, suppresses hard
 `no_ref` barge-in cuts, and resumes from `write_failed` through a deeper

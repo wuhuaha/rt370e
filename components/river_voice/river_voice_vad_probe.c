@@ -11,7 +11,7 @@
 #include "audio/audio_control.h"
 #include "audio/audio_service.h"
 
-#include "river/river_cloud.h"
+#include "river/river_dialog_cloud_port.h"
 #include "river/river_interaction_state.h"
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
@@ -580,7 +580,7 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
                (unsigned int)playback_ref_peak,
                (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15,
                (unsigned int)interrupt_hit_frames);
-    interrupt_status = river_cloud_adapter_interrupt_tts_with_reason("barge_in_near_end_vad");
+    interrupt_status = river_dialog_cloud_interrupt_tts_with_reason("barge_in_near_end_vad");
     if (interrupt_status == RIVER_OK) {
         g_river_voice_vad_probe.barge_in_duck_active = false;
         g_river_voice_vad_probe.barge_in_release_frames = 0U;
@@ -591,7 +591,7 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
 
 static void river_voice_vad_probe_close_audio(void)
 {
-    river_cloud_asr_audio_close();
+    river_dialog_cloud_asr_audio_close();
     river_voice_detector_close(&g_river_voice_vad_probe.detector);
     river_voice_preproc_close(&g_river_voice_vad_probe.preproc);
     river_voice_capture_close(&g_river_voice_vad_probe.capture);
@@ -657,9 +657,9 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
     segment_config.post_roll_ms = RIVER_VOICE_VAD_PROBE_POST_ROLL_MS;
     segment_config.max_segment_ms = RIVER_VOICE_VAD_PROBE_MAX_SEGMENT_MS;
 
-    if (!river_cloud_asr_batch_supported()) {
+    if (!river_dialog_cloud_asr_batch_supported()) {
         RIVER_LOGI("vad probe segment buffer disabled: provider=%s batch=no stream-only bridge active",
-                   river_cloud_asr_provider_name());
+                   river_dialog_cloud_provider_name());
         return RIVER_OK;
     }
 
@@ -674,7 +674,7 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
                    (unsigned long)free_heap,
                    (unsigned long)required_segment_bytes,
                    (unsigned long)RIVER_VOICE_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_BYTES,
-                   river_cloud_asr_provider_name());
+                   river_dialog_cloud_provider_name());
         return RIVER_OK;
     }
 
@@ -683,7 +683,7 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
         RIVER_LOGW("vad probe segment buffer open failed: free_heap=%luB required~%luB provider=%s; continue stream-only",
                    (unsigned long)free_heap,
                    (unsigned long)required_segment_bytes,
-                   river_cloud_asr_provider_name());
+                   river_dialog_cloud_provider_name());
         return RIVER_OK;
     }
     g_river_voice_vad_probe.segment_buffer_enabled = true;
@@ -693,7 +693,7 @@ static river_status_t river_voice_vad_probe_prepare_buffers(void)
 
 static river_status_t river_voice_vad_probe_open_audio(void)
 {
-    river_cloud_asr_audio_desc_t audio_desc;
+    river_dialog_asr_audio_desc_t audio_desc;
     const river_voice_profile_config_t *voice_profile;
     bool use_reference;
 
@@ -735,9 +735,9 @@ static river_status_t river_voice_vad_probe_open_audio(void)
     audio_desc.bits_per_sample = 16U;
     audio_desc.frame_ms = g_river_voice_vad_probe.capture.frame_ms;
     audio_desc.encoding = "pcm_s16le";
-    if (river_cloud_asr_audio_open(&audio_desc,
-                                   RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
-                                   RIVER_VOICE_VAD_PROBE_POST_ROLL_MS) != RIVER_OK) {
+    if (river_dialog_cloud_asr_audio_open(&audio_desc,
+                                          RIVER_VOICE_VAD_PROBE_PRE_ROLL_MS,
+                                          RIVER_VOICE_VAD_PROBE_POST_ROLL_MS) != RIVER_OK) {
         RIVER_LOGE("vad probe cloud asr bridge open failed");
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -979,7 +979,7 @@ static void river_voice_vad_probe_task(void *param)
                 river_voice_segment_buffer_release_ready(&g_river_voice_vad_probe.segment_buffer);
             }
 
-            cloud_status = river_cloud_asr_stream_push_frame(
+            cloud_status = river_dialog_cloud_asr_stream_push_frame(
                 g_river_voice_vad_probe.enhanced_buffer,
                 g_river_voice_vad_probe.enhanced_chunk_bytes,
                 detector_result.is_speech);
@@ -990,7 +990,7 @@ static void river_voice_vad_probe_task(void *param)
                 g_river_voice_vad_probe.diag_cloud_stream_busy++;
                 if (detector_result.is_speech && !previous_vad_state) {
                     RIVER_LOGI("speech detected but cloud stream backpressured/deferred: provider=%s status=%d wifi=%s",
-                               river_cloud_asr_provider_name(),
+                               river_dialog_cloud_provider_name(),
                                cloud_status,
                                river_wifi_station_status_name());
                 }
@@ -998,7 +998,7 @@ static void river_voice_vad_probe_task(void *param)
                 g_river_voice_vad_probe.diag_cloud_stream_fail++;
                 if (detector_result.is_speech && !previous_vad_state) {
                     RIVER_LOGW("speech detected but cloud stream push failed: provider=%s status=%d wifi=%s",
-                               river_cloud_asr_provider_name(),
+                               river_dialog_cloud_provider_name(),
                                cloud_status,
                                river_wifi_station_status_name());
                 }

@@ -563,6 +563,7 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     g_river_cloud.xiaozhi_window_deadline_ms = 0U;
     g_river_cloud.xiaozhi_listen_stop_pending = false;
     g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
+    g_river_cloud.xiaozhi_uplink_retry_valid = false;
     g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
     g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
     g_river_cloud.xiaozhi_local_close_pending = false;

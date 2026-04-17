@@ -1,7 +1,7 @@
 /* 语音分段桥接：把分段数据转交给当前云端或后续下游。 */
 #include <string.h>
 
-#include "river/river_cloud.h"
+#include "river/river_dialog_cloud_port.h"
 #include "river/river_log.h"
 #include "river/river_voice_segment_sink.h"
 
@@ -28,7 +28,7 @@ river_status_t river_voice_segment_sink_submit(const uint8_t *data,
         return RIVER_ERR_ARG;
     }
 
-    switch (river_cloud_asr_batch_submit_segment(data, bytes, segment)) {
+    switch (river_dialog_cloud_asr_batch_submit_segment(data, bytes, segment)) {
     case RIVER_OK:
         break;
     case RIVER_ERR_UNSUPPORTED:
@@ -57,9 +57,9 @@ void river_voice_segment_sink_dump_profile(void)
 {
     RIVER_LOGI("segment sink: %s provider=%s stream=%s batch=%s total_bytes=%lu last_bytes=%lu segments=%lu unsupported=%lu fail=%lu",
                river_voice_segment_sink_name(),
-               river_cloud_asr_provider_name(),
-               river_cloud_asr_streaming_supported() ? "yes" : "no",
-               river_cloud_asr_batch_supported() ? "yes" : "no",
+               river_dialog_cloud_provider_name(),
+               river_dialog_cloud_asr_streaming_supported() ? "yes" : "no",
+               river_dialog_cloud_asr_batch_supported() ? "yes" : "no",
                (unsigned long)g_river_voice_segment_sink_bridge.submitted_bytes,
                (unsigned long)g_river_voice_segment_sink_bridge.last_segment_bytes,
                (unsigned long)g_river_voice_segment_sink_bridge.submitted_segments,

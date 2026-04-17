@@ -23,7 +23,7 @@ extern "C" {
 #include "os_wrapper.h"
 #include "real_fft.h"
 #include "river/river_audio_frame_ring.h"
-#include "river/river_cloud.h"
+#include "river/river_dialog_cloud_port.h"
 #include "river/river_interaction_state.h"
 #include "river/river_log.h"
 #include "river/river_voice.h"
@@ -2456,7 +2456,7 @@ static void river_voice_kws_reset_frontend(river_voice_kws_context_t *context)
 
 static bool river_voice_kws_detection_allowed(void)
 {
-    if (river_cloud_adapter_conversation_window_active()) {
+    if (river_dialog_cloud_conversation_window_active()) {
         return false;
     }
 
@@ -4644,7 +4644,7 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
     if (!river_voice_kws_detection_allowed()) {
         RIVER_LOGW("kws align requires idle wake monitoring: interaction=%s window=%s",
                    river_interaction_state_name(river_interaction_state_get()),
-                   river_cloud_adapter_conversation_window_active() ? "open" : "closed");
+                   river_dialog_cloud_conversation_window_active() ? "open" : "closed");
         return RIVER_ERR_BUSY;
     }
 
