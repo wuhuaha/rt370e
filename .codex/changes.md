@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.180
+- Moved the remaining XiaoZhi playback reset / meta / stop helpers out of the
+  session runtime and into the dedicated playback runtime so media-owned state
+  is no longer implemented in two different modules:
+  - `river_cloud_xiaozhi_clear_playback_meta_state()`
+  - `river_cloud_xiaozhi_cancel_playback_stop()`
+  - `river_cloud_xiaozhi_playback_note_duplex_ready()`
+  - `river_cloud_xiaozhi_mark_playback_started()`
+  - `river_cloud_xiaozhi_arm_playback_stop()`
+  - `river_cloud_xiaozhi_reset_playback_state()`
+  - `river_cloud_xiaozhi_reset_downlink_state()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Tightened session/adapter behavior around the new runtime truth boundary:
+  - `river_cloud_xiaozhi_playback_allows_vad_open()` now reports duplex-ready
+    playback state through a runtime-owned helper instead of mutating playback
+    fields inside `session.c`
+  - follow-up window timeout now blocks on `playback_has_work()`
+  - XiaoZhi TTS interrupt admission now also keys off `playback_has_work()`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- This closes the “remaining playback helper ownership” cleanup from the
+  execution plan and leaves the next slice focused on real terminal/recovery
+  behavior instead of ownership churn:
+  - rebuild `write_failed / underrun / rebuffer / cleared-completed` semantics
+    on top of the now runtime-owned playback state
+
 ## Step 5.179
 - Moved XiaoZhi playback terminal ownership one step further toward a true
   runtime-owned media source instead of leaving adapter branches to assemble

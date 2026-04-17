@@ -227,13 +227,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - reset downlink
   - stop/interrupt stream
   - reset playback
+- playback runtime 已继续吸收剩余 playback helper 所属权：
+  - `clear_playback_meta_state`
+  - `cancel_playback_stop`
+  - `playback_note_duplex_ready`
+  - `mark_playback_started`
+  - `arm_playback_stop`
+  - `reset_playback_state`
+  - `reset_downlink_state`
+- `river_cloud_xiaozhi_session.c` 已不再实现 playback 自身的
+  reset/meta/stop helper
+- `followup_timeout` 与 XiaoZhi `interrupt` 分支现在都通过 runtime
+  playback predicate 判断媒体工作量，而不是直接拼原始播放字段
 
 下一步焦点：
 
-- 把剩余 playback reset / clear / terminal helper 再继续收进 playback runtime
-- 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
-- 在已抽离的 playback runtime 上重建更干净的
+- 在已 runtime-owned 的 playback 状态基座上重建
   `write_failed / underrun / rebuffer / cleared/completed` 终态模型
+- 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 
 ### Step D: 重建 downlink / playback 恢复模型

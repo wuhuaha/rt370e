@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.180
+Validate that the remaining XiaoZhi playback reset/meta/stop helpers are now
+implemented in the playback runtime, and that session/adapter branches consume
+runtime predicates instead of raw playback fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_(clear_playback_meta_state|cancel_playback_stop|playback_note_duplex_ready|mark_playback_started|arm_playback_stop|reset_playback_state|reset_downlink_state)\\(' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+rg -n 'playback_has_work|playback_note_duplex_ready' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the helper implementations live in
+    `river_cloud_xiaozhi_playback_runtime.c`
+  - `river_cloud_xiaozhi_session.c` consumes the runtime helper boundary
+    instead of defining those playback helpers locally
+  - interrupt/window-timeout/duplex-ready branches now read
+    `playback_has_work()` or `playback_note_duplex_ready()`
+
 ## Step 5.179
 Validate that playback termination truth is now exposed as runtime-owned
 queries/operations and that adapter close/interrupt branches consume those

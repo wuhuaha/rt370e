@@ -328,6 +328,7 @@ river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
 uint32_t river_cloud_xiaozhi_playback_queued_frames(void);
 bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_has_work(void);
+void river_cloud_xiaozhi_playback_note_duplex_ready(void);
 river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
                                                   const char *stream_reason,
                                                   bool interrupt_stream);

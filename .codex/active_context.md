@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.179 xiaozhi playback termination runtime ownership`
+  - `5.180 xiaozhi playback helper runtime ownership`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -56,6 +56,17 @@ or top-of-tree verification target changes.
       terminal semantics for XiaoZhi playback
     - adapter close/interrupt/config-refresh branches no longer assemble
       playback stop/reset logic from raw flags and ring/meta checks
+  - fifth landed slice on that plan:
+    - playback runtime now also owns the remaining playback-local helper set:
+      - playback meta clear
+      - stop cancel / stop arm
+      - playback start / reset
+      - downlink reset
+      - duplex-ready playback note
+    - `river_cloud_xiaozhi_session.c` no longer implements playback-owned
+      reset/meta/stop helpers
+    - follow-up timeout and XiaoZhi interrupt admission now key off runtime
+      playback predicates instead of direct raw playback fields
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -221,8 +232,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - move the remaining playback reset/terminal helpers fully behind the
-    extracted playback runtime
+  - rebuild `write_failed / underrun / rebuffer / cleared-completed`
+    semantics on top of the now runtime-owned playback state
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

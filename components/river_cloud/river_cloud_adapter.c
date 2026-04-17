@@ -2336,8 +2336,7 @@ river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason)
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled() &&
-        (g_river_cloud.xiaozhi_playback_active ||
-         g_river_cloud.xiaozhi_tts_stop_pending ||
+        (river_cloud_xiaozhi_playback_has_work() ||
          g_river_cloud.xiaozhi_listening ||
          river_xiaozhi_session_open())) {
         status = RIVER_OK;
