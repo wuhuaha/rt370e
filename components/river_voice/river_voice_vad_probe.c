@@ -565,6 +565,14 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
 
     g_river_voice_vad_probe.barge_in_last_trigger_ms = now_ms;
     g_river_voice_vad_probe.barge_in_hit_frames = 0U;
+    if (strict_no_ref_gate) {
+        RIVER_LOGI("barge-in interrupt suppressed: mode=no_ref_duck_only afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u reason=sustained_near_end_speech",
+                   (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
+                   (unsigned int)playback_ref_peak,
+                   (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15,
+                   (unsigned int)interrupt_hit_frames);
+        return;
+    }
     g_river_voice_vad_probe.diag_barge_in_triggered++;
     RIVER_LOGI("barge-in interrupt: mode=%s afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u reason=sustained_near_end_speech",
                strict_no_ref_gate ? "no_ref_strict" : "normal",

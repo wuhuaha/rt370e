@@ -183,6 +183,8 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_cleared_reported = false;
     g_river_cloud.xiaozhi_playback_completed_reported = false;
     g_river_cloud.xiaozhi_playback_last_segment = false;
+    g_river_cloud.xiaozhi_playback_rebuffer_pending = false;
+    g_river_cloud.xiaozhi_playback_rebuffer_count = 0U;
     g_river_cloud.xiaozhi_playback_segment_head = 0U;
     g_river_cloud.xiaozhi_playback_segment_count = 0U;
     g_river_cloud.xiaozhi_playback_expected_duration_ms = 0U;
@@ -540,6 +542,9 @@ void river_cloud_xiaozhi_reset_downlink_state(void)
         river_audio_frame_ring_reset(&g_river_cloud.xiaozhi_downlink_ring);
     }
     g_river_cloud.xiaozhi_downlink_ring_dropped = 0U;
+    g_river_cloud.xiaozhi_downlink_retry_valid = false;
+    g_river_cloud.xiaozhi_playback_rebuffer_pending = false;
+    g_river_cloud.xiaozhi_playback_rebuffer_count = 0U;
 }
 
 void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)

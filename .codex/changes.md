@@ -1,5 +1,39 @@
 # Change Log
 
+## Step 5.175
+- Addressed the three device-side playback regressions exposed by the latest
+  XiaoZhi board log instead of waiting on further server-side TTS changes:
+  - reduced local digital gain during mono->stereo expansion from `5/2` to
+    unity `1/1`, so the current 16 kHz playback path no longer amplifies and
+    clips already-hot service audio
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Changed the strict `no_ref` half-duplex barge-in path from “duck then hard
+  interrupt” to “duck only”:
+  - once the stricter `no_ref` evidence threshold is met, the board now logs
+    `barge-in interrupt suppressed: mode=no_ref_duck_only ...`
+  - the local ducking path stays active, but the device no longer cuts XiaoZhi
+    TTS outright just because the no-reference fallback saw sustained near-end
+    speech
+  - [components/river_voice/river_voice_vad_probe.c](/root/ameba-river/components/river_voice/river_voice_vad_probe.c)
+- Reworked the XiaoZhi downlink `write_failed` path from “clear playback and
+  drop the round” into “rebuffer and resume”:
+  - playback metadata / segment queue is preserved across `write_failed`
+  - the failing frame is retained for retry instead of being silently dropped
+  - ACK progress pauses while rebuffering, so `audio.out.mark` timing no longer
+    advances during the gap
+  - restart now waits for a deeper resume watermark: `18` frames
+  - board logs now expose:
+    - `rebuffer=yes`
+    - `xiaozhi playback rebuffer requested: ...`
+    - `xiaozhi playback rebuffer resumed: ...`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Updated the active context and duplex execution plan so this playback-fix
+  slice is recorded as the latest landed step before the next board regression:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.174
 - Tightened local barge-in interruption while XiaoZhi playback is running in
   the current no-reference / half-duplex fallback path so brief leakage no

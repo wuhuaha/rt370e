@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.174 tighten no-ref barge-in + deepen XiaoZhi downlink playback buffering`
+  - `5.175 reduce XiaoZhi playback gain + duck-only no_ref barge-in + rebuffer write_failed`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -157,6 +157,20 @@ or top-of-tree verification target changes.
     - the next focus is:
       - flash `5.174` to board and regress the original "未识别到有效语音 /
         只播片段" scenario against the current half-duplex service deployment
+  - `5.175` is now landed:
+    - local XiaoZhi playback gain is back to unity:
+      - `5/2 -> 1/1`
+    - strict `no_ref` barge-in no longer escalates to a hard interrupt:
+      - the board now keeps ducking but logs
+        `mode=no_ref_duck_only`
+    - `write_failed` no longer clears playback state immediately:
+      - the current frame is retained for retry
+      - playback ACK timing pauses while rebuffering
+      - resume now waits for a deeper `18`-frame watermark
+    - the next focus is:
+      - flash `5.175` to board and regress the original clipping /
+        `write_failed` / short-playback scenario against the current
+        half-duplex service deployment
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -200,7 +214,7 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - board regression and log validation of the landed `5.174` playback
+  - board regression and log validation of the landed `5.175` playback
     stabilization on the current half-duplex service path
   - after that, return to the landed `5.173` / `5.173A` / `5.173B`
     negotiation, sparse-semantics, and playback-ack diagnostics against the

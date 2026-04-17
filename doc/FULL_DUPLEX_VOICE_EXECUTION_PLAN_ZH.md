@@ -1371,3 +1371,38 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
     - `xiaozhi playback start: ... start=12 ... buffer=6 ...`
     - `underrun`
     - `xiaozhi playback write failed`
+
+2026-04-17 端侧修复（5.175）：
+
+- 在用户追加的新板端日志里，问题已经进一步收敛到三条明确的设备侧缺陷：
+  - 本地播放增益仍然过高，`gain=5/2` 容易把服务端已经偏热的语音继续放大
+  - `no_ref_strict` 仍会在半双工回退路径下对 TTS 执行硬打断
+  - `write_failed` 仍走“清空播放上下文 + reset 下行”的破坏性路径，导致
+    一句话播到一半就断、然后整段重起
+- 本轮端侧收口：
+  - XiaoZhi 本地播放增益改回 unity：
+    - `5/2 -> 1/1`
+  - 严格 `no_ref` barge-in 改为：
+    - 保持 duck
+    - suppress hard interrupt
+    - monitor 日志改为：
+      - `barge-in interrupt suppressed: mode=no_ref_duck_only ...`
+  - `write_failed` 改为 rebuffer / resume：
+    - 保留当前 playback meta / segment 队列
+    - 保留失败帧做 retry，而不是直接丢掉
+    - ACK 计时在重缓冲期间暂停，避免 `audio.out.mark` 虚增
+    - 恢复起播门槛改为更深的：
+      - `18` frames
+    - monitor 日志新增：
+      - `rebuffer=yes`
+      - `xiaozhi playback rebuffer requested: ...`
+      - `xiaozhi playback rebuffer resumed: ...`
+- 下一步重点：
+  - 必须先把 `5.175` 烧到板上，再回归同一条用户场景
+  - 重点看：
+    - `xiaozhi playback start: ... gain=1/1 ... rebuffer=yes|no`
+    - `barge-in interrupt suppressed: mode=no_ref_duck_only`
+    - `xiaozhi playback rebuffer requested`
+    - `xiaozhi playback rebuffer resumed`
+    - `underrun`
+    - `xiaozhi playback write failed`

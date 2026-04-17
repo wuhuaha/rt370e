@@ -64,6 +64,7 @@
 /* Favor continuity over lowest latency while the service often stays on no-ref playback. */
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES 32U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES 12U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_START_FRAMES 18U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 4U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
@@ -107,6 +108,7 @@ typedef struct {
     bool started_ack_reported;
     bool is_last_segment;
     uint64_t started_at_ms;
+    uint64_t paused_at_ms;
     uint32_t expected_duration_ms;
     uint32_t last_mark_ms;
     char response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
@@ -186,6 +188,7 @@ typedef struct {
     bool xiaozhi_playback_completed_reported;
     bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
+    bool xiaozhi_playback_rebuffer_pending;
     bool xiaozhi_playback_duplex_ready_seen;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
@@ -225,6 +228,7 @@ typedef struct {
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
+    uint32_t xiaozhi_playback_rebuffer_count;
     uint32_t xiaozhi_playback_segment_head;
     uint32_t xiaozhi_playback_segment_count;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
@@ -239,6 +243,7 @@ typedef struct {
                                           RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES];
     uint8_t xiaozhi_downlink_task_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
     uint8_t xiaozhi_downlink_drop_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
+    bool xiaozhi_downlink_retry_valid;
     int16_t xiaozhi_downlink_mono[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX];
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
     river_cloud_xiaozhi_control_request_t

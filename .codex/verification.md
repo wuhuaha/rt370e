@@ -1,5 +1,58 @@
 # Verification
 
+## Step 5.175
+Validate that the branch now removes local TTS over-gain, suppresses hard
+`no_ref` barge-in cuts, and resumes from `write_failed` through a deeper
+rebuffer path instead of clearing playback:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'PLAYBACK_GAIN_NUM 1|PLAYBACK_GAIN_DEN 1|DOWNLINK_REBUFFER_START_FRAMES 18U|rebuffer requested|rebuffer resumed|rebuffer=%s|interrupt suppressed: mode=no_ref_duck_only|paused_at_ms|downlink_retry_valid|5\.175' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_voice/river_voice_vad_probe.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - playback gain is now `1/1`
+  - the branch contains the `18`-frame rebuffer watermark and retry-frame path
+  - `river_voice_vad_probe.c` now logs `mode=no_ref_duck_only`
+  - active context and duplex plan both record `5.175` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Run the same reproduction that previously showed:
+```text
+barge-in interrupt: mode=no_ref_strict ...
+xiaozhi playback write failed: ...
+underrun
+```
+
+Expected result:
+- local monitor logs now prefer:
+  - `barge-in interrupt suppressed: mode=no_ref_duck_only ...`
+  - `xiaozhi playback start: ... gain=1/1 ... rebuffer=yes|no`
+  - `xiaozhi playback rebuffer requested: ...`
+  - `xiaozhi playback rebuffer resumed: ...`
+- the same scenario should show:
+  - fewer or no hard TTS cuts while still in `mode=no_ref`
+  - fewer or no repeated full-response restarts after `write_failed`
+  - audibly lower clipping/distortion compared with the previous `gain=5/2`
+
 ## Step 5.174
 Validate that the branch now favors playback continuity on the current
 half-duplex XiaoZhi path and no longer allows `no_ref` barge-in to cut TTS on
