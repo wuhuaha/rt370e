@@ -1,5 +1,71 @@
 # Verification
 
+## Step 5.173
+Validate that the branch now encodes an explicit XiaoZhi duplex default-on
+policy and a richer half-duplex fallback matrix spanning service negotiation
+and local runtime readiness:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN|half_duplex_default_policy_disabled|half_duplex_service_collaboration_unavailable|half_duplex_service_endpoint_unavailable|half_duplex_service_endpoint_disabled|half_duplex_service_preview_unavailable|half_duplex_service_playback_ack_unavailable|duplex_policy default_on|default_reason=' \
+  Kconfig \
+  prj.conf \
+  components/river_cloud/river_xiaozhi_ws.c \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - the branch now has a separate `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN`
+    policy switch
+  - `session.start` / status / fallback code all know the richer service-side
+    fallback reasons
+  - active context and duplex plan both record `5.173` as landed
+
+Board validation after flashing:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status output now contains an explicit policy line similar to:
+  - `xiaozhi duplex_policy default_on=yes|no default_reason=...`
+- the same dump also shows:
+  - `voice_collaboration=yes|no`
+  - `server_endpoint=yes/no`
+  - `preview_events=yes|no`
+  - `playback_ack=segment_mark_v1|-`
+
+Run one discovery / wake / speaking-time round and inspect monitor logs:
+```text
+xiaozhi session.start sent: ... half_duplex=... default_on=... default_reason=...
+xiaozhi tts_start keeps local round open: ...
+xiaozhi tts_start falls back to round close: fallback=...
+xiaozhi capture held during playback: fallback=...
+```
+
+Expected result:
+- when discovery + board profile satisfy the full matrix:
+  - `session.start` logs `half_duplex=no`
+  - `default_on=yes`
+  - speaking-time logs can stay on the duplex-ready path
+- when any prerequisite is missing:
+  - `session.start` logs `half_duplex=yes`
+  - `default_reason` names the exact fallback cause
+  - speaking-time fallback / capture-hold logs reuse the same reason family
+
 ## Step 5.172
 Validate that the branch now builds a dedicated duplex-ready experimental board
 profile and that native `ch3` reference telemetry is wired into both runtime

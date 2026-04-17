@@ -51,11 +51,26 @@ config RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
     default n
     depends on RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
     help
-      Experimental gate for the XiaoZhi realtime full-duplex rollout.
-      In the current device-side slice this only changes the advertised
-      session capability contract and related diagnostics; the runtime
-      close/listen behavior stays on the conservative half-duplex baseline
-      until later full-duplex steps are verified on board.
+      Build-time gate for the XiaoZhi realtime full-duplex experiment path.
+      This enables the device-side duplex runtime, related diagnostics, and
+      the capability negotiation code paths, but does not by itself force
+      every session to advertise half_duplex=false.
+
+config RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN
+    bool "Default XiaoZhi sessions to full-duplex experiment when ready"
+    default n
+    depends on RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
+    help
+      Allow session.start to advertise half_duplex=false on builds meant for
+      the duplex-ready experimental profile.
+
+      Runtime still falls back to half-duplex unless all of the following are
+      satisfied:
+      - the active board/profile supports playback reference
+      - discovery advertises the required voice-collaboration contract
+      - server endpointing is available and enabled
+      - preview_events and playback_ack negotiation both succeed
+      - the local duplex-ready gate later keeps AEC/reference readiness
 
 config RIVER_INTERACTION_DIAG_EN
     bool "Enable local interaction diagnostic router"

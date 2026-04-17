@@ -31,6 +31,41 @@ void river_cloud_xiaozhi_get_duplex_ready_eval(river_voice_duplex_ready_eval_t *
                                           eval);
 }
 
+static const char *river_cloud_xiaozhi_runtime_duplex_fallback_reason(
+    const river_voice_duplex_ready_eval_t *eval)
+{
+    if (eval == NULL) {
+        return "half_duplex_aec_blocked";
+    }
+
+    switch (eval->reason) {
+    case RIVER_VOICE_DUPLEX_READY_EXPERIMENT_OFF:
+        return "half_duplex_experiment_disabled";
+    case RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF:
+        return "half_duplex_no_playback_reference";
+    case RIVER_VOICE_DUPLEX_READY_REF_IDLE:
+        return "half_duplex_ref_idle";
+    case RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED:
+    default:
+        return "half_duplex_aec_blocked";
+    }
+}
+
+const char *river_cloud_xiaozhi_duplex_fallback_reason(
+    const river_voice_duplex_ready_eval_t *eval)
+{
+    const char *policy_reason;
+
+    policy_reason = river_xiaozhi_duplex_default_fallback_reason();
+    if (policy_reason != NULL) {
+        return policy_reason;
+    }
+    if (eval != NULL && eval->ready) {
+        return NULL;
+    }
+    return river_cloud_xiaozhi_runtime_duplex_fallback_reason(eval);
+}
+
 bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 {
 #if defined(CONFIG_RIVER_VOICE_CAPABILITY_KWS) && CONFIG_RIVER_VOICE_CAPABILITY_KWS
@@ -43,12 +78,14 @@ bool river_cloud_xiaozhi_idle_requires_wakeword(void)
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     river_voice_duplex_ready_eval_t eval;
+    const char *fallback_reason;
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&eval);
-    if (eval.ready && g_river_cloud.xiaozhi_playback_active) {
+    fallback_reason = river_cloud_xiaozhi_duplex_fallback_reason(&eval);
+    if (fallback_reason == NULL && g_river_cloud.xiaozhi_playback_active) {
         g_river_cloud.xiaozhi_playback_duplex_ready_seen = true;
     }
-    return eval.ready;
+    return fallback_reason == NULL;
 }
 
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
@@ -323,6 +360,8 @@ bool river_cloud_xiaozhi_turn_accepted(void)
 void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
 {
     river_voice_duplex_ready_eval_t duplex_eval;
+    const char *duplex_default_reason;
+    bool duplex_default_on;
 
     if (reason == NULL || reason[0] == '\0') {
         return;
@@ -332,10 +371,12 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
     }
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
+    duplex_default_reason = river_xiaozhi_duplex_default_fallback_reason();
+    duplex_default_on = duplex_default_reason == NULL;
     river_cloud_xiaozhi_copy_semantic_text(g_river_cloud.xiaozhi_semantic_fallback_reason,
                                            sizeof(g_river_cloud.xiaozhi_semantic_fallback_reason),
                                            reason);
-    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_ready=%s duplex_reason=%s sid=%s",
+    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_default_on=%s duplex_default_reason=%s duplex_ready=%s duplex_reason=%s sid=%s",
                g_river_cloud.xiaozhi_semantic_fallback_reason,
                river_cloud_xiaozhi_turn_accepted() ? "yes" : "no",
                g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
@@ -347,6 +388,8 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
                g_river_cloud.xiaozhi_output_state[0] != '\0' ?
                    g_river_cloud.xiaozhi_output_state :
                    "-",
+               duplex_default_on ? "yes" : "no",
+               duplex_default_reason != NULL ? duplex_default_reason : "-",
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");

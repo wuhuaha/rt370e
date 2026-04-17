@@ -1,5 +1,51 @@
 # Change Log
 
+## Step 5.173
+- Added an explicit XiaoZhi duplex `default-on` policy switch so the branch can
+  distinguish:
+  - experiment code compiled in
+  - sessions that are actually allowed to advertise `half_duplex=false`
+  - [Kconfig](/root/ameba-river/Kconfig)
+  - [prj.conf](/root/ameba-river/prj.conf)
+- Tightened `session.start` duplex advertisement behind a full default-enable
+  matrix instead of the old compile-time-only experiment flag:
+  - active board/profile must support playback reference
+  - discovery must advertise `voice_collaboration`
+  - server endpoint must be available and enabled
+  - `preview_events` negotiation must succeed
+  - `playback_ack.mode=segment_mark_v1` negotiation must succeed
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [include/river/river_xiaozhi_ws.h](/root/ameba-river/include/river/river_xiaozhi_ws.h)
+- Unified device-side duplex fallback mapping so speaking-time keep-open,
+  capture-hold, and status logs now report service-side collaboration failures
+  and local runtime failures from one matrix:
+  - `half_duplex_default_policy_disabled`
+  - `half_duplex_service_collaboration_unavailable`
+  - `half_duplex_service_endpoint_unavailable`
+  - `half_duplex_service_endpoint_disabled`
+  - `half_duplex_service_preview_unavailable`
+  - `half_duplex_service_playback_ack_unavailable`
+  - plus the existing local runtime reasons:
+    - `half_duplex_no_playback_reference`
+    - `half_duplex_ref_idle`
+    - `half_duplex_aec_blocked`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Extended board-visible XiaoZhi diagnostics so validation can now correlate:
+  - negotiated default-on state
+  - default fallback reason
+  - discovery voice-collaboration/server-endpoint readiness
+  - negotiated preview/playback-ack state
+  - runtime `duplex_ready`
+  - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Updated the duplex execution plan and active context so `5.173` is recorded
+  as landed and the branch focus moves to board regression of the new default
+  matrix:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.172
 - Promoted the branch build to a dedicated `duplex-ready experimental`
   board-profile baseline by enabling:

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.172 establish duplex-ready experimental board-profile acoustic baseline`
+  - `5.173 encode duplex default-on policy and fallback matrix`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -84,8 +84,29 @@ or top-of-tree verification target changes.
     - `vad_probe` now measures `ref_peak` from capture `ch3` when the active
       profile uses native reference, so board logs and local barge-in
       arbitration can observe the real far-end reference source
-    - the next implementation slice is:
-      - `5.173` default-enable and fallback matrix
+  - `5.173` is now landed:
+    - the branch now separates:
+      - duplex experiment compiled in
+      - default-on policy enabled
+      - per-session permission to advertise `half_duplex=false`
+    - `session.start` default duplex advertisement now requires the full
+      device + service matrix:
+      - active profile supports playback reference
+      - discovery advertises `voice_collaboration`
+      - server endpoint is available and enabled
+      - `preview_events` negotiation succeeds
+      - `playback_ack.mode=segment_mark_v1` negotiation succeeds
+    - speaking-time keep-open / capture-hold / status logs now share the same
+      richer fallback reason family, including:
+      - `half_duplex_default_policy_disabled`
+      - `half_duplex_service_collaboration_unavailable`
+      - `half_duplex_service_endpoint_unavailable`
+      - `half_duplex_service_endpoint_disabled`
+      - `half_duplex_service_preview_unavailable`
+      - `half_duplex_service_playback_ack_unavailable`
+    - the next focus is:
+      - board regression of the 5.173 default-on matrix on the duplex-ready
+        experimental profile
 - Primary active execution plan:
   - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
 
@@ -129,7 +150,8 @@ or top-of-tree verification target changes.
   continues:
   - `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
 - The next device-side duplex code slices are now explicitly staged as:
-  - `5.173` default-enable and fallback matrix
+  - board regression and log validation of the landed `5.173`
+    default-enable/fallback matrix
 - Preserve the project flash profile:
   - `board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 

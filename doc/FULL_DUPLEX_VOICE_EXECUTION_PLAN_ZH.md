@@ -1264,3 +1264,37 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
   - follow-up
   - speaking-time barge-in
   - reconnect / error fallback
+
+2026-04-17 落地记录：
+
+- 已新增独立的 `default-on` 编译闸门：
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN`
+  - 用于把“实验代码已编进来”和“本 session 默认按全双工实验态宣告”
+    这两个概念拆开
+- 当前分支实验 profile 已显式开启：
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN=y`
+  - `CONFIG_RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN=y`
+- `session.start` 的 `half_duplex` 广告不再只看 compile-time experiment，而是
+  需要同时满足：
+  - active board/profile 支持 playback reference
+  - discovery 已声明 `voice_collaboration`
+  - server endpoint `available=true`
+  - server endpoint `enabled=true`
+  - `preview_events` 已成功协商
+  - `playback_ack.mode=segment_mark_v1` 已成功协商
+- 端侧 speaking-time keep-open / capture-hold / status 也已切到同一套
+  fallback matrix：
+  - `half_duplex_default_policy_disabled`
+  - `half_duplex_service_collaboration_unavailable`
+  - `half_duplex_service_endpoint_unavailable`
+  - `half_duplex_service_endpoint_disabled`
+  - `half_duplex_service_preview_unavailable`
+  - `half_duplex_service_playback_ack_unavailable`
+  - 以及已有本地 runtime 原因：
+    - `half_duplex_no_playback_reference`
+    - `half_duplex_ref_idle`
+    - `half_duplex_aec_blocked`
+- 当前结论：
+  - `5.173` 的默认开启条件和回退矩阵已编码收口
+  - 下一步重点转到板端回归，验证 discovery 组合、wake/first-turn/follow-up
+    以及 speaking-time barge-in 下的实际默认路径是否与日志矩阵一致
