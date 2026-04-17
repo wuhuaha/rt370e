@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.182 playback recovering vs fatal fault split`
+  - `5.183 terminal completed gated by last-segment truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -83,6 +83,14 @@ or top-of-tree verification target changes.
       `playback_recovering` path
     - this gives the runtime truth source a real semantic split between
       recoverable rebuffer/restart churn and hard local playback faults
+  - eighth landed slice on that plan:
+    - terminal `completed` is now gated by `last_segment observed + fully
+      heard`, not only by a transient local drain point
+    - `tts_stop_pending` no longer resets playback runtime state early when the
+      local player goes idle before the final tail has actually been observed
+    - this narrows the false-completion window that previously let late
+      segments arrive after the device had already decided the response was
+      completed
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -248,8 +256,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - finish rebuilding terminal ACK completion and last-segment close semantics
-    on top of the new recoverable playback state split
+  - finish the `cleared` side of the playback terminal model and expose
+    terminal-tail waiting as a first-class runtime fact
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

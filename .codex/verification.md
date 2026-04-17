@@ -1,5 +1,28 @@
 # Verification
 
+## Step 5.183
+Validate that terminal `completed` is now gated by last-segment truth instead
+of only by a transient local drain/idle point:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_last_segment_observed|playback_completed_ready|try_queue_playback_completed_ack|last_fully_heard_segment_id' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - terminal `completed` has explicit last-segment predicates
+  - pending-stop no longer queues `completed` before the last segment is both
+    observed and fully heard
+
 ## Step 5.182
 Validate that playback write-path churn now lands on an explicit recoverable
 state and no longer forces the dialog runtime onto the fatal playback-error

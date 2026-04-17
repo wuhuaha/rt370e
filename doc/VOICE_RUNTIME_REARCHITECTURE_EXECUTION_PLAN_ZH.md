@@ -260,11 +260,21 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `playback_state`
   - 当前 fatal playback 语义被收窄到 start/init/flush-restart 等真正本地
     无法继续的路径
+- terminal `completed` 已继续从“本地 drain 成功”改为“最后一段已观察且已完整听完”：
+  - 新增显式判定：
+    - `river_cloud_xiaozhi_playback_last_segment_observed()`
+    - `river_cloud_xiaozhi_playback_completed_ready()`
+  - `tts_stop_pending` 在 `service inactive + queued=0` 时不再立刻关闭
+    terminal；若最后一段尚未观察/听完，会继续等待 late tail
+  - `audio.out.completed` 现在绑定：
+    - last segment observed
+    - local segment queue drained
+    - `last_fully_heard_segment_id == last_segment_id`
 
 下一步焦点：
 
-- 完成 terminal ACK completion / last-segment close 语义重建，避免当前
-  `cleared/completed` 与本地 drain/stop 时序继续交叉污染
+- 完成 `cleared` 侧终态语义重建，并把“等待最后尾音”的 terminal-tail wait
+  变成可观测 runtime fact
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

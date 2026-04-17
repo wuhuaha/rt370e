@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.183
+- Rebuilt XiaoZhi terminal `completed` admission so it now depends on
+  last-segment truth instead of only depending on the local player having gone
+  idle:
+  - added explicit terminal predicates:
+    - `river_cloud_xiaozhi_playback_last_segment_observed()`
+    - `river_cloud_xiaozhi_playback_completed_ready()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `audio.out.completed` is no longer queued just because `tts_stop_pending`
+  sees `service inactive + queued=0`:
+  - the runtime now requires:
+    - server-side last segment has been observed
+    - local playback segment queue has fully drained
+    - `last_fully_heard_segment_id` matches the latest last-segment id
+  - if that condition is not yet true, the playback runtime keeps the terminal
+    window open and waits for the late tail instead of prematurely closing the
+    response
+- Tightened pending-stop behavior around the new terminal truth:
+  - the local stop path after `xiaozhi_tts_stop` no longer resets playback
+    runtime state until `completed` is actually admissible
+  - `playback_check_pending_stop()` now keeps waiting when the local player has
+    already gone idle but the last segment has not yet been observed/heard
+  - once terminal completion becomes admissible, the existing reset path still
+    clears the runtime in one place
+- This continues the dialog-runtime / downlink rebuild by removing one of the
+  main sources of false completion:
+  - `completed` is now tied to `last_segment observed + fully heard`, not only
+    to a transient local drain point
+  - next focus is to finish the `cleared` side of the terminal model and make
+    “waiting for final tail” observably distinct from normal idle
+
 ## Step 5.182
 - Continued the playback/downlink recovery rebuild by splitting recoverable
   playback churn from hard local faults at the playback-service interface
