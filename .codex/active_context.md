@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.183 terminal completed gated by last-segment truth`
+  - `5.184 truthful cleared and terminal tail wait export`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -91,6 +91,13 @@ or top-of-tree verification target changes.
     - this narrows the false-completion window that previously let late
       segments arrive after the device had already decided the response was
       completed
+  - ninth landed slice on that plan:
+    - local-only clear no longer fabricates terminal `cleared` truth when the
+      board never actually queued `audio.out.cleared`
+    - terminal-tail waiting is now exported as runtime-owned state all the way
+      through cloud snapshot -> dialog runtime snapshot
+    - runtime dumps can now distinguish ordinary stop-pending playback from
+      “waiting for final tail/meta before terminal completion”
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -256,8 +263,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - finish the `cleared` side of the playback terminal model and expose
-    terminal-tail waiting as a first-class runtime fact
+  - continue shrinking terminal ambiguity by aligning interrupt/local-clear
+    policy and playback terminal truth around explicit runtime-owned facts
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

@@ -191,6 +191,7 @@ typedef struct {
     bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
     bool xiaozhi_playback_rebuffer_pending;
+    bool xiaozhi_playback_terminal_waiting;
     bool xiaozhi_playback_duplex_ready_seen;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;
@@ -289,6 +290,7 @@ typedef struct {
     char xiaozhi_playback_last_fully_heard_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_terminal_ack[RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX];
     char xiaozhi_playback_clear_reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
+    char xiaozhi_playback_terminal_wait_reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
     char xiaozhi_playback_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     uint32_t xiaozhi_playback_expected_duration_ms;
     river_cloud_xiaozhi_playback_segment_t

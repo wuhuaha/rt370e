@@ -33,6 +33,7 @@ typedef struct {
     bool cloud_listening;
     bool cloud_stream_active;
     bool playback_active;
+    bool playback_terminal_waiting;
     bool tts_stop_pending;
     bool turn_accepted;
     bool barge_in_enabled_known;
@@ -47,6 +48,7 @@ typedef struct {
     char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char input_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char output_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
 } river_dialog_runtime_snapshot_t;

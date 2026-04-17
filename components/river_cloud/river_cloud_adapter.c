@@ -2981,12 +2981,16 @@ void river_cloud_adapter_dump_status(void)
                    g_river_cloud.xiaozhi_playback_started_reported ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_meta_valid ? "yes" : "no");
-        RIVER_LOGI("xiaozhi playback_ack terminal=%s clear_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
+        RIVER_LOGI("xiaozhi playback_ack terminal=%s clear_reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
                    g_river_cloud.xiaozhi_playback_terminal_ack[0] != '\0' ?
                        g_river_cloud.xiaozhi_playback_terminal_ack :
                        "-",
                    g_river_cloud.xiaozhi_playback_clear_reason[0] != '\0' ?
                        g_river_cloud.xiaozhi_playback_clear_reason :
+                       "-",
+                   g_river_cloud.xiaozhi_playback_terminal_waiting ? "yes" : "no",
+                   g_river_cloud.xiaozhi_playback_terminal_wait_reason[0] != '\0' ?
+                       g_river_cloud.xiaozhi_playback_terminal_wait_reason :
                        "-",
                    (unsigned long)g_river_cloud.xiaozhi_playback_segment_count,
                    g_river_cloud.xiaozhi_playback_last_started_segment_id[0] != '\0' ?
@@ -3110,6 +3114,8 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
         snapshot->conversation_window_active = g_river_cloud.xiaozhi_window_active;
         snapshot->listening = g_river_cloud.xiaozhi_listening;
         snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
+        snapshot->playback_terminal_waiting =
+            g_river_cloud.xiaozhi_playback_terminal_waiting;
         snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
         snapshot->turn_accepted = g_river_cloud.xiaozhi_turn_accepted;
         snapshot->barge_in_enabled_known =
@@ -3124,6 +3130,9 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
         river_cloud_runtime_copy_text(snapshot->accept_reason,
                                       sizeof(snapshot->accept_reason),
                                       g_river_cloud.xiaozhi_accept_reason);
+        river_cloud_runtime_copy_text(snapshot->playback_terminal_wait_reason,
+                                      sizeof(snapshot->playback_terminal_wait_reason),
+                                      g_river_cloud.xiaozhi_playback_terminal_wait_reason);
         river_cloud_runtime_copy_text(snapshot->input_state,
                                       sizeof(snapshot->input_state),
                                       g_river_cloud.xiaozhi_input_state);

@@ -171,6 +171,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     g_river_dialog_runtime.snapshot.cloud_listening = snapshot->listening;
     g_river_dialog_runtime.snapshot.cloud_stream_active = snapshot->stream_active;
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
+    g_river_dialog_runtime.snapshot.playback_terminal_waiting =
+        snapshot->playback_terminal_waiting;
     g_river_dialog_runtime.snapshot.turn_accepted = snapshot->turn_accepted;
     g_river_dialog_runtime.snapshot.barge_in_enabled_known =
         snapshot->barge_in_enabled_known;
@@ -187,6 +189,10 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
                                    sizeof(g_river_dialog_runtime.snapshot.accept_reason),
                                    snapshot->accept_reason);
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
+        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
+        snapshot->playback_terminal_wait_reason);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.input_state_text,
                                    sizeof(g_river_dialog_runtime.snapshot.input_state_text),
                                    snapshot->input_state);
@@ -366,12 +372,16 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
                snapshot.asr_session_active ? "yes" : "no",
                snapshot.playback_active ? "yes" : "no",
+               snapshot.playback_terminal_waiting ? "yes" : "no",
+               snapshot.playback_terminal_wait_reason[0] != '\0' ?
+                   snapshot.playback_terminal_wait_reason :
+                   "-",
                snapshot.conversation_window_active ? "open" : "closed",
                snapshot.wake_confirmed ? "yes" : "no",
                snapshot.error_recovering ? "yes" : "no",

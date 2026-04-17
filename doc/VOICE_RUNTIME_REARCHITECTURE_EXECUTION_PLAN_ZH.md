@@ -270,11 +270,25 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - last segment observed
     - local segment queue drained
     - `last_fully_heard_segment_id == last_segment_id`
+- `cleared` 与 terminal-tail waiting 也已继续收口到 runtime 真相：
+  - `audio.out.cleared` 现在只有在板端真的排队了 cleared ACK 时才算
+    terminal truth；clear-before-start 不再伪造 `cleared`
+  - 新增 runtime-owned tail-wait 状态：
+    - `playback_terminal_waiting`
+    - `playback_terminal_wait_reason`
+  - terminal-tail waiting 已通过：
+    - cloud runtime snapshot
+    - dialog runtime snapshot
+    暴露给真相源和诊断层
+  - 当前等待原因显式区分：
+    - `await_last_segment_meta`
+    - `await_segment_queue_drain`
+    - `await_last_segment_tail`
 
 下一步焦点：
 
-- 完成 `cleared` 侧终态语义重建，并把“等待最后尾音”的 terminal-tail wait
-  变成可观测 runtime fact
+- 继续把 interrupt / local-clear / network-loss 的 terminal close policy
+  从 adapter 分支逻辑收口成更少的 runtime-owned cause
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

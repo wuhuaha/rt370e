@@ -1,5 +1,47 @@
 # Change Log
 
+## Step 5.184
+- Continued the XiaoZhi playback terminal rebuild by making `cleared` truthful
+  and by exposing “waiting for final tail” as runtime-owned state instead of
+  hiding it inside `tts_stop_pending`:
+  - added runtime-owned tail-wait fields:
+    - `xiaozhi_playback_terminal_waiting`
+    - `xiaozhi_playback_terminal_wait_reason`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- `audio.out.cleared` is now only treated as reported when the board actually
+  queued a cleared ACK:
+  - `river_cloud_xiaozhi_try_queue_playback_cleared_ack()` now returns whether
+    a real cleared ACK was queued
+  - `playback_finalize_cleared()` no longer fabricates terminal `cleared`
+    state for clear-before-start or other local-only stops with no
+    `last_fully_heard_segment_id`
+  - local-only clear now logs:
+    - `xiaozhi playback clear kept local only`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Tightened the pending-stop completion wait into an explicit runtime fact:
+  - when `tts_stop_pending` cannot yet admit `completed`, the runtime now
+    latches a structured wait reason such as:
+    - `await_last_segment_meta`
+    - `await_segment_queue_drain`
+    - `await_last_segment_tail`
+  - that wait state clears on playback start, reset, terminal ACK close, and
+    downlink reset
+- Exported the new terminal-tail wait fact through the truth-source chain:
+  - `river_cloud_runtime_snapshot_t`
+  - `river_dialog_runtime_snapshot_t`
+  - adapter and dialog dump logs now show:
+    - terminal wait on/off
+    - terminal wait reason
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- This slice removes another source of terminal-state ambiguity:
+  - local clear without a truthful `audio.out.cleared` no longer masquerades
+    as protocol-cleared playback
+  - dialog/runtime diagnostics can now distinguish ordinary playback from
+    “still waiting for the final tail before terminal completion”
+
 ## Step 5.183
 - Rebuilt XiaoZhi terminal `completed` admission so it now depends on
   last-segment truth instead of only depending on the local player having gone

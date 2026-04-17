@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.184
+Validate that `cleared` is no longer fabricated locally and that terminal tail
+waiting is exported through the cloud/dialog runtime snapshots:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_terminal_waiting|playback_terminal_wait_reason|await_last_segment_meta|await_segment_queue_drain|await_last_segment_tail|clear kept local only' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - local-only clear no longer fabricates terminal `cleared`
+  - terminal-tail waiting is exported via cloud/dialog runtime snapshots
+  - the runtime exposes structured reasons for pending final-tail waits
+
 ## Step 5.183
 Validate that terminal `completed` is now gated by last-segment truth instead
 of only by a transient local drain/idle point:
