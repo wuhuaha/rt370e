@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.182
+- Continued the playback/downlink recovery rebuild by splitting recoverable
+  playback churn from hard local faults at the playback-service interface
+  instead of letting every write-side glitch collapse into `playback_error`:
+  - added a dedicated playback state:
+    - `RIVER_PLAYBACK_RECOVERING`
+  - [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h)
+- `AudioTrack_Write()` failure now enters an explicit recoverable playback
+  state instead of immediately poisoning the dialog runtime with fatal error
+  semantics:
+  - `river_playback_service_write()` now reports write-path churn as
+    `RIVER_PLAYBACK_RECOVERING`
+  - fatal startup / flush / track-init failures still stay on
+    `RIVER_PLAYBACK_ERROR`
+  - state-name dumps and diagnostics now expose `recovering`
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- Tightened the dialog-runtime ingress path so only true fatal playback faults
+  trip `error_recovering`:
+  - `session_coordinator` now emits:
+    - `playback_recovering`
+    - `playback_error`
+    - `playback_state`
+    as distinct runtime reasons
+  - only `RIVER_PLAYBACK_ERROR` still calls
+    `river_dialog_runtime_note_error("playback_error")`
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- This slice makes the dialog runtime truth source more faithful during XiaoZhi
+  rebuffer churn:
+  - recoverable playback restart loops no longer masquerade as fatal runtime
+    recovery
+  - next focus is to finish rebuilding terminal ACK completion and last-segment
+    close semantics on top of the now explicit `recovering` vs `error` split
+
 ## Step 5.181
 - Started rebuilding XiaoZhi playback recovery semantics on top of the
   runtime-owned media state by separating predictable upstream starvation from

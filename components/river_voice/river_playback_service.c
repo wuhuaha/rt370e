@@ -749,7 +749,7 @@ river_status_t river_playback_service_write(const uint8_t *playback,
     if (write_result < 0) {
         g_river_playback_service.stats.write_fail++;
         river_playback_service_record_control_locked("write_error", "playback_write_failed");
-        river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_RECOVERING);
         rtos_mutex_give(g_river_playback_service.lock);
         return RIVER_ERR_IO;
     }
@@ -871,6 +871,8 @@ const char *river_playback_service_state_name(river_playback_state_t state)
         return "draining";
     case RIVER_PLAYBACK_STOPPING:
         return "stopping";
+    case RIVER_PLAYBACK_RECOVERING:
+        return "recovering";
     case RIVER_PLAYBACK_ERROR:
         return "error";
     default:

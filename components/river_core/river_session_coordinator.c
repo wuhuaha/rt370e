@@ -401,19 +401,23 @@ void river_session_coordinator_on_playback_state(
     const river_playback_stream_config_t *config,
     void *user_data)
 {
+    const char *reason;
+
     (void)config;
     (void)user_data;
 
-    river_dialog_runtime_note_playback_state(state,
-                                             state == RIVER_PLAYBACK_ERROR ?
-                                                 "playback_error" :
-                                                 "playback_state");
+    reason = "playback_state";
+    if (state == RIVER_PLAYBACK_RECOVERING) {
+        reason = "playback_recovering";
+    } else if (state == RIVER_PLAYBACK_ERROR) {
+        reason = "playback_error";
+    }
+
+    river_dialog_runtime_note_playback_state(state, reason);
     if (state == RIVER_PLAYBACK_ERROR) {
         river_dialog_runtime_note_error("playback_error");
     }
-    river_dialog_runtime_sync_cloud_state(state == RIVER_PLAYBACK_ERROR ?
-                                              "playback_error" :
-                                              "playback_state");
+    river_dialog_runtime_sync_cloud_state(reason);
 }
 
 void river_session_coordinator_on_voice_event(const river_voice_event_t *event)

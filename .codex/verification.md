@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.182
+Validate that playback write-path churn now lands on an explicit recoverable
+state and no longer forces the dialog runtime onto the fatal playback-error
+path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RIVER_PLAYBACK_RECOVERING|playback_recovering|playback_write_failed' \
+  include/river/river_playback_service.h \
+  components/river_voice/river_playback_service.c \
+  components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - playback service exposes `RIVER_PLAYBACK_RECOVERING`
+  - `AudioTrack_Write()` failure maps to `RIVER_PLAYBACK_RECOVERING`
+  - session-coordinator runtime sync now distinguishes
+    `playback_recovering` from `playback_error`
+
 ## Step 5.181
 Validate that the playback runtime now proactively re-buffers sustained
 upstream starvation gaps before they degrade into the old write-failure

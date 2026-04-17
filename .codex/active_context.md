@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.181 xiaozhi playback starvation rebuffer gating`
+  - `5.182 playback recovering vs fatal fault split`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -75,6 +75,14 @@ or top-of-tree verification target changes.
       of waiting for the AudioTrack path to fail first
     - starvation watch state is reset together with playback/downlink runtime
       restart points so the recovery path stays deterministic
+  - seventh landed slice on that plan:
+    - playback service now exposes an explicit `recovering` state instead of
+      collapsing write-path churn into fatal `playback_error`
+    - dialog runtime ingress now only treats `RIVER_PLAYBACK_ERROR` as fatal
+      `error_recovering`, while recoverable write churn stays on the
+      `playback_recovering` path
+    - this gives the runtime truth source a real semantic split between
+      recoverable rebuffer/restart churn and hard local playback faults
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -240,8 +248,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - continue splitting recoverable rebuffer from hard local playback faults
-    and terminal ACK completion semantics
+  - finish rebuilding terminal ACK completion and last-segment close semantics
+    on top of the new recoverable playback state split
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

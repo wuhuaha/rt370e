@@ -248,11 +248,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     `xiaozhi_playback_starved` rebuffer 路径，而不是继续空跑到
     AudioTrack 硬失败
   - 已知最后一段已播完时不会误进入该 starvation rebuffer 路径
+- playback service / dialog runtime 入口已继续把 recoverable churn 与 fatal
+  playback fault 拆开：
+  - 新增显式状态：
+    - `RIVER_PLAYBACK_RECOVERING`
+  - `AudioTrack_Write` 失败现在先进入 `recovering`，不再直接把 dialog
+    runtime 推进到 fatal `playback_error`
+  - `session_coordinator` 现在会区分：
+    - `playback_recovering`
+    - `playback_error`
+    - `playback_state`
+  - 当前 fatal playback 语义被收窄到 start/init/flush-restart 等真正本地
+    无法继续的路径
 
 下一步焦点：
 
-- 继续把 recoverable rebuffer 与 hard local playback fault / terminal ACK
-  completion 语义拆开
+- 完成 terminal ACK completion / last-segment close 语义重建，避免当前
+  `cleared/completed` 与本地 drain/stop 时序继续交叉污染
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 
