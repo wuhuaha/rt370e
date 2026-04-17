@@ -70,8 +70,11 @@
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_REF_MARGIN_PEAK 448U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_MIN_ENHANCED_PEAK 1200U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_RATIO_PCT 150U
-#define RIVER_VOICE_VAD_PROBE_BARGE_IN_HIT_FRAMES 3U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_HIT_FRAMES 1U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES 5U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_RELEASE_FRAMES 6U
 #define RIVER_VOICE_VAD_PROBE_BARGE_IN_COOLDOWN_MS 1200U
+#define RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_GAIN 0.45f
 
 typedef struct {
     bool running;
@@ -126,7 +129,9 @@ typedef struct {
     bool diag_vad_is_speech;
     bool diag_vad_prev_is_speech;
     bool diag_vad_last_logged_is_speech;
+    bool barge_in_duck_active;
     uint8_t barge_in_hit_frames;
+    uint8_t barge_in_release_frames;
 } river_voice_vad_probe_context_t;
 
 static river_voice_vad_probe_context_t g_river_voice_vad_probe;
@@ -254,12 +259,72 @@ static void river_voice_vad_probe_reset_diag_counters(void)
     g_river_voice_vad_probe.diag_vad_probability_raw_q15 = 0U;
     g_river_voice_vad_probe.diag_vad_probability_q15 = 0U;
     g_river_voice_vad_probe.diag_vad_is_speech = false;
+    g_river_voice_vad_probe.barge_in_duck_active = false;
     g_river_voice_vad_probe.barge_in_hit_frames = 0U;
+    g_river_voice_vad_probe.barge_in_release_frames = 0U;
     g_river_voice_vad_probe.diag_chunks_until_log =
         (RIVER_VOICE_VAD_PROBE_DIAG_WINDOW_MS + (frame_ms / 2U)) / frame_ms;
     if (g_river_voice_vad_probe.diag_chunks_until_log == 0U) {
         g_river_voice_vad_probe.diag_chunks_until_log = 1U;
     }
+}
+
+static void river_voice_vad_probe_release_barge_in_duck(const char *reason)
+{
+    if (!g_river_voice_vad_probe.barge_in_duck_active) {
+        g_river_voice_vad_probe.barge_in_release_frames = 0U;
+        return;
+    }
+
+    (void)river_playback_service_set_ducking_ex(false, 1.0f, reason);
+    g_river_voice_vad_probe.barge_in_duck_active = false;
+    g_river_voice_vad_probe.barge_in_release_frames = 0U;
+    RIVER_LOGI("barge-in duck release: reason=%s afe_peak=%u ref_peak=%u prob_q15=%u",
+               reason != NULL ? reason : "-",
+               (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
+               (unsigned int)g_river_voice_vad_probe.diag_playback_ref_peak,
+               (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15);
+}
+
+static void river_voice_vad_probe_consider_barge_in_release(const char *reason)
+{
+    g_river_voice_vad_probe.barge_in_hit_frames = 0U;
+    if (!g_river_voice_vad_probe.barge_in_duck_active) {
+        g_river_voice_vad_probe.barge_in_release_frames = 0U;
+        return;
+    }
+
+    if (g_river_voice_vad_probe.barge_in_release_frames < 0xFFU) {
+        g_river_voice_vad_probe.barge_in_release_frames++;
+    }
+    if (g_river_voice_vad_probe.barge_in_release_frames <
+        RIVER_VOICE_VAD_PROBE_BARGE_IN_RELEASE_FRAMES) {
+        return;
+    }
+
+    river_voice_vad_probe_release_barge_in_duck(reason);
+}
+
+static void river_voice_vad_probe_arm_barge_in_duck(void)
+{
+    if (g_river_voice_vad_probe.barge_in_duck_active) {
+        return;
+    }
+
+    if (river_playback_service_set_ducking_ex(true,
+                                              RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_GAIN,
+                                              "barge_in_duck_only") != RIVER_OK) {
+        return;
+    }
+
+    g_river_voice_vad_probe.barge_in_duck_active = true;
+    g_river_voice_vad_probe.barge_in_release_frames = 0U;
+    RIVER_LOGI("barge-in duck: gain=%.2f afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u",
+               (double)RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_GAIN,
+               (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
+               (unsigned int)g_river_voice_vad_probe.diag_playback_ref_peak,
+               (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15,
+               (unsigned int)g_river_voice_vad_probe.barge_in_hit_frames);
 }
 
 static void river_voice_vad_probe_log_diagnostics_if_needed(void)
@@ -395,17 +460,19 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
     river_interaction_state_t interaction_state;
     uint64_t now_ms;
     bool near_end_speech;
+    river_status_t interrupt_status;
 
     interaction_state = river_interaction_state_get();
     if (!river_voice_vad_probe_playback_active() ||
         (interaction_state != RIVER_INTERACTION_SPEAKING &&
          interaction_state != RIVER_INTERACTION_BARGE_IN_LISTENING)) {
+        river_voice_vad_probe_release_barge_in_duck("playback_inactive");
         g_river_voice_vad_probe.barge_in_hit_frames = 0U;
         return;
     }
 
     if (!detector_decision_valid || !detector_is_speech || playback_ref_peak == 0U) {
-        g_river_voice_vad_probe.barge_in_hit_frames = 0U;
+        river_voice_vad_probe_consider_barge_in_release("speech_cleared");
         return;
     }
 
@@ -416,14 +483,20 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
         ((uint32_t)g_river_voice_vad_probe.diag_enhanced_peak * 100U) >=
             ((uint32_t)playback_ref_peak * RIVER_VOICE_VAD_PROBE_BARGE_IN_RATIO_PCT);
     if (!near_end_speech) {
-        g_river_voice_vad_probe.barge_in_hit_frames = 0U;
+        river_voice_vad_probe_consider_barge_in_release("near_end_not_ready");
         return;
     }
 
+    g_river_voice_vad_probe.barge_in_release_frames = 0U;
     if (g_river_voice_vad_probe.barge_in_hit_frames < 0xFFU) {
         g_river_voice_vad_probe.barge_in_hit_frames++;
     }
-    if (g_river_voice_vad_probe.barge_in_hit_frames < RIVER_VOICE_VAD_PROBE_BARGE_IN_HIT_FRAMES) {
+    if (g_river_voice_vad_probe.barge_in_hit_frames >=
+        RIVER_VOICE_VAD_PROBE_BARGE_IN_DUCK_HIT_FRAMES) {
+        river_voice_vad_probe_arm_barge_in_duck();
+    }
+    if (g_river_voice_vad_probe.barge_in_hit_frames <
+        RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES) {
         return;
     }
 
@@ -437,11 +510,18 @@ static void river_voice_vad_probe_consider_barge_in(bool detector_decision_valid
     g_river_voice_vad_probe.barge_in_last_trigger_ms = now_ms;
     g_river_voice_vad_probe.barge_in_hit_frames = 0U;
     g_river_voice_vad_probe.diag_barge_in_triggered++;
-    RIVER_LOGI("barge-in detected: afe_peak=%u ref_peak=%u prob_q15=%u -> interrupt tts",
+    RIVER_LOGI("barge-in interrupt: afe_peak=%u ref_peak=%u prob_q15=%u hit_frames=%u reason=sustained_near_end_speech",
                (unsigned int)g_river_voice_vad_probe.diag_enhanced_peak,
                (unsigned int)playback_ref_peak,
-               (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15);
-    (void)river_cloud_adapter_interrupt_tts_with_reason("barge_in_near_end_vad");
+               (unsigned int)g_river_voice_vad_probe.diag_vad_probability_q15,
+               (unsigned int)RIVER_VOICE_VAD_PROBE_BARGE_IN_INTERRUPT_HIT_FRAMES);
+    interrupt_status = river_cloud_adapter_interrupt_tts_with_reason("barge_in_near_end_vad");
+    if (interrupt_status == RIVER_OK) {
+        g_river_voice_vad_probe.barge_in_duck_active = false;
+        g_river_voice_vad_probe.barge_in_release_frames = 0U;
+    } else {
+        RIVER_LOGW("barge-in interrupt request failed: status=%d", (int)interrupt_status);
+    }
 }
 
 static void river_voice_vad_probe_close_audio(void)

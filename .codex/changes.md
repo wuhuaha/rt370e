@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.171
+- Reworked the device-side speaking-time near-end arbitration from a single
+  `interrupt` threshold into a local `duck_only -> release / interrupt` ladder:
+  - [components/river_voice/river_voice_vad_probe.c](/root/ameba-river/components/river_voice/river_voice_vad_probe.c)
+- Split the old barge-in trigger into three stages:
+  - first qualifying near-end speech arms local ducking
+  - short/noisy speech falls back through a short release window
+  - only sustained near-end speech escalates to hard interrupt
+- Added explicit local logs so board traces can distinguish:
+  - `barge-in duck`
+  - `barge-in duck release`
+  - `barge-in interrupt`
+  - `barge-in interrupt request failed`
+- Reused the existing playback ducking path instead of introducing a new cloud
+  wire event, so this slice stays device-local and keeps the current service
+  protocol stable.
+- Updated active context and duplex execution plan so `5.171` is recorded as
+  landed and the next slice moves to `5.172`:
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+  - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
+
 ## Step 5.170
 - Kept XiaoZhi duplex-ready speaking rounds on the device in continued-uplink
   mode instead of letting the deferred endpoint timer hard-close the local

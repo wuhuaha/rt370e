@@ -1097,6 +1097,22 @@ python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 15000
 
 ### 10.5 Step 5.171: duck-first 本地打断仲裁
 
+状态：
+
+- 已落地设备侧 baseline：
+  - 端侧 VAD probe 已从“命中门限就直接 interrupt”改成：
+    - `duck_only`
+    - `release`
+    - `hard_interrupt`
+  - 第一段满足条件的 near-end speech 会先触发本地 duck，而不是立刻硬停播
+  - 若后续语音很短或证据不足，会在短 release window 后自动解除 duck
+  - 只有持续 near-end speech 才会升级为现有 `interrupt_tts` 路径
+  - 日志现可明确区分：
+    - `barge-in duck`
+    - `barge-in duck release`
+    - `barge-in interrupt`
+  - 下一步由 `5.172` 继续推进 board-profile 级 duplex-ready 声学基线
+
 目标：
 
 - 让端侧从“near-end speech 一来就 interrupt”升级到“先 duck，再按阈值升级 hard interrupt”

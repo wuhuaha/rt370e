@@ -1,5 +1,55 @@
 # Verification
 
+## Step 5.171
+Validate that local speaking-time barge-in arbitration now ducks first and only
+escalates to hard interrupt after sustained near-end speech:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'BARGE_IN_DUCK_HIT_FRAMES|BARGE_IN_INTERRUPT_HIT_FRAMES|BARGE_IN_RELEASE_FRAMES|BARGE_IN_DUCK_GAIN|barge-in duck|barge-in duck release|barge-in interrupt' \
+  components/river_voice/river_voice_vad_probe.c \
+  .codex/active_context.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - barge-in handling now has separate duck / interrupt / release thresholds
+  - local logs explicitly distinguish duck, release, and interrupt
+  - active context and duplex plan both record `5.171` as landed
+  - next slice moves to `5.172`
+
+Board validation after flashing:
+```text
+river playback status
+```
+
+Expected result:
+- during a short speaking-time interjection:
+  - playback status briefly shows `ducked=on`
+  - interrupt count does not necessarily increase
+- during a sustained interjection:
+  - playback interrupt count increases
+
+Wake the board, wait for TTS speaking, then test three cases in monitor logs:
+```text
+barge-in duck: ...
+barge-in duck release: ...
+barge-in interrupt: ...
+```
+
+Expected result:
+- 轻声附和 / 极短插话只出现 `duck` 和随后 `duck release`
+- 持续插话才升级到 `barge-in interrupt`
+- half-duplex / non-speaking path不受影响
+
 ## Step 5.170
 Validate that duplex-ready speaking rounds now keep the local uplink alive
 across short silence while output is still speaking, and only resolve the
