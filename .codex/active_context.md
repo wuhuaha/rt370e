@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.184 truthful cleared and terminal tail wait export`
+  - `5.185 split terminal result from terminal ACK truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -98,6 +98,20 @@ or top-of-tree verification target changes.
       through cloud snapshot -> dialog runtime snapshot
     - runtime dumps can now distinguish ordinary stop-pending playback from
       “waiting for final tail/meta before terminal completion”
+  - tenth landed slice on that plan:
+    - playback runtime now separates:
+      - local terminal outcome
+      - protocol terminal ACK truth
+    - local-only terminal outcomes now explicitly surface as:
+      - `local_completed`
+      - `local_cleared`
+    - cloud snapshot and dialog runtime snapshot now both export:
+      - `playback_terminal_state`
+      - `playback_terminal_reason`
+    - adapter/dialog diagnostics now show:
+      - terminal state
+      - terminal ACK
+      independently
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -263,8 +277,12 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - continue shrinking terminal ambiguity by aligning interrupt/local-clear
-    policy and playback terminal truth around explicit runtime-owned facts
+  - continue shrinking terminal ambiguity by aligning interrupt/local-clear /
+    transport-close policy and playback terminal truth around explicit
+    runtime-owned facts
+  - continue moving terminal-cause derivation behind the playback runtime so
+    `dialog runtime` consumes exported truth instead of reconstructing terminal
+    meaning from stop/active flags
   - keep shrinking `river_cloud_adapter.c` by separating provider lifecycle /
     policy from playback/session media engines
   - preserve the already-landed `dialog runtime` as the only

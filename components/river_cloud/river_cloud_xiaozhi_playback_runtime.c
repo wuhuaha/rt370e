@@ -30,7 +30,7 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 
 static bool river_cloud_xiaozhi_playback_terminal_open(void)
 {
-    return g_river_cloud.xiaozhi_playback_terminal_ack[0] == '\0';
+    return g_river_cloud.xiaozhi_playback_terminal_state[0] == '\0';
 }
 
 static void river_cloud_xiaozhi_clear_playback_terminal_wait(void)
@@ -51,6 +51,18 @@ static void river_cloud_xiaozhi_set_playback_terminal_wait(const char *reason)
         g_river_cloud.xiaozhi_playback_terminal_wait_reason,
         sizeof(g_river_cloud.xiaozhi_playback_terminal_wait_reason),
         reason);
+}
+
+static void river_cloud_xiaozhi_set_playback_terminal_state(const char *state,
+                                                            const char *reason)
+{
+    river_cloud_xiaozhi_clear_playback_terminal_wait();
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_playback_terminal_state,
+                                           sizeof(g_river_cloud.xiaozhi_playback_terminal_state),
+                                           state);
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_playback_clear_reason,
+                                           sizeof(g_river_cloud.xiaozhi_playback_clear_reason),
+                                           reason);
 }
 
 static bool river_cloud_xiaozhi_playback_last_segment_observed(void)
@@ -117,6 +129,7 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_last_started_segment_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_terminal_ack[0] = '\0';
+    g_river_cloud.xiaozhi_playback_terminal_state[0] = '\0';
     g_river_cloud.xiaozhi_playback_clear_reason[0] = '\0';
     river_cloud_xiaozhi_clear_playback_terminal_wait();
     g_river_cloud.xiaozhi_playback_text[0] = '\0';
@@ -318,13 +331,10 @@ static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t star
 static void river_cloud_xiaozhi_set_playback_terminal_ack(const char *ack,
                                                           const char *reason)
 {
-    river_cloud_xiaozhi_clear_playback_terminal_wait();
     river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_playback_terminal_ack,
                                            sizeof(g_river_cloud.xiaozhi_playback_terminal_ack),
                                            ack);
-    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_playback_clear_reason,
-                                           sizeof(g_river_cloud.xiaozhi_playback_clear_reason),
-                                           reason);
+    river_cloud_xiaozhi_set_playback_terminal_state(ack, reason);
     g_river_cloud.xiaozhi_playback_cleared_reported =
         ack != NULL && strcmp(ack, "cleared") == 0;
     g_river_cloud.xiaozhi_playback_completed_reported =
@@ -718,7 +728,7 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
     }
 
     if (g_river_cloud.xiaozhi_playback_last_started_segment_id[0] == '\0') {
-        river_cloud_xiaozhi_set_playback_terminal_ack("completed", NULL);
+        river_cloud_xiaozhi_set_playback_terminal_state("local_completed", NULL);
         return true;
     }
 
@@ -746,6 +756,8 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
                    g_river_cloud.xiaozhi_playback_id[0] != '\0' ?
                        g_river_cloud.xiaozhi_playback_id :
                        "-");
+        river_cloud_xiaozhi_set_playback_terminal_state("local_completed", NULL);
+        return true;
     }
     river_cloud_xiaozhi_set_playback_terminal_ack("completed", NULL);
     return true;
@@ -792,7 +804,7 @@ void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason)
     if (cleared_sent) {
         river_cloud_xiaozhi_set_playback_terminal_ack("cleared", reason);
     } else {
-        river_cloud_xiaozhi_clear_playback_terminal_wait();
+        river_cloud_xiaozhi_set_playback_terminal_state("local_cleared", reason);
         RIVER_LOGI("xiaozhi playback clear kept local only: reason=%s last_fully_heard=%s",
                    reason != NULL && reason[0] != '\0' ? reason : "-",
                    g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id[0] != '\0' ?

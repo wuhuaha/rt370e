@@ -284,11 +284,31 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `await_last_segment_meta`
     - `await_segment_queue_drain`
     - `await_last_segment_tail`
+- terminal close 现在也已继续拆成“两条真相线”：
+  - playback runtime 新增独立本地终态结果：
+    - `playback_terminal_state`
+  - 这条线和协议 ACK 真相：
+    - `playback_terminal_ack`
+    彻底分离
+  - 典型本地终态结果现在包括：
+    - `local_completed`
+    - `local_cleared`
+  - 因而以下场景不再被混成“已 truthful completed/cleared”：
+    - `audio.out.completed` 排队失败但本地已经播完
+    - clear-before-start 或没有 `last_fully_heard_segment_id` 的本地清理
+  - 该终态结果也已通过：
+    - cloud runtime snapshot
+    - dialog runtime snapshot
+    暴露给 core 真相源和诊断日志
 
 下一步焦点：
 
-- 继续把 interrupt / local-clear / network-loss 的 terminal close policy
-  从 adapter 分支逻辑收口成更少的 runtime-owned cause
+- 继续把 interrupt / local-clear / network-loss / transport-close 的
+  terminal close policy 从 adapter 分支逻辑收口成统一的
+  runtime-owned cause reducer
+- 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
+  terminal truth，而不是继续依赖 `tts_stop_pending + playback_active`
+  组合猜测终态
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

@@ -2981,7 +2981,10 @@ void river_cloud_adapter_dump_status(void)
                    g_river_cloud.xiaozhi_playback_started_reported ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_meta_valid ? "yes" : "no");
-        RIVER_LOGI("xiaozhi playback_ack terminal=%s clear_reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
+        RIVER_LOGI("xiaozhi playback_terminal state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
+                   g_river_cloud.xiaozhi_playback_terminal_state[0] != '\0' ?
+                       g_river_cloud.xiaozhi_playback_terminal_state :
+                       "-",
                    g_river_cloud.xiaozhi_playback_terminal_ack[0] != '\0' ?
                        g_river_cloud.xiaozhi_playback_terminal_ack :
                        "-",
@@ -3130,6 +3133,12 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
         river_cloud_runtime_copy_text(snapshot->accept_reason,
                                       sizeof(snapshot->accept_reason),
                                       g_river_cloud.xiaozhi_accept_reason);
+        river_cloud_runtime_copy_text(snapshot->playback_terminal_state,
+                                      sizeof(snapshot->playback_terminal_state),
+                                      g_river_cloud.xiaozhi_playback_terminal_state);
+        river_cloud_runtime_copy_text(snapshot->playback_terminal_reason,
+                                      sizeof(snapshot->playback_terminal_reason),
+                                      g_river_cloud.xiaozhi_playback_clear_reason);
         river_cloud_runtime_copy_text(snapshot->playback_terminal_wait_reason,
                                       sizeof(snapshot->playback_terminal_wait_reason),
                                       g_river_cloud.xiaozhi_playback_terminal_wait_reason);

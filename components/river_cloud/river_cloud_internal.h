@@ -38,6 +38,7 @@
 #define RIVER_CLOUD_XIAOZHI_LANE_STATE_MAX   32U
 #define RIVER_CLOUD_XIAOZHI_FALLBACK_REASON_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX 16U
+#define RIVER_CLOUD_XIAOZHI_TERMINAL_STATE_MAX 24U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX 48U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX 8U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX  96U
@@ -289,6 +290,7 @@ typedef struct {
     char xiaozhi_playback_last_started_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_last_fully_heard_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_terminal_ack[RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX];
+    char xiaozhi_playback_terminal_state[RIVER_CLOUD_XIAOZHI_TERMINAL_STATE_MAX];
     char xiaozhi_playback_clear_reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
     char xiaozhi_playback_terminal_wait_reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
     char xiaozhi_playback_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];

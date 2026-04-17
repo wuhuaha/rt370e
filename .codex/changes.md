@@ -1,5 +1,46 @@
 # Change Log
 
+## Step 5.185
+- Continued the XiaoZhi terminal-truth rebuild by separating local playback
+  outcome from protocol ACK truth instead of storing both in the same
+  `terminal_ack` field:
+  - added a dedicated runtime-owned terminal result:
+    - `xiaozhi_playback_terminal_state`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Tightened playback terminal close semantics in the runtime:
+  - terminal openness is now controlled by `terminal_state`, not only by
+    whether a protocol ACK string was written
+  - successful protocol terminal ACK still records:
+    - `completed`
+    - `cleared`
+  - local-only terminal outcomes now record:
+    - `local_completed`
+    - `local_cleared`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- This removes the remaining truth conflation in the terminal path:
+  - `audio.out.completed` queue failure no longer fabricates a truthful
+    protocol `completed`
+  - clear-before-start / no-ACK local stops no longer look identical to a
+    server-visible terminal ACK
+- Exported the new terminal result through the truth-source chain:
+  - `river_cloud_runtime_snapshot_t` now carries:
+    - `playback_terminal_state`
+    - `playback_terminal_reason`
+  - `river_dialog_runtime_snapshot_t` now mirrors those fields
+  - adapter / dialog status dumps now print:
+    - local terminal state
+    - protocol terminal ACK
+    - terminal reason
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- With this slice landed, the dialog runtime can now distinguish three
+  different truths instead of one mixed terminal flag:
+  - local playback terminal outcome
+  - protocol terminal ACK truth
+  - terminal-tail wait state
+
 ## Step 5.184
 - Continued the XiaoZhi playback terminal rebuild by making `cleared` truthful
   and by exposing “waiting for final tail” as runtime-owned state instead of
