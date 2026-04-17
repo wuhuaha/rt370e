@@ -1,5 +1,51 @@
 # Verification
 
+## Step 5.177
+Validate that `dialog runtime` is now the only interaction-state truth source
+in `river_core`, and that cloud/provider state can be ingested through the new
+runtime snapshot path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_runtime|get_runtime_snapshot|boot_ready' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_app.c \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c
+rg -n 'RIVER_SESSION_PHASE|river_interaction_state_set\\(' \
+  components/river_core/river_session_coordinator.c \
+  components/river_core/river_app.c \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - `river_dialog_runtime` exists as a new core module
+  - `river_cloud_adapter_get_runtime_snapshot(...)` exists and is used by the
+    runtime
+  - `river_app.c` no longer writes interaction state directly
+  - `river_session_coordinator.c` no longer contains the old
+    `RIVER_SESSION_PHASE_*` state machine
+
+Board validation after flashing:
+```text
+river status
+river xiaozhi status
+```
+
+Expected result:
+- status output now includes a `dialog_runtime` line
+- one wake / speak / reply round should keep `interaction_state` transitions
+  aligned with runtime facts instead of flipping from multiple owners
+
 ## Step 5.176
 Validate that the branch now records the runtime re-architecture direction,
 removes direct `river_voice -> river_cloud` coupling, and preserves XiaoZhi

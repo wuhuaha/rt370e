@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.176 core-owned dialog cloud port + XiaoZhi uplink burst retry pacing`
+  - `5.177 dialog runtime truth source + cloud snapshot ingestion`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -26,13 +26,20 @@ or top-of-tree verification target changes.
       - `doc/VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17.md`
     - active execution plan:
       - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
-  - current first landed slice on that plan:
+  - first landed slice on that plan:
     - added a core-owned dialog cloud port so `river_voice` no longer calls
       `river_cloud_*` directly
     - hardened XiaoZhi uplink pacing with:
       - retry-preserved in-flight frame ownership
       - bounded burst drain
       - round-level pacing metrics
+  - second landed slice on that plan:
+    - introduced a core-owned `dialog runtime` truth source
+    - moved boot / cloud-state / playback / ASR interaction-state derivation
+      behind that runtime
+    - removed the old `session_coordinator` coarse phase truth source
+    - added a generic cloud runtime snapshot export so `river_core` no longer
+      reaches into XiaoZhi runtime details to derive state
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -198,9 +205,11 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - establish a core-owned dialog runtime boundary
-  - keep shrinking `river_voice <-> river_cloud` direct coupling
-  - fix XiaoZhi media-plane ownership before resuming larger duplex slices
+  - rebuild XiaoZhi downlink / playback around runtime-owned media truth
+  - keep shrinking `river_cloud_adapter.c` by separating runtime / media /
+    protocol responsibilities
+  - preserve the already-landed `dialog runtime` as the only interaction-state
+    source while the playback rebuild moves forward
 - Keep the landed collaboration baseline explicit and conservative:
   - accepted-turn is confirmed only from `session.update.accept_reason`
   - preview events remain observation-only

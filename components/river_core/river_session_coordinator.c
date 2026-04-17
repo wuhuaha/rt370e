@@ -6,8 +6,8 @@
 #include "os_wrapper.h"
 
 #include "river/river_cloud.h"
+#include "river/river_dialog_runtime.h"
 #include "river/river_interaction_diag.h"
-#include "river/river_interaction_state.h"
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
 #include "river/river_voice_kws.h"
@@ -19,17 +19,6 @@
 #define RIVER_SESSION_WAKEWORD_TASK_STACK (1024U * 8U)
 #define RIVER_SESSION_WAKEWORD_TASK_PRIO  3U
 #define RIVER_SESSION_WAKEWORD_RETRY_MS   250U
-
-typedef enum {
-    RIVER_SESSION_PHASE_BOOTING = 0,
-    RIVER_SESSION_PHASE_WAKE_MONITORING,
-    RIVER_SESSION_PHASE_WAKE_CONFIRMED,
-    RIVER_SESSION_PHASE_ASR_STREAMING,
-    RIVER_SESSION_PHASE_FOLLOW_UP,
-    RIVER_SESSION_PHASE_SPEAKING,
-    RIVER_SESSION_PHASE_BARGE_IN_LISTENING,
-    RIVER_SESSION_PHASE_ERROR_RECOVERING
-} river_session_phase_t;
 
 typedef struct {
     rtos_mutex_t lock;
@@ -45,63 +34,12 @@ typedef struct {
 typedef struct {
     bool initialized;
     rtos_mutex_t state_lock;
-    river_session_phase_t phase;
     char last_partial[192];
-    bool asr_session_active;
     bool barge_in_interrupt_requested;
     river_session_wakeword_context_t wakeword;
 } river_session_coordinator_context_t;
 
 static river_session_coordinator_context_t g_river_session_coordinator;
-
-static const char *river_session_phase_name(river_session_phase_t phase)
-{
-    switch (phase) {
-    case RIVER_SESSION_PHASE_BOOTING:
-        return "booting";
-    case RIVER_SESSION_PHASE_WAKE_MONITORING:
-        return "wake_monitoring";
-    case RIVER_SESSION_PHASE_WAKE_CONFIRMED:
-        return "wake_confirmed";
-    case RIVER_SESSION_PHASE_ASR_STREAMING:
-        return "asr_streaming";
-    case RIVER_SESSION_PHASE_FOLLOW_UP:
-        return "follow_up";
-    case RIVER_SESSION_PHASE_SPEAKING:
-        return "speaking";
-    case RIVER_SESSION_PHASE_BARGE_IN_LISTENING:
-        return "barge_in_listening";
-    case RIVER_SESSION_PHASE_ERROR_RECOVERING:
-        return "error_recovering";
-    default:
-        return "unknown";
-    }
-}
-
-static river_interaction_state_t river_session_phase_to_interaction_state(
-    river_session_phase_t phase)
-{
-    switch (phase) {
-    case RIVER_SESSION_PHASE_BOOTING:
-        return RIVER_INTERACTION_BOOTING;
-    case RIVER_SESSION_PHASE_WAKE_MONITORING:
-        return RIVER_INTERACTION_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_WAKE_CONFIRMED:
-        return RIVER_INTERACTION_WAKE_CONFIRMED;
-    case RIVER_SESSION_PHASE_ASR_STREAMING:
-        return RIVER_INTERACTION_ASR_STREAMING;
-    case RIVER_SESSION_PHASE_FOLLOW_UP:
-        return RIVER_INTERACTION_FOLLOW_UP;
-    case RIVER_SESSION_PHASE_SPEAKING:
-        return RIVER_INTERACTION_SPEAKING;
-    case RIVER_SESSION_PHASE_BARGE_IN_LISTENING:
-        return RIVER_INTERACTION_BARGE_IN_LISTENING;
-    case RIVER_SESSION_PHASE_ERROR_RECOVERING:
-        return RIVER_INTERACTION_ERROR_RECOVERING;
-    default:
-        return RIVER_INTERACTION_IDLE;
-    }
-}
 
 static bool river_session_state_lock(void)
 {
@@ -144,93 +82,18 @@ static bool river_session_playback_state_active(river_playback_state_t state)
     return river_playback_service_state_active(state);
 }
 
-static bool river_session_phase_valid_transition(river_session_phase_t from,
-                                                 river_session_phase_t to)
+static bool river_session_runtime_snapshot(river_dialog_runtime_snapshot_t *snapshot)
 {
-    if (from == to) {
-        return true;
-    }
-    if (to == RIVER_SESSION_PHASE_ERROR_RECOVERING) {
-        return true;
-    }
-    if (from == RIVER_SESSION_PHASE_ERROR_RECOVERING) {
-        return to != RIVER_SESSION_PHASE_BOOTING;
-    }
-
-    switch (from) {
-    case RIVER_SESSION_PHASE_BOOTING:
-        return to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_WAKE_MONITORING:
-        return to == RIVER_SESSION_PHASE_WAKE_CONFIRMED;
-    case RIVER_SESSION_PHASE_WAKE_CONFIRMED:
-        return to == RIVER_SESSION_PHASE_ASR_STREAMING ||
-               to == RIVER_SESSION_PHASE_FOLLOW_UP ||
-               to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_ASR_STREAMING:
-        return to == RIVER_SESSION_PHASE_BARGE_IN_LISTENING ||
-               to == RIVER_SESSION_PHASE_SPEAKING ||
-               to == RIVER_SESSION_PHASE_FOLLOW_UP ||
-               to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_FOLLOW_UP:
-        return to == RIVER_SESSION_PHASE_ASR_STREAMING ||
-               to == RIVER_SESSION_PHASE_SPEAKING ||
-               to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_SPEAKING:
-        return to == RIVER_SESSION_PHASE_BARGE_IN_LISTENING ||
-               to == RIVER_SESSION_PHASE_FOLLOW_UP ||
-               to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    case RIVER_SESSION_PHASE_BARGE_IN_LISTENING:
-        return to == RIVER_SESSION_PHASE_ASR_STREAMING ||
-               to == RIVER_SESSION_PHASE_SPEAKING ||
-               to == RIVER_SESSION_PHASE_FOLLOW_UP ||
-               to == RIVER_SESSION_PHASE_WAKE_MONITORING;
-    default:
+    if (snapshot == NULL) {
         return false;
     }
-}
-
-static river_session_phase_t river_session_phase_from_runtime_locked(void)
-{
-    if (river_session_playback_state_active(river_playback_service_state())) {
-        return g_river_session_coordinator.asr_session_active ?
-                   RIVER_SESSION_PHASE_BARGE_IN_LISTENING :
-                   RIVER_SESSION_PHASE_SPEAKING;
-    }
-
-    if (g_river_session_coordinator.asr_session_active) {
-        return RIVER_SESSION_PHASE_ASR_STREAMING;
-    }
-
-    return river_cloud_adapter_conversation_window_active() ?
-               RIVER_SESSION_PHASE_FOLLOW_UP :
-               RIVER_SESSION_PHASE_WAKE_MONITORING;
-}
-
-static void river_session_apply_phase_locked(river_session_phase_t phase,
-                                             const char *reason)
-{
-    if (!river_session_phase_valid_transition(g_river_session_coordinator.phase, phase)) {
-        RIVER_LOGW("session phase transition outside preferred contract: %s -> %s reason=%s",
-                   river_session_phase_name(g_river_session_coordinator.phase),
-                   river_session_phase_name(phase),
-                   reason != NULL ? reason : "-");
-    }
-
-    g_river_session_coordinator.phase = phase;
-    (void)river_interaction_state_set(river_session_phase_to_interaction_state(phase), reason);
+    memset(snapshot, 0, sizeof(*snapshot));
+    return river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
 }
 
 void river_session_coordinator_sync_interaction_state(const char *reason)
 {
-    river_session_phase_t phase;
-
-    if (!river_session_state_lock()) {
-        return;
-    }
-
-    phase = river_session_phase_from_runtime_locked();
-    river_session_apply_phase_locked(phase, reason);
-    river_session_state_unlock();
+    river_dialog_runtime_sync_cloud_state(reason);
 }
 
 static void river_session_wakeword_worker(void *param)
@@ -272,11 +135,8 @@ static void river_session_wakeword_worker(void *param)
                     river_session_wakeword_clear_locked();
                     river_session_wakeword_unlock();
                 }
-                if (river_session_state_lock()) {
-                    river_session_apply_phase_locked(RIVER_SESSION_PHASE_WAKE_CONFIRMED,
-                                                     "wakeword_detected");
-                    river_session_state_unlock();
-                }
+                river_dialog_runtime_note_wake_confirmed("wakeword_detected");
+                river_dialog_runtime_sync_cloud_state("wakeword_detected");
                 RIVER_LOGI("wakeword admission accepted: text=%s confidence=%d",
                            wake_text[0] != '\0' ? wake_text : "-",
                            confidence);
@@ -348,7 +208,8 @@ static river_status_t river_session_wakeword_worker_init(void)
 
 static river_status_t river_session_schedule_wakeword(const river_voice_event_t *event)
 {
-    river_session_phase_t phase;
+    river_dialog_runtime_snapshot_t snapshot;
+    bool have_snapshot;
 
     if (event == NULL) {
         return RIVER_ERR_ARG;
@@ -359,20 +220,17 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
         return RIVER_ERR_NOT_FOUND;
     }
 
-    phase = RIVER_SESSION_PHASE_BOOTING;
-    if (river_session_state_lock()) {
-        phase = g_river_session_coordinator.phase;
-        river_session_state_unlock();
-    }
-    if (river_cloud_adapter_conversation_window_active()) {
+    have_snapshot = river_session_runtime_snapshot(&snapshot);
+    if (have_snapshot && snapshot.conversation_window_active) {
         RIVER_LOGI("wakeword ignored: conversation window already active text=%s confidence=%d",
                    event->text != NULL ? event->text : "-",
                    event->confidence);
         return RIVER_OK;
     }
-    if (phase != RIVER_SESSION_PHASE_WAKE_MONITORING) {
-        RIVER_LOGI("wakeword ignored: session_phase=%s text=%s confidence=%d",
-                   river_session_phase_name(phase),
+    if (have_snapshot &&
+        snapshot.interaction_state != RIVER_INTERACTION_WAKE_MONITORING) {
+        RIVER_LOGI("wakeword ignored: interaction=%s text=%s confidence=%d",
+                   river_interaction_state_name(snapshot.interaction_state),
                    event->text != NULL ? event->text : "-",
                    event->confidence);
         return RIVER_OK;
@@ -419,35 +277,35 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
 static void river_session_try_interrupt_playback_on_asr_text(
     const river_cloud_asr_result_t *result)
 {
-    bool asr_session_active;
     bool interrupt_requested;
-    river_session_phase_t phase;
+    river_dialog_runtime_snapshot_t snapshot;
 
     if (result == NULL || result->text == NULL || result->text[0] == '\0') {
+        return;
+    }
+    if (!river_session_runtime_snapshot(&snapshot)) {
         return;
     }
     if (!river_session_state_lock()) {
         return;
     }
-    asr_session_active = g_river_session_coordinator.asr_session_active;
     interrupt_requested = g_river_session_coordinator.barge_in_interrupt_requested;
-    phase = g_river_session_coordinator.phase;
     river_session_state_unlock();
 
-    if (!asr_session_active || interrupt_requested) {
+    if (!snapshot.asr_session_active || interrupt_requested) {
         return;
     }
-    if (!river_session_playback_state_active(river_playback_service_state())) {
+    if (!snapshot.playback_active &&
+        !river_session_playback_state_active(river_playback_service_state())) {
+        return;
+    }
+    if (snapshot.interaction_state != RIVER_INTERACTION_SPEAKING &&
+        snapshot.interaction_state != RIVER_INTERACTION_BARGE_IN_LISTENING) {
         return;
     }
 
-    if (phase != RIVER_SESSION_PHASE_SPEAKING &&
-        phase != RIVER_SESSION_PHASE_BARGE_IN_LISTENING) {
-        return;
-    }
-
-    RIVER_LOGI("barge-in text confirmed during playback: phase=%s sid=%s text=%s -> interrupt tts",
-               river_session_phase_name(phase),
+    RIVER_LOGI("barge-in text confirmed during playback: interaction=%s sid=%s text=%s -> interrupt tts",
+               river_interaction_state_name(snapshot.interaction_state),
                result->sid != NULL ? result->sid : "-",
                result->text);
     if (river_cloud_adapter_interrupt_tts_with_reason("asr_text_confirmed") == RIVER_OK) {
@@ -495,7 +353,6 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         break;
     case RIVER_CLOUD_ASR_EVENT_ERROR:
         if (river_session_state_lock()) {
-            g_river_session_coordinator.asr_session_active = false;
             g_river_session_coordinator.barge_in_interrupt_requested = false;
             g_river_session_coordinator.last_partial[0] = '\0';
             river_session_state_unlock();
@@ -505,15 +362,12 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->code,
                    result->sid != NULL ? result->sid : "-",
                    result->message != NULL ? result->message : "-");
-        if (river_session_state_lock()) {
-            river_session_apply_phase_locked(RIVER_SESSION_PHASE_ERROR_RECOVERING,
-                                             "asr_error");
-            river_session_state_unlock();
-        }
+        river_dialog_runtime_note_asr_session_closed(result->sid, "asr_error");
+        river_dialog_runtime_note_error("asr_error");
+        river_dialog_runtime_sync_cloud_state("asr_error");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
         if (river_session_state_lock()) {
-            g_river_session_coordinator.asr_session_active = true;
             g_river_session_coordinator.barge_in_interrupt_requested = false;
             g_river_session_coordinator.last_partial[0] = '\0';
             river_session_state_unlock();
@@ -521,11 +375,11 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
-        river_session_coordinator_sync_interaction_state("asr_session_started");
+        river_dialog_runtime_note_asr_session_started(result->sid, "asr_session_started");
+        river_dialog_runtime_sync_cloud_state("asr_session_started");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
         if (river_session_state_lock()) {
-            g_river_session_coordinator.asr_session_active = false;
             g_river_session_coordinator.barge_in_interrupt_requested = false;
             g_river_session_coordinator.last_partial[0] = '\0';
             river_session_state_unlock();
@@ -533,7 +387,8 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
-        river_session_coordinator_sync_interaction_state("asr_session_closed");
+        river_dialog_runtime_note_asr_session_closed(result->sid, "asr_session_closed");
+        river_dialog_runtime_sync_cloud_state("asr_session_closed");
         (void)river_interaction_diag_flush_deferred();
         break;
     default:
@@ -549,16 +404,16 @@ void river_session_coordinator_on_playback_state(
     (void)config;
     (void)user_data;
 
+    river_dialog_runtime_note_playback_state(state,
+                                             state == RIVER_PLAYBACK_ERROR ?
+                                                 "playback_error" :
+                                                 "playback_state");
     if (state == RIVER_PLAYBACK_ERROR) {
-        if (river_session_state_lock()) {
-            river_session_apply_phase_locked(RIVER_SESSION_PHASE_ERROR_RECOVERING,
-                                             "playback_error");
-            river_session_state_unlock();
-        }
-        return;
+        river_dialog_runtime_note_error("playback_error");
     }
-
-    river_session_coordinator_sync_interaction_state("playback_state");
+    river_dialog_runtime_sync_cloud_state(state == RIVER_PLAYBACK_ERROR ?
+                                              "playback_error" :
+                                              "playback_state");
 }
 
 void river_session_coordinator_on_voice_event(const river_voice_event_t *event)
@@ -584,11 +439,8 @@ void river_session_coordinator_on_voice_event(const river_voice_event_t *event)
         }
         RIVER_LOGW("wakeword worker unavailable; falling back to inline admission");
         if (river_cloud_adapter_begin_conversation_window("wakeword") == RIVER_OK) {
-            if (river_session_state_lock()) {
-                river_session_apply_phase_locked(RIVER_SESSION_PHASE_WAKE_CONFIRMED,
-                                                 "wakeword_detected");
-                river_session_state_unlock();
-            }
+            river_dialog_runtime_note_wake_confirmed("wakeword_detected");
+            river_dialog_runtime_sync_cloud_state("wakeword_detected");
         }
         break;
     default:
@@ -610,7 +462,6 @@ river_status_t river_session_coordinator_init(void)
     if (rtos_mutex_create(&g_river_session_coordinator.state_lock) != RTK_SUCCESS) {
         return RIVER_ERR_NO_MEMORY;
     }
-    g_river_session_coordinator.phase = RIVER_SESSION_PHASE_BOOTING;
     if (river_session_wakeword_worker_init() != RIVER_OK) {
         rtos_mutex_delete(g_river_session_coordinator.state_lock);
         g_river_session_coordinator.state_lock = NULL;

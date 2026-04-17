@@ -137,6 +137,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 ### Step B: 建立 `dialog runtime` 真相源
 
+状态：
+
+- 已落地（2026-04-17，Step 5.177）
+
 目标：
 
 - 让 `river_core` 显式维护：
@@ -156,6 +160,28 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 - 不再主要依赖 playback/asr 回调反推 coarse `phase`
 - `turn_id / accept_reason / input_state / output_state` 有统一落点
+
+已完成事实：
+
+- 新增 `river_dialog_runtime`，由 `river_core` 统一维护：
+  - boot
+  - wake confirmed
+  - ASR lifecycle
+  - playback lifecycle
+  - input/output lane
+  - 派生 interaction state
+- `river_app` 不再直接写 `interaction_state`
+- `session_coordinator` 不再维护本地 `phase` / `asr_session_active` 真相源
+- `river_cloud_adapter` 暴露通用 runtime snapshot，`river_core` 通过稳定接口
+  吸收 provider/session/lane 事实
+
+下一步焦点：
+
+- 进入 Step C / Step D 的组合推进：
+  - 先把 XiaoZhi downlink / playback 从单体 adapter 中继续抽出成清晰的
+    runtime/media engine
+  - 再重建 `write_failed / underrun / rebuffer` 恢复模型，避免当前 stop/start
+    风暴反复打穿播放链
 
 ### Step C: 拆分 XiaoZhi adapter 的 transport / protocol / runtime / media
 

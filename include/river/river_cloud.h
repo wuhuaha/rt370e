@@ -54,6 +54,29 @@ typedef void (*river_cloud_asr_result_handler_t)(const river_cloud_asr_result_t 
 typedef void (*river_cloud_state_sync_handler_t)(const char *reason,
                                                  void *user_data);
 
+#define RIVER_CLOUD_RUNTIME_PROVIDER_MAX 32U
+#define RIVER_CLOUD_RUNTIME_ID_MAX       96U
+#define RIVER_CLOUD_RUNTIME_REASON_MAX   64U
+#define RIVER_CLOUD_RUNTIME_STATE_MAX    32U
+
+typedef struct {
+    bool available;
+    bool conversation_window_active;
+    bool listening;
+    bool stream_active;
+    bool playback_active;
+    bool tts_stop_pending;
+    bool turn_accepted;
+    bool barge_in_enabled_known;
+    bool barge_in_enabled;
+    char provider_name[RIVER_CLOUD_RUNTIME_PROVIDER_MAX];
+    char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
+    char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
+    char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char input_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    char output_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
+} river_cloud_runtime_snapshot_t;
+
 river_status_t river_cloud_adapter_init(void);
 river_status_t river_cloud_adapter_set_result_handler(river_cloud_asr_result_handler_t handler,
                                                       void *user_data);
@@ -82,6 +105,7 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
 river_status_t river_cloud_asr_batch_submit_segment(const uint8_t *pcm,
                                                     size_t bytes,
                                                     const river_voice_segment_desc_t *segment);
+river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot);
 void river_cloud_adapter_dump_status(void);
 
 #endif

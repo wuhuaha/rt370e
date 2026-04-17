@@ -1,5 +1,41 @@
 # Change Log
 
+## Step 5.177
+- Landed the first real `dialog runtime` truth-source slice so `river_core`
+  now owns derived interaction state instead of letting `app` and
+  `session_coordinator` each maintain their own coarse phase view:
+  - new runtime public API:
+    - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - new core runtime implementation:
+    - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - build wiring:
+    - [components/river_core/CMakeLists.txt](/root/ameba-river/components/river_core/CMakeLists.txt)
+- Rewired boot and cloud-state sync through the new runtime instead of direct
+  `interaction_state_set()` calls from the app layer:
+  - `river_app_boot()` now initializes `dialog runtime`
+  - boot completion now flows through:
+    - `river_dialog_runtime_mark_boot_ready(...)`
+    - `river_dialog_runtime_sync_cloud_state(...)`
+  - runtime status is included in the standard boot/status dump
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- Turned `session_coordinator` into an event ingester instead of a parallel
+  phase state machine:
+  - removed the local `phase` / `asr_session_active` truth source
+  - wake admission, ASR lifecycle, playback lifecycle, and playback-interrupt
+    guards now read or update `dialog runtime`
+  - `river_session_coordinator_sync_interaction_state()` now delegates to the
+    runtime cloud-sync path
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- Added a generic cloud-runtime snapshot export so `river_core` can ingest
+  provider/session/lane facts without poking XiaoZhi internals directly:
+  - new public snapshot contract:
+    - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - new adapter snapshot implementation:
+    - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- This closes the Step B architecture gap enough to start the next real slice:
+  - rebuild XiaoZhi downlink / playback as a runtime-owned media engine on top
+    of the new `dialog runtime` truth source
+
 ## Step 5.176
 - Saved a new architecture review that captures the current root causes behind
   slow XiaoZhi response and playback churn, then re-designed the target runtime

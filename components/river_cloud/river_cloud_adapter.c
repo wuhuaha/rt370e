@@ -2292,6 +2292,19 @@ static const char *river_cloud_active_provider_name(void)
                river_cloud_split_asr_provider_name();
 }
 
+static void river_cloud_runtime_copy_text(char *dst, size_t dst_size, const char *src)
+{
+    if (dst == NULL || dst_size == 0U) {
+        return;
+    }
+    if (src == NULL || src[0] == '\0') {
+        dst[0] = '\0';
+        return;
+    }
+
+    snprintf(dst, dst_size, "%s", src);
+}
+
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  const char *text,
@@ -4042,4 +4055,49 @@ bool river_cloud_adapter_conversation_window_active(void)
 #else
     return g_river_cloud.xiaozhi_enabled && g_river_cloud.xiaozhi_window_active;
 #endif
+}
+
+river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    memset(snapshot, 0, sizeof(*snapshot));
+    snapshot->available = g_river_cloud.initialized;
+    river_cloud_runtime_copy_text(snapshot->provider_name,
+                                  sizeof(snapshot->provider_name),
+                                  river_cloud_active_provider_name());
+    snapshot->stream_active = g_river_cloud.stream_active;
+    snapshot->listening = g_river_cloud.stream_active;
+
+#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
+    if (river_cloud_xiaozhi_enabled()) {
+        snapshot->conversation_window_active = g_river_cloud.xiaozhi_window_active;
+        snapshot->listening = g_river_cloud.xiaozhi_listening;
+        snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
+        snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
+        snapshot->turn_accepted = g_river_cloud.xiaozhi_turn_accepted;
+        snapshot->barge_in_enabled_known =
+            g_river_cloud.xiaozhi_transport_barge_in_enabled_known;
+        snapshot->barge_in_enabled = g_river_cloud.xiaozhi_transport_barge_in_enabled;
+        river_cloud_runtime_copy_text(snapshot->session_id,
+                                      sizeof(snapshot->session_id),
+                                      g_river_cloud.xiaozhi_session_id);
+        river_cloud_runtime_copy_text(snapshot->turn_id,
+                                      sizeof(snapshot->turn_id),
+                                      g_river_cloud.xiaozhi_turn_id);
+        river_cloud_runtime_copy_text(snapshot->accept_reason,
+                                      sizeof(snapshot->accept_reason),
+                                      g_river_cloud.xiaozhi_accept_reason);
+        river_cloud_runtime_copy_text(snapshot->input_state,
+                                      sizeof(snapshot->input_state),
+                                      g_river_cloud.xiaozhi_input_state);
+        river_cloud_runtime_copy_text(snapshot->output_state,
+                                      sizeof(snapshot->output_state),
+                                      g_river_cloud.xiaozhi_output_state);
+    }
+#endif
+
+    return RIVER_OK;
 }

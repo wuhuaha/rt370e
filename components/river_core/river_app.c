@@ -2,6 +2,7 @@
 #include "river/river_app.h"
 #include "river/river_cloud.h"
 #include "river/river_dialog_cloud_port.h"
+#include "river/river_dialog_runtime.h"
 #include "river/river_interaction_state.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
@@ -24,7 +25,7 @@
 static void river_app_on_cloud_state_sync(const char *reason, void *user_data)
 {
     (void)user_data;
-    river_session_coordinator_sync_interaction_state(reason);
+    river_dialog_runtime_sync_cloud_state(reason);
 }
 
 static const char *river_app_dialog_cloud_provider_name(void)
@@ -117,7 +118,9 @@ river_status_t river_app_boot(void)
     if (river_playback_service_init() != RIVER_OK) {
         return RIVER_ERR_NO_MEMORY;
     }
-    river_interaction_state_set(RIVER_INTERACTION_BOOTING, "boot_begin");
+    if (river_dialog_runtime_init() != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
 
     if (river_wifi_station_init() != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
@@ -173,7 +176,8 @@ river_status_t river_app_boot(void)
     }
 #endif
 
-    river_session_coordinator_sync_interaction_state("boot_ready");
+    river_dialog_runtime_mark_boot_ready("boot_ready");
+    river_dialog_runtime_sync_cloud_state("boot_ready");
     river_app_print_status();
     river_runtime_stats_snapshot("boot_ready");
     return RIVER_OK;
@@ -208,6 +212,7 @@ void river_app_print_status(void)
     RIVER_LOGI("online_control=disabled");
 #endif
     river_interaction_state_dump_status();
+    river_dialog_runtime_dump_status();
     river_reset_trace_dump_status();
     river_playback_service_dump_status();
     river_voice_capture_dump_status();
