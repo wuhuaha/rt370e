@@ -112,6 +112,20 @@ bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void)
            river_cloud_xiaozhi_duplex_soft_endpoint_enabled();
 }
 
+void river_cloud_xiaozhi_note_round_finish_request(const char *reason)
+{
+    if (!g_river_cloud.xiaozhi_asr_round_active ||
+        reason == NULL ||
+        reason[0] == '\0') {
+        return;
+    }
+
+    snprintf(g_river_cloud.xiaozhi_asr_round_close_reason,
+             sizeof(g_river_cloud.xiaozhi_asr_round_close_reason),
+             "%s",
+             reason);
+}
+
 void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void)
 {
     g_river_cloud.xiaozhi_endpoint_soft_close_pending = false;
@@ -173,6 +187,92 @@ void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger, const char
                (unsigned int)RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS,
                g_river_cloud.stream_active ? "yes" : "no",
                g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+}
+
+static const char *river_cloud_xiaozhi_stream_finish_cause_name(
+    river_cloud_xiaozhi_stream_finish_cause_t cause)
+{
+    switch (cause) {
+    case RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL:
+        return "post_roll";
+    case RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT:
+        return "endpoint_soft_close_timeout";
+    default:
+        return "unknown";
+    }
+}
+
+bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason, size_t reason_size)
+{
+    uint64_t now_ms;
+
+    if (!g_river_cloud.xiaozhi_endpoint_soft_close_pending) {
+        return false;
+    }
+
+    if (!g_river_cloud.stream_active || g_river_cloud.xiaozhi_listen_stop_pending) {
+        river_cloud_xiaozhi_clear_endpoint_soft_close_state();
+        return false;
+    }
+
+    if (river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active()) {
+        return false;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (now_ms < g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms) {
+        return false;
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(
+        reason,
+        reason_size,
+        g_river_cloud.xiaozhi_endpoint_soft_close_reason[0] != '\0' ?
+            g_river_cloud.xiaozhi_endpoint_soft_close_reason :
+            "server_endpoint_candidate");
+    RIVER_LOGI("xiaozhi deferred local close resolved: trigger=endpoint_soft_close_timeout reason=%s",
+               reason != NULL && reason[0] != '\0' ? reason : "-");
+    return true;
+}
+
+void river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
+    river_cloud_xiaozhi_stream_finish_cause_t cause,
+    const char *detail_reason)
+{
+    const char *cause_name = river_cloud_xiaozhi_stream_finish_cause_name(cause);
+
+    if (!g_river_cloud.stream_active) {
+        return;
+    }
+
+    RIVER_LOGI("xiaozhi active stream finish: cause=%s trigger=%s partial=%s final=%s",
+               cause_name,
+               detail_reason != NULL && detail_reason[0] != '\0' ? detail_reason : cause_name,
+               g_river_cloud.xiaozhi_asr_round_partial_seen ? "yes" : "no",
+               g_river_cloud.xiaozhi_asr_round_final_seen ? "yes" : "no");
+    river_cloud_xiaozhi_clear_endpoint_soft_close_state();
+    river_cloud_xiaozhi_note_round_finish_request("post_roll");
+    g_river_cloud.xiaozhi_listen_stop_pending = true;
+    river_cloud_xiaozhi_finalize_pending_text("post_roll");
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS,
+                                     "post_commit_wait");
+    RIVER_LOGI("xiaozhi response wait armed after commit: timeout_ms=%u",
+               (unsigned int)RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS);
+    if (river_cloud_xiaozhi_should_defer_local_close()) {
+        river_cloud_xiaozhi_arm_local_close_defer();
+    } else {
+        g_river_cloud.xiaozhi_local_close_pending = false;
+        g_river_cloud.xiaozhi_local_close_deadline_ms = 0U;
+    }
+    g_river_cloud.stream_active = false;
+    g_river_cloud.silence_frames = 0U;
+    g_river_cloud.stream_started_ms = 0U;
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
+    g_river_cloud.xiaozhi_uplink_retry_valid = false;
+    g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
+    river_cloud_pre_roll_reset();
 }
 
 bool river_cloud_xiaozhi_should_defer_local_close(void)

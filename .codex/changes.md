@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.193
+- Continued pulling XiaoZhi round-close truth out of `river_cloud_adapter.c`
+  by moving these state transitions into
+  `river_cloud_xiaozhi_session.c`:
+  - round-finish reason latching
+  - endpoint soft-close timeout decision
+  - active-stream finish state commit
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Added a typed active-stream finish cause family so adapter no longer decides
+  how session runtime should commit a local input round:
+  - `RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL`
+  - `RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter now only provides the transport tail for those finishes
+  (`flush_accumulator_padded + finalize_listen_stop_if_ready`) and forwards
+  typed round-close causes directly:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.192
 - Continued thinning `river_cloud_adapter.c` by moving XiaoZhi
   `endpoint soft close / local close defer` helper ownership into

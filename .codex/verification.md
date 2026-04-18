@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.193
+Validate that active-stream finish truth and endpoint soft-close timeout
+decision now live in XiaoZhi session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'STREAM_FINISH_|note_round_finish_request|poll_endpoint_soft_close_timeout|commit_active_stream_finish_for_cause|complete_active_stream_finish' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports the typed stream-finish cause family
+  - endpoint timeout polling and stream-finish state commit live in
+    `river_cloud_xiaozhi_session.c`
+  - adapter only keeps the transport-tail glue helper
+
 ## Step 5.192
 Validate that endpoint/local-close state helpers now live in XiaoZhi session
 runtime instead of the adapter:

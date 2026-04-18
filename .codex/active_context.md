@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.192 move endpoint/local-close helpers into session runtime`
+  - `5.193 move stream-finish truth into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -181,6 +181,13 @@ or top-of-tree verification target changes.
       - endpoint soft-close arm/cancel
       - local-close defer arm/check
       - duplex-speaking uplink continuation predicate
+  - eighteenth landed slice on that plan:
+    - `active stream finish` state commit and `endpoint soft-close timeout`
+      decision now also live in XiaoZhi session runtime
+    - adapter keeps only the transport tail that flushes the last accumulator
+      frame and finalizes `listen_stop`
+    - local-close/server-response branches now forward typed causes directly
+      instead of routing through adapter-local wrappers
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

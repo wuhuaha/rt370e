@@ -338,6 +338,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `round_finish`
 - `endpoint soft close / local close defer` 的状态辅助函数也已开始迁入
   session runtime
+- `active stream finish` 的 state commit 与 `endpoint soft-close timeout`
+  判定也已迁入 session runtime；adapter 只保留 transport tail
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

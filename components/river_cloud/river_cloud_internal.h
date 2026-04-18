@@ -118,6 +118,11 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE = 1
 } river_cloud_xiaozhi_round_close_cause_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL = 0,
+    RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT = 1
+} river_cloud_xiaozhi_stream_finish_cause_t;
+
 typedef struct {
     bool valid;
     bool started;
@@ -366,12 +371,18 @@ bool river_cloud_xiaozhi_playback_allows_vad_open(void);
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
+void river_cloud_xiaozhi_note_round_finish_request(const char *reason);
 void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void);
 void river_cloud_xiaozhi_cancel_endpoint_soft_close(const char *trigger);
 void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger,
                                              const char *reason);
 void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
                                                  const char *reason);
+bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason,
+                                                          size_t reason_size);
+void river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
+    river_cloud_xiaozhi_stream_finish_cause_t cause,
+    const char *detail_reason);
 bool river_cloud_xiaozhi_should_defer_local_close(void);
 void river_cloud_xiaozhi_arm_local_close_defer(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
