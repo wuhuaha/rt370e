@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.203
+Validate that the redundant XiaoZhi `keep_local_round_on_tts_start` predicate
+is gone after TTS-start policy moved into session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'keep_local_round_on_tts_start|apply_tts_start_round_policy' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - `keep_local_round_on_tts_start` is no longer exported or defined
+  - `apply_tts_start_round_policy` remains the only session-runtime TTS-start policy helper
+
 ## Step 5.202
 Validate that XiaoZhi `tts_start` keep-open / close policy now lives in
 session runtime and adapter only consumes the exported helper:

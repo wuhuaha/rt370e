@@ -201,11 +201,6 @@ bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech)
     return !guard_active && !g_river_cloud.xiaozhi_no_ref_reopen_rearm;
 }
 
-bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
-{
-    return river_cloud_xiaozhi_playback_allows_vad_open();
-}
-
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
     return river_cloud_xiaozhi_playback_output_active() ||

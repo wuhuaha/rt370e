@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.203
+- Removed the now-redundant XiaoZhi `keep_local_round_on_tts_start` predicate
+  after `tts_start` keep-open / close policy had already been moved into
+  session runtime:
+  - deleted:
+    - `river_cloud_xiaozhi_keep_local_round_on_tts_start()`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- The session-runtime TTS-start surface is now a single exported policy helper:
+  - `river_cloud_xiaozhi_apply_tts_start_round_policy(...)`
+
 ## Step 5.202
 - Moved XiaoZhi `tts_start` keep-open / round-close policy out of
   `river_cloud_adapter.c` and into session runtime so the adapter no longer

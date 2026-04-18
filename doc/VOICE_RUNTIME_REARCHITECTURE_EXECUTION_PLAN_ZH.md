@@ -329,6 +329,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - finalize pending text
     - 调用 runtime helper
     - cancel playback stop 的 transport 尾部胶水
+  - 该 helper 现已成为唯一的 session-runtime TTS-start policy surface，
+    相关冗余 predicate 已删除
   - 后续若要继续瘦身 adapter，可把这条 `tts_start` 分支的剩余胶水
     再拆成更细的 session-runtime/transport 边界
 

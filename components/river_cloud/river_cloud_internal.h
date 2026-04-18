@@ -380,7 +380,6 @@ bool river_cloud_xiaozhi_capture_held_by_playback(
 void river_cloud_xiaozhi_apply_tts_start_round_policy(void);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
-bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason);
