@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-17
+Last Updated: 2026-04-18
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -366,6 +366,35 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   `stop/start`
 - playback service 已可从 `RIVER_PLAYBACK_RECOVERING` 重新回到
   `RIVER_PLAYBACK_RUNNING`
+- 下行本地预取/重缓冲门限已按当前板端问题重建：
+  - downlink ring：`32 -> 96`
+  - 首播起播门限：`12 -> 16`
+  - 重缓冲再起播门限：`18 -> 28`
+  - playback target/fallback buffer：`6/4 -> 12/8`
+- playback runtime 现已把 `audio.out.meta` 到达节奏纳入同一条 runtime
+  真相：
+  - 记录：
+    - `playback_last_meta_ms`
+    - `playback_last_meta_gap_ms`
+    - `playback_prefetch_target_ms`
+  - `prefetch_target_ms` 取：
+    - 当前 segment `expected_duration_ms`
+    - 最近一次 `meta_gap_ms`
+    中较大者，再附加固定 margin，并受 ring 可播放预算上限约束
+- `upstream gap` 触发的 starvation rebuffer 不再只看一个小固定等待值：
+  - 当前等待窗口会跟随 `prefetch_target_ms` / 起播门限自适应抬高
+  - repeated rebuffer 会继续抬高再起播门限，避免短队列反复打穿
+- `river xiaozhi status` / 运行时诊断现在可以直接观察到新的下行真相：
+  - `target_ms`
+  - `meta_gap_ms`
+  - `rebuffer_count`
+
+下一步焦点：
+
+- 继续把“可恢复的 rebuffer/restart churn”从
+  `error_recovering -> follow_up -> speaking` 的粗状态跳变里拆掉
+- 让 `dialog runtime` / `session coordinator` 消费统一 playback runtime
+  状态机，而不是把 recoverable stop/start 当成 fatal playback error 的旁路
 
 ### Step E: 统一 turn timeline 与板端验证
 

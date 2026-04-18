@@ -63,12 +63,14 @@
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_IDLE_MS    20U
 /* Favor continuity over lowest latency while the service often stays on no-ref playback. */
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES 32U
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES 12U
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_START_FRAMES 18U
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS 60U
-#define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 6U
-#define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 4U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES 96U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES 16U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_START_FRAMES 28U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS 120U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_PREFETCH_MARGIN_MS 120U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_EXTRA_FRAMES 4U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 12U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 8U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
@@ -242,6 +244,7 @@ typedef struct {
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_downlink_starved_since_ms;
+    uint64_t xiaozhi_playback_last_meta_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
     uint64_t xiaozhi_local_close_deadline_ms;
@@ -252,6 +255,8 @@ typedef struct {
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
     uint32_t xiaozhi_playback_rebuffer_count;
+    uint32_t xiaozhi_playback_last_meta_gap_ms;
+    uint32_t xiaozhi_playback_prefetch_target_ms;
     uint32_t xiaozhi_playback_segment_head;
     uint32_t xiaozhi_playback_segment_count;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;

@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.194
+Validate that downlink/prefetch runtime now owns a larger local buffer budget
+and adaptive rebuffer threshold model:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'DOWNLINK_RING_FRAMES|DOWNLINK_START_FRAMES|DOWNLINK_REBUFFER_START_FRAMES|DOWNLINK_STARVED_REBUFFER_MS|DOWNLINK_PREFETCH_MARGIN_MS|DOWNLINK_REBUFFER_EXTRA_FRAMES|PLAYBACK_BUFFER_FRAMES' \
+  components/river_cloud/river_cloud_internal.h
+rg -n 'prefetch_target_ms|last_meta_gap_ms|target_ms=|upstream gap rebuffer|playback prefetch|playback rebuffer requested' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - cloud internal constants now expose the larger downlink/playback buffer
+    budget
+  - playback runtime exports the adaptive `prefetch_target_ms` / meta-gap logic
+  - adapter diagnostics expose `target_ms`, `meta_gap_ms`, and `rebuffer_count`
+
 ## Step 5.193
 Validate that active-stream finish truth and endpoint soft-close timeout
 decision now live in XiaoZhi session runtime:

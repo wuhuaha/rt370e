@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.193 move stream-finish truth into session runtime`
+  - `5.194 rebuild downlink prefetch and rebuffer thresholds`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -188,6 +188,22 @@ or top-of-tree verification target changes.
       frame and finalizes `listen_stop`
     - local-close/server-response branches now forward typed causes directly
       instead of routing through adapter-local wrappers
+  - nineteenth landed slice on that plan:
+    - downlink / playback local buffering was rebuilt around a larger jitter
+      budget:
+      - downlink ring `96`
+      - start threshold `16`
+      - rebuffer threshold `28`
+      - playback target/fallback buffer `12/8`
+    - playback runtime now derives adaptive prefetch truth from
+      `audio.out.meta` arrival cadence:
+      - `playback_last_meta_gap_ms`
+      - `playback_prefetch_target_ms`
+    - starvation-triggered rebuffer now waits against that adaptive target
+      instead of a small fixed timeout, and adapter diagnostics now print:
+      - `target_ms`
+      - `meta_gap_ms`
+      - `rebuffer_count`
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

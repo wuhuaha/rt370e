@@ -2755,13 +2755,16 @@ void river_cloud_adapter_dump_status(void)
                g_river_cloud.xiaozhi_asr_round_close_reason[0] != '\0' ?
                    g_river_cloud.xiaozhi_asr_round_close_reason :
                    "-");
-    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums",
+    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums target_ms=%lu meta_gap_ms=%lu rebuffer_count=%lu",
                (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring),
                (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES,
                (unsigned long)g_river_cloud.xiaozhi_downlink_ring_dropped,
                g_river_cloud.xiaozhi_downlink_started ? "running" : "off",
                (unsigned long)g_river_cloud.xiaozhi_downlink_sample_rate,
-               (unsigned long)g_river_cloud.xiaozhi_downlink_frame_duration_ms);
+               (unsigned long)g_river_cloud.xiaozhi_downlink_frame_duration_ms,
+               (unsigned long)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
+               (unsigned long)g_river_cloud.xiaozhi_playback_last_meta_gap_ms,
+               (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count);
 #else
     RIVER_LOGI("xiaozhi runtime compiled=no");
 #endif

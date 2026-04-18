@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.194
+- Rebuilt the XiaoZhi downlink jitter buffer and local playback prefetch budget
+  so the device stops starting playback on an unrealistically thin queue:
+  - downlink ring depth: `32 -> 96`
+  - initial start threshold: `12 -> 16`
+  - rebuffer restart threshold: `18 -> 28`
+  - AudioTrack target/fallback buffer: `6/4 -> 12/8`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Extended playback runtime to derive an adaptive `prefetch_target_ms` from
+  observed `audio.out.meta` cadence instead of reusing one static rebuffer
+  threshold:
+  - records:
+    - `xiaozhi_playback_last_meta_ms`
+    - `xiaozhi_playback_last_meta_gap_ms`
+    - `xiaozhi_playback_prefetch_target_ms`
+  - raises start/rebuffer thresholds after repeated rebuffer and larger
+    meta-supply gaps
+  - stretches starvation-trigger wait to match the active prefetch target
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Adapter-side diagnostics now print the new downlink truth directly so board
+  logs can distinguish server supply gaps from too-aggressive local start
+  policy:
+  - `target_ms`
+  - `meta_gap_ms`
+  - `rebuffer_count`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.193
 - Continued pulling XiaoZhi round-close truth out of `river_cloud_adapter.c`
   by moving these state transitions into
