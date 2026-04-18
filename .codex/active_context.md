@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.221 move xiaozhi uplink send-ready gate into session runtime`
+  - `5.222 route adapter listening/window reads through session-runtime getters`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -167,6 +167,14 @@ or top-of-tree verification target changes.
       to `RIVER_PLAYBACK_RUNNING`
     - stop/start is retained only as the fallback path when same-track recover
       fails
+  - latest landed slice on that plan:
+    - session runtime now exports adapter-facing getters for:
+      - `listening`
+      - `conversation_window_active`
+      - `conversation_window_remaining_ms`
+    - adapter transport-active, config busy guard, status dump, and public
+      runtime snapshot/window getters now consume those exported session facts
+      instead of directly reading `xiaozhi_listening/xiaozhi_window_active`
   - sixteenth landed slice on that plan:
     - local round-close truth has started moving out of
       `river_cloud_adapter.c` into `river_cloud_xiaozhi_session.c`

@@ -136,7 +136,7 @@ static bool river_cloud_xiaozhi_transport_active(void)
     }
 
     return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_lane_engaged() ||
-           g_river_cloud.xiaozhi_listening;
+           river_cloud_xiaozhi_listening_active();
 }
 
 static bool river_cloud_xiaozhi_io_owner(void)
@@ -279,7 +279,7 @@ static river_status_t river_cloud_xiaozhi_control_execute(
             }
         }
         river_cloud_xiaozhi_copy_session_id_from_transport();
-        if (!g_river_cloud.xiaozhi_listening) {
+        if (!river_cloud_xiaozhi_listening_active()) {
             status = river_xiaozhi_send_listen_start(
                 request->arg[0] != '\0' ? request->arg : "auto");
             if (status != RIVER_OK) {
@@ -1459,7 +1459,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
     case RIVER_XIAOZHI_EVENT_SESSION_CLOSED:
         RIVER_LOGW("xiaozhi transport closed: sid=%s window=%s stream=%s playback=%s",
                    event->session_id != NULL ? event->session_id : "-",
-                   g_river_cloud.xiaozhi_window_active ? "yes" : "no",
+                   river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",
                    g_river_cloud.stream_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
         river_cloud_xiaozhi_apply_transport_closed_terminal_policy();
@@ -1731,7 +1731,7 @@ river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config
     }
 
     if (g_river_cloud.audio_bridge_open || g_river_cloud.stream_active ||
-        g_river_cloud.xiaozhi_listening || river_cloud_xiaozhi_playback_has_work() ||
+        river_cloud_xiaozhi_listening_active() || river_cloud_xiaozhi_playback_has_work() ||
         river_xiaozhi_session_open()) {
         return RIVER_ERR_BUSY;
     }
@@ -2324,10 +2324,7 @@ void river_cloud_adapter_dump_status(void)
         river_voice_duplex_ready_eval_t duplex_eval;
         uint64_t now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
         uint64_t remaining_ms =
-            (g_river_cloud.xiaozhi_window_active &&
-             g_river_cloud.xiaozhi_window_deadline_ms > now_ms) ?
-                (g_river_cloud.xiaozhi_window_deadline_ms - now_ms) :
-                0U;
+            river_cloud_xiaozhi_conversation_window_remaining_ms(now_ms);
         uint64_t local_close_left_ms =
             (g_river_cloud.xiaozhi_local_close_pending &&
              g_river_cloud.xiaozhi_local_close_deadline_ms > now_ms) ?
@@ -2348,11 +2345,11 @@ void river_cloud_adapter_dump_status(void)
                    g_river_cloud.xiaozhi_enabled ? "yes" : "no",
                    g_river_cloud.xiaozhi_io_started ? "running" : "off",
                    river_xiaozhi_session_open() ? "open" : "closed",
-                   g_river_cloud.xiaozhi_listening ? "yes" : "no",
+                   river_cloud_xiaozhi_listening_active() ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_tts_stop_pending ? "yes" : "no",
                    g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no",
-                   g_river_cloud.xiaozhi_window_active ? "yes" : "no",
+                   river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",
                    (unsigned long)remaining_ms,
                    (unsigned long)local_close_left_ms,
                    river_cloud_xiaozhi_idle_requires_wakeword() ? "wakeword" : "legacy_vad",
@@ -2538,7 +2535,8 @@ bool river_cloud_adapter_conversation_window_active(void)
 #if !RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     return false;
 #else
-    return g_river_cloud.xiaozhi_enabled && g_river_cloud.xiaozhi_window_active;
+    return g_river_cloud.xiaozhi_enabled &&
+           river_cloud_xiaozhi_conversation_window_active();
 #endif
 }
 
@@ -2558,8 +2556,9 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        snapshot->conversation_window_active = g_river_cloud.xiaozhi_window_active;
-        snapshot->listening = g_river_cloud.xiaozhi_listening;
+        snapshot->conversation_window_active =
+            river_cloud_xiaozhi_conversation_window_active();
+        snapshot->listening = river_cloud_xiaozhi_listening_active();
         snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
         snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
         snapshot->playback_rebuffer_pending =

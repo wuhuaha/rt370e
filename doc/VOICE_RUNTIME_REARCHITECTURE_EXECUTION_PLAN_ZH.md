@@ -217,6 +217,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - playback start / restart
 - `river_cloud_adapter.c` 现已改为通过共享内部接口调用该媒体运行时，
   不再保留同一套 playback/downlink 本地重复实现
+- XiaoZhi session-runtime 也已开始继续吸收 adapter 可见的会话事实读路径：
+  - 新增 exported getter：
+    - `river_cloud_xiaozhi_listening_active()`
+    - `river_cloud_xiaozhi_conversation_window_active()`
+    - `river_cloud_xiaozhi_conversation_window_remaining_ms(...)`
+  - adapter 侧以下入口已改为消费这些 runtime truth，而不是直接读
+    `xiaozhi_listening/xiaozhi_window_active`：
+    - transport active
+    - config busy guard
+    - transport-closed diagnostics
+    - status dump
+    - public runtime snapshot / conversation-window getter
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

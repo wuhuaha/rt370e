@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.222
+Validate that adapter-side XiaoZhi `listening/window` reads now consume
+session-runtime getters:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '130,305p' components/river_cloud/river_cloud_adapter.c
+sed -n '70,110p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '366,378p' components/river_cloud/river_cloud_internal.h
+rg -n 'river_cloud_xiaozhi_listening_active|river_cloud_xiaozhi_conversation_window_active|river_cloud_xiaozhi_conversation_window_remaining_ms|g_river_cloud\\.xiaozhi_(listening|window_active)' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports:
+  - `river_cloud_xiaozhi_listening_active()`
+  - `river_cloud_xiaozhi_conversation_window_active()`
+  - `river_cloud_xiaozhi_conversation_window_remaining_ms(...)`
+- adapter read-side references to `xiaozhi_listening/xiaozhi_window_active` are
+  routed through those getters
+- the only remaining raw adapter-side `xiaozhi_listening` touch is the
+  successful `listen_start` state write
+
 ## Step 5.221
 Validate that XiaoZhi uplink send-ready gating now lives in session runtime:
 ```bash

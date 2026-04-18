@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.222
+- Added XiaoZhi session-runtime getters for adapter-visible `listening` and
+  `conversation_window` truth so adapter now consumes exported runtime facts
+  instead of directly reading those session flags:
+  - `river_cloud_xiaozhi_listening_active()`
+  - `river_cloud_xiaozhi_conversation_window_active()`
+  - `river_cloud_xiaozhi_conversation_window_remaining_ms(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter transport/state surfaces now route through those getters for:
+  - transport-active admission
+  - `open_and_listen` listen-start read-side guard
+  - XiaoZhi config busy guard
+  - transport-closed diagnostics
+  - runtime dump follow-up window remaining time
+  - public conversation-window/runtime snapshot export
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.221
 - Moved the XiaoZhi uplink send-ready gate into session runtime so runtime now
   owns the canonical predicate for whether transport can actually send uplink
