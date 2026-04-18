@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.206
+- Moved XiaoZhi `LLM` terminal local-close policy out of the adapter and into
+  session runtime so adapter no longer assembles the `llm` finalize/close path:
+  - exported:
+    - `river_cloud_xiaozhi_apply_llm_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `RIVER_XIAOZHI_EVENT_LLM` handling now only logs the event, touches the
+  follow-up window, and calls the exported runtime helper:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.205
 - Moved XiaoZhi local-close `reopen_overlap` policy out of the adapter and
   into session runtime so adapter no longer hand-assembles that overlap-close

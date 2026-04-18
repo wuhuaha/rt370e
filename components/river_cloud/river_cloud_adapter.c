@@ -1501,10 +1501,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
                        event->emotion != NULL ? event->emotion : "-",
                        event->text != NULL ? event->text : "-");
         }
-        river_cloud_xiaozhi_finalize_pending_text("llm");
-        river_cloud_xiaozhi_close_local_round_for_cause(
-            RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
-            "llm");
+        river_cloud_xiaozhi_apply_llm_round_policy();
         break;
     case RIVER_XIAOZHI_EVENT_TTS:
         if (event->state != NULL && strcmp(event->state, "start") == 0) {

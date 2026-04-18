@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.206
+Validate that XiaoZhi `LLM` local-close policy now lives in session runtime and
+adapter only consumes the exported helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'apply_llm_round_policy|finalize_pending_text\\(\"llm\"\\)|close_local_round_for_cause\\(|RIVER_XIAOZHI_EVENT_LLM' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_apply_llm_round_policy(...)`
+  - `finalize_pending_text("llm")` now lives in session runtime
+  - adapter `RIVER_XIAOZHI_EVENT_LLM` path only calls the exported helper
+
 ## Step 5.205
 Validate that XiaoZhi `reopen_overlap` local-close policy now lives in session
 runtime and adapter only consumes the exported helper:

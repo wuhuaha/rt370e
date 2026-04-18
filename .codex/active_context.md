@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.205 move reopen-overlap close policy into xiaozhi session runtime`
+  - `5.206 move llm close policy into xiaozhi session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -243,6 +243,10 @@ or top-of-tree verification target changes.
   - twenty-sixth landed slice on that plan:
     - XiaoZhi local-close `reopen_overlap` policy now lives in session runtime
     - adapter reopen path now only calls the exported overlap helper
+  - twenty-seventh landed slice on that plan:
+    - XiaoZhi `LLM` local-close policy now lives in session runtime
+    - adapter `RIVER_XIAOZHI_EVENT_LLM` branch now only calls the exported
+      runtime helper
     - fixed-dsb AECM summary now counts:
       - `restart_pending`
       separately from generic playback-disabled/reference-idle churn

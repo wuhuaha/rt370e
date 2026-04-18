@@ -350,6 +350,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 记录 round finish request
     - 触发 local round close
   - adapter reopen 分支现在只剩下调用这个 overlap helper
+- XiaoZhi `LLM` terminal local-close 语义也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_llm_round_policy()`
+  - 该 helper 负责：
+    - finalize pending text
+    - 触发 local round close
+  - adapter `RIVER_XIAOZHI_EVENT_LLM` 分支现在只剩下调用这个 runtime
+    helper
 
 下一步焦点：
 
