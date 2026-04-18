@@ -511,6 +511,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - first packet timestamp
     - packet_sent 计数
   - adapter 现在只在 uplink-send 和 reopen-open 路径调用它们，不再定义本地实现
+- XiaoZhi ASR partial/final 发射记账也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_note_asr_result_emitted()`
+  - 该 helper 现在统一拥有：
+    - `partial_seen`
+    - `partial_count`
+    - `final_seen`
+    - `final_count`
+  - adapter `river_cloud_emit_asr_result()` 现在只保留：
+    - generic ASR result payload 组装
+    - runtime helper 调用
+    - listener notify
 - XiaoZhi TTS interrupt 语义也已收口到 session runtime：
   - 新增 exported helper：
     - `river_cloud_xiaozhi_interrupt_tts()`

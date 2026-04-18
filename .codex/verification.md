@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.233
+Validate that XiaoZhi ASR partial/final emission accounting is now owned by
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '344,353p' components/river_cloud/river_cloud_internal.h
+sed -n '176,196p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1068,1081p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_asr_result_emitted|partial_seen|partial_count|final_seen|final_count' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_note_asr_result_emitted(...)`
+- adapter `river_cloud_emit_asr_result(...)` no longer mutates XiaoZhi
+  round-level `partial/final` counters inline
+- XiaoZhi ASR round emission bookkeeping now lives behind a runtime-owned
+  helper instead of adapter-side field mutation
+
 ## Step 5.232
 Validate that the XiaoZhi I/O-loop work gate is now owned by runtime:
 ```bash

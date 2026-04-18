@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.233
+- Moved XiaoZhi ASR partial/final emission accounting out of
+  `river_cloud_adapter.c` and into a session-runtime-owned helper so adapter
+  no longer mutates ASR-round emission counters inline while delivering generic
+  cloud ASR results:
+  - `river_cloud_xiaozhi_note_asr_result_emitted(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the reducer that tracks XiaoZhi ASR result emission
+  facts for the active round:
+  - `partial_seen`
+  - `partial_count`
+  - `final_seen`
+  - `final_count`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_emit_asr_result(...)` now only constructs the generic
+  ASR result payload and delegates XiaoZhi-specific emission bookkeeping to
+  runtime before notifying listeners:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.232
 - Collapsed the XiaoZhi I/O-loop work-presence gate out of
   `river_cloud_adapter.c` and into a runtime-owned helper so adapter no longer

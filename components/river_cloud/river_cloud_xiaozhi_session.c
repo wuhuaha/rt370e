@@ -180,6 +180,21 @@ bool river_cloud_xiaozhi_io_has_work(void)
            river_cloud_xiaozhi_uplink_active();
 }
 
+void river_cloud_xiaozhi_note_asr_result_emitted(river_cloud_asr_event_type_t type)
+{
+    if (type == RIVER_CLOUD_ASR_EVENT_PARTIAL) {
+        g_river_cloud.xiaozhi_asr_round_partial_seen = true;
+        if (g_river_cloud.xiaozhi_asr_round_partial_count < UINT32_MAX) {
+            g_river_cloud.xiaozhi_asr_round_partial_count++;
+        }
+    } else if (type == RIVER_CLOUD_ASR_EVENT_FINAL) {
+        g_river_cloud.xiaozhi_asr_round_final_seen = true;
+        if (g_river_cloud.xiaozhi_asr_round_final_count < UINT32_MAX) {
+            g_river_cloud.xiaozhi_asr_round_final_count++;
+        }
+    }
+}
+
 void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot)
 {
     if (snapshot == NULL) {

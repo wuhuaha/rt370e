@@ -1075,16 +1075,8 @@ void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
     result.message = message;
     result.code = code;
     result.is_final = is_final;
-    if (type == RIVER_CLOUD_ASR_EVENT_PARTIAL) {
-        g_river_cloud.xiaozhi_asr_round_partial_seen = true;
-        if (g_river_cloud.xiaozhi_asr_round_partial_count < UINT32_MAX) {
-            g_river_cloud.xiaozhi_asr_round_partial_count++;
-        }
-    } else if (type == RIVER_CLOUD_ASR_EVENT_FINAL) {
-        g_river_cloud.xiaozhi_asr_round_final_seen = true;
-        if (g_river_cloud.xiaozhi_asr_round_final_count < UINT32_MAX) {
-            g_river_cloud.xiaozhi_asr_round_final_count++;
-        }
+    if (river_cloud_xiaozhi_enabled()) {
+        river_cloud_xiaozhi_note_asr_result_emitted(type);
     }
     river_cloud_notify_result(&result, &g_river_cloud);
 }
