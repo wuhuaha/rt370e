@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.236 move XiaoZhi transport meta/error terminal observation into runtime`
+  - `5.237 move XiaoZhi input preview glue into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -259,20 +259,16 @@ or top-of-tree verification target changes.
     - the session-runtime TTS-start surface is now a single exported policy
       helper
   - latest landed slice on that plan:
-    - XiaoZhi transport-event reducer ownership has continued moving out of
-      `river_cloud_adapter.c` into runtime helper boundaries
-    - adapter `RIVER_XIAOZHI_EVENT_AUDIO_OUT_META / SESSION_CLOSED / ERROR`
-      handling now only dispatches transport observations to:
-      - `river_cloud_xiaozhi_note_audio_out_meta_observation(...)`
-      - `river_cloud_xiaozhi_note_session_closed_observation(...)`
-      - `river_cloud_xiaozhi_note_error_observation(...)`
-    - playback runtime now owns:
-      - `audio_out_meta` follow-up window touch
-      - playback fact log projection
-      - playback-meta observation reduction
-    - session runtime now owns:
-      - `session_closed` transport terminal policy entry
-      - `error` message normalization and ASR error emission
+    - XiaoZhi input-side preview transport glue has continued moving out of
+      `river_cloud_adapter.c` into session runtime
+    - adapter `RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START / INPUT_PREVIEW /
+      INPUT_ENDPOINT` handling now only dispatches transport observations to:
+      - `river_cloud_xiaozhi_note_input_observation(...)`
+    - session runtime now owns one grouped reducer for:
+      - preview-window touch
+      - preview interrupt hint
+      - endpoint soft-close arm/cancel policy
+      across the three input preview event types
   - twenty-fifth landed slice on that plan:
     - XiaoZhi `tts_stop` round-close policy now lives in session runtime
     - adapter TTS-stop handling now only calls the exported runtime helper

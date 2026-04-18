@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.237
+Validate that XiaoZhi input preview/endpoint transport glue now belongs to
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '352,360p' components/river_cloud/river_cloud_internal.h
+sed -n '526,566p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1096,1105p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_input_observation|RIVER_XIAOZHI_EVENT_INPUT_(SPEECH_START|PREVIEW|ENDPOINT)|cancel_endpoint_soft_close|arm_endpoint_soft_close|note_interrupt_hint' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_note_input_observation(...)`
+- adapter `RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START / INPUT_PREVIEW /
+  INPUT_ENDPOINT` branches no longer inline:
+  - follow-up window touch
+  - endpoint soft-close arm/cancel
+  - preview interrupt-hint glue
+- XiaoZhi input preview/endpoint transport glue now lives behind a
+  session-runtime-owned reducer instead of adapter-side branch logic
+
 ## Step 5.236
 Validate that XiaoZhi transport `audio_out_meta / session_closed / error`
 observation now belongs to runtime:

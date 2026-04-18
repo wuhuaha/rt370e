@@ -1098,34 +1098,9 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
         river_cloud_xiaozhi_note_stt_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
-        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
-                                         "input_speech_start");
-        river_cloud_xiaozhi_note_preview_observation(event);
-        river_cloud_xiaozhi_cancel_endpoint_soft_close("input_speech_start");
-        river_cloud_xiaozhi_note_interrupt_hint("input_speech_start",
-                                                "server_preview_speech_start");
-        break;
     case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
-        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
-                                         "input_preview");
-        river_cloud_xiaozhi_note_preview_observation(event);
-        if (event->text != NULL && event->text[0] != '\0') {
-            river_cloud_xiaozhi_cancel_endpoint_soft_close("input_preview");
-        }
-        break;
     case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
-        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
-                                         "input_endpoint");
-        river_cloud_xiaozhi_note_preview_observation(event);
-        if (event->candidate) {
-            river_cloud_xiaozhi_arm_endpoint_soft_close("input_endpoint",
-                                                        event->reason != NULL &&
-                                                                event->reason[0] != '\0' ?
-                                                            event->reason :
-                                                            "server_endpoint_candidate");
-        } else {
-            river_cloud_xiaozhi_cancel_endpoint_soft_close("input_endpoint_clear");
-        }
+        river_cloud_xiaozhi_note_input_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_AUDIO_OUT_META:
         river_cloud_xiaozhi_note_audio_out_meta_observation(event);

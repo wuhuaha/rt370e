@@ -352,6 +352,7 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
 bool river_cloud_xiaozhi_io_has_work(void);
 void river_cloud_xiaozhi_note_asr_result_emitted(river_cloud_asr_event_type_t type);
 void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event);
+void river_cloud_xiaozhi_note_input_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_llm_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_tts_observation(const river_xiaozhi_event_t *event);

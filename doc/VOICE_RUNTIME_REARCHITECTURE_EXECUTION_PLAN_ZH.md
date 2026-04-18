@@ -286,6 +286,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `RIVER_CLOUD_ASR_EVENT_ERROR` 发射
   - 这使 adapter 更接近纯 transport 分发层，而 playback/session runtime
     分别继续收口各自的真相与终态语义
+- `input_speech_start / input_preview / input_endpoint` 这组输入侧 preview
+  glue 也已继续从 adapter 分支下沉到 session runtime：
+  - 新增：
+    - `river_cloud_xiaozhi_note_input_observation(...)`
+  - adapter 的对应 transport 分支不再直接内联：
+    - preview follow-up window touch
+    - endpoint soft-close arm/cancel
+    - preview interrupt hint
+  - 这使输入侧 transport 事件也开始通过 grouped reducer 进入 session
+    runtime，而不是在 adapter 中分散维护策略 glue
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：

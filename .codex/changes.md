@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.237
+- Moved the remaining XiaoZhi input-side transport glue for
+  `input_speech_start / input_preview / input_endpoint` out of
+  `river_cloud_adapter.c` and into a session-runtime-owned reducer so adapter
+  no longer embeds preview-window touch, endpoint soft-close transitions, or
+  preview interrupt hints inline:
+  - `river_cloud_xiaozhi_note_input_observation(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the grouped input-event reducer for:
+  - `input_speech_start` follow-up window touch, endpoint-soft-close cancel,
+    and interrupt hint
+  - `input_preview` follow-up window touch, preview note, and text-driven
+    soft-close cancel
+  - `input_endpoint` follow-up window touch, preview note, and endpoint
+    arm/cancel policy
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_event_handler(...)` now collapses those three
+  input transport branches into one runtime-owned reducer call:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.236
 - Moved the remaining XiaoZhi transport-event semantic branches for
   `audio_out_meta / session_closed / error` out of
