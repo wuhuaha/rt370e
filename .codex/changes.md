@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.192
+- Continued thinning `river_cloud_adapter.c` by moving XiaoZhi
+  `endpoint soft close / local close defer` helper ownership into
+  `river_cloud_xiaozhi_session.c`:
+  - duplex soft-endpoint predicate
+  - duplex-speaking uplink continuation predicate
+  - endpoint soft-close clear / cancel / arm
+  - interrupt hint logging
+  - local-close defer predicate / arm
+  - local-close timeout check
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Those helpers are now exported through the shared cloud internal contract, so
+  adapter code only consumes session-runtime policy instead of owning those
+  state transitions locally:
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- After this slice, adapter still owns `finish_active_stream()` and the
+  endpoint-timeout trigger site, but the underlying local-close state machine
+  helpers no longer live there
+
 ## Step 5.191
 - Continued shrinking `river_cloud_adapter.c` by moving core local-round close
   truth into XiaoZhi session runtime:

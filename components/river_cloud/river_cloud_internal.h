@@ -364,6 +364,16 @@ const char *river_cloud_xiaozhi_duplex_fallback_reason(
     const river_voice_duplex_ready_eval_t *eval);
 bool river_cloud_xiaozhi_playback_allows_vad_open(void);
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);
+bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
+bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
+void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void);
+void river_cloud_xiaozhi_cancel_endpoint_soft_close(const char *trigger);
+void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger,
+                                             const char *reason);
+void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
+                                                 const char *reason);
+bool river_cloud_xiaozhi_should_defer_local_close(void);
+void river_cloud_xiaozhi_arm_local_close_defer(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
 void river_cloud_xiaozhi_window_close(const char *reason);
 void river_cloud_xiaozhi_window_abort_local(const char *reason);
@@ -390,6 +400,7 @@ void river_cloud_xiaozhi_round_finish(const char *reason);
 void river_cloud_xiaozhi_close_local_round_for_cause(
     river_cloud_xiaozhi_round_close_cause_t cause,
     const char *detail_reason);
+void river_cloud_xiaozhi_check_local_close_timeout(void);
 river_status_t river_cloud_xiaozhi_request_open_and_listen(const char *mode);
 river_status_t river_cloud_xiaozhi_request_listen_stop(void);
 river_status_t river_cloud_xiaozhi_request_abort(const char *reason);

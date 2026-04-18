@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.191 move local round-close truth into session runtime`
+  - `5.192 move endpoint/local-close helpers into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -174,6 +174,13 @@ or top-of-tree verification target changes.
       lifecycle ownership
     - adapter `local_close_resolved / server_response_started` paths now upload
       only typed round-close causes into session runtime
+  - seventeenth landed slice on that plan:
+    - `endpoint soft close / local close defer` helper ownership has also
+      started moving out of the adapter and into XiaoZhi session runtime
+    - adapter now consumes exported session-runtime helpers for:
+      - endpoint soft-close arm/cancel
+      - local-close defer arm/check
+      - duplex-speaking uplink continuation predicate
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
