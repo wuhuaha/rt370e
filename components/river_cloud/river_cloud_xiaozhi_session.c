@@ -208,6 +208,17 @@ void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
     river_cloud_xiaozhi_reset_transport_state(false);
 }
 
+void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void)
+{
+    if (river_cloud_xiaozhi_playback_has_work()) {
+        (void)river_cloud_xiaozhi_playback_abort_for_cause(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE,
+            NULL);
+    }
+    river_cloud_xiaozhi_round_finish("bridge_close");
+    river_cloud_xiaozhi_reset_transport_state(false);
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

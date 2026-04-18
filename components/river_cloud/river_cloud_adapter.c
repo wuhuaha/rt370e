@@ -2077,16 +2077,10 @@ void river_cloud_asr_audio_close(void)
                 RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL,
                 "bridge_close");
         }
-        if (river_cloud_xiaozhi_playback_has_work()) {
-            (void)river_cloud_xiaozhi_playback_abort_for_cause(
-                RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE,
-                NULL);
-        }
-        river_cloud_xiaozhi_round_finish("bridge_close");
+        river_cloud_xiaozhi_apply_bridge_close_terminal_policy();
         (void)river_cloud_xiaozhi_request_close_session();
         river_opus_encoder_close(&g_river_cloud.xiaozhi_encoder);
         river_opus_decoder_close(&g_river_cloud.xiaozhi_decoder);
-        river_cloud_xiaozhi_reset_transport_state(false);
     } else {
         river_cloud_stream_finish_active();
     }

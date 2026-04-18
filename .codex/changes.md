@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.210
+- Moved XiaoZhi `bridge_close` terminal cleanup policy out of the adapter and
+  into session runtime so adapter no longer assembles the playback-abort /
+  round-finish / reset sequence on audio-bridge close:
+  - exported:
+    - `river_cloud_xiaozhi_apply_bridge_close_terminal_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_asr_audio_close()` now only keeps the active-stream
+  finish and transport/codec tail actions, and calls the exported runtime
+  helper for the terminal cleanup:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.209
 - Moved XiaoZhi `network_lost` terminal cleanup policy out of the adapter and
   into session runtime so adapter no longer assembles the abort/round-finish/

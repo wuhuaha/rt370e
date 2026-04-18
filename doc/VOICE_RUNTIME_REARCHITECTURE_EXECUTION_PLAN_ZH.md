@@ -386,11 +386,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport state reset
   - adapter `river_cloud_adapter_notify_network_lost()` 现在只剩下调用这个
     runtime helper，并保留 close-session/state-sync 的 transport 尾部动作
+- XiaoZhi `bridge_close` terminal cleanup 语义也已继续收口到
+  session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_bridge_close_terminal_policy()`
+  - 该 helper 负责：
+    - playback abort
+    - round finish
+    - transport state reset
+  - adapter `river_cloud_asr_audio_close()` 现在只剩下：
+    - active-stream finish
+    - close-session
+    - Opus codec close
+    这些桥接/transport 尾部动作
 
 下一步焦点：
 
-- 继续把 remaining local-clear / data-plane 异常 / follow-up close 的
-  terminal close policy 收口进同一个 runtime-owned cause family
+- 继续把 remaining local-clear / follow-up close / close-session 触发路径的
+  terminal ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
   terminal truth，而不是继续依赖 `tts_stop_pending + playback_active`
   组合猜测终态
