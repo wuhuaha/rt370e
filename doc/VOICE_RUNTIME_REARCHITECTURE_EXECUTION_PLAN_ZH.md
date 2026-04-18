@@ -252,6 +252,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   现都由 session runtime 提供实现
   - adapter 的 `input_speech_start / input_preview / input_endpoint` 分支
     继续只负责 transport event 分发，不再持有 preview-state helper body
+- STT pending-text 的观测入口也已继续下沉到 session runtime：
+  - 新增 `river_cloud_xiaozhi_note_stt_observation(...)`
+  - adapter 的 `RIVER_XIAOZHI_EVENT_STT` 分支不再直接写：
+    - `xiaozhi_pending_text`
+    - `xiaozhi_pending_text_valid`
+    - `xiaozhi_pending_text_finalized`
+  - partial ASR 发射与存量文本去重现统一收口到 runtime helper
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

@@ -133,6 +133,36 @@ void river_cloud_xiaozhi_copy_optional_text(char *dst,
     snprintf(dst, dst_size, "%s", src);
 }
 
+void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event)
+{
+    char next_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+
+    if (event == NULL || event->text == NULL || event->text[0] == '\0') {
+        return;
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(next_text, sizeof(next_text), event->text);
+    if (next_text[0] == '\0') {
+        return;
+    }
+    if (g_river_cloud.xiaozhi_pending_text_valid &&
+        strcmp(g_river_cloud.xiaozhi_pending_text, next_text) == 0) {
+        return;
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_pending_text,
+                                           sizeof(g_river_cloud.xiaozhi_pending_text),
+                                           next_text);
+    g_river_cloud.xiaozhi_pending_text_valid = true;
+    g_river_cloud.xiaozhi_pending_text_finalized = false;
+    river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_PARTIAL,
+                                g_river_cloud.xiaozhi_pending_text,
+                                river_cloud_xiaozhi_current_sid(),
+                                NULL,
+                                0,
+                                false);
+}
+
 void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event)
 {
     if (event == NULL) {

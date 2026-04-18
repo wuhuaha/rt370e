@@ -341,6 +341,7 @@ void river_cloud_request_state_sync(const char *reason);
 void river_cloud_xiaozhi_copy_optional_text(char *dst,
                                             size_t dst_size,
                                             const char *src);
+void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event);
 river_status_t river_cloud_xiaozhi_control_request_async(
     river_cloud_xiaozhi_control_op_t op,

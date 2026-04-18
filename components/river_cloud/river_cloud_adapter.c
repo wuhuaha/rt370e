@@ -1296,23 +1296,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
     case RIVER_XIAOZHI_EVENT_STT:
         river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                          "stt");
-        if (event->text != NULL && event->text[0] != '\0') {
-            if (!g_river_cloud.xiaozhi_pending_text_valid ||
-                strcmp(g_river_cloud.xiaozhi_pending_text, event->text) != 0) {
-                snprintf(g_river_cloud.xiaozhi_pending_text,
-                         sizeof(g_river_cloud.xiaozhi_pending_text),
-                         "%s",
-                         event->text);
-                g_river_cloud.xiaozhi_pending_text_valid = true;
-                g_river_cloud.xiaozhi_pending_text_finalized = false;
-                river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_PARTIAL,
-                                            g_river_cloud.xiaozhi_pending_text,
-                                            river_cloud_xiaozhi_current_sid(),
-                                            NULL,
-                                            0,
-                                            false);
-            }
-        }
+        river_cloud_xiaozhi_note_stt_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
         river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,

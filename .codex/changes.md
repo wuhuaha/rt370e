@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.226
+- Moved XiaoZhi STT pending-text observation out of
+  `river_cloud_adapter.c` and into session runtime so adapter-side transport
+  event handling now delegates pending-text normalization to a runtime-owned
+  helper:
+  - `river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns STT text normalization, stored-text deduplication,
+  `pending_text_valid/finalized` mutation, and partial ASR emission for XiaoZhi
+  STT observations:
+  - `river_cloud_xiaozhi_pending_text`
+  - `river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_PARTIAL, ...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `RIVER_XIAOZHI_EVENT_STT` branch now only keeps the follow-up window
+  touch and delegates the pending-text observation to session runtime:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.225
 - Moved XiaoZhi preview-observation helper ownership out of
   `river_cloud_adapter.c` and into session runtime so transport event handling
