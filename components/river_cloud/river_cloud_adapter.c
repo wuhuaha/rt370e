@@ -1529,16 +1529,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
                    g_river_cloud.xiaozhi_window_active ? "yes" : "no",
                    g_river_cloud.stream_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
-        river_cloud_xiaozhi_finalize_pending_text("transport_closed");
-        river_cloud_xiaozhi_round_finish("transport_closed");
-        river_cloud_xiaozhi_window_abort_local("transport_closed");
-        if (river_cloud_xiaozhi_playback_has_work()) {
-            (void)river_cloud_xiaozhi_playback_abort_for_cause(
-                RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED,
-                NULL);
-        }
-        river_cloud_xiaozhi_reset_transport_state(true);
-        river_cloud_xiaozhi_check_window_timeout();
+        river_cloud_xiaozhi_apply_transport_closed_terminal_policy();
         break;
     case RIVER_XIAOZHI_EVENT_ERROR:
         river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_ERROR,

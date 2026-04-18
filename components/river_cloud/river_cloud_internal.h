@@ -382,6 +382,7 @@ void river_cloud_xiaozhi_apply_tts_stop_round_policy(void);
 void river_cloud_xiaozhi_apply_reopen_overlap_round_policy(void);
 void river_cloud_xiaozhi_apply_llm_round_policy(void);
 void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void);
+void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);

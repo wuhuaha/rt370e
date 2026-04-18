@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.208
+- Moved XiaoZhi `transport_closed` terminal cleanup policy out of the adapter
+  and into session runtime so adapter no longer assembles the close/abort/reset
+  sequence:
+  - exported:
+    - `river_cloud_xiaozhi_apply_transport_closed_terminal_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `RIVER_XIAOZHI_EVENT_SESSION_CLOSED` handling now only logs the event
+  and calls the exported runtime helper:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.207
 - Moved XiaoZhi `post_stop_result` local-close policy out of the adapter and
   into session runtime so adapter no longer directly decides the listen-stop
