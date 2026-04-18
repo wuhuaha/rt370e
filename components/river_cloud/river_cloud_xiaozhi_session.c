@@ -358,6 +358,29 @@ void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger, const char *re
                g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
 }
 
+river_status_t river_cloud_xiaozhi_interrupt_tts(const char *reason)
+{
+    river_status_t status = RIVER_ERR_UNSUPPORTED;
+
+    if (!(river_cloud_xiaozhi_playback_has_work() ||
+          g_river_cloud.xiaozhi_listening ||
+          river_xiaozhi_session_open())) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    status = RIVER_OK;
+    if (river_cloud_xiaozhi_playback_has_work()) {
+        status = river_cloud_xiaozhi_playback_abort_for_cause(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT,
+            reason);
+    }
+    if (river_xiaozhi_session_open()) {
+        (void)river_cloud_xiaozhi_request_abort(reason);
+    }
+    RIVER_LOGI("tts interrupt requested: reason=%s", reason != NULL ? reason : "-");
+    return status;
+}
+
 void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames)
 {
     g_river_cloud.xiaozhi_asr_round_id++;

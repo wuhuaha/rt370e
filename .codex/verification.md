@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.213
+Validate that XiaoZhi TTS interrupt policy now lives in session runtime and
+adapter only dispatches to the exported helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_interrupt_tts|river_cloud_adapter_interrupt_tts_with_reason|tts interrupt requested' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_interrupt_tts(...)`
+  - session runtime owns the XiaoZhi `tts interrupt requested` log and policy
+  - adapter only dispatches through the exported helper for XiaoZhi
+
 ## Step 5.212
 Validate that XiaoZhi ASR round lifecycle now lives in session runtime and
 adapter only consumes the exported helpers:

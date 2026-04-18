@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.213
+- Moved XiaoZhi TTS interrupt policy out of the adapter and into session
+  runtime so adapter no longer decides whether session/playback state should
+  trigger interrupt-side playback abort or transport abort:
+  - exported:
+    - `river_cloud_xiaozhi_interrupt_tts(const char *reason)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_adapter_interrupt_tts_with_reason(...)` now only keeps
+  provider dispatch and consumes the exported session-runtime helper for
+  XiaoZhi:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.212
 - Moved XiaoZhi ASR round lifecycle ownership out of the adapter and into
   session runtime so adapter no longer owns local `round_begin / first_packet /

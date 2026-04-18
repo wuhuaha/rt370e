@@ -1849,19 +1849,7 @@ river_status_t river_cloud_adapter_interrupt_tts_with_reason(const char *reason)
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled() &&
-        (river_cloud_xiaozhi_playback_has_work() ||
-         g_river_cloud.xiaozhi_listening ||
-         river_xiaozhi_session_open())) {
-        status = RIVER_OK;
-        if (river_cloud_xiaozhi_playback_has_work()) {
-            status = river_cloud_xiaozhi_playback_abort_for_cause(
-                RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT,
-                reason);
-        }
-        if (river_xiaozhi_session_open()) {
-            (void)river_cloud_xiaozhi_request_abort(reason);
-        }
-        RIVER_LOGI("tts interrupt requested: reason=%s", reason != NULL ? reason : "-");
+        ((status = river_cloud_xiaozhi_interrupt_tts(reason)) != RIVER_ERR_UNSUPPORTED)) {
         return status;
     }
 #endif

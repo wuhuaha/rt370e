@@ -420,6 +420,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - first packet timestamp
     - packet_sent 计数
   - adapter 现在只在 uplink-send 和 reopen-open 路径调用它们，不再定义本地实现
+- XiaoZhi TTS interrupt 语义也已收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_interrupt_tts()`
+  - 它现在统一拥有：
+    - 是否存在可中断的 playback/session work
+    - interrupt 导致的 playback abort
+    - interrupt 导致的 transport abort request
+    - interrupt 请求日志
+  - adapter `river_cloud_adapter_interrupt_tts_with_reason()` 现在只保留
+    provider dispatch，不再本地决定 XiaoZhi interrupt 语义
 
 下一步焦点：
 
