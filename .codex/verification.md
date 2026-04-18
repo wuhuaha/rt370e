@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.218
+Validate that the XiaoZhi reopen-time `listen_stop_pending` busy gate now lives
+in session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '2070,2094p' components/river_cloud/river_cloud_adapter.c
+sed -n '312,332p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'xiaozhi_listen_stop_pending|river_cloud_xiaozhi_maybe_start_followup_round' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter no longer contains a reopen-time early return on
+  `xiaozhi_listen_stop_pending`
+- session runtime `river_cloud_xiaozhi_maybe_start_followup_round(...)` now
+  owns that busy gate
+
 ## Step 5.217
 Validate that XiaoZhi listen-stop completion now lives in session runtime and
 adapter only feeds drain-state facts into the runtime helper:

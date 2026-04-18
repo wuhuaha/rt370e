@@ -320,6 +320,10 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
         *opened = false;
     }
 
+    if (g_river_cloud.xiaozhi_listen_stop_pending) {
+        return RIVER_ERR_BUSY;
+    }
+
     if (!g_river_cloud.xiaozhi_window_active &&
         river_cloud_xiaozhi_idle_requires_wakeword()) {
         g_river_cloud.xiaozhi_open_speech_frames = 0U;

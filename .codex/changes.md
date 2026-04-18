@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.218
+- Moved the XiaoZhi reopen-time `listen_stop_pending` busy gate out of
+  `river_cloud_xiaozhi_stream_push_frame(...)` and into session runtime so the
+  runtime now owns the full reopen admission policy while a listen-stop drain is
+  still pending:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter idle reopen path no longer directly checks
+  `g_river_cloud.xiaozhi_listen_stop_pending` before delegating to
+  `river_cloud_xiaozhi_maybe_start_followup_round(...)`:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.217
 - Moved XiaoZhi listen-stop completion policy out of the adapter and into
   session runtime so the runtime now owns:

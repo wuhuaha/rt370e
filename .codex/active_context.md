@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.217 move xiaozhi listen-stop completion into session runtime`
+  - `5.218 move xiaozhi listen-stop reopen busy gate into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -301,6 +301,10 @@ or top-of-tree verification target changes.
     - adapter uplink service path now only samples drain state and delegates:
       - queued uplink frame count
       - pending accum buffer bytes
+  - thirty-ninth landed slice on that plan:
+    - XiaoZhi listen-stop reopen busy gate now lives in session runtime
+    - adapter reopen-open path no longer directly reads
+      `xiaozhi_listen_stop_pending` before delegating to runtime
   - twenty-third landed slice on that plan:
     - cloud/runtime now export a first-class playback-lane engagement fact:
       - `playback_lane_engaged`

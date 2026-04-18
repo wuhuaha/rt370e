@@ -469,6 +469,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - queued uplink frame 数采样
     - pending accum bytes 采样
     - runtime helper 调用
+- XiaoZhi reopen-time `listen_stop_pending` busy gate 也已收口到 session runtime：
+  - runtime reopen helper 现在统一拥有：
+    - listen-stop drain pending 时的 reopen busy gate
+  - adapter reopen-open 路径现在不再直接读取：
+    - `xiaozhi_listen_stop_pending`
 
 下一步焦点：
 
