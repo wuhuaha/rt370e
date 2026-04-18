@@ -220,6 +220,7 @@ void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
     }
     river_cloud_xiaozhi_round_finish("network_lost");
     river_cloud_xiaozhi_reset_transport_state(false);
+    (void)river_cloud_xiaozhi_request_close_session();
 }
 
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void)
@@ -231,6 +232,7 @@ void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void)
     }
     river_cloud_xiaozhi_round_finish("bridge_close");
     river_cloud_xiaozhi_reset_transport_state(false);
+    (void)river_cloud_xiaozhi_request_close_session();
 }
 
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)

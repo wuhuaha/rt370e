@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.215
+Validate that XiaoZhi terminal close-session tail actions for `network_lost`
+and `bridge_close` now live in session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'apply_network_lost_terminal_policy|apply_bridge_close_terminal_policy|request_close_session\\(' \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime terminal-policy helpers own the close-session tail action
+  - adapter terminal paths no longer append `request_close_session()` after
+    invoking those helpers
+
 ## Step 5.214
 Validate that XiaoZhi follow-up reopen round-start policy now lives in session
 runtime and adapter only delegates to the exported helper:

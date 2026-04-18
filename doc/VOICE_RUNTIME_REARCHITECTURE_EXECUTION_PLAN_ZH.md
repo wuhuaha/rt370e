@@ -441,6 +441,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - pre-roll frame 数量计算
     - pre-roll replay / current frame replay
     - stream_open 计数与日志
+- XiaoZhi `network_lost` / `bridge_close` terminal close-session 尾动作也已
+  收口到 session runtime：
+  - terminal-policy helper 现在统一拥有：
+    - terminal state 收敛
+    - transport reset
+    - `request_close_session()` 尾动作
+  - adapter 对应路径现在只保留：
+    - runtime helper 调用
+    - 非 terminal-policy 的外围清理或 state sync
 
 下一步焦点：
 

@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.215
+- Moved XiaoZhi terminal close-session tail actions for `network_lost` and
+  `bridge_close` out of the adapter and into session runtime so terminal policy
+  fully owns the transport close follow-through:
+  - `river_cloud_xiaozhi_apply_network_lost_terminal_policy()`
+  - `river_cloud_xiaozhi_apply_bridge_close_terminal_policy()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter terminal paths now only invoke the runtime terminal policy and no
+  longer append their own `request_close_session()` tail action:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.214
 - Moved XiaoZhi follow-up reopen round-start policy out of the adapter and into
   session runtime so adapter no longer directly decides:

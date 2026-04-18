@@ -1794,7 +1794,6 @@ void river_cloud_adapter_notify_network_lost(void)
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
         river_cloud_xiaozhi_apply_network_lost_terminal_policy();
-        (void)river_cloud_xiaozhi_request_close_session();
         river_cloud_request_state_sync("network_lost");
         return;
     }
@@ -2012,7 +2011,6 @@ void river_cloud_asr_audio_close(void)
                 "bridge_close");
         }
         river_cloud_xiaozhi_apply_bridge_close_terminal_policy();
-        (void)river_cloud_xiaozhi_request_close_session();
         river_opus_encoder_close(&g_river_cloud.xiaozhi_encoder);
         river_opus_decoder_close(&g_river_cloud.xiaozhi_decoder);
     } else {

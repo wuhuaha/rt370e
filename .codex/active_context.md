@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.214 move xiaozhi follow-up reopen round-start policy into session runtime`
+  - `5.215 move xiaozhi terminal close-session tail actions into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -286,6 +286,10 @@ or top-of-tree verification target changes.
     - XiaoZhi follow-up reopen round-start policy now lives in session runtime
     - adapter reopen-open path now only computes pre-roll count and delegates
       follow-up round-start policy to runtime
+  - thirty-sixth landed slice on that plan:
+    - XiaoZhi `network_lost` / `bridge_close` terminal-policy helpers now own
+      close-session tail actions
+    - adapter terminal paths no longer append local close-session requests
   - twenty-third landed slice on that plan:
     - cloud/runtime now export a first-class playback-lane engagement fact:
       - `playback_lane_engaged`
