@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.228
+Validate that XiaoZhi runtime snapshot filling is now implemented in runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '340,348p' components/river_cloud/river_cloud_internal.h
+sed -n '120,175p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2456,2488p' components/river_cloud/river_cloud_adapter.c
+rg -n 'fill_runtime_snapshot\\(|playback_terminal_wait_reason|xiaozhi_transport_barge_in_enabled_known|xiaozhi_playback_rebuffer_pending' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_fill_runtime_snapshot(...)`
+- adapter `river_cloud_adapter_get_runtime_snapshot(...)` no longer assembles
+  XiaoZhi-specific runtime fields inline
+- XiaoZhi runtime snapshot projection is owned by runtime instead of adapter
+
 ## Step 5.227
 Validate that pending-text finalize gating after poll is now implemented in
 session runtime:

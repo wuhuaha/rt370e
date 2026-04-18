@@ -268,6 +268,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - finalize eligibility
     - final commit
     - accept-only finalize 路径
+- dialog runtime 依赖的云侧 XiaoZhi snapshot 投影也已继续从 adapter 收口：
+  - 新增 `river_cloud_xiaozhi_fill_runtime_snapshot(...)`
+  - `river_cloud_adapter_get_runtime_snapshot()` 不再逐项拼装：
+    - playback / rebuffer / terminal wait
+    - accept / barge-in 语义
+    - session / turn / input-output state 文本
+  - adapter 现在只负责 generic snapshot 初始化，再委托 runtime 填充
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

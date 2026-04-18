@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.228
+- Moved XiaoZhi cloud-runtime snapshot filling out of
+  `river_cloud_adapter_get_runtime_snapshot()` and into a runtime-owned helper
+  so dialog runtime now consumes a runtime-exported XiaoZhi snapshot boundary
+  instead of adapter-side field assembly:
+  - `river_cloud_xiaozhi_fill_runtime_snapshot(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session/runtime now owns the XiaoZhi snapshot projection for:
+  - conversation window / listening
+  - playback local state / lane / rebuffer / terminal wait
+  - accept / barge-in semantics
+  - session / turn / playback semantic text fields
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter cloud snapshot export now only performs generic snapshot setup and
+  delegates XiaoZhi-specific runtime truth filling to the runtime helper:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.227
 - Moved the adapter-side `accept_reason`-driven pending-text finalize gate into
   session runtime so the XiaoZhi I/O loop no longer directly inspects
