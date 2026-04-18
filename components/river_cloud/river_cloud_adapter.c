@@ -41,9 +41,6 @@ static river_status_t river_cloud_xiaozhi_control_request(
     river_cloud_xiaozhi_control_op_t op,
     const char *arg);
 static void river_cloud_xiaozhi_process_control_queue(void);
-static void river_cloud_xiaozhi_complete_active_stream_finish(
-    river_cloud_xiaozhi_stream_finish_cause_t cause,
-    const char *detail_reason);
 #endif
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
@@ -105,31 +102,6 @@ static uint32_t river_cloud_xiaozhi_uplink_busy_backoff_ms(uint32_t frame_ms,
     }
 
     return delay_ms;
-}
-
-static uint32_t river_cloud_xiaozhi_trim_uplink_stale_frames(uint32_t keep_frames)
-{
-    uint32_t dropped = 0U;
-
-    if (!g_river_cloud.xiaozhi_uplink_ring.initialized) {
-        return 0U;
-    }
-
-    while (river_cloud_xiaozhi_uplink_ready_frames() > keep_frames) {
-        if (river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring) == 0U) {
-            break;
-        }
-        if (river_audio_frame_ring_read(&g_river_cloud.xiaozhi_uplink_ring,
-                                        g_river_cloud.xiaozhi_uplink_drop_frame) != RIVER_OK) {
-            break;
-        }
-        dropped++;
-    }
-
-    if (dropped != 0U) {
-        g_river_cloud.xiaozhi_uplink_stale_dropped += dropped;
-    }
-    return dropped;
 }
 
 static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_t backoff_ms)
@@ -1099,123 +1071,6 @@ static river_status_t river_cloud_xiaozhi_send_uplink_packet(const uint8_t *pcm,
         river_cloud_xiaozhi_round_note_packet_sent();
     }
     return status;
-}
-
-static river_status_t river_cloud_xiaozhi_queue_uplink_packet(const uint8_t *pcm,
-                                                              size_t pcm_bytes)
-{
-    river_status_t status;
-    uint32_t keep_before_write;
-
-    if (pcm == NULL || pcm_bytes == 0U || !g_river_cloud.xiaozhi_uplink_ring.initialized) {
-        return RIVER_ERR_ARG;
-    }
-
-    /*
-     * Keep the realtime uplink queue short. Once the transport falls behind,
-     * older audio is less valuable than preserving a low-latency tail for live
-     * ASR. This mirrors the reference xiaozhi client more closely than waiting
-     * for the full 64-frame ring to overflow.
-     */
-    keep_before_write = (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX > 0U) ?
-                            (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX - 1U) :
-                            0U;
-    (void)river_cloud_xiaozhi_trim_uplink_stale_frames(keep_before_write);
-
-    status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_uplink_ring, pcm);
-    if (status == RIVER_OK) {
-        return RIVER_OK;
-    }
-
-    if (river_audio_frame_ring_read(&g_river_cloud.xiaozhi_uplink_ring,
-                                    g_river_cloud.xiaozhi_uplink_drop_frame) != RIVER_OK) {
-        return status;
-    }
-
-    status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_uplink_ring, pcm);
-    if (status == RIVER_OK) {
-        g_river_cloud.xiaozhi_uplink_ring_dropped++;
-        RIVER_LOGW("xiaozhi uplink ring overflow: dropped=%lu queued=%lu capacity=%u",
-                   (unsigned long)g_river_cloud.xiaozhi_uplink_ring_dropped,
-                   (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring),
-                   (unsigned int)RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES);
-    }
-    return status;
-}
-
-static river_status_t river_cloud_xiaozhi_push_pcm(const uint8_t *pcm, size_t pcm_bytes)
-{
-    size_t frame_bytes;
-
-    if (pcm == NULL || pcm_bytes == 0U || !g_river_cloud.xiaozhi_uplink_ring.initialized) {
-        return RIVER_ERR_ARG;
-    }
-
-    frame_bytes = RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX;
-    if ((g_river_cloud.xiaozhi_uplink_accum_bytes + pcm_bytes) >
-        sizeof(g_river_cloud.xiaozhi_uplink_accum)) {
-        return RIVER_ERR_BUSY;
-    }
-
-    memcpy(g_river_cloud.xiaozhi_uplink_accum + g_river_cloud.xiaozhi_uplink_accum_bytes,
-           pcm,
-           pcm_bytes);
-    g_river_cloud.xiaozhi_uplink_accum_bytes += pcm_bytes;
-
-    while (g_river_cloud.xiaozhi_uplink_accum_bytes >= frame_bytes) {
-        river_status_t status;
-
-        status = river_cloud_xiaozhi_queue_uplink_packet(g_river_cloud.xiaozhi_uplink_accum,
-                                                         frame_bytes);
-        if (status != RIVER_OK) {
-            return status;
-        }
-        g_river_cloud.xiaozhi_uplink_accum_bytes -= frame_bytes;
-        if (g_river_cloud.xiaozhi_uplink_accum_bytes > 0U) {
-            memmove(g_river_cloud.xiaozhi_uplink_accum,
-                    g_river_cloud.xiaozhi_uplink_accum + frame_bytes,
-                    g_river_cloud.xiaozhi_uplink_accum_bytes);
-        }
-    }
-
-    return RIVER_OK;
-}
-
-static river_status_t river_cloud_xiaozhi_flush_accumulator_padded(void)
-{
-    size_t frame_bytes;
-    river_status_t status;
-
-    if (!g_river_cloud.xiaozhi_uplink_ring.initialized ||
-        g_river_cloud.xiaozhi_uplink_accum_bytes == 0U) {
-        return RIVER_OK;
-    }
-
-    frame_bytes = RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX;
-    if (g_river_cloud.xiaozhi_uplink_accum_bytes < frame_bytes) {
-        memset(g_river_cloud.xiaozhi_uplink_accum + g_river_cloud.xiaozhi_uplink_accum_bytes,
-               0,
-               frame_bytes - g_river_cloud.xiaozhi_uplink_accum_bytes);
-    }
-    status = river_cloud_xiaozhi_queue_uplink_packet(g_river_cloud.xiaozhi_uplink_accum,
-                                                     frame_bytes);
-    g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
-    return status;
-}
-
-static void river_cloud_xiaozhi_complete_active_stream_finish(
-    river_cloud_xiaozhi_stream_finish_cause_t cause,
-    const char *detail_reason)
-{
-    if (!g_river_cloud.stream_active) {
-        return;
-    }
-
-    (void)river_cloud_xiaozhi_flush_accumulator_padded();
-    river_cloud_xiaozhi_commit_active_stream_finish_for_cause(cause, detail_reason);
-    river_cloud_xiaozhi_maybe_finalize_listen_stop(
-        river_cloud_xiaozhi_uplink_ready_frames(),
-        g_river_cloud.xiaozhi_uplink_accum_bytes);
 }
 
 static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event, void *user_data)

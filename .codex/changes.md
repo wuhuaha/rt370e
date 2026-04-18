@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.234
+- Moved the remaining XiaoZhi uplink-ingress / active-stream-finish helper set
+  out of `river_cloud_adapter.c` and into session runtime so adapter no longer
+  owns uplink queue trimming, PCM accumulator packetization, or padded
+  stream-finish flushing inline:
+  - `river_cloud_xiaozhi_trim_uplink_stale_frames(...)`
+  - `river_cloud_xiaozhi_push_pcm(...)`
+  - `river_cloud_xiaozhi_complete_active_stream_finish(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the uplink-ingress reducer set for:
+  - stale-tail trimming before ring write
+  - overflow drop logging / ring-drop accounting
+  - PCM accumulator framing into uplink packets
+  - padded flush on active-stream finish
+  - finish -> listen-stop finalize bridging
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi capture/I/O paths now only:
+  - call runtime helpers for uplink ingress and stream finish
+  - retain the actual transport send path
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.233
 - Moved XiaoZhi ASR partial/final emission accounting out of
   `river_cloud_adapter.c` and into a session-runtime-owned helper so adapter

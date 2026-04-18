@@ -523,6 +523,21 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - generic ASR result payload 组装
     - runtime helper 调用
     - listener notify
+- XiaoZhi uplink ingress / active-stream finish 语义也已继续收口到
+  session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_trim_uplink_stale_frames()`
+    - `river_cloud_xiaozhi_push_pcm()`
+    - `river_cloud_xiaozhi_complete_active_stream_finish()`
+  - 这些 helper 现在统一拥有：
+    - stale-tail trim
+    - uplink ring overflow drop 记账
+    - PCM accumulator packetization
+    - padded flush on active-stream finish
+    - finish 后的 `listen_stop` finalize bridge
+  - adapter 现在只保留：
+    - actual uplink transport send
+    - I/O 调度与 runtime helper 调用
 - XiaoZhi TTS interrupt 语义也已收口到 session runtime：
   - 新增 exported helper：
     - `river_cloud_xiaozhi_interrupt_tts()`

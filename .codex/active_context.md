@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.233 move XiaoZhi ASR emission accounting into runtime`
+  - `5.234 move XiaoZhi uplink ingress and finish helpers into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -534,11 +534,15 @@ or top-of-tree verification target changes.
 - Primary active execution plan:
   - `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
 - Latest runtime-owned adapter shrink slice:
-  - `river_cloud_emit_asr_result(...)` now delegates XiaoZhi partial/final
-    round emission bookkeeping to
-    `river_cloud_xiaozhi_note_asr_result_emitted(...)`
-  - adapter no longer mutates XiaoZhi ASR round counters inline while emitting
-    generic cloud ASR results
+  - adapter capture/I/O paths now delegate XiaoZhi uplink ingress and
+    stream-finish closure to runtime:
+    - `river_cloud_xiaozhi_trim_uplink_stale_frames(...)`
+    - `river_cloud_xiaozhi_push_pcm(...)`
+    - `river_cloud_xiaozhi_complete_active_stream_finish(...)`
+  - adapter no longer owns XiaoZhi:
+    - uplink stale-tail trimming
+    - PCM accumulator framing
+    - padded flush on active-stream finish
   - the next focus remains:
     - continue moving remaining XiaoZhi runtime truth/projection helpers out
       of `river_cloud_adapter.c`

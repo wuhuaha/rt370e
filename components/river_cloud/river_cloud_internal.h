@@ -343,6 +343,8 @@ void river_cloud_xiaozhi_copy_optional_text(char *dst,
                                             const char *src);
 uint32_t river_cloud_xiaozhi_uplink_ready_frames(void);
 bool river_cloud_xiaozhi_uplink_active(void);
+uint32_t river_cloud_xiaozhi_trim_uplink_stale_frames(uint32_t keep_frames);
+river_status_t river_cloud_xiaozhi_push_pcm(const uint8_t *pcm, size_t pcm_bytes);
 void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms);
 void river_cloud_xiaozhi_dump_io_status(void);
 void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms);
@@ -426,6 +428,9 @@ void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
 bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason,
                                                           size_t reason_size);
 void river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
+    river_cloud_xiaozhi_stream_finish_cause_t cause,
+    const char *detail_reason);
+void river_cloud_xiaozhi_complete_active_stream_finish(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason);
 bool river_cloud_xiaozhi_should_defer_local_close(void);
