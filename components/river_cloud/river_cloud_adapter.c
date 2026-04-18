@@ -140,7 +140,7 @@ static bool river_cloud_xiaozhi_transport_active(void)
         return false;
     }
 
-    return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_output_active() ||
+    return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_lane_engaged() ||
            g_river_cloud.xiaozhi_listening;
 }
 
@@ -2266,7 +2266,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
     duplex_fallback_reason = river_cloud_xiaozhi_duplex_fallback_reason(&duplex_eval);
-    if (!g_river_cloud.stream_active && river_playback_service_active() &&
+    if (!g_river_cloud.stream_active && river_cloud_xiaozhi_playback_lane_engaged() &&
         duplex_fallback_reason != NULL) {
         river_cloud_xiaozhi_note_semantic_fallback(duplex_fallback_reason);
         RIVER_LOGI("xiaozhi capture held during playback: fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u",
@@ -2817,6 +2817,7 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
         snapshot->conversation_window_active = g_river_cloud.xiaozhi_window_active;
         snapshot->listening = g_river_cloud.xiaozhi_listening;
         snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
+        snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
         snapshot->playback_rebuffer_pending =
             g_river_cloud.xiaozhi_playback_rebuffer_pending;
         snapshot->playback_terminal_waiting =

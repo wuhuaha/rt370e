@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.198 separate restart_pending from generic reference-missing duplex truth`
+  - `5.199 export playback-lane engagement truth into cloud/core runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,16 @@ or top-of-tree verification target changes.
     - fixed-dsb AECM summary now counts:
       - `restart_pending`
       separately from generic playback-disabled/reference-idle churn
+  - twenty-third landed slice on that plan:
+    - cloud/runtime now export a first-class playback-lane engagement fact:
+      - `playback_lane_engaged`
+    - XiaoZhi playback runtime owns the reducer for that fact by folding:
+      - playback output active
+      - rebuffer pending
+      - playback-service active states
+    - adapter transport/capture gating and dialog runtime playback derivation
+      now consume that exported lane truth instead of reassembling engagement
+      from raw local flags
     - playback service now tears down the failed track and returns to
       restartable `IDLE` with a dedicated `recover fallback` path
     - XiaoZhi downlink recovery no longer forces an extra redundant local stop

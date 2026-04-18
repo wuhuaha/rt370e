@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.199
+- Added an explicit cloud/runtime `playback_lane_engaged` truth so the stack no
+  longer has to reconstruct “playback still occupies the turn” by locally
+  mixing `playback_active`, `tts_stop_pending`, `rebuffer_pending`, and
+  playback-service state:
+  - `river_cloud_runtime_snapshot_t` exports `playback_lane_engaged`
+  - `river_dialog_runtime_snapshot_t` stores the same field
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+- XiaoZhi playback runtime now owns the reducer for that lane truth:
+  - added `river_cloud_xiaozhi_playback_lane_engaged()`
+  - it folds:
+    - playback output active
+    - rebuffer pending
+    - playback-service active states
+  - `playback_has_work()` and downlink-task liveness now consume that reducer
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Adapter/core policy now consume the exported lane truth instead of directly
+  guessing from raw playback-service state:
+  - XiaoZhi transport-active gating now uses `playback_lane_engaged`
+  - `capture held during playback` now keys off that same reducer
+  - dialog runtime playback derivation now treats lane engagement as a first
+    class input and surfaces it in runtime dumps
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.198
 - Separated `restart_pending` from generic `ref_missing/ref_idle` AEC truth so
   the voice/runtime stack can distinguish “playback lane still occupied during

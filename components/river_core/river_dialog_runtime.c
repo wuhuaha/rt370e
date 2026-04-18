@@ -126,18 +126,19 @@ static bool river_dialog_runtime_compute_playback_active_locked(void)
     bool service_active =
         river_playback_service_state_active(g_river_dialog_runtime.snapshot.playback_state);
     bool cloud_playback_active = g_river_dialog_runtime.snapshot.playback_cloud_active;
+    bool lane_engaged = g_river_dialog_runtime.snapshot.playback_lane_engaged;
     bool recovering = g_river_dialog_runtime.snapshot.playback_recovering;
 
     if (river_dialog_runtime_playback_terminal_closed_locked()) {
         return false;
     }
 
-    if (!service_active && !cloud_playback_active && !recovering &&
+    if (!service_active && !cloud_playback_active && !lane_engaged && !recovering &&
         g_river_dialog_runtime.snapshot.playback_terminal_waiting) {
         return false;
     }
 
-    return service_active || cloud_playback_active || recovering;
+    return service_active || cloud_playback_active || lane_engaged || recovering;
 }
 
 static void river_dialog_runtime_refresh_playback_locked(void)
@@ -232,6 +233,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     g_river_dialog_runtime.snapshot.cloud_listening = snapshot->listening;
     g_river_dialog_runtime.snapshot.cloud_stream_active = snapshot->stream_active;
     g_river_dialog_runtime.snapshot.playback_cloud_active = snapshot->playback_active;
+    g_river_dialog_runtime.snapshot.playback_lane_engaged = snapshot->playback_lane_engaged;
     g_river_dialog_runtime.snapshot.playback_rebuffer_pending =
         snapshot->playback_rebuffer_pending;
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
@@ -440,13 +442,14 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s cloud_playback=%s recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s cloud_playback=%s lane=%s recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
                snapshot.asr_session_active ? "yes" : "no",
                snapshot.playback_active ? "yes" : "no",
                snapshot.playback_cloud_active ? "yes" : "no",
+               snapshot.playback_lane_engaged ? "yes" : "no",
                snapshot.playback_recovering ? "yes" : "no",
                snapshot.playback_terminal_state[0] != '\0' ?
                    snapshot.playback_terminal_state :

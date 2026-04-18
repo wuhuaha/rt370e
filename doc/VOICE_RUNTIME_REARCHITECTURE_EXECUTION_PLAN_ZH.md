@@ -438,6 +438,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - fixed-dsb AECM 统计也新增：
     - `restart_pending`
     计数，便于板端确认恢复空窗是否仍在被误判成参考链缺失
+- cloud/runtime 也已开始显式导出“播放链仍占用”的统一真相，而不是让
+  adapter / core 各自拼接：
+  - 新增 runtime truth：
+    - `playback_lane_engaged`
+  - XiaoZhi playback runtime 现统一归并：
+    - playback output active
+    - rebuffer pending
+    - playback-service active states
+  - adapter transport active / capture-held policy 与 dialog runtime playback
+    派生现在都改为消费这条统一 truth
 
 下一步焦点：
 
@@ -450,6 +460,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   语义中完全拆开，避免 recovery 空窗重新被其他模块折叠成：
   - `playback inactive`
   - `reference missing`
+- 继续把 adapter 中剩余的 capture-open / no-ref reopen 决策下沉到
+  session/playback runtime helper，避免 adapter 同时掌握：
+  - duplex fallback reason
+  - reopen rearm guard
+  - playback lane occupied truth
 - 让 `dialog runtime` / `session coordinator` / cloud bridge 最终都只消费
   一条统一的 playback-runtime 真相，而不是再从局部 active/idle 信号二次猜测
 
