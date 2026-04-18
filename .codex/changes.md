@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.219
+- Moved XiaoZhi `open_and_listen` success-time stop-intent clearing out of the
+  adapter and into session runtime so runtime now owns the post-success session
+  normalization for:
+  - follow-up reopen via `river_cloud_xiaozhi_open_session_and_listen()`
+  - wake admission via `river_cloud_xiaozhi_begin_conversation_window(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN` transport execution now no
+  longer directly clears `g_river_cloud.xiaozhi_listen_stop_pending`:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.218
 - Moved the XiaoZhi reopen-time `listen_stop_pending` busy gate out of
   `river_cloud_xiaozhi_stream_push_frame(...)` and into session runtime so the

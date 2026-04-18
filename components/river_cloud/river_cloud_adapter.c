@@ -277,7 +277,6 @@ static river_status_t river_cloud_xiaozhi_control_execute(
             }
         }
         river_cloud_xiaozhi_copy_session_id_from_transport();
-        g_river_cloud.xiaozhi_listen_stop_pending = false;
         if (!g_river_cloud.xiaozhi_listening) {
             status = river_xiaozhi_send_listen_start(
                 request->arg[0] != '\0' ? request->arg : "auto");

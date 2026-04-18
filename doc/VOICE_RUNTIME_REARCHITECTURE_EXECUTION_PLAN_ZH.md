@@ -474,6 +474,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - listen-stop drain pending 时的 reopen busy gate
   - adapter reopen-open 路径现在不再直接读取：
     - `xiaozhi_listen_stop_pending`
+- XiaoZhi `open_and_listen` 成功后的 stop-intent clear 也已收口到 session runtime：
+  - runtime open/listen success policy 现在统一拥有：
+    - follow-up reopen success 后的 stop-intent clear
+    - wake admission success 后的 stop-intent clear
+  - adapter `CTRL_OPEN_AND_LISTEN` transport 路径现在只保留：
+    - open session / send listen_start
 
 下一步焦点：
 
