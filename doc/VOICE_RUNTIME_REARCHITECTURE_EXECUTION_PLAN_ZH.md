@@ -329,6 +329,9 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `playback_terminal_state`
   - `playback_terminal_waiting`
   来抑制 stale `output_lane=speaking` 对交互态的误导
+- `session coordinator` 的 barge-in interrupt gate 已切到
+  `dialog runtime` snapshot，不再回退依赖 playback service 的局部 active
+  状态
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

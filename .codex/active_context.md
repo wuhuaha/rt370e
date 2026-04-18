@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.188 make dialog runtime consume playback terminal truth`
+  - `5.189 remove session playback-state bypass from barge-in gating`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -153,6 +153,12 @@ or top-of-tree verification target changes.
       reducer on both:
       - cloud snapshot sync
       - playback-service ingress
+  - fourteenth landed slice on that plan:
+    - `session coordinator` no longer bypasses `dialog runtime` by checking
+      playback-service local activity directly during barge-in admission
+    - barge-in text confirmation now consumes one runtime-owned predicate:
+      - playback is locally interruptible
+      - playback has not already entered a terminal state
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

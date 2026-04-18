@@ -9,7 +9,6 @@
 #include "river/river_dialog_runtime.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
-#include "river/river_playback_service.h"
 #include "river/river_voice_kws.h"
 #include "river_session_coordinator.h"
 
@@ -77,11 +76,6 @@ static void river_session_wakeword_clear_locked(void)
     g_river_session_coordinator.wakeword.text[0] = '\0';
 }
 
-static bool river_session_playback_state_active(river_playback_state_t state)
-{
-    return river_playback_service_state_active(state);
-}
-
 static bool river_session_runtime_snapshot(river_dialog_runtime_snapshot_t *snapshot)
 {
     if (snapshot == NULL) {
@@ -89,6 +83,17 @@ static bool river_session_runtime_snapshot(river_dialog_runtime_snapshot_t *snap
     }
     memset(snapshot, 0, sizeof(*snapshot));
     return river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
+}
+
+static bool river_session_snapshot_playback_interruptible(
+    const river_dialog_runtime_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
+        return false;
+    }
+
+    return snapshot->playback_active &&
+           snapshot->playback_terminal_state[0] == '\0';
 }
 
 void river_session_coordinator_sync_interaction_state(const char *reason)
@@ -295,8 +300,7 @@ static void river_session_try_interrupt_playback_on_asr_text(
     if (!snapshot.asr_session_active || interrupt_requested) {
         return;
     }
-    if (!snapshot.playback_active &&
-        !river_session_playback_state_active(river_playback_service_state())) {
+    if (!river_session_snapshot_playback_interruptible(&snapshot)) {
         return;
     }
     if (snapshot.interaction_state != RIVER_INTERACTION_SPEAKING &&

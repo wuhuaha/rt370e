@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.189
+- Tightened `session coordinator` barge-in interruption admission so it now
+  relies only on `dialog runtime` snapshot truth instead of secretly falling
+  back to playback-service local state:
+  - removed the local playback-service active helper path
+  - added a runtime-snapshot playback-interruptible predicate
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- `river_session_try_interrupt_playback_on_asr_text()` now interrupts TTS only
+  when the core snapshot says playback is still locally interruptible, which
+  means:
+  - playback is active in runtime truth
+  - playback has not already reached a terminal state
+- This closes another truth leak after Step `5.188`: `session_coordinator`
+  no longer bypasses the dialog runtime and no longer reintroduces stale local
+  playback-state guesses into barge-in control flow
+
 ## Step 5.188
 - Hardened the core-owned `dialog runtime` so interaction derivation now
   consumes playback terminal truth explicitly instead of still treating

@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.189
+Validate that `session coordinator` barge-in admission now keys off the
+dialog-runtime snapshot instead of falling back to playback-service state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_interruptible|playback_terminal_state|river_playback_service_state_active|river_session_try_interrupt_playback_on_asr_text' \
+  components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - `session_coordinator` uses a dialog-runtime snapshot predicate for
+    playback interruption
+  - the old `river_playback_service_state_active(...)` fallback is gone from
+    the barge-in admission path
+  - terminal playback state blocks stale interrupt attempts
+
 ## Step 5.188
 Validate that `dialog runtime` now derives speaking/playback interaction from
 terminal-aware playback truth instead of directly trusting late speaking lane
