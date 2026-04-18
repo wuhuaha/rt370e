@@ -358,6 +358,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 触发 local round close
   - adapter `RIVER_XIAOZHI_EVENT_LLM` 分支现在只剩下调用这个 runtime
     helper
+- XiaoZhi `post_stop_result` local-close 语义也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_post_stop_result_round_policy()`
+  - 该 helper 负责：
+    - 根据已完成的 pending text / final 事实决定 local round close
+  - adapter listen-stop completion path 现在只剩下调用这个 runtime helper
 
 下一步焦点：
 

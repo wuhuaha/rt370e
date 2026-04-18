@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.207
+- Moved XiaoZhi `post_stop_result` local-close policy out of the adapter and
+  into session runtime so adapter no longer directly decides the listen-stop
+  resolved close:
+  - exported:
+    - `river_cloud_xiaozhi_apply_post_stop_result_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter listen-stop completion path now only handles transport gating and
+  calls the exported runtime helper for the local-close decision:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.206
 - Moved XiaoZhi `LLM` terminal local-close policy out of the adapter and into
   session runtime so adapter no longer assembles the `llm` finalize/close path:

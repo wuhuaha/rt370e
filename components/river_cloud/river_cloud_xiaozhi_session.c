@@ -173,6 +173,16 @@ void river_cloud_xiaozhi_apply_llm_round_policy(void)
         "llm");
 }
 
+void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void)
+{
+    if (g_river_cloud.xiaozhi_pending_text_finalized ||
+        g_river_cloud.xiaozhi_asr_round_final_seen) {
+        river_cloud_xiaozhi_close_local_round_for_cause(
+            RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
+            "post_stop_result");
+    }
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||
