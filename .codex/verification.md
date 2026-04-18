@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.220
+Validate that XiaoZhi uplink keepalive gating now lives in session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '168,179p' components/river_cloud/river_cloud_adapter.c
+sed -n '198,216p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'uplink_keepalive_needed|xiaozhi_listen_stop_pending' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter `river_cloud_xiaozhi_uplink_active()` only samples `queued_frames`
+- session runtime owns:
+  - `river_cloud_xiaozhi_uplink_keepalive_needed(...)`
+
 ## Step 5.219
 Validate that XiaoZhi `open_and_listen` success-time stop-intent clearing now
 lives in session runtime:

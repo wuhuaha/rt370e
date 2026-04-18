@@ -167,13 +167,15 @@ static bool river_cloud_xiaozhi_control_pending(void)
 
 static bool river_cloud_xiaozhi_uplink_active(void)
 {
+    uint32_t queued_frames;
+
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled ||
         !g_river_cloud.xiaozhi_uplink_ring.initialized) {
         return false;
     }
 
-    return river_cloud_xiaozhi_uplink_ready_frames() > 0U ||
-           g_river_cloud.xiaozhi_listen_stop_pending;
+    queued_frames = river_cloud_xiaozhi_uplink_ready_frames();
+    return river_cloud_xiaozhi_uplink_keepalive_needed(queued_frames);
 }
 
 static uint32_t river_cloud_xiaozhi_uplink_busy_backoff_ms(uint32_t frame_ms,

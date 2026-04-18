@@ -480,6 +480,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - wake admission success 后的 stop-intent clear
   - adapter `CTRL_OPEN_AND_LISTEN` transport 路径现在只保留：
     - open session / send listen_start
+- XiaoZhi uplink keepalive gate 也已收口到 session runtime：
+  - runtime helper 现在统一拥有：
+    - queued uplink drain 后因 stop-intent 维持 I/O 活跃的 keepalive gate
+  - adapter `uplink_active()` 现在只保留：
+    - queued uplink frame 数采样
 
 下一步焦点：
 

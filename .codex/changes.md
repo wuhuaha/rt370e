@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.220
+- Moved XiaoZhi uplink keepalive gating out of adapter and into session runtime
+  so runtime now owns the stop-intent fact that keeps the xiaozhi I/O loop
+  active after queued uplink frames drain:
+  - `river_cloud_xiaozhi_uplink_keepalive_needed(uint32_t queued_frames)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_xiaozhi_uplink_active()` now only samples queued uplink
+  frames and delegates keepalive policy to runtime:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.219
 - Moved XiaoZhi `open_and_listen` success-time stop-intent clearing out of the
   adapter and into session runtime so runtime now owns the post-success session

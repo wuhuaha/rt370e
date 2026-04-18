@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.219 move xiaozhi open-and-listen stop-intent clear into session runtime`
+  - `5.220 move xiaozhi uplink keepalive gate into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -309,6 +309,10 @@ or top-of-tree verification target changes.
     - XiaoZhi open-and-listen success policy now clears stop intent in session
       runtime
     - adapter `CTRL_OPEN_AND_LISTEN` path no longer directly clears
+      `xiaozhi_listen_stop_pending`
+  - forty-first landed slice on that plan:
+    - XiaoZhi uplink keepalive gate now lives in session runtime
+    - adapter `uplink_active()` no longer directly folds
       `xiaozhi_listen_stop_pending`
   - twenty-third landed slice on that plan:
     - cloud/runtime now export a first-class playback-lane engagement fact:

@@ -385,6 +385,7 @@ void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void);
 void river_cloud_xiaozhi_apply_listen_stop_completion_round_policy(void);
 void river_cloud_xiaozhi_maybe_finalize_listen_stop(uint32_t queued_frames,
                                                     size_t accum_bytes);
+bool river_cloud_xiaozhi_uplink_keepalive_needed(uint32_t queued_frames);
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void);
 void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void);
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void);
