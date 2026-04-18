@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.185 split terminal result from terminal ACK truth`
+  - `5.186 route terminal close causes through playback runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -112,6 +112,23 @@ or top-of-tree verification target changes.
       - terminal state
       - terminal ACK
       independently
+  - eleventh landed slice on that plan:
+    - adapter terminal-close branches now use one playback-runtime
+      cause reducer instead of locally assembling:
+      - `clear_reason`
+      - `stream_reason`
+      - `interrupt_stream`
+    - typed runtime abort causes now cover:
+      - `interrupt`
+      - `transport_closed`
+      - `network_lost`
+      - `bridge_close`
+    - playback runtime now emits one normalized abort fact with:
+      - cause
+      - clear reason
+      - stream reason
+      - interrupt mode
+      - entry playback/work state
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
@@ -277,8 +294,8 @@ or top-of-tree verification target changes.
 - Replace the old XiaoZhi wire contract with direct `rtos-ws-v0` transport while
   keeping the existing upper cloud state machine temporarily stable.
 - Current highest-priority runtime cleanup is now:
-  - continue shrinking terminal ambiguity by aligning interrupt/local-clear /
-    transport-close policy and playback terminal truth around explicit
+  - continue shrinking terminal ambiguity by aligning local-clear /
+    data-plane terminal close / playback terminal truth around explicit
     runtime-owned facts
   - continue moving terminal-cause derivation behind the playback runtime so
     `dialog runtime` consumes exported truth instead of reconstructing terminal

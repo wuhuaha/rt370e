@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.186
+Validate that adapter terminal-close branches now route through a single
+runtime-owned typed cause reducer instead of assembling local abort triples:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'PLAYBACK_ABORT_(INTERRUPT|TRANSPORT_CLOSED|NETWORK_LOST|BRIDGE_CLOSE)|playback_abort_for_cause|playback abort: cause=' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - typed playback abort causes exist for the main terminal-close entries
+  - adapter branches call `playback_abort_for_cause(...)`
+  - runtime logs normalized abort facts from the reducer itself
+
 ## Step 5.185
 Validate that local terminal outcome and protocol terminal ACK truth are now
 split all the way through the runtime snapshot chain:

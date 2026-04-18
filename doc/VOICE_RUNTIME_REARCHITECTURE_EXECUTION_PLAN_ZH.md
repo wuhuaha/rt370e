@@ -300,12 +300,25 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - cloud runtime snapshot
     - dialog runtime snapshot
     暴露给 core 真相源和诊断日志
+- adapter 侧分散的 terminal close 参数拼装也已继续收口：
+  - playback runtime 新增统一 typed cause reducer
+  - 目前已覆盖的入口包括：
+    - `interrupt`
+    - `transport_closed`
+    - `network_lost`
+    - `bridge_close`
+  - adapter 不再自行拼：
+    - `clear_reason`
+    - `stream_reason`
+    - `interrupt_stream`
+    三元组，而是只上传 `cause + detail_reason`
+  - 这让后续 terminal policy 调整可以稳定落在 playback runtime 一处
+    完成，而不是继续在 adapter 分支里复制终态规则
 
 下一步焦点：
 
-- 继续把 interrupt / local-clear / network-loss / transport-close 的
-  terminal close policy 从 adapter 分支逻辑收口成统一的
-  runtime-owned cause reducer
+- 继续把 remaining local-clear / data-plane 异常 / follow-up close 的
+  terminal close policy 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
   terminal truth，而不是继续依赖 `tts_stop_pending + playback_active`
   组合猜测终态

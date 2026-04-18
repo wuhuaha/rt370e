@@ -341,6 +341,63 @@ static void river_cloud_xiaozhi_set_playback_terminal_ack(const char *ack,
         ack != NULL && strcmp(ack, "completed") == 0;
 }
 
+static const char *river_cloud_xiaozhi_playback_abort_cause_name(
+    river_cloud_xiaozhi_playback_abort_cause_t cause)
+{
+    switch (cause) {
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT:
+        return "interrupt";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED:
+        return "transport_closed";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST:
+        return "network_lost";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE:
+        return "bridge_close";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *river_cloud_xiaozhi_playback_abort_clear_reason(
+    river_cloud_xiaozhi_playback_abort_cause_t cause,
+    const char *detail_reason)
+{
+    if (cause == RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT) {
+        return (detail_reason != NULL && detail_reason[0] != '\0') ?
+                   detail_reason :
+                   "xiaozhi_interrupt";
+    }
+
+    return river_cloud_xiaozhi_playback_abort_cause_name(cause);
+}
+
+static const char *river_cloud_xiaozhi_playback_abort_stream_reason(
+    river_cloud_xiaozhi_playback_abort_cause_t cause,
+    const char *detail_reason)
+{
+    if (cause == RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT) {
+        return (detail_reason != NULL && detail_reason[0] != '\0') ?
+                   detail_reason :
+                   "xiaozhi_interrupt";
+    }
+    switch (cause) {
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED:
+        return "xiaozhi_transport_closed";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST:
+        return "xiaozhi_network_lost";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE:
+        return "xiaozhi_bridge_close";
+    default:
+        return "xiaozhi_playback_abort";
+    }
+}
+
+static bool river_cloud_xiaozhi_playback_abort_interrupt_stream(
+    river_cloud_xiaozhi_playback_abort_cause_t cause)
+{
+    return cause == RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT;
+}
+
 static void river_cloud_xiaozhi_mark_segment_fully_heard(
     const river_cloud_xiaozhi_playback_segment_t *segment)
 {
@@ -848,18 +905,26 @@ void river_cloud_xiaozhi_playback_check_pending_stop(void)
     river_cloud_xiaozhi_reset_playback_state();
 }
 
-river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
-                                                  const char *stream_reason,
-                                                  bool interrupt_stream)
+river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
+    river_cloud_xiaozhi_playback_abort_cause_t cause,
+    const char *detail_reason)
 {
     river_status_t status = RIVER_OK;
+    bool had_work = river_cloud_xiaozhi_playback_has_work();
+    bool stream_was_active = river_playback_service_active();
+    const char *clear_reason =
+        river_cloud_xiaozhi_playback_abort_clear_reason(cause, detail_reason);
+    const char *stream_reason =
+        river_cloud_xiaozhi_playback_abort_stream_reason(cause, detail_reason);
+    bool interrupt_stream =
+        river_cloud_xiaozhi_playback_abort_interrupt_stream(cause);
 
-    if (river_cloud_xiaozhi_playback_has_work()) {
+    if (had_work) {
         river_cloud_xiaozhi_playback_finalize_cleared(clear_reason);
         river_cloud_xiaozhi_reset_downlink_state();
     }
 
-    if (river_playback_service_active()) {
+    if (stream_was_active) {
         const char *resolved_reason =
             (stream_reason != NULL && stream_reason[0] != '\0') ?
                 stream_reason :
@@ -870,6 +935,13 @@ river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
                      river_playback_service_stop_stream_ex(resolved_reason);
     }
 
+    RIVER_LOGI("xiaozhi playback abort: cause=%s clear_reason=%s stream_reason=%s interrupt=%s had_work=%s stream_active=%s",
+               river_cloud_xiaozhi_playback_abort_cause_name(cause),
+               clear_reason != NULL && clear_reason[0] != '\0' ? clear_reason : "-",
+               stream_reason != NULL && stream_reason[0] != '\0' ? stream_reason : "-",
+               interrupt_stream ? "yes" : "no",
+               had_work ? "yes" : "no",
+               stream_was_active ? "yes" : "no");
     river_cloud_xiaozhi_reset_playback_state();
     return status;
 }

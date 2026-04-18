@@ -105,6 +105,13 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED = 7
 } river_cloud_xiaozhi_control_op_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT = 0,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED = 1,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST = 2,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE = 3
+} river_cloud_xiaozhi_playback_abort_cause_t;
+
 typedef struct {
     bool valid;
     bool started;
@@ -335,9 +342,9 @@ uint32_t river_cloud_xiaozhi_playback_queued_frames(void);
 bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_has_work(void);
 void river_cloud_xiaozhi_playback_note_duplex_ready(void);
-river_status_t river_cloud_xiaozhi_playback_abort(const char *clear_reason,
-                                                  const char *stream_reason,
-                                                  bool interrupt_stream);
+river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
+    river_cloud_xiaozhi_playback_abort_cause_t cause,
+    const char *detail_reason);
 void river_cloud_emit_asr_result(river_cloud_asr_event_type_t type,
                                  const char *text,
                                  const char *sid,

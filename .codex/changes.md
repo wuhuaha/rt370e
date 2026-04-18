@@ -1,5 +1,42 @@
 # Change Log
 
+## Step 5.186
+- Continued shrinking XiaoZhi terminal-close ambiguity by moving the adapter’s
+  terminal-abort parameter assembly behind a runtime-owned typed cause reducer:
+  - added:
+    - `river_cloud_xiaozhi_playback_abort_cause_t`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Replaced the old three-parameter abort interface:
+  - `clear_reason`
+  - `stream_reason`
+  - `interrupt_stream`
+  with one runtime-owned entrypoint:
+  - `river_cloud_xiaozhi_playback_abort_for_cause(cause, detail_reason)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- The playback runtime now centrally derives terminal-close semantics for:
+  - `interrupt`
+  - `transport_closed`
+  - `network_lost`
+  - `bridge_close`
+  including:
+  - local clear reason
+  - playback-service stop/interrupt reason
+  - whether the stream should be hard-interrupted or normally stopped
+- Adapter branches no longer assemble playback terminal policy locally:
+  - `SESSION_CLOSED`
+  - `notify_network_lost()`
+  - `interrupt_tts_with_reason()`
+  - `asr_audio_close()`
+  now all route through the same typed runtime reducer
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Added reducer-side diagnostics so board logs can now show one normalized
+  terminal-abort fact:
+  - `cause`
+  - resolved `clear_reason`
+  - resolved `stream_reason`
+  - whether it was an interrupt path
+  - whether playback work / stream were active on entry
+
 ## Step 5.185
 - Continued the XiaoZhi terminal-truth rebuild by separating local playback
   outcome from protocol ACK truth instead of storing both in the same
