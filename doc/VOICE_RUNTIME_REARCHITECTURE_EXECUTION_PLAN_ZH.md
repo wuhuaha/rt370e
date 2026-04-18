@@ -296,6 +296,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - preview interrupt hint
   - 这使输入侧 transport 事件也开始通过 grouped reducer 进入 session
     runtime，而不是在 adapter 中分散维护策略 glue
+- `STT` 分支剩余的 follow-up window glue 也已继续从 adapter 收口：
+  - `river_cloud_xiaozhi_note_stt_observation(...)` 现同时负责：
+    - `stt` follow-up window touch
+    - pending-text dedup / partial ASR emission
+  - adapter 的 `RIVER_XIAOZHI_EVENT_STT` 分支不再在 runtime helper 之前再
+    持有一次单独的 `window_touch(...)`
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：

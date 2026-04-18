@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.238
+Validate that XiaoZhi `STT` follow-up window touch now belongs to session
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '442,460p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1094,1098p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_stt_observation|window_touch\\(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, \"stt\"|RIVER_XIAOZHI_EVENT_STT' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime `river_cloud_xiaozhi_note_stt_observation(...)` now contains
+  the `stt` follow-up window touch
+- adapter `RIVER_XIAOZHI_EVENT_STT` branch no longer performs a separate
+  `window_touch(...)` before dispatching to runtime
+
 ## Step 5.237
 Validate that XiaoZhi input preview/endpoint transport glue now belongs to
 session runtime:

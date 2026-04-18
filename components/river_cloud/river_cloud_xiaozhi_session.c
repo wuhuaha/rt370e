@@ -443,6 +443,8 @@ void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event
 {
     char next_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
 
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, "stt");
+
     if (event == NULL || event->text == NULL || event->text[0] == '\0') {
         return;
     }

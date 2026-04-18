@@ -1093,8 +1093,6 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
         river_cloud_xiaozhi_copy_session_id_from_transport();
         break;
     case RIVER_XIAOZHI_EVENT_STT:
-        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
-                                         "stt");
         river_cloud_xiaozhi_note_stt_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:

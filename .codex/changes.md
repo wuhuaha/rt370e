@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.238
+- Moved the remaining XiaoZhi `STT` event follow-up window touch out of
+  `river_cloud_adapter.c` and into the existing session-runtime observation
+  helper so adapter `RIVER_XIAOZHI_EVENT_STT` handling is now pure dispatch:
+  - `river_cloud_xiaozhi_note_stt_observation(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime `river_cloud_xiaozhi_note_stt_observation(...)` now owns
+  both:
+  - `stt` follow-up window touch
+  - pending-text dedup / partial ASR emission
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi `STT` branch no longer carries any session-semantics glue
+  before delegating to runtime:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.237
 - Moved the remaining XiaoZhi input-side transport glue for
   `input_speech_start / input_preview / input_endpoint` out of
