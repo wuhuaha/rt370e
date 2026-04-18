@@ -571,6 +571,53 @@ void river_cloud_xiaozhi_note_tts_observation(const river_xiaozhi_event_t *event
     }
 }
 
+void river_cloud_xiaozhi_note_session_closed_observation(const river_xiaozhi_event_t *event)
+{
+    const char *sid = "-";
+
+    if (event != NULL && event->session_id != NULL && event->session_id[0] != '\0') {
+        sid = event->session_id;
+    } else if (river_cloud_xiaozhi_current_sid() != NULL) {
+        sid = river_cloud_xiaozhi_current_sid();
+    }
+
+    RIVER_LOGW("xiaozhi transport closed: sid=%s window=%s stream=%s playback=%s",
+               sid,
+               river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+    river_cloud_xiaozhi_apply_transport_closed_terminal_policy();
+}
+
+void river_cloud_xiaozhi_note_error_observation(const river_xiaozhi_event_t *event)
+{
+    const char *message = NULL;
+
+    if (event != NULL) {
+        if (event->reason != NULL && event->reason[0] != '\0') {
+            message = event->reason;
+        } else if (event->state != NULL && event->state[0] != '\0') {
+            message = event->state;
+        } else if (event->text != NULL && event->text[0] != '\0') {
+            message = event->text;
+        }
+    }
+
+    if (message == NULL || message[0] == '\0') {
+        message = river_xiaozhi_last_error();
+    }
+    if (message == NULL || message[0] == '\0') {
+        message = "xiaozhi_transport_error";
+    }
+
+    river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_ERROR,
+                                NULL,
+                                river_cloud_xiaozhi_current_sid(),
+                                message,
+                                -1,
+                                true);
+}
+
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     river_voice_duplex_ready_eval_t eval;

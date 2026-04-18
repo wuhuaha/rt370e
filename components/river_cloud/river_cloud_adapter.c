@@ -1128,17 +1128,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
         }
         break;
     case RIVER_XIAOZHI_EVENT_AUDIO_OUT_META:
-        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
-                                         "audio_out_meta");
-        river_cloud_xiaozhi_playback_note_meta(event);
-        RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
-                   event->response_id != NULL ? event->response_id : "-",
-                   event->playback_id != NULL ? event->playback_id : "-",
-                   event->segment_id != NULL ? event->segment_id : "-",
-                   event->text != NULL ? event->text : "-",
-                   (unsigned long)event->expected_duration_ms,
-                   event->is_last_segment ? "yes" : "no",
-                   river_cloud_xiaozhi_turn_accepted() ? "yes" : "no");
+        river_cloud_xiaozhi_note_audio_out_meta_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_LLM:
         river_cloud_xiaozhi_note_llm_observation(event);
@@ -1150,22 +1140,10 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
         (void)river_cloud_xiaozhi_playback_handle_audio_event(event);
         break;
     case RIVER_XIAOZHI_EVENT_SESSION_CLOSED:
-        RIVER_LOGW("xiaozhi transport closed: sid=%s window=%s stream=%s playback=%s",
-                   event->session_id != NULL ? event->session_id : "-",
-                   river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",
-                   g_river_cloud.stream_active ? "yes" : "no",
-                   g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
-        river_cloud_xiaozhi_apply_transport_closed_terminal_policy();
+        river_cloud_xiaozhi_note_session_closed_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_ERROR:
-        river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_ERROR,
-                                    NULL,
-                                    river_cloud_xiaozhi_current_sid(),
-                                    river_xiaozhi_last_error() != NULL ?
-                                        river_xiaozhi_last_error() :
-                                        "xiaozhi_transport_error",
-                                    -1,
-                                    true);
+        river_cloud_xiaozhi_note_error_observation(event);
         break;
     default:
         break;

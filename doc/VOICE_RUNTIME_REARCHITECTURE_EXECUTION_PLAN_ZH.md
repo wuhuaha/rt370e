@@ -273,6 +273,19 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport event 分发
     - runtime helper 调用
     - 避免继续持有 session truth mutation
+- `audio_out_meta / session_closed / error` 这组 transport 观察也已继续从
+  adapter 分支下沉到 runtime：
+  - playback runtime 新增：
+    - `river_cloud_xiaozhi_note_audio_out_meta_observation(...)`
+  - session runtime 新增：
+    - `river_cloud_xiaozhi_note_session_closed_observation(...)`
+    - `river_cloud_xiaozhi_note_error_observation(...)`
+  - adapter 的对应 transport 分支不再直接内联：
+    - playback fact log projection
+    - transport-closed terminal policy
+    - `RIVER_CLOUD_ASR_EVENT_ERROR` 发射
+  - 这使 adapter 更接近纯 transport 分发层，而 playback/session runtime
+    分别继续收口各自的真相与终态语义
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：

@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.236
+- Moved the remaining XiaoZhi transport-event semantic branches for
+  `audio_out_meta / session_closed / error` out of
+  `river_cloud_adapter.c` and into runtime-owned helpers so adapter no longer
+  embeds playback-fact logging, transport-closed terminal handling, or cloud
+  error ASR emission inline:
+  - `river_cloud_xiaozhi_note_audio_out_meta_observation(...)`
+  - `river_cloud_xiaozhi_note_session_closed_observation(...)`
+  - `river_cloud_xiaozhi_note_error_observation(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Playback runtime now owns the `audio_out_meta` observation reducer for:
+  - follow-up window touch during playback-meta arrival
+  - playback meta note + prefetch truth update
+  - playback fact log projection with accepted-turn visibility
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Session runtime now owns the remaining transport terminal/error reducers for:
+  - `session_closed` diagnostic log + transport-closed terminal policy apply
+  - `error` message normalization + `RIVER_CLOUD_ASR_EVENT_ERROR` emission
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_event_handler(...)` now only dispatches
+  `AUDIO_OUT_META / SESSION_CLOSED / ERROR` transport observations into
+  runtime-owned reducers:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.235
 - Moved XiaoZhi `LLM/TTS` transport-event observation ownership out of
   `river_cloud_adapter.c` and into session runtime so adapter no longer embeds

@@ -781,6 +781,25 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count);
 }
 
+void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                     "audio_out_meta");
+    river_cloud_xiaozhi_playback_note_meta(event);
+    RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
+               event->response_id != NULL ? event->response_id : "-",
+               event->playback_id != NULL ? event->playback_id : "-",
+               event->segment_id != NULL ? event->segment_id : "-",
+               event->text != NULL ? event->text : "-",
+               (unsigned long)event->expected_duration_ms,
+               event->is_last_segment ? "yes" : "no",
+               river_cloud_xiaozhi_turn_accepted() ? "yes" : "no");
+}
+
 static void river_cloud_xiaozhi_try_queue_playback_started_ack(void)
 {
     river_status_t status;

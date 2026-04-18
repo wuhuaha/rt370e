@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.236
+Validate that XiaoZhi transport `audio_out_meta / session_closed / error`
+observation now belongs to runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '354,367p' components/river_cloud/river_cloud_internal.h
+sed -n '574,616p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '784,800p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1130,1147p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_audio_out_meta_observation|note_session_closed_observation|note_error_observation|RIVER_XIAOZHI_EVENT_(AUDIO_OUT_META|SESSION_CLOSED|ERROR)' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- runtime exports and implements:
+  - `river_cloud_xiaozhi_note_audio_out_meta_observation(...)`
+  - `river_cloud_xiaozhi_note_session_closed_observation(...)`
+  - `river_cloud_xiaozhi_note_error_observation(...)`
+- adapter `RIVER_XIAOZHI_EVENT_AUDIO_OUT_META / SESSION_CLOSED / ERROR`
+  branches no longer inline:
+  - playback fact log projection
+  - transport-closed terminal policy apply
+  - cloud error ASR emission
+- XiaoZhi transport-event terminal/playback observation now lives behind
+  runtime-owned reducers instead of adapter-side event-branch logic
+
 ## Step 5.235
 Validate that XiaoZhi `LLM/TTS` transport-event observation now belongs to
 session runtime:

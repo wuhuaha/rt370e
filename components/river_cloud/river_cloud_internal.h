@@ -355,6 +355,8 @@ void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event
 void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_llm_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_tts_observation(const river_xiaozhi_event_t *event);
+void river_cloud_xiaozhi_note_session_closed_observation(const river_xiaozhi_event_t *event);
+void river_cloud_xiaozhi_note_error_observation(const river_xiaozhi_event_t *event);
 river_status_t river_cloud_xiaozhi_control_request_async(
     river_cloud_xiaozhi_control_op_t op,
     const char *arg,
@@ -362,6 +364,7 @@ river_status_t river_cloud_xiaozhi_control_request_async(
     const char *playback_id,
     const char *segment_id,
     uint32_t played_duration_ms);
+void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);
