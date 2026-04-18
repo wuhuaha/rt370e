@@ -455,6 +455,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `no_ref_reopen_ready()` 现在会直接消费：
     - `playback_lane_engaged`
     从 helper 内部拒绝仍被占用的播放链重开口
+- `capture held during playback` 这条高频 capture 判定也已开始 helper 化：
+  - 新增：
+    - `river_cloud_xiaozhi_capture_held_by_playback(...)`
+  - 该 helper 内部统一归并：
+    - `playback_lane_engaged`
+    - `duplex_fallback_reason`
+  - adapter 现在只负责消费结果并记录日志
 
 下一步焦点：
 
@@ -474,6 +481,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - playback lane occupied truth
 - 继续把 `capture held during playback` 这类高频分支也改造成 typed helper /
   reducer，让 adapter 从“判定者”进一步退化成“调用者”
+- 继续审视 `tts_start keep/fallback` 这类仍在 adapter 的 duplex gate 决策，
+  让它们也与 session/runtime helper 采用同一 ownership 模式
 - 让 `dialog runtime` / `session coordinator` / cloud bridge 最终都只消费
   一条统一的 playback-runtime 真相，而不是再从局部 active/idle 信号二次猜测
 

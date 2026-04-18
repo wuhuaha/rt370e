@@ -91,6 +91,19 @@ bool river_cloud_xiaozhi_playback_allows_vad_open(void)
     return fallback_reason == NULL;
 }
 
+bool river_cloud_xiaozhi_capture_held_by_playback(
+    const river_voice_duplex_ready_eval_t *eval,
+    const char **fallback_reason)
+{
+    const char *resolved_reason = river_cloud_xiaozhi_duplex_fallback_reason(eval);
+
+    if (fallback_reason != NULL) {
+        *fallback_reason = resolved_reason;
+    }
+
+    return river_cloud_xiaozhi_playback_lane_engaged() && resolved_reason != NULL;
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

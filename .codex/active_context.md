@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.200 move no-ref reopen/open-hold helpers into xiaozhi session runtime`
+  - `5.201 move capture-held playback predicate into xiaozhi session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -248,6 +248,15 @@ or top-of-tree verification target changes.
       reopening during an occupied playback lane
     - adapter capture-open flow now only calls exported helpers for those two
       policy decisions
+  - twenty-fifth landed slice on that plan:
+    - `capture held during playback` has also started moving behind a
+      session-runtime helper:
+      - `river_cloud_xiaozhi_capture_held_by_playback(...)`
+    - that helper now owns the combined reducer:
+      - `playback_lane_engaged`
+      - `duplex_fallback_reason`
+    - adapter capture path now consumes the helper and no longer reconstructs
+      that predicate locally
     - playback service now tears down the failed track and returns to
       restartable `IDLE` with a dedicated `recover fallback` path
     - XiaoZhi downlink recovery no longer forces an extra redundant local stop

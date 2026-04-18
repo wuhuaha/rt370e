@@ -374,6 +374,9 @@ void river_cloud_xiaozhi_get_duplex_ready_eval(river_voice_duplex_ready_eval_t *
 const char *river_cloud_xiaozhi_duplex_fallback_reason(
     const river_voice_duplex_ready_eval_t *eval);
 bool river_cloud_xiaozhi_playback_allows_vad_open(void);
+bool river_cloud_xiaozhi_capture_held_by_playback(
+    const river_voice_duplex_ready_eval_t *eval,
+    const char **fallback_reason);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void);

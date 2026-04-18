@@ -2211,9 +2211,9 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
     river_cloud_log_time_ready_once();
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
-    duplex_fallback_reason = river_cloud_xiaozhi_duplex_fallback_reason(&duplex_eval);
-    if (!g_river_cloud.stream_active && river_cloud_xiaozhi_playback_lane_engaged() &&
-        duplex_fallback_reason != NULL) {
+    if (!g_river_cloud.stream_active &&
+        river_cloud_xiaozhi_capture_held_by_playback(&duplex_eval,
+                                                     &duplex_fallback_reason)) {
         river_cloud_xiaozhi_note_semantic_fallback(duplex_fallback_reason);
         RIVER_LOGI("xiaozhi capture held during playback: fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u",
                    duplex_fallback_reason,

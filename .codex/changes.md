@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.201
+- Added a session-runtime helper for the hot-path
+  `capture held during playback` decision so adapter no longer assembles that
+  predicate from raw playback-lane and duplex-fallback facts itself:
+  - exported:
+    - `river_cloud_xiaozhi_capture_held_by_playback(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- That helper now owns the combined reducer:
+  - `playback_lane_engaged`
+  - `duplex_fallback_reason`
+  and returns a typed fallback reason to the caller
+- Adapter capture path now only calls the exported helper, then logs/acts on
+  the result, instead of locally recomputing:
+  - `lane_engaged && fallback_reason != NULL`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.200
 - Moved XiaoZhi `open_hold_frames_required` / `no_ref_reopen_ready` helper
   ownership out of `river_cloud_adapter.c` and into session runtime so adapter
