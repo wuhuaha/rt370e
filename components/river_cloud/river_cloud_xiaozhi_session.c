@@ -118,6 +118,35 @@ bool river_cloud_xiaozhi_listen_stop_pending(void)
     return g_river_cloud.xiaozhi_listen_stop_pending;
 }
 
+static bool river_cloud_xiaozhi_control_pending(void)
+{
+    return g_river_cloud.xiaozhi_control_ready != NULL &&
+           rtos_sema_get_count(g_river_cloud.xiaozhi_control_ready) > 0U;
+}
+
+static bool river_cloud_xiaozhi_transport_active(void)
+{
+    if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
+        return false;
+    }
+
+    return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_lane_engaged() ||
+           river_cloud_xiaozhi_listening_active();
+}
+
+bool river_cloud_xiaozhi_uplink_active(void)
+{
+    uint32_t queued_frames;
+
+    if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled ||
+        !g_river_cloud.xiaozhi_uplink_ring.initialized) {
+        return false;
+    }
+
+    queued_frames = river_cloud_xiaozhi_uplink_ready_frames();
+    return river_cloud_xiaozhi_uplink_keepalive_needed(queued_frames);
+}
+
 void river_cloud_xiaozhi_copy_optional_text(char *dst,
                                             size_t dst_size,
                                             const char *src)
@@ -142,6 +171,13 @@ uint32_t river_cloud_xiaozhi_uplink_ready_frames(void)
         ready_frames++;
     }
     return ready_frames;
+}
+
+bool river_cloud_xiaozhi_io_has_work(void)
+{
+    return river_cloud_xiaozhi_control_pending() ||
+           river_cloud_xiaozhi_transport_active() ||
+           river_cloud_xiaozhi_uplink_active();
 }
 
 void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot)

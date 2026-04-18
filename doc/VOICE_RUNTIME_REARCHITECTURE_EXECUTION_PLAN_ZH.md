@@ -300,6 +300,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `river_cloud_xiaozhi_uplink_ready_frames()` 也已从 adapter 移入 runtime，
     让 transport 路径与诊断路径共享同一条 retry-aware uplink queue 真相
   - adapter 诊断面进一步退化为 generic 壳与 runtime helper 调用
+- XiaoZhi I/O loop 的 active-poll 工作量判定也已继续从 adapter 收口：
+  - 新增 runtime-owned reducer：
+    - `river_cloud_xiaozhi_io_has_work(...)`
+  - session runtime 统一归并：
+    - control pending
+    - transport active
+    - uplink active
+  - adapter I/O task 不再本地拼接这三类状态来判断是否继续 active poll
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

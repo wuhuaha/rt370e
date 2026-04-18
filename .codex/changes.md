@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.232
+- Collapsed the XiaoZhi I/O-loop work-presence gate out of
+  `river_cloud_adapter.c` and into a runtime-owned helper so adapter no longer
+  reconstructs whether the XiaoZhi runtime still has active control/transport/
+  uplink work:
+  - `river_cloud_xiaozhi_io_has_work()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the underlying reducer that decides whether the
+  XiaoZhi I/O loop should stay in its active poll cadence:
+  - control-queue pending state
+  - transport-active state
+  - retry-aware uplink-active state
+  - exported `river_cloud_xiaozhi_uplink_active()` truth reused by adapter's
+    uplink service path
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi I/O task now consumes a single runtime-owned work predicate
+  instead of locally chaining three state checks inline:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.231
 - Moved the remaining XiaoZhi control/uplink/ASR-round diagnostic projection
   out of `river_cloud_adapter.c` and into session-runtime-owned helpers so the
