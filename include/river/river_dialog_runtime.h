@@ -32,7 +32,10 @@ typedef struct {
     bool conversation_window_active;
     bool cloud_listening;
     bool cloud_stream_active;
+    bool playback_cloud_active;
     bool playback_active;
+    bool playback_rebuffer_pending;
+    bool playback_recovering;
     bool playback_terminal_waiting;
     bool tts_stop_pending;
     bool turn_accepted;

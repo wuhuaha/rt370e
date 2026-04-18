@@ -65,6 +65,7 @@ typedef struct {
     bool listening;
     bool stream_active;
     bool playback_active;
+    bool playback_rebuffer_pending;
     bool playback_terminal_waiting;
     bool tts_stop_pending;
     bool turn_accepted;

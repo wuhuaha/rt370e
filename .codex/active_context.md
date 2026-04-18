@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.194 rebuild downlink prefetch and rebuffer thresholds`
+  - `5.195 promote playback recovering truth through runtime chain`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -204,6 +204,17 @@ or top-of-tree verification target changes.
       - `target_ms`
       - `meta_gap_ms`
       - `rebuffer_count`
+  - twentieth landed slice on that plan:
+    - recoverable playback churn is now exported as runtime truth end-to-end:
+      - cloud snapshot exports `playback_rebuffer_pending`
+      - dialog runtime stores `playback_cloud_active`
+      - dialog runtime derives `playback_recovering`
+    - `dialog runtime` playback-active truth now stays engaged across
+      same-track recover / rebuffer churn instead of inferring “stopped” from
+      a transient local active gap
+    - `river_playback_service_state_active()` now also treats
+      `RIVER_PLAYBACK_RECOVERING` as active, so AEC/VAD and interaction truth
+      no longer flap on recover-first restart
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.195
+Validate that recoverable playback rebuffer/restart is now exported as runtime
+truth and no longer depends on local active-gap inference:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_rebuffer_pending|playback_cloud_active|playback_recovering|RIVER_PLAYBACK_RECOVERING' \
+  include/river \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_core/river_dialog_runtime.c \
+  components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - cloud snapshot exports `playback_rebuffer_pending`
+  - dialog runtime stores `playback_cloud_active` and derived
+    `playback_recovering`
+  - playback service still treats `RIVER_PLAYBACK_RECOVERING` as active
+
 ## Step 5.194
 Validate that downlink/prefetch runtime now owns a larger local buffer budget
 and adaptive rebuffer threshold model:

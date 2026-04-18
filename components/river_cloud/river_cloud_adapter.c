@@ -2817,6 +2817,8 @@ river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snap
         snapshot->conversation_window_active = g_river_cloud.xiaozhi_window_active;
         snapshot->listening = g_river_cloud.xiaozhi_listening;
         snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
+        snapshot->playback_rebuffer_pending =
+            g_river_cloud.xiaozhi_playback_rebuffer_pending;
         snapshot->playback_terminal_waiting =
             g_river_cloud.xiaozhi_playback_terminal_waiting;
         snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;

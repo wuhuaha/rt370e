@@ -388,11 +388,30 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `target_ms`
   - `meta_gap_ms`
   - `rebuffer_count`
+- recoverable playback churn 已继续从“局部 active 抖动”提升为显式 runtime
+  真相：
+  - cloud runtime snapshot 新增：
+    - `playback_rebuffer_pending`
+  - dialog runtime snapshot 新增：
+    - `playback_cloud_active`
+    - `playback_rebuffer_pending`
+    - `playback_recovering`
+  - `playback_active` 现已由：
+    - service active
+    - cloud playback active
+    - runtime recovering
+    共同派生，而不是只依赖瞬时本地活跃位
+- local playback service 也已同步收紧语义：
+  - `RIVER_PLAYBACK_RECOVERING` 现在仍计入 active playback lane
+  - 同轨 recover-first 的 flush/restart 不再被 VAD/AEC/dialog runtime 当成
+    一次真实停播
 
 下一步焦点：
 
 - 继续把“可恢复的 rebuffer/restart churn”从
   `error_recovering -> follow_up -> speaking` 的粗状态跳变里拆掉
+- 重点检查 fallback `stop/start` 失败分支是否仍暴露一个 `IDLE` 空窗，
+  让 cloud/runtime 边界短暂丢失 `speaking` 事实
 - 让 `dialog runtime` / `session coordinator` 消费统一 playback runtime
   状态机，而不是把 recoverable stop/start 当成 fatal playback error 的旁路
 

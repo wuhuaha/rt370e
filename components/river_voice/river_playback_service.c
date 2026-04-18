@@ -104,7 +104,8 @@ bool river_playback_service_state_active(river_playback_state_t state)
     return state == RIVER_PLAYBACK_PREPARING ||
            state == RIVER_PLAYBACK_RUNNING ||
            state == RIVER_PLAYBACK_DRAINING ||
-           state == RIVER_PLAYBACK_STOPPING;
+           state == RIVER_PLAYBACK_STOPPING ||
+           state == RIVER_PLAYBACK_RECOVERING;
 }
 
 bool river_playback_service_active(void)

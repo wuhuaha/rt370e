@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.195
+- Promoted recoverable playback churn into explicit runtime truth instead of
+  letting `dialog runtime` infer it indirectly from transient local active
+  gaps:
+  - cloud runtime snapshot now exports `playback_rebuffer_pending`
+  - dialog runtime snapshot now keeps:
+    - `playback_cloud_active`
+    - `playback_rebuffer_pending`
+    - derived `playback_recovering`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- Reworked dialog-runtime playback derivation so `speaking/barge_in_listening`
+  is preserved across recoverable `rebuffer/recovering` churn:
+  - `playback_active` is now derived from:
+    - service active state
+    - cloud playback active
+    - runtime recovering truth
+  - `output_lane=speaking` is no longer suppressed during tail-wait if the
+    player is still in recoverable restart
+  - runtime status dump now prints:
+    - `cloud_playback`
+    - `recovering`
+- Tightened local playback semantics so `RIVER_PLAYBACK_RECOVERING` still
+  counts as an engaged playback lane for the rest of the stack:
+  - `river_playback_service_state_active()` now includes `RECOVERING`
+  - this keeps AEC/VAD/dialog orchestration from treating a same-track recover
+    as a real local stop
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+
 ## Step 5.194
 - Rebuilt the XiaoZhi downlink jitter buffer and local playback prefetch budget
   so the device stops starting playback on an unrealistically thin queue:
