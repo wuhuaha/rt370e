@@ -45,21 +45,9 @@ static void river_cloud_xiaozhi_process_control_queue(void);
 static void river_cloud_xiaozhi_complete_active_stream_finish(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason);
-static uint32_t river_cloud_xiaozhi_uplink_ready_frames(void);
 #endif
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
-static uint32_t river_cloud_xiaozhi_uplink_ready_frames(void)
-{
-    uint32_t ready_frames;
-
-    ready_frames = river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring);
-    if (g_river_cloud.xiaozhi_uplink_retry_valid && ready_frames < UINT32_MAX) {
-        ready_frames++;
-    }
-    return ready_frames;
-}
-
 static bool river_cloud_xiaozhi_transport_active(void)
 {
     if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
@@ -2241,31 +2229,8 @@ void river_cloud_adapter_dump_status(void)
 
         river_cloud_xiaozhi_dump_session_status(now_ms);
         river_cloud_xiaozhi_dump_playback_status(now_ms);
+        river_cloud_xiaozhi_dump_io_status();
     }
-    RIVER_LOGI("xiaozhi control queue=%lu/%u peak=%lu owner=%s",
-               (unsigned long)g_river_cloud.xiaozhi_control_count,
-               (unsigned int)RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH,
-               (unsigned long)g_river_cloud.xiaozhi_control_high_watermark,
-               g_river_cloud.xiaozhi_io_started ? "running" : "off");
-    RIVER_LOGI("xiaozhi uplink queue=%lu/%u dropped=%lu stale_drop=%lu busy=%lu fail=%lu stop_pending=%s owner=%s",
-               (unsigned long)river_cloud_xiaozhi_uplink_ready_frames(),
-               (unsigned int)RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES,
-               (unsigned long)g_river_cloud.xiaozhi_uplink_ring_dropped,
-               (unsigned long)g_river_cloud.xiaozhi_uplink_stale_dropped,
-               (unsigned long)g_river_cloud.xiaozhi_uplink_busy_count,
-               (unsigned long)g_river_cloud.xiaozhi_uplink_fail_count,
-               river_cloud_xiaozhi_listen_stop_pending() ? "yes" : "no",
-               g_river_cloud.xiaozhi_io_started ? "running" : "off");
-    RIVER_LOGI("xiaozhi asr round id=%lu active=%s pre_roll_frames=%lu packets=%lu partial=%lu final=%lu close_reason=%s",
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_id,
-               g_river_cloud.xiaozhi_asr_round_active ? "yes" : "no",
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_pre_roll_frames,
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_packets_sent,
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_partial_count,
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_final_count,
-               g_river_cloud.xiaozhi_asr_round_close_reason[0] != '\0' ?
-                   g_river_cloud.xiaozhi_asr_round_close_reason :
-                   "-");
 #else
     RIVER_LOGI("xiaozhi runtime compiled=no");
 #endif

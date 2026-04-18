@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.231
+- Moved the remaining XiaoZhi control/uplink/ASR-round diagnostic projection
+  out of `river_cloud_adapter.c` and into session-runtime-owned helpers so the
+  adapter dump path no longer formats those runtime-truth fields inline:
+  - `river_cloud_xiaozhi_dump_io_status()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the diagnostic projection for:
+  - control queue occupancy / owner state
+  - uplink queue occupancy / retry-aware ready frame truth
+  - ASR round summary state
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- The retry-aware uplink-ready frame calculation was also moved out of adapter
+  and exported from runtime so both diagnostics and adapter transport logic now
+  consume the same runtime-owned queue-count helper:
+  - `river_cloud_xiaozhi_uplink_ready_frames()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.230
 - Moved the remaining XiaoZhi playback/downlink diagnostic projection out of
   `river_cloud_adapter.c` and into a playback-runtime-owned helper so adapter

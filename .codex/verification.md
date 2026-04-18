@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.231
+Validate that XiaoZhi control/uplink/ASR-round diagnostic dumping is now owned
+by session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '343,353p' components/river_cloud/river_cloud_internal.h
+sed -n '118,245p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2238,2270p' components/river_cloud/river_cloud_adapter.c
+rg -n 'uplink_ready_frames\\(|dump_io_status\\(|control queue=|uplink queue=|asr round id=' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_uplink_ready_frames(...)`
+  - `river_cloud_xiaozhi_dump_io_status(...)`
+- adapter dump-status path no longer formats XiaoZhi control/uplink/ASR-round
+  diagnostic lines inline
+- adapter transport logic and runtime diagnostics share the same runtime-owned
+  retry-aware uplink queue-count helper
+
 ## Step 5.230
 Validate that XiaoZhi playback/downlink diagnostic dumping is now owned by
 playback runtime:

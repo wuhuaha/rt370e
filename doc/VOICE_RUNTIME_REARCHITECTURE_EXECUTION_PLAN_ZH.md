@@ -291,6 +291,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - no-ref reopen guard
     - downlink queue / rebuffer observation
   - adapter 诊断面进一步退化为 generic 壳与 control/uplink/ASR 队列统计
+- adapter `dump_status()` 里的 control/uplink/ASR round 诊断也已继续收口：
+  - 新增 `river_cloud_xiaozhi_dump_io_status(...)`
+  - session runtime 现统一负责输出：
+    - control queue
+    - uplink queue
+    - ASR round summary
+  - `river_cloud_xiaozhi_uplink_ready_frames()` 也已从 adapter 移入 runtime，
+    让 transport 路径与诊断路径共享同一条 retry-aware uplink queue 真相
+  - adapter 诊断面进一步退化为 generic 壳与 runtime helper 调用
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`
