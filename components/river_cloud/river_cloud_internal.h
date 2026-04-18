@@ -342,6 +342,7 @@ void river_cloud_xiaozhi_copy_optional_text(char *dst,
                                             size_t dst_size,
                                             const char *src);
 void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms);
+void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms);
 void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot);
 void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event);

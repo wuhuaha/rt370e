@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.230
+- Moved the remaining XiaoZhi playback/downlink diagnostic projection out of
+  `river_cloud_adapter.c` and into a playback-runtime-owned helper so adapter
+  status dumping no longer formats playback-truth fields inline:
+  - `river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Playback runtime now owns the diagnostic projection for:
+  - playback meta / segment identity / expected duration truth
+  - playback terminal / tail-wait / last-heard segment truth
+  - duplex-ready / negotiated-duplex policy visibility
+  - no-ref reopen guard state
+  - downlink queue / rebuffer observation
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Adapter `river_cloud_adapter_dump_status()` now only delegates XiaoZhi
+  session and playback diagnostic blocks to runtime before printing generic
+  control/uplink/ASR queue statistics:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.229
 - Moved the XiaoZhi session/preview/turn-semantics diagnostic dump out of
   `river_cloud_adapter.c` and into a runtime-owned helper so adapter dump code

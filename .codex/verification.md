@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.230
+Validate that XiaoZhi playback/downlink diagnostic dumping is now owned by
+playback runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '342,351p' components/river_cloud/river_cloud_internal.h
+sed -n '125,225p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2238,2310p' components/river_cloud/river_cloud_adapter.c
+rg -n 'dump_playback_status\\(|playback_meta response_id=|playback_terminal state=|duplex_policy default_on=|no_ref reopen rearm=|downlink queue=' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exports and implements:
+  - `river_cloud_xiaozhi_dump_playback_status(...)`
+- adapter dump-status path no longer formats XiaoZhi playback/downlink/duplex
+  diagnostic lines inline
+- those playback/downlink runtime-truth diagnostics are emitted from playback
+  runtime instead of adapter
+
 ## Step 5.229
 Validate that XiaoZhi session/preview/turn diagnostic dumping is now owned by
 runtime:

@@ -283,6 +283,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - endpoint soft-close
     - turn semantics
   - adapter 诊断面开始只保留 generic 壳与 playback/downlink 统计
+- adapter `dump_status()` 里的下行播放真相诊断也已继续收口：
+  - 新增 `river_cloud_xiaozhi_dump_playback_status(...)`
+  - playback runtime 现统一负责输出：
+    - playback meta / terminal / tail-wait
+    - duplex-ready / duplex-policy
+    - no-ref reopen guard
+    - downlink queue / rebuffer observation
+  - adapter 诊断面进一步退化为 generic 壳与 control/uplink/ASR 队列统计
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`
@@ -701,6 +709,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `playback_lane_engaged`
     - `duplex_fallback_reason`
   - adapter 现在只负责消费结果并记录日志
+- `river xiaozhi status` 的 playback/downlink 诊断投影也已进一步收口到
+  playback runtime：
+  - 新增 runtime-owned dump helper：
+    - `river_cloud_xiaozhi_dump_playback_status(...)`
+  - 由 playback runtime 统一导出：
+    - playback meta / terminal
+    - duplex-ready / duplex policy
+    - no-ref reopen guard
+    - downlink queue / rebuffer
+  - adapter 不再自行拼接这些下行/播放真相字段
 
 下一步焦点：
 
