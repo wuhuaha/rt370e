@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.227
+- Moved the adapter-side `accept_reason`-driven pending-text finalize gate into
+  session runtime so the XiaoZhi I/O loop no longer directly inspects
+  `pending_text_valid/finalized` before deciding whether a turn can finalize:
+  - `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now centralizes the shared pending-text finalize eligibility
+  and commit logic for both:
+  - permissive finalize path with `await_accept_reason` fallback logging
+  - accept-only finalize path used after transport polling
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi I/O service loop now only triggers the runtime helper after
+  `refresh_turn_semantics("poll")` instead of reading raw pending-text fields:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.226
 - Moved XiaoZhi STT pending-text observation out of
   `river_cloud_adapter.c` and into session runtime so adapter-side transport

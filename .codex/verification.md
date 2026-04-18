@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.227
+Validate that pending-text finalize gating after poll is now implemented in
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '424,440p' components/river_cloud/river_cloud_internal.h
+sed -n '610,626p' components/river_cloud/river_cloud_adapter.c
+sed -n '1090,1145p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'finalize_pending_text_if_turn_accepted|pending_text_ready_for_finalize|commit_pending_text_finalization|xiaozhi_pending_text_valid &&' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
+- adapter I/O poll path no longer directly inspects:
+  - `xiaozhi_pending_text_valid`
+  - `xiaozhi_pending_text_finalized`
+  for accept-driven finalize gating
+- pending-text finalize eligibility/commit logic is shared inside session
+  runtime instead of duplicated between adapter and runtime
+
 ## Step 5.226
 Validate that XiaoZhi STT pending-text observation is now implemented in
 session runtime:

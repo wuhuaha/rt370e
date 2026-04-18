@@ -1093,23 +1093,15 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
 }
 
-void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
+static bool river_cloud_xiaozhi_pending_text_ready_for_finalize(void)
 {
-    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
+    return g_river_cloud.xiaozhi_pending_text_valid &&
+           !g_river_cloud.xiaozhi_pending_text_finalized &&
+           g_river_cloud.xiaozhi_pending_text[0] != '\0';
+}
 
-    if (!g_river_cloud.xiaozhi_pending_text_valid || g_river_cloud.xiaozhi_pending_text_finalized ||
-        g_river_cloud.xiaozhi_pending_text[0] == '\0') {
-        return;
-    }
-
-    if (!river_cloud_xiaozhi_turn_accepted()) {
-        river_cloud_xiaozhi_note_semantic_fallback("await_accept_reason");
-        RIVER_LOGI("xiaozhi pending text waits for accepted turn: trigger=%s text=%s",
-                   trigger != NULL ? trigger : "-",
-                   g_river_cloud.xiaozhi_pending_text);
-        return;
-    }
-
+static void river_cloud_xiaozhi_commit_pending_text_finalization(const char *trigger)
+{
     g_river_cloud.xiaozhi_pending_text_finalized = true;
     RIVER_LOGI("xiaozhi accepted turn final text: trigger=%s accept_reason=%s turn_id=%s text=%s",
                trigger != NULL ? trigger : "-",
@@ -1126,6 +1118,39 @@ void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
                                 NULL,
                                 0,
                                 true);
+}
+
+void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trigger)
+{
+    if (!river_cloud_xiaozhi_pending_text_ready_for_finalize()) {
+        return;
+    }
+
+    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
+    if (!river_cloud_xiaozhi_turn_accepted()) {
+        return;
+    }
+
+    river_cloud_xiaozhi_commit_pending_text_finalization(trigger);
+}
+
+void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
+{
+    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
+
+    if (!river_cloud_xiaozhi_pending_text_ready_for_finalize()) {
+        return;
+    }
+
+    if (!river_cloud_xiaozhi_turn_accepted()) {
+        river_cloud_xiaozhi_note_semantic_fallback("await_accept_reason");
+        RIVER_LOGI("xiaozhi pending text waits for accepted turn: trigger=%s text=%s",
+                   trigger != NULL ? trigger : "-",
+                   g_river_cloud.xiaozhi_pending_text);
+        return;
+    }
+
+    river_cloud_xiaozhi_commit_pending_text_finalization(trigger);
 }
 
 void river_cloud_xiaozhi_emit_session_started(void)

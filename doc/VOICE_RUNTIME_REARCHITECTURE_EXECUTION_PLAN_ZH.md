@@ -259,6 +259,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `xiaozhi_pending_text_valid`
     - `xiaozhi_pending_text_finalized`
   - partial ASR 发射与存量文本去重现统一收口到 runtime helper
+- `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
+  - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
+  - adapter 的 XiaoZhi I/O poll 路径不再直接检查：
+    - `xiaozhi_pending_text_valid`
+    - `xiaozhi_pending_text_finalized`
+  - runtime 侧现统一维护：
+    - finalize eligibility
+    - final commit
+    - accept-only finalize 路径
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

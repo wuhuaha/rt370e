@@ -434,6 +434,7 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void);
 void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger);
 bool river_cloud_xiaozhi_turn_accepted(void);
 void river_cloud_xiaozhi_note_semantic_fallback(const char *reason);
+void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trigger);
 void river_cloud_xiaozhi_finalize_pending_text(const char *trigger);
 void river_cloud_xiaozhi_emit_session_started(void);
 void river_cloud_xiaozhi_emit_session_closed(void);

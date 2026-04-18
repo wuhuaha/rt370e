@@ -616,11 +616,7 @@ static void river_cloud_xiaozhi_io_task(void *arg)
                 rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_IO_ACTIVE_MS);
             }
             river_cloud_xiaozhi_refresh_turn_semantics("poll");
-            if (g_river_cloud.xiaozhi_pending_text_valid &&
-                !g_river_cloud.xiaozhi_pending_text_finalized &&
-                river_cloud_xiaozhi_turn_accepted()) {
-                river_cloud_xiaozhi_finalize_pending_text("accept_reason");
-            }
+            river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted("accept_reason");
             river_cloud_xiaozhi_process_control_queue();
             river_cloud_xiaozhi_io_service_uplink();
             river_cloud_xiaozhi_playback_check_pending_stop();
