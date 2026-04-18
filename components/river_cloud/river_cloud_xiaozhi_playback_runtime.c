@@ -1403,9 +1403,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
             recover_status =
                 river_playback_service_flush_stream_ex("xiaozhi_playback_write_failed");
             if (recover_status != RIVER_OK) {
-                RIVER_LOGW("xiaozhi playback recover fallback to stop: status=%d",
+                RIVER_LOGW("xiaozhi playback recover fallback to fresh start: status=%d",
                            (int)recover_status);
-                (void)river_playback_service_stop_stream_ex("xiaozhi_playback_write_failed");
             }
             rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
             continue;

@@ -425,6 +425,20 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
         AudioTrack_Flush(g_river_playback_service.track);
         AudioTrack_Stop(g_river_playback_service.track);
         if (AudioTrack_Start(g_river_playback_service.track) != 0) {
+            if (recovering) {
+                char stream_name[sizeof(g_river_playback_service.stats.stream_name)];
+
+                memcpy(stream_name,
+                       g_river_playback_service.stats.stream_name,
+                       sizeof(stream_name));
+                stream_name[sizeof(stream_name) - 1U] = '\0';
+                river_playback_service_close_locked(true);
+                river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
+                RIVER_LOGW("playback recover fallback: stream=%s epoch=%lu reason=restart_failed",
+                           stream_name[0] != '\0' ? stream_name : "-",
+                           (unsigned long)g_river_playback_service.stats.epoch);
+                return RIVER_ERR_BUSY;
+            }
             river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
             river_playback_service_close_locked(true);
             river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);

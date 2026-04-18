@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.195 promote playback recovering truth through runtime chain`
+  - `5.196 downgrade recover fallback away from fatal playback error`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -215,6 +215,13 @@ or top-of-tree verification target changes.
     - `river_playback_service_state_active()` now also treats
       `RIVER_PLAYBACK_RECOVERING` as active, so AEC/VAD and interaction truth
       no longer flap on recover-first restart
+  - twenty-first landed slice on that plan:
+    - recover-first restart failure no longer escalates into
+      `RIVER_PLAYBACK_ERROR` before the runtime can try a normal fresh start
+    - playback service now tears down the failed track and returns to
+      restartable `IDLE` with a dedicated `recover fallback` path
+    - XiaoZhi downlink recovery no longer forces an extra redundant local stop
+      after that fallback, reducing fatal/error noise on the rebuffer path
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

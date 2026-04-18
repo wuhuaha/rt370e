@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.196
+Validate that recover-first restart failure now falls back to a clean fresh
+start path instead of first surfacing a fatal playback error:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'recover fallback|fresh start|playback flush restart failed|RIVER_PLAYBACK_ERROR' \
+  components/river_voice/river_playback_service.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - playback service has a dedicated `recover fallback` log for restart failure
+  - XiaoZhi runtime logs `recover fallback to fresh start`
+  - the old fatal `playback flush restart failed` path remains only for
+    non-recovering flush failures
+
 ## Step 5.195
 Validate that recoverable playback rebuffer/restart is now exported as runtime
 truth and no longer depends on local active-gap inference:

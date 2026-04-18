@@ -405,6 +405,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `RIVER_PLAYBACK_RECOVERING` 现在仍计入 active playback lane
   - 同轨 recover-first 的 flush/restart 不再被 VAD/AEC/dialog runtime 当成
     一次真实停播
+- recover-first 的 fallback 归因也已继续下压：
+  - 当 `RIVER_PLAYBACK_RECOVERING` 下的同轨 restart 失败时，playback
+    service 不再先上报 fatal `RIVER_PLAYBACK_ERROR`
+  - 当前行为改为：
+    - 释放失败 track
+    - 回到可 fresh-start 的 `IDLE`
+    - 由下行 runtime 保留 `rebuffer_pending` 并等待下一次正常 start
+  - XiaoZhi downlink runtime 也不再在这条支路上额外调用一次冗余 `stop`
 
 下一步焦点：
 
@@ -412,6 +420,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   `error_recovering -> follow_up -> speaking` 的粗状态跳变里拆掉
 - 重点检查 fallback `stop/start` 失败分支是否仍暴露一个 `IDLE` 空窗，
   让 cloud/runtime 边界短暂丢失 `speaking` 事实
+- 若该 `IDLE` 空窗仍会影响 AEC/VAD 门控，则下一刀需要把“restart pending”
+  也提升成 playback service / runtime 的显式状态，而不是停在 `IDLE`
 - 让 `dialog runtime` / `session coordinator` 消费统一 playback runtime
   状态机，而不是把 recoverable stop/start 当成 fatal playback error 的旁路
 

@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.196
+- Downgraded the recover-first fallback path so a same-track restart failure no
+  longer reports a fatal playback error before the cloud runtime has a chance
+  to fresh-start the stream:
+  - when `flush/restart` fails in `RIVER_PLAYBACK_RECOVERING`, playback service
+    now releases the broken track and returns to `IDLE` without emitting
+    `RIVER_PLAYBACK_ERROR`
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- XiaoZhi downlink recovery now treats that branch as a recoverable
+  `fresh_start` fallback instead of explicitly forcing another local `stop`
+  cycle after the service already tore the failed track down:
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Result:
+  - same-track recover failure still preserves the queued audio / rebuffer
+    truth
+  - but it no longer escalates the dialog runtime into a spurious fatal
+    `playback_error` before the next normal start attempt
+
 ## Step 5.195
 - Promoted recoverable playback churn into explicit runtime truth instead of
   letting `dialog runtime` infer it indirectly from transient local active
