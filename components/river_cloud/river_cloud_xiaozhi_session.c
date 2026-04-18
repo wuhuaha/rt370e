@@ -145,6 +145,18 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
         "tts_start");
 }
 
+void river_cloud_xiaozhi_apply_tts_stop_round_policy(void)
+{
+    river_cloud_xiaozhi_finalize_pending_text("tts_stop");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
+        "tts_stop");
+    river_cloud_xiaozhi_window_touch(
+        RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS,
+        "tts_stop");
+    river_cloud_xiaozhi_arm_playback_stop(RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS);
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.204
+- Moved XiaoZhi `tts_stop` round-close policy out of `river_cloud_adapter.c`
+  and into session runtime so the adapter no longer owns the stop-path round
+  closure:
+  - exported:
+    - `river_cloud_xiaozhi_apply_tts_stop_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter TTS-stop handling now only calls the exported session-runtime helper
+  and keeps no local stop-path policy body:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.203
 - Removed the now-redundant XiaoZhi `keep_local_round_on_tts_start` predicate
   after `tts_start` keep-open / close policy had already been moved into

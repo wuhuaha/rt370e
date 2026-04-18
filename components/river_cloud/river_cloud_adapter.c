@@ -1525,14 +1525,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
             RIVER_LOGI("xiaozhi tts sentence_start: %s",
                        event->text != NULL ? event->text : "-");
         } else if (event->state != NULL && strcmp(event->state, "stop") == 0) {
-            river_cloud_xiaozhi_finalize_pending_text("tts_stop");
-            river_cloud_xiaozhi_close_local_round_for_cause(
-                RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
-                "tts_stop");
-            river_cloud_xiaozhi_window_touch(
-                RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS,
-                "tts_stop");
-            river_cloud_xiaozhi_arm_playback_stop(RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS);
+            river_cloud_xiaozhi_apply_tts_stop_round_policy();
         }
         break;
     case RIVER_XIAOZHI_EVENT_AUDIO:

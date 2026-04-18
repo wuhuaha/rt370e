@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.203 remove redundant tts_start keep-open predicate after runtime move`
+  - `5.204 move tts_stop round-close policy into xiaozhi session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -237,6 +237,9 @@ or top-of-tree verification target changes.
       after `tts_start` policy had already been centralized in session runtime
     - the session-runtime TTS-start surface is now a single exported policy
       helper
+  - twenty-fifth landed slice on that plan:
+    - XiaoZhi `tts_stop` round-close policy now lives in session runtime
+    - adapter TTS-stop handling now only calls the exported runtime helper
     - fixed-dsb AECM summary now counts:
       - `restart_pending`
       separately from generic playback-disabled/reference-idle churn

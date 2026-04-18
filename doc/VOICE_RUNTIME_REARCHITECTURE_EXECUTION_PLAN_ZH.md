@@ -333,6 +333,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     相关冗余 predicate 已删除
   - 后续若要继续瘦身 adapter，可把这条 `tts_start` 分支的剩余胶水
     再拆成更细的 session-runtime/transport 边界
+- XiaoZhi `tts_stop` 的 round-close 语义也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_tts_stop_round_policy()`
+  - 该 helper 负责：
+    - finalize pending text
+    - local round close
+    - post-TTS silence window touch
+    - playback stop arm
+  - adapter 现在只剩下调用这个 runtime helper，不再自己拼 stop-path
+    policy body
 
 下一步焦点：
 
