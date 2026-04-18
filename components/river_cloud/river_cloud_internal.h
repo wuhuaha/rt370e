@@ -385,6 +385,7 @@ void river_cloud_xiaozhi_apply_tts_stop_round_policy(void);
 void river_cloud_xiaozhi_apply_reopen_overlap_round_policy(void);
 void river_cloud_xiaozhi_apply_llm_round_policy(void);
 void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void);
+void river_cloud_xiaozhi_apply_open_and_listen_session_policy(void);
 void river_cloud_xiaozhi_apply_listen_stop_completion_round_policy(void);
 void river_cloud_xiaozhi_maybe_finalize_listen_stop(uint32_t queued_frames,
                                                     size_t accum_bytes);

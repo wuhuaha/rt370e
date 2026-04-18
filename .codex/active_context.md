@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.222 route adapter listening/window reads through session-runtime getters`
+  - `5.223 move open_and_listen success listen-state normalization to request boundary`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -175,6 +175,9 @@ or top-of-tree verification target changes.
     - adapter transport-active, config busy guard, status dump, and public
       runtime snapshot/window getters now consume those exported session facts
       instead of directly reading `xiaozhi_listening/xiaozhi_window_active`
+    - `open_and_listen` success-time `listening=true` normalization is now also
+      applied by the exported request-success session policy, so adapter
+      transport execution no longer owns that state write
   - sixteenth landed slice on that plan:
     - local round-close truth has started moving out of
       `river_cloud_adapter.c` into `river_cloud_xiaozhi_session.c`

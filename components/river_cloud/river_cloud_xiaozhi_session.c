@@ -397,8 +397,9 @@ static bool river_cloud_xiaozhi_output_speaking_active(void)
            (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") == 0);
 }
 
-static void river_cloud_xiaozhi_apply_open_and_listen_session_policy(void)
+void river_cloud_xiaozhi_apply_open_and_listen_session_policy(void)
 {
+    g_river_cloud.xiaozhi_listening = true;
     g_river_cloud.xiaozhi_listen_stop_pending = false;
 }
 
@@ -1282,7 +1283,6 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
     }
     river_xiaozhi_clear_session_update_cache();
     river_cloud_xiaozhi_copy_session_id_from_transport();
-    river_cloud_xiaozhi_apply_open_and_listen_session_policy();
 
     /*
      * A fresh follow-up listen/asr round must re-arm the conversation window.
@@ -1393,7 +1393,6 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
     }
     river_xiaozhi_clear_session_update_cache();
     river_cloud_xiaozhi_copy_session_id_from_transport();
-    river_cloud_xiaozhi_apply_open_and_listen_session_policy();
     RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
                reason,
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");

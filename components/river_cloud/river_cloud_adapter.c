@@ -285,7 +285,6 @@ static river_status_t river_cloud_xiaozhi_control_execute(
             if (status != RIVER_OK) {
                 return status;
             }
-            g_river_cloud.xiaozhi_listening = true;
         }
         return RIVER_OK;
     case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
@@ -1112,8 +1111,14 @@ void river_cloud_request_state_sync(const char *reason)
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 river_status_t river_cloud_xiaozhi_request_open_and_listen(const char *mode)
 {
-    return river_cloud_xiaozhi_control_request(RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN,
-                                               mode);
+    river_status_t status;
+
+    status = river_cloud_xiaozhi_control_request(RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN,
+                                                 mode);
+    if (status == RIVER_OK) {
+        river_cloud_xiaozhi_apply_open_and_listen_session_policy();
+    }
+    return status;
 }
 
 river_status_t river_cloud_xiaozhi_request_listen_stop(void)

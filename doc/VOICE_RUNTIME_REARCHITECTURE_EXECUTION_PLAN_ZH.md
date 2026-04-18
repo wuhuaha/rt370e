@@ -229,6 +229,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport-closed diagnostics
     - status dump
     - public runtime snapshot / conversation-window getter
+- `open_and_listen` 成功态的会话归一也已继续从 adapter 执行体下沉：
+  - 新增 exported runtime policy：
+    - `river_cloud_xiaozhi_apply_open_and_listen_session_policy()`
+  - adapter 现在只在 request wrapper 成功后调用该 policy，不再在 transport
+    executor 内直接写 `xiaozhi_listening = true`
+  - session 侧 follow-up / wake admission 调用点也不再各自手工补一次该
+    policy，避免成功态归一分散在多个入口
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

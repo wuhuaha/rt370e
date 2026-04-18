@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.223
+Validate that `open_and_listen` success-time listen-state normalization now
+lives on the session-runtime request-success boundary:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '276,292p' components/river_cloud/river_cloud_adapter.c
+sed -n '1110,1122p' components/river_cloud/river_cloud_adapter.c
+sed -n '397,406p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1276,1288p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1388,1400p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'xiaozhi_listening = true|apply_open_and_listen_session_policy|request_open_and_listen\\(' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter `CTRL_OPEN_AND_LISTEN` transport executor no longer writes
+  `xiaozhi_listening = true`
+- session runtime exports and owns:
+  - `river_cloud_xiaozhi_apply_open_and_listen_session_policy()`
+- adapter request wrapper applies that policy after successful
+  `open_and_listen`
+- session-side callers no longer manually invoke that policy after
+  `river_cloud_xiaozhi_request_open_and_listen(...)`
+
 ## Step 5.222
 Validate that adapter-side XiaoZhi `listening/window` reads now consume
 session-runtime getters:

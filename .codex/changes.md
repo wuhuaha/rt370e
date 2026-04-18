@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.223
+- Moved XiaoZhi `open_and_listen` success-time `listening=true`
+  normalization out of the adapter control executor and into the exported
+  session-runtime success policy:
+  - `river_cloud_xiaozhi_apply_open_and_listen_session_policy()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_xiaozhi_request_open_and_listen(...)` now owns the
+  request-success glue and invokes that runtime policy centrally, so callers no
+  longer need to manually re-apply it after a successful request:
+  - `components/river_cloud/river_cloud_adapter.c`
+  - `river_cloud_xiaozhi_open_session_and_listen()`
+  - `river_cloud_xiaozhi_begin_conversation_window(...)`
+
 ## Step 5.222
 - Added XiaoZhi session-runtime getters for adapter-visible `listening` and
   `conversation_window` truth so adapter now consumes exported runtime facts
