@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.229
+- Moved the XiaoZhi session/preview/turn-semantics diagnostic dump out of
+  `river_cloud_adapter.c` and into a runtime-owned helper so adapter dump code
+  no longer directly formats those runtime-truth fields:
+  - `river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the diagnostic projection for:
+  - session/window/local-close/pending-text runtime summary
+  - preview state
+  - endpoint soft-close state
+  - turn semantics / accept / barge-in / fallback text
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_adapter_dump_status()` now only delegates that
+  session-truth diagnostic block to runtime before emitting playback/downlink
+  and queue statistics:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.228
 - Moved XiaoZhi cloud-runtime snapshot filling out of
   `river_cloud_adapter_get_runtime_snapshot()` and into a runtime-owned helper

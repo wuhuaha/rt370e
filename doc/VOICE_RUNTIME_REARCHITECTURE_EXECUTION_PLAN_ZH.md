@@ -275,6 +275,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - accept / barge-in 语义
     - session / turn / input-output state 文本
   - adapter 现在只负责 generic snapshot 初始化，再委托 runtime 填充
+- adapter `dump_status()` 里的 session 真相诊断也已继续收口：
+  - 新增 `river_cloud_xiaozhi_dump_session_status(...)`
+  - runtime 现统一负责输出：
+    - session/window/local-close/pending-text
+    - preview
+    - endpoint soft-close
+    - turn semantics
+  - adapter 诊断面开始只保留 generic 壳与 playback/downlink 统计
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.229
+Validate that XiaoZhi session/preview/turn diagnostic dumping is now owned by
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '340,349p' components/river_cloud/river_cloud_internal.h
+sed -n '175,255p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2238,2310p' components/river_cloud/river_cloud_adapter.c
+rg -n 'dump_session_status\\(|preview preview_id=|turn_semantics accepted=|endpoint_soft_close pending=' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_dump_session_status(...)`
+- adapter dump-status path no longer formats XiaoZhi session/preview/turn
+  diagnostic lines inline
+- those diagnostic lines are emitted from runtime instead of adapter
+
 ## Step 5.228
 Validate that XiaoZhi runtime snapshot filling is now implemented in runtime:
 ```bash
