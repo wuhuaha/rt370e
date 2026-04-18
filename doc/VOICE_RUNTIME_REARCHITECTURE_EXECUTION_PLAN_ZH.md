@@ -430,6 +430,17 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - interrupt 请求日志
   - adapter `river_cloud_adapter_interrupt_tts_with_reason()` 现在只保留
     provider dispatch，不再本地决定 XiaoZhi interrupt 语义
+- XiaoZhi follow-up reopen round-start 语义也已收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_start_followup_round()`
+  - 它现在统一拥有：
+    - `followup_transport_unavailable` 本地窗口 abort
+    - `reopen_overlap` 本地 close 终态衔接
+    - overlap round finish 与新 round begin 的时序
+  - adapter reopen-open 路径现在只保留：
+    - pre-roll frame 数量计算
+    - pre-roll replay / current frame replay
+    - stream_open 计数与日志
 
 下一步焦点：
 

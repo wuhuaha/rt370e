@@ -1192,6 +1192,31 @@ river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
     return RIVER_OK;
 }
 
+river_status_t river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames)
+{
+    river_status_t status;
+
+    if (!river_xiaozhi_session_open()) {
+        river_cloud_xiaozhi_window_abort_local("followup_transport_unavailable");
+        river_cloud_xiaozhi_check_window_timeout();
+        return RIVER_ERR_BUSY;
+    }
+
+    if (g_river_cloud.xiaozhi_local_close_pending) {
+        river_cloud_xiaozhi_apply_reopen_overlap_round_policy();
+    }
+
+    status = river_cloud_xiaozhi_open_session_and_listen();
+    if (status != RIVER_OK) {
+        return status;
+    }
+    if (g_river_cloud.xiaozhi_asr_round_active) {
+        river_cloud_xiaozhi_round_finish("reopen_overlap");
+    }
+    river_cloud_xiaozhi_round_begin(pre_roll_frames);
+    return RIVER_OK;
+}
+
 river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
 {
     river_status_t status;

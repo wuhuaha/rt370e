@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.214
+- Moved XiaoZhi follow-up reopen round-start policy out of the adapter and into
+  session runtime so adapter no longer directly decides:
+  - `followup_transport_unavailable` window abort
+  - `reopen_overlap` local-close resolution
+  - overlap round finish + next round begin sequencing
+  - exported:
+    - `river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter reopen-open path in `river_cloud_xiaozhi_stream_push_frame(...)` now
+  only computes pre-roll size, delegates the follow-up round-start policy to
+  runtime, and keeps the remaining audio replay work local:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.213
 - Moved XiaoZhi TTS interrupt policy out of the adapter and into session
   runtime so adapter no longer decides whether session/playback state should

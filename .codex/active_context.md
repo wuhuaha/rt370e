@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.213 move xiaozhi TTS interrupt policy into session runtime`
+  - `5.214 move xiaozhi follow-up reopen round-start policy into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -282,6 +282,10 @@ or top-of-tree verification target changes.
     - XiaoZhi TTS interrupt policy now lives in session runtime
     - adapter `river_cloud_adapter_interrupt_tts_with_reason(...)` now only
       keeps provider dispatch and calls exported runtime helper
+  - thirty-fifth landed slice on that plan:
+    - XiaoZhi follow-up reopen round-start policy now lives in session runtime
+    - adapter reopen-open path now only computes pre-roll count and delegates
+      follow-up round-start policy to runtime
   - twenty-third landed slice on that plan:
     - cloud/runtime now export a first-class playback-lane engagement fact:
       - `playback_lane_engaged`

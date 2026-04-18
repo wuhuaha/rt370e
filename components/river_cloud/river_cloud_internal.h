@@ -439,6 +439,7 @@ river_status_t river_cloud_xiaozhi_request_listen_stop(void);
 river_status_t river_cloud_xiaozhi_request_abort(const char *reason);
 river_status_t river_cloud_xiaozhi_request_close_session(void);
 river_status_t river_cloud_xiaozhi_open_session_and_listen(void);
+river_status_t river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames);
 river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source);
 #endif
 

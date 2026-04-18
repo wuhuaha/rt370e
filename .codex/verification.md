@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.214
+Validate that XiaoZhi follow-up reopen round-start policy now lives in session
+runtime and adapter only delegates to the exported helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_start_followup_round|followup_transport_unavailable|reopen_overlap|river_cloud_xiaozhi_stream_push_frame' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_start_followup_round(...)`
+  - session runtime owns `followup_transport_unavailable` / `reopen_overlap`
+    round-start policy
+  - adapter reopen-open path only delegates to the exported helper before local
+    pre-roll replay
+
 ## Step 5.213
 Validate that XiaoZhi TTS interrupt policy now lives in session runtime and
 adapter only dispatches to the exported helper:
