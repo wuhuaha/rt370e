@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.196 downgrade recover fallback away from fatal playback error`
+  - `5.197 introduce restart_pending playback state`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -222,6 +222,16 @@ or top-of-tree verification target changes.
       restartable `IDLE` with a dedicated `recover fallback` path
     - XiaoZhi downlink recovery no longer forces an extra redundant local stop
       after that fallback, reducing fatal/error noise on the rebuffer path
+  - twenty-second landed slice on that plan:
+    - playback service now exposes one explicit intermediate state:
+      - `RIVER_PLAYBACK_RESTART_PENDING`
+    - this keeps the rest of the stack on the “recoverable playback still
+      engaged” path after a broken track is torn down, without pretending the
+      track is still running
+    - XiaoZhi downlink worker now explicitly fresh-starts from:
+      - `IDLE`
+      - `RESTART_PENDING`
+      so the new engaged state does not stall restart
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

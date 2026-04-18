@@ -413,6 +413,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 回到可 fresh-start 的 `IDLE`
     - 由下行 runtime 保留 `rebuffer_pending` 并等待下一次正常 start
   - XiaoZhi downlink runtime 也不再在这条支路上额外调用一次冗余 `stop`
+- playback service / downlink 之间的“engaged but needs a new start”边界也已显式化：
+  - 新增播放状态：
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+  - recover fallback 现在不再直接落到普通 `IDLE`，而是进入该中间态
+  - 该状态语义是：
+    - 当前播放链仍属于一次 recoverable playback churn
+    - 本地坏 track 已拆掉
+    - 需要下一次正常 `start_stream()` fresh-start
+  - dialog runtime / session coordinator 已把它归入统一
+    `playback_recovering` 家族
+  - XiaoZhi downlink worker 也已显式把：
+    - `IDLE`
+    - `RESTART_PENDING`
+    视为需要 fresh-start 的本地状态，而不是被新的 active 语义卡死
 
 下一步焦点：
 
@@ -422,6 +436,9 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   让 cloud/runtime 边界短暂丢失 `speaking` 事实
 - 若该 `IDLE` 空窗仍会影响 AEC/VAD 门控，则下一刀需要把“restart pending”
   也提升成 playback service / runtime 的显式状态，而不是停在 `IDLE`
+- 当前该显式状态已落地，下一刀应转向：
+  - 检查 reference-service / duplex gate 是否仍把 `restart_pending` 误当成
+    “参考链真实缺失 => 可重新开口”
 - 让 `dialog runtime` / `session coordinator` 消费统一 playback runtime
   状态机，而不是把 recoverable stop/start 当成 fatal playback error 的旁路
 

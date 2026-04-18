@@ -1,5 +1,35 @@
 # Change Log
 
+## Step 5.197
+- Introduced an explicit playback `restart_pending` state so the stack can keep
+  treating playback as engaged after a recover-first restart failure without
+  lying that the track is still running:
+  - new enum state:
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+  - `river_playback_service_state_active()` now includes it
+  - recovering restart failure now lands in `restart_pending` instead of plain
+    `idle`
+  - `start_stream()` accepts that state as a valid fresh-start source
+  - [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h)
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- Dialog/runtime state derivation now treats `restart_pending` as part of the
+  same recoverable playback family:
+  - `playback_recovering` includes:
+    - `RECOVERING`
+    - `RESTART_PENDING`
+    - cloud `rebuffer_pending`
+  - session-coordinator playback listener maps `restart_pending` to the same
+    `playback_recovering` reason family
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- XiaoZhi downlink restart policy was updated to distinguish “playback lane is
+  still engaged” from “local track really needs a new start”:
+  - downlink worker now explicitly fresh-starts on:
+    - `IDLE`
+    - `RESTART_PENDING`
+  - but still avoids unnecessary takeover while another healthy track is live
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.196
 - Downgraded the recover-first fallback path so a same-track restart failure no
   longer reports a fatal playback error before the cloud runtime has a chance

@@ -411,7 +411,8 @@ void river_session_coordinator_on_playback_state(
     (void)user_data;
 
     reason = "playback_state";
-    if (state == RIVER_PLAYBACK_RECOVERING) {
+    if (state == RIVER_PLAYBACK_RECOVERING ||
+        state == RIVER_PLAYBACK_RESTART_PENDING) {
         reason = "playback_recovering";
     } else if (state == RIVER_PLAYBACK_ERROR) {
         reason = "playback_error";

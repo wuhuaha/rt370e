@@ -1102,19 +1102,29 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
                                                                    size_t mono_bytes)
 {
     river_status_t status;
+    river_playback_state_t playback_state;
+    bool playback_needs_start;
     uint32_t buffer_frames = RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES;
     uint32_t start_frames = river_cloud_xiaozhi_downlink_start_threshold_frames();
     uint64_t now_ms;
     const bool reference_export = river_cloud_xiaozhi_playback_allows_vad_open();
     const char *mode = reference_export ? "ref" : "no_ref";
 
-    if (g_river_cloud.xiaozhi_playback_active && river_playback_service_active()) {
+    playback_state = river_playback_service_state();
+    playback_needs_start = playback_state == RIVER_PLAYBACK_IDLE ||
+                           playback_state == RIVER_PLAYBACK_RESTART_PENDING;
+
+    if (g_river_cloud.xiaozhi_playback_active &&
+        river_playback_service_active() &&
+        !playback_needs_start) {
         return RIVER_OK;
     }
     if (sample_rate == 0U || frame_duration_ms == 0U || mono_bytes == 0U) {
         return RIVER_ERR_ARG;
     }
-    if (river_playback_service_active() && !g_river_cloud.xiaozhi_playback_active) {
+    if (river_playback_service_active() &&
+        !playback_needs_start &&
+        !g_river_cloud.xiaozhi_playback_active) {
         if (river_playback_service_interrupt_stream_ex("xiaozhi_tts_takeover") != RIVER_OK &&
             river_playback_service_stop_stream_ex("xiaozhi_tts_takeover") != RIVER_OK) {
             return RIVER_ERR_BUSY;
@@ -1318,6 +1328,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
     size_t stereo_bytes;
     uint32_t queued_frames;
     uint32_t start_frames;
+    river_playback_state_t playback_state;
+    bool playback_needs_start;
     uint64_t now_ms;
 
     (void)arg;
@@ -1343,7 +1355,10 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
 
         river_cloud_xiaozhi_clear_downlink_starvation_watch();
 
-        if (!g_river_cloud.xiaozhi_playback_active || !river_playback_service_active()) {
+        playback_state = river_playback_service_state();
+        playback_needs_start = playback_state == RIVER_PLAYBACK_IDLE ||
+                               playback_state == RIVER_PLAYBACK_RESTART_PENDING;
+        if (!g_river_cloud.xiaozhi_playback_active || playback_needs_start) {
             start_frames = river_cloud_xiaozhi_downlink_start_threshold_frames();
             if (!g_river_cloud.xiaozhi_tts_stop_pending && queued_frames < start_frames) {
                 rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);

@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.197
+Validate that `restart_pending` is now a first-class playback state and that
+XiaoZhi downlink knows it must fresh-start from that state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RESTART_PENDING|restart_pending|playback_needs_start' \
+  include/river/river_playback_service.h \
+  components/river_voice/river_playback_service.c \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_session_coordinator.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - playback service exports `RIVER_PLAYBACK_RESTART_PENDING`
+  - dialog runtime and session coordinator fold it into the recovering path
+  - XiaoZhi downlink worker explicitly treats it as `playback_needs_start`
+
 ## Step 5.196
 Validate that recover-first restart failure now falls back to a clean fresh
 start path instead of first surfacing a fatal playback error:

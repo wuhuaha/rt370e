@@ -105,7 +105,8 @@ bool river_playback_service_state_active(river_playback_state_t state)
            state == RIVER_PLAYBACK_RUNNING ||
            state == RIVER_PLAYBACK_DRAINING ||
            state == RIVER_PLAYBACK_STOPPING ||
-           state == RIVER_PLAYBACK_RECOVERING;
+           state == RIVER_PLAYBACK_RECOVERING ||
+           state == RIVER_PLAYBACK_RESTART_PENDING;
 }
 
 bool river_playback_service_active(void)
@@ -433,7 +434,7 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
                        sizeof(stream_name));
                 stream_name[sizeof(stream_name) - 1U] = '\0';
                 river_playback_service_close_locked(true);
-                river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
+                river_playback_service_set_state_locked(RIVER_PLAYBACK_RESTART_PENDING);
                 RIVER_LOGW("playback recover fallback: stream=%s epoch=%lu reason=restart_failed",
                            stream_name[0] != '\0' ? stream_name : "-",
                            (unsigned long)g_river_playback_service.stats.epoch);
@@ -612,7 +613,8 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         return RIVER_ERR_BUSY;
     }
 
-    if (g_river_playback_service.stats.state != RIVER_PLAYBACK_IDLE) {
+    if (g_river_playback_service.stats.state != RIVER_PLAYBACK_IDLE &&
+        g_river_playback_service.stats.state != RIVER_PLAYBACK_RESTART_PENDING) {
         rtos_mutex_give(g_river_playback_service.lock);
         return RIVER_ERR_BUSY;
     }
@@ -895,6 +897,8 @@ const char *river_playback_service_state_name(river_playback_state_t state)
         return "stopping";
     case RIVER_PLAYBACK_RECOVERING:
         return "recovering";
+    case RIVER_PLAYBACK_RESTART_PENDING:
+        return "restart_pending";
     case RIVER_PLAYBACK_ERROR:
         return "error";
     default:
