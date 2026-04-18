@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.191
+Validate that local round close and round-finish ownership have started moving
+from the adapter into XiaoZhi session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'ROUND_CLOSE_(LOCAL_RESOLVED|SERVER_RESPONSE)|close_local_round_for_cause|round_finish\\(' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports the new round-close cause family
+  - round-finish ownership now lives in `river_cloud_xiaozhi_session.c`
+  - adapter local-close branches call `close_local_round_for_cause(...)`
+
 ## Step 5.190
 Validate that playback write recovery now prefers an in-place flush/restart
 instead of always escalating to a full stop/start cycle:

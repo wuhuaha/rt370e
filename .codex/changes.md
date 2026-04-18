@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.191
+- Continued shrinking `river_cloud_adapter.c` by moving core local-round close
+  truth into XiaoZhi session runtime:
+  - `river_cloud_xiaozhi_round_finish(...)` moved out of the adapter and is now
+    exported by:
+    - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - added a session-runtime round-close cause family:
+    - `RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED`
+    - `RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter-local close branches no longer hand-assemble those round-close
+  behaviors:
+  - `resolve_local_close(...)`
+  - `close_round_on_server_response(...)`
+  now both route through one session-runtime reducer:
+  - `river_cloud_xiaozhi_close_local_round_for_cause(...)`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- This keeps round-finish pacing truth and local-round close policy in the same
+  session-runtime module, which is the next step toward removing adapter-owned
+  `local close / endpoint close` truth entirely
+
 ## Step 5.190
 - Started the downlink/playback recovery-model rebuild by downgrading local
   `write_failed` from an unconditional stop/start cycle into a same-track

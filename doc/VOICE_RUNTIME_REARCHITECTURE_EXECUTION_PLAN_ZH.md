@@ -332,6 +332,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `session coordinator` 的 barge-in interrupt gate 已切到
   `dialog runtime` snapshot，不再回退依赖 playback service 的局部 active
   状态
+- XiaoZhi local round close 已开始从 adapter 收口到 session runtime：
+  - `local_resolved`
+  - `server_response_started`
+  - `round_finish`
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

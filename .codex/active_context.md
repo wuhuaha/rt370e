@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.190 make write-failed recovery prefer same-track restart`
+  - `5.191 move local round-close truth into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -167,6 +167,13 @@ or top-of-tree verification target changes.
       to `RIVER_PLAYBACK_RUNNING`
     - stop/start is retained only as the fallback path when same-track recover
       fails
+  - sixteenth landed slice on that plan:
+    - local round-close truth has started moving out of
+      `river_cloud_adapter.c` into `river_cloud_xiaozhi_session.c`
+    - `round_finish` pacing truth now lives with other XiaoZhi session
+      lifecycle ownership
+    - adapter `local_close_resolved / server_response_started` paths now upload
+      only typed round-close causes into session runtime
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

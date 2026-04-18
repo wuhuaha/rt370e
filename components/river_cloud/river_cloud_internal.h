@@ -113,6 +113,11 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE = 4
 } river_cloud_xiaozhi_playback_abort_cause_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED = 0,
+    RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE = 1
+} river_cloud_xiaozhi_round_close_cause_t;
+
 typedef struct {
     bool valid;
     bool started;
@@ -381,6 +386,10 @@ void river_cloud_xiaozhi_reset_playback_state(void);
 void river_cloud_xiaozhi_reset_downlink_state(void);
 void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed);
 void river_cloud_xiaozhi_check_window_timeout(void);
+void river_cloud_xiaozhi_round_finish(const char *reason);
+void river_cloud_xiaozhi_close_local_round_for_cause(
+    river_cloud_xiaozhi_round_close_cause_t cause,
+    const char *detail_reason);
 river_status_t river_cloud_xiaozhi_request_open_and_listen(const char *mode);
 river_status_t river_cloud_xiaozhi_request_listen_stop(void);
 river_status_t river_cloud_xiaozhi_request_abort(const char *reason);
