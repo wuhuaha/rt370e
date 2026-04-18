@@ -353,6 +353,8 @@ static const char *river_cloud_xiaozhi_playback_abort_cause_name(
         return "network_lost";
     case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE:
         return "bridge_close";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE:
+        return "frame_oversize";
     default:
         return "unknown";
     }
@@ -387,6 +389,8 @@ static const char *river_cloud_xiaozhi_playback_abort_stream_reason(
         return "xiaozhi_network_lost";
     case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE:
         return "xiaozhi_bridge_close";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE:
+        return "xiaozhi_downlink_frame_oversize";
     default:
         return "xiaozhi_playback_abort";
     }
@@ -1248,10 +1252,9 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
         mono_bytes = g_river_cloud.xiaozhi_downlink_ring.frame_bytes;
         stereo_bytes = mono_bytes * 2U;
         if (stereo_bytes > sizeof(g_river_cloud.xiaozhi_downlink_stereo)) {
-            river_cloud_xiaozhi_playback_finalize_cleared("frame_oversize");
-            river_cloud_xiaozhi_reset_downlink_state();
-            (void)river_playback_service_stop_stream_ex("xiaozhi_downlink_frame_oversize");
-            river_cloud_xiaozhi_reset_playback_state();
+            (void)river_cloud_xiaozhi_playback_abort_for_cause(
+                RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE,
+                NULL);
             continue;
         }
 

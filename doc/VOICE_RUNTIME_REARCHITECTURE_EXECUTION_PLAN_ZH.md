@@ -227,6 +227,9 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - reset downlink
   - stop/interrupt stream
   - reset playback
+- downlink worker 的本地致命数据面异常也已继续收口到同一条 typed
+  playback abort 入口：
+  - `frame_oversize`
 - playback runtime 已继续吸收剩余 playback helper 所属权：
   - `clear_playback_meta_state`
   - `cancel_playback_stop`

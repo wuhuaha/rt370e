@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.187
+Validate that fatal downlink oversize now goes through the same typed playback
+abort reducer instead of a manual clear/reset/stop sequence:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'FRAME_OVERSIZE|xiaozhi_downlink_frame_oversize|playback_abort_for_cause' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - `frame_oversize` has its own typed abort cause
+  - the downlink worker routes that fatal path through
+    `playback_abort_for_cause(...)`
+  - the playback-service stop reason remains `xiaozhi_downlink_frame_oversize`
+
 ## Step 5.186
 Validate that adapter terminal-close branches now route through a single
 runtime-owned typed cause reducer instead of assembling local abort triples:

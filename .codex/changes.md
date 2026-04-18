@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.187
+- Continued unifying XiaoZhi playback terminal close ownership by moving the
+  remaining downlink data-plane fatal path into the same runtime-owned typed
+  abort family:
+  - added:
+    - `RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- `frame_oversize` in the downlink worker no longer hand-assembles:
+  - local clear
+  - downlink reset
+  - playback stop
+  - playback reset
+  and now routes through:
+  - `river_cloud_xiaozhi_playback_abort_for_cause(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- This removes the last known playback-runtime local terminal special case in
+  the data plane, so both:
+  - transport-originated aborts
+  - local fatal downlink faults
+  now share one typed terminal-close reducer and one normalized runtime log
+
 ## Step 5.186
 - Continued shrinking XiaoZhi terminal-close ambiguity by moving the adapter’s
   terminal-abort parameter assembly behind a runtime-owned typed cause reducer:

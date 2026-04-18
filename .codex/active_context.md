@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.186 route terminal close causes through playback runtime`
+  - `5.187 fold frame_oversize into playback abort cause family`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -129,6 +129,20 @@ or top-of-tree verification target changes.
       - stream reason
       - interrupt mode
       - entry playback/work state
+  - twelfth landed slice on that plan:
+    - the remaining local playback data-plane fatal path
+      `frame_oversize` now also routes through the same playback-runtime typed
+      abort reducer
+    - downlink worker no longer hand-assembles:
+      - finalize_cleared
+      - reset_downlink
+      - stop_stream
+      - reset_playback
+      for that fatal path
+    - this leaves the playback runtime with one common terminal-close entry for
+      both:
+      - transport-side aborts
+      - local fatal downlink faults
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
