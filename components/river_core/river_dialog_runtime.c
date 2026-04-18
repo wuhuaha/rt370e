@@ -108,9 +108,50 @@ const char *river_dialog_output_lane_name(river_dialog_output_lane_t state)
     }
 }
 
+static bool river_dialog_runtime_playback_terminal_closed_locked(void)
+{
+    return g_river_dialog_runtime.snapshot.playback_terminal_state[0] != '\0';
+}
+
+static bool river_dialog_runtime_compute_playback_active_locked(bool cloud_playback_active)
+{
+    bool service_active =
+        river_playback_service_state_active(g_river_dialog_runtime.snapshot.playback_state);
+
+    if (river_dialog_runtime_playback_terminal_closed_locked()) {
+        return false;
+    }
+
+    if (!service_active && !cloud_playback_active &&
+        g_river_dialog_runtime.snapshot.playback_terminal_waiting) {
+        return false;
+    }
+
+    return service_active || cloud_playback_active;
+}
+
+static bool river_dialog_runtime_output_speaking_effective_locked(void)
+{
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+
+    if (snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING) {
+        return false;
+    }
+    if (river_dialog_runtime_playback_terminal_closed_locked()) {
+        return false;
+    }
+    if (snapshot->playback_terminal_waiting && !snapshot->playback_active) {
+        return false;
+    }
+
+    return true;
+}
+
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+    bool speaking_output = river_dialog_runtime_output_speaking_effective_locked();
+    bool playback_engaged = snapshot->playback_active || speaking_output;
 
     if (!snapshot->boot_ready) {
         return RIVER_INTERACTION_BOOTING;
@@ -118,7 +159,7 @@ static river_interaction_state_t river_dialog_runtime_compute_interaction_state_
     if (snapshot->error_recovering) {
         return RIVER_INTERACTION_ERROR_RECOVERING;
     }
-    if (snapshot->playback_active || snapshot->output_lane == RIVER_DIALOG_OUTPUT_LANE_SPEAKING) {
+    if (playback_engaged) {
         if (snapshot->asr_session_active || snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
             return RIVER_INTERACTION_BARGE_IN_LISTENING;
         }
@@ -211,8 +252,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     g_river_dialog_runtime.snapshot.output_lane =
         river_dialog_runtime_parse_output_lane(snapshot->output_state);
     g_river_dialog_runtime.snapshot.playback_active =
-        river_playback_service_state_active(g_river_dialog_runtime.snapshot.playback_state) ||
-        snapshot->playback_active;
+        river_dialog_runtime_compute_playback_active_locked(snapshot->playback_active);
 }
 
 river_status_t river_dialog_runtime_init(void)
@@ -302,7 +342,8 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
 
     g_river_dialog_runtime.snapshot.playback_state = state;
     g_river_dialog_runtime.snapshot.playback_active =
-        river_playback_service_state_active(state);
+        river_dialog_runtime_compute_playback_active_locked(
+            g_river_dialog_runtime.snapshot.playback_active);
     if (state != RIVER_PLAYBACK_ERROR) {
         g_river_dialog_runtime.snapshot.error_recovering = false;
     }

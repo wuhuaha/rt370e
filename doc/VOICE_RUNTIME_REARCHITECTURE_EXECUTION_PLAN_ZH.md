@@ -325,6 +325,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
   terminal truth，而不是继续依赖 `tts_stop_pending + playback_active`
   组合猜测终态
+- `dialog runtime` 已开始显式消费：
+  - `playback_terminal_state`
+  - `playback_terminal_waiting`
+  来抑制 stale `output_lane=speaking` 对交互态的误导
 - 继续把 XiaoZhi session / turn transport 语义从 adapter 中拆分出来
 - 让 adapter 进一步退化为 provider 生命周期与高层策略装配层
 

@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.188
+Validate that `dialog runtime` now derives speaking/playback interaction from
+terminal-aware playback truth instead of directly trusting late speaking lane
+state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_terminal_closed|compute_playback_active_locked|output_speaking_effective|playback_terminal_waiting' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - dialog runtime has terminal-aware playback/effective-speaking helpers
+  - playback activity is re-derived through the same reducer on cloud sync and
+    playback-state ingress
+  - speaking interaction no longer keys only on raw `output_lane=speaking`
+
 ## Step 5.187
 Validate that fatal downlink oversize now goes through the same typed playback
 abort reducer instead of a manual clear/reset/stop sequence:

@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.188
+- Hardened the core-owned `dialog runtime` so interaction derivation now
+  consumes playback terminal truth explicitly instead of still treating
+  `output_lane=speaking` as sufficient truth after local playback already
+  reached a terminal outcome:
+  - added terminal-aware runtime helpers for:
+    - terminal-closed playback
+    - effective playback engagement
+    - effective speaking output
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `interaction_state` derivation now suppresses stale speaking/playback
+  interpretations when:
+  - `playback_terminal_state` is already terminal
+  - `playback_terminal_waiting` is the only remaining local fact after audio
+    has already drained
+- The runtime also now re-computes effective playback activity through the same
+  terminal-aware reducer on both:
+  - cloud snapshot sync
+  - playback-service state ingress
+  so local terminal truth can dominate over transient late lane/service facts
+
 ## Step 5.187
 - Continued unifying XiaoZhi playback terminal close ownership by moving the
   remaining downlink data-plane fatal path into the same runtime-owned typed

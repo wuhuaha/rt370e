@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.187 fold frame_oversize into playback abort cause family`
+  - `5.188 make dialog runtime consume playback terminal truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -143,6 +143,16 @@ or top-of-tree verification target changes.
       both:
       - transport-side aborts
       - local fatal downlink faults
+  - thirteenth landed slice on that plan:
+    - `dialog runtime` no longer treats late `output_lane=speaking` as
+      sufficient truth after local playback has already entered a terminal
+      outcome
+    - local terminal close and terminal-tail wait are now consumed directly in
+      the interaction-state derivation path
+    - playback-active truth is now re-derived through the same terminal-aware
+      reducer on both:
+      - cloud snapshot sync
+      - playback-service ingress
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events
