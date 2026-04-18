@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.223 move open_and_listen success listen-state normalization to request boundary`
+  - `5.224 route adapter local-close/listen-stop diagnostics through session-runtime getters`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -178,6 +178,12 @@ or top-of-tree verification target changes.
     - `open_and_listen` success-time `listening=true` normalization is now also
       applied by the exported request-success session policy, so adapter
       transport execution no longer owns that state write
+    - adapter dump/uplink diagnostics now also consume exported runtime facts
+      for:
+      - `local_close_pending`
+      - `local_close_remaining_ms`
+      - `listen_stop_pending`
+      instead of directly reading those session fields
   - sixteenth landed slice on that plan:
     - local round-close truth has started moving out of
       `river_cloud_adapter.c` into `river_cloud_xiaozhi_session.c`

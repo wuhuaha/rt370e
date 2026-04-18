@@ -98,6 +98,26 @@ uint64_t river_cloud_xiaozhi_conversation_window_remaining_ms(uint64_t now_ms)
     return g_river_cloud.xiaozhi_window_deadline_ms - now_ms;
 }
 
+bool river_cloud_xiaozhi_local_close_pending(void)
+{
+    return g_river_cloud.xiaozhi_local_close_pending;
+}
+
+uint64_t river_cloud_xiaozhi_local_close_remaining_ms(uint64_t now_ms)
+{
+    if (!g_river_cloud.xiaozhi_local_close_pending ||
+        g_river_cloud.xiaozhi_local_close_deadline_ms <= now_ms) {
+        return 0U;
+    }
+
+    return g_river_cloud.xiaozhi_local_close_deadline_ms - now_ms;
+}
+
+bool river_cloud_xiaozhi_listen_stop_pending(void)
+{
+    return g_river_cloud.xiaozhi_listen_stop_pending;
+}
+
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     river_voice_duplex_ready_eval_t eval;

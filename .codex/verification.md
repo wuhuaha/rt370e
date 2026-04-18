@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.224
+Validate that adapter-side XiaoZhi `local_close/listen_stop` diagnostics now
+consume session-runtime getters:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '96,120p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '372,380p' components/river_cloud/river_cloud_internal.h
+sed -n '2328,2493p' components/river_cloud/river_cloud_adapter.c
+rg -n 'river_cloud_xiaozhi_local_close_pending|river_cloud_xiaozhi_local_close_remaining_ms|river_cloud_xiaozhi_listen_stop_pending|g_river_cloud\\.xiaozhi_(local_close_pending|listen_stop_pending|local_close_deadline_ms)' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports:
+  - `river_cloud_xiaozhi_local_close_pending()`
+  - `river_cloud_xiaozhi_local_close_remaining_ms(...)`
+  - `river_cloud_xiaozhi_listen_stop_pending()`
+- adapter dump/status diagnostics use those getters
+- adapter no longer directly reads:
+  - `xiaozhi_local_close_pending`
+  - `xiaozhi_local_close_deadline_ms`
+  - `xiaozhi_listen_stop_pending`
+  for those diagnostic surfaces
+
 ## Step 5.223
 Validate that `open_and_listen` success-time listen-state normalization now
 lives on the session-runtime request-success boundary:

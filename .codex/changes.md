@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.224
+- Added XiaoZhi session-runtime getters for the remaining adapter-visible
+  `local_close_pending` / `listen_stop_pending` diagnostic facts:
+  - `river_cloud_xiaozhi_local_close_pending()`
+  - `river_cloud_xiaozhi_local_close_remaining_ms(...)`
+  - `river_cloud_xiaozhi_listen_stop_pending()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter status/uplink diagnostics now consume those getters instead of
+  directly reading the raw XiaoZhi session fields:
+  - close-defer remaining time in `river_cloud_adapter_dump_status()`
+  - runtime `close_pending` diagnostic text
+  - uplink `stop_pending` diagnostic text
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.223
 - Moved XiaoZhi `open_and_listen` success-time `listening=true`
   normalization out of the adapter control executor and into the exported

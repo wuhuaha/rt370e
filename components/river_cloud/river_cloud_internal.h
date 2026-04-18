@@ -372,6 +372,9 @@ bool river_cloud_xiaozhi_idle_requires_wakeword(void);
 bool river_cloud_xiaozhi_listening_active(void);
 bool river_cloud_xiaozhi_conversation_window_active(void);
 uint64_t river_cloud_xiaozhi_conversation_window_remaining_ms(uint64_t now_ms);
+bool river_cloud_xiaozhi_local_close_pending(void);
+uint64_t river_cloud_xiaozhi_local_close_remaining_ms(uint64_t now_ms);
+bool river_cloud_xiaozhi_listen_stop_pending(void);
 bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void);
 void river_cloud_xiaozhi_get_duplex_ready_eval(river_voice_duplex_ready_eval_t *eval);
 const char *river_cloud_xiaozhi_duplex_fallback_reason(

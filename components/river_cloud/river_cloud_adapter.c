@@ -2331,10 +2331,7 @@ void river_cloud_adapter_dump_status(void)
         uint64_t remaining_ms =
             river_cloud_xiaozhi_conversation_window_remaining_ms(now_ms);
         uint64_t local_close_left_ms =
-            (g_river_cloud.xiaozhi_local_close_pending &&
-             g_river_cloud.xiaozhi_local_close_deadline_ms > now_ms) ?
-                (g_river_cloud.xiaozhi_local_close_deadline_ms - now_ms) :
-                0U;
+            river_cloud_xiaozhi_local_close_remaining_ms(now_ms);
         uint64_t endpoint_soft_close_left_ms =
             (g_river_cloud.xiaozhi_endpoint_soft_close_pending &&
              g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms > now_ms) ?
@@ -2353,7 +2350,7 @@ void river_cloud_adapter_dump_status(void)
                    river_cloud_xiaozhi_listening_active() ? "yes" : "no",
                    g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_tts_stop_pending ? "yes" : "no",
-                   g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no",
+                   river_cloud_xiaozhi_local_close_pending() ? "yes" : "no",
                    river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",
                    (unsigned long)remaining_ms,
                    (unsigned long)local_close_left_ms,
@@ -2489,7 +2486,7 @@ void river_cloud_adapter_dump_status(void)
                (unsigned long)g_river_cloud.xiaozhi_uplink_stale_dropped,
                (unsigned long)g_river_cloud.xiaozhi_uplink_busy_count,
                (unsigned long)g_river_cloud.xiaozhi_uplink_fail_count,
-               g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
+               river_cloud_xiaozhi_listen_stop_pending() ? "yes" : "no",
                g_river_cloud.xiaozhi_io_started ? "running" : "off");
     RIVER_LOGI("xiaozhi asr round id=%lu active=%s pre_roll_frames=%lu packets=%lu partial=%lu final=%lu close_reason=%s",
                (unsigned long)g_river_cloud.xiaozhi_asr_round_id,

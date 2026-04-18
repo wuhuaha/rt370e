@@ -236,6 +236,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     executor 内直接写 `xiaozhi_listening = true`
   - session 侧 follow-up / wake admission 调用点也不再各自手工补一次该
     policy，避免成功态归一分散在多个入口
+- adapter 侧剩余的 session 诊断读取也已继续收口：
+  - 新增 exported getter：
+    - `river_cloud_xiaozhi_local_close_pending()`
+    - `river_cloud_xiaozhi_local_close_remaining_ms(...)`
+    - `river_cloud_xiaozhi_listen_stop_pending()`
+  - `river_cloud_adapter_dump_status()` 不再直接读：
+    - `xiaozhi_local_close_pending`
+    - `xiaozhi_local_close_deadline_ms`
+    - `xiaozhi_listen_stop_pending`
+    这些状态，而是消费 runtime 导出的只读事实
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`
