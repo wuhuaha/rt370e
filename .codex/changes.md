@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.221
+- Moved the XiaoZhi uplink send-ready gate into session runtime so runtime now
+  owns the canonical predicate for whether transport can actually send uplink
+  audio:
+  - `river_cloud_xiaozhi_uplink_send_ready()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter control/uplink paths now delegate to that helper instead of repeating
+  `river_xiaozhi_session_open() && g_river_cloud.xiaozhi_listening`:
+  - `RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP`
+  - `river_cloud_xiaozhi_io_service_uplink()`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.220
 - Moved XiaoZhi uplink keepalive gating out of adapter and into session runtime
   so runtime now owns the stop-intent fact that keeps the xiaozhi I/O loop

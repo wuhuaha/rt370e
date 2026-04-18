@@ -485,6 +485,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - queued uplink drain 后因 stop-intent 维持 I/O 活跃的 keepalive gate
   - adapter `uplink_active()` 现在只保留：
     - queued uplink frame 数采样
+- XiaoZhi uplink send-ready gate 也已收口到 session runtime：
+  - runtime helper 现在统一拥有：
+    - transport session open + listening 的 uplink send-ready predicate
+  - adapter control/uplink 路径现在统一调用：
+    - `river_cloud_xiaozhi_uplink_send_ready()`
 
 下一步焦点：
 

@@ -220,6 +220,11 @@ bool river_cloud_xiaozhi_uplink_keepalive_needed(uint32_t queued_frames)
     return queued_frames > 0U || g_river_cloud.xiaozhi_listen_stop_pending;
 }
 
+bool river_cloud_xiaozhi_uplink_send_ready(void)
+{
+    return river_xiaozhi_session_open() && g_river_cloud.xiaozhi_listening;
+}
+
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
 {
     river_cloud_xiaozhi_finalize_pending_text("transport_closed");

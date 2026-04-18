@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.221
+Validate that XiaoZhi uplink send-ready gating now lives in session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '290,296p' components/river_cloud/river_cloud_adapter.c
+sed -n '580,610p' components/river_cloud/river_cloud_adapter.c
+sed -n '218,226p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'uplink_send_ready|river_xiaozhi_session_open\\(\\) && g_river_cloud.xiaozhi_listening' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter control/uplink paths call:
+  - `river_cloud_xiaozhi_uplink_send_ready()`
+- session runtime owns that predicate
+
 ## Step 5.220
 Validate that XiaoZhi uplink keepalive gating now lives in session runtime:
 ```bash
