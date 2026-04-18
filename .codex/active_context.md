@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.199 export playback-lane engagement truth into cloud/core runtime`
+  - `5.200 move no-ref reopen/open-hold helpers into xiaozhi session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -240,6 +240,14 @@ or top-of-tree verification target changes.
     - adapter transport/capture gating and dialog runtime playback derivation
       now consume that exported lane truth instead of reassembling engagement
       from raw local flags
+  - twenty-fourth landed slice on that plan:
+    - XiaoZhi `open_hold_frames_required` and `no_ref_reopen_ready` helper
+      ownership has moved out of `river_cloud_adapter.c` into session runtime
+    - the session helper now directly consumes `playback_lane_engaged`, so
+      `no_ref` reopen no longer depends on adapter-local call ordering to avoid
+      reopening during an occupied playback lane
+    - adapter capture-open flow now only calls exported helpers for those two
+      policy decisions
     - playback service now tears down the failed track and returns to
       restartable `IDLE` with a dedicated `recover fallback` path
     - XiaoZhi downlink recovery no longer forces an extra redundant local stop

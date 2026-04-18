@@ -91,6 +91,62 @@ bool river_cloud_xiaozhi_playback_allows_vad_open(void)
     return fallback_reason == NULL;
 }
 
+uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
+{
+    if (!g_river_cloud.xiaozhi_window_active ||
+        river_cloud_xiaozhi_playback_allows_vad_open()) {
+        return RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES;
+    }
+
+    return RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES;
+}
+
+bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech)
+{
+    uint64_t now_ms;
+    bool guard_active;
+
+    if (!g_river_cloud.xiaozhi_window_active ||
+        river_cloud_xiaozhi_playback_allows_vad_open()) {
+        return true;
+    }
+
+    if (river_cloud_xiaozhi_playback_lane_engaged()) {
+        return false;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    guard_active =
+        g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms != 0U &&
+        now_ms < g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms;
+
+    if (g_river_cloud.xiaozhi_no_ref_reopen_rearm) {
+        if (is_speech) {
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
+        } else if (g_river_cloud.xiaozhi_no_ref_reopen_silence_frames <
+                   RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES) {
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames++;
+        }
+
+        if (!guard_active &&
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames >=
+                RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES) {
+            g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
+            g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
+            g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+            RIVER_LOGI("xiaozhi no_ref reopen rearmed after silence: frames=%u",
+                       (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES);
+            return true;
+        }
+    }
+
+    if (!guard_active) {
+        g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+    }
+
+    return !guard_active && !g_river_cloud.xiaozhi_no_ref_reopen_rearm;
+}
+
 bool river_cloud_xiaozhi_keep_local_round_on_tts_start(void)
 {
     return river_cloud_xiaozhi_playback_allows_vad_open();

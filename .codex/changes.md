@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.200
+- Moved XiaoZhi `open_hold_frames_required` / `no_ref_reopen_ready` helper
+  ownership out of `river_cloud_adapter.c` and into session runtime so adapter
+  no longer directly carries that reopen-guard policy:
+  - exported:
+    - `river_cloud_xiaozhi_open_hold_frames_required()`
+    - `river_cloud_xiaozhi_no_ref_reopen_ready()`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- The session-runtime reopen helper now explicitly refuses `no_ref` reopen while
+  the playback lane is still engaged, so the helper itself understands the new
+  playback-runtime truth instead of relying on adapter call ordering alone:
+  - consumes:
+    - `river_cloud_xiaozhi_playback_lane_engaged()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter capture-open flow now only consumes exported helpers for those two
+  decisions and no longer defines their bodies locally:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.199
 - Added an explicit cloud/runtime `playback_lane_engaged` truth so the stack no
   longer has to reconstruct “playback still occupies the turn” by locally

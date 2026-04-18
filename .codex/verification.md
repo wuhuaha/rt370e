@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.200
+Validate that XiaoZhi `no_ref` reopen / open-hold policy helpers now live in
+session runtime and that adapter only consumes the exported helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'open_hold_frames_required|no_ref_reopen_ready|playback_lane_engaged' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports the two helper bodies
+  - adapter keeps only the call sites
+  - `no_ref_reopen_ready()` now consumes `playback_lane_engaged`
+
 ## Step 5.199
 Validate that cloud/runtime now exports one explicit `playback_lane_engaged`
 truth and that adapter/core policy consume it instead of reconstructing
