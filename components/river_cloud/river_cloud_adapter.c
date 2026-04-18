@@ -1847,14 +1847,7 @@ void river_cloud_adapter_notify_network_lost(void)
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        if (river_cloud_xiaozhi_playback_has_work()) {
-            (void)river_cloud_xiaozhi_playback_abort_for_cause(
-                RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST,
-                NULL);
-        }
-
-        river_cloud_xiaozhi_round_finish("network_lost");
-        river_cloud_xiaozhi_reset_transport_state(false);
+        river_cloud_xiaozhi_apply_network_lost_terminal_policy();
         (void)river_cloud_xiaozhi_request_close_session();
         river_cloud_request_state_sync("network_lost");
         return;

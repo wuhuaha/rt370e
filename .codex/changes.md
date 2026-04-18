@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.209
+- Moved XiaoZhi `network_lost` terminal cleanup policy out of the adapter and
+  into session runtime so adapter no longer assembles the abort/round-finish/
+  reset sequence:
+  - exported:
+    - `river_cloud_xiaozhi_apply_network_lost_terminal_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_adapter_notify_network_lost()` now only calls the
+  exported runtime helper and keeps the remaining transport tail actions:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.208
 - Moved XiaoZhi `transport_closed` terminal cleanup policy out of the adapter
   and into session runtime so adapter no longer assembles the close/abort/reset

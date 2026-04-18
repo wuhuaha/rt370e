@@ -197,6 +197,17 @@ void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
     river_cloud_xiaozhi_check_window_timeout();
 }
 
+void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
+{
+    if (river_cloud_xiaozhi_playback_has_work()) {
+        (void)river_cloud_xiaozhi_playback_abort_for_cause(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST,
+            NULL);
+    }
+    river_cloud_xiaozhi_round_finish("network_lost");
+    river_cloud_xiaozhi_reset_transport_state(false);
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

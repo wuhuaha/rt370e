@@ -376,6 +376,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport state reset
   - adapter `RIVER_XIAOZHI_EVENT_SESSION_CLOSED` 分支现在只剩下调用这个
     runtime helper
+- XiaoZhi `network_lost` terminal cleanup 语义也已继续收口到
+  session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_network_lost_terminal_policy()`
+  - 该 helper 负责：
+    - playback abort
+    - round finish
+    - transport state reset
+  - adapter `river_cloud_adapter_notify_network_lost()` 现在只剩下调用这个
+    runtime helper，并保留 close-session/state-sync 的 transport 尾部动作
 
 下一步焦点：
 
