@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.224 route adapter local-close/listen-stop diagnostics through session-runtime getters`
+  - `5.225 move preview observation helper ownership into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -184,6 +184,10 @@ or top-of-tree verification target changes.
       - `local_close_remaining_ms`
       - `listen_stop_pending`
       instead of directly reading those session fields
+    - preview observation helper ownership is now also session-runtime-owned:
+      - `river_cloud_xiaozhi_note_preview_observation(...)`
+      - `river_cloud_xiaozhi_copy_optional_text(...)`
+      so adapter no longer implements preview-state mutation helpers locally
   - sixteenth landed slice on that plan:
     - local round-close truth has started moving out of
       `river_cloud_adapter.c` into `river_cloud_xiaozhi_session.c`

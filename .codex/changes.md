@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.225
+- Moved XiaoZhi preview-observation helper ownership out of
+  `river_cloud_adapter.c` and into session runtime so transport event handling
+  now delegates preview-state normalization to runtime-owned helpers:
+  - `river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Moved the shared XiaoZhi text-copy helper implementation together with that
+  preview ownership so session/runtime code no longer depends on an adapter-side
+  implementation:
+  - `river_cloud_xiaozhi_copy_optional_text(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `input_speech_start / input_preview / input_endpoint` handling now
+  only invokes the exported preview helper instead of embedding preview-state
+  mutation locally:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.224
 - Added XiaoZhi session-runtime getters for the remaining adapter-visible
   `local_close_pending` / `listen_stop_pending` diagnostic facts:

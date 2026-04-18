@@ -246,6 +246,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `xiaozhi_local_close_deadline_ms`
     - `xiaozhi_listen_stop_pending`
     这些状态，而是消费 runtime 导出的只读事实
+- preview observation 的 helper 所有权也已继续从 adapter 移走：
+  - `river_cloud_xiaozhi_note_preview_observation(...)`
+  - `river_cloud_xiaozhi_copy_optional_text(...)`
+  现都由 session runtime 提供实现
+  - adapter 的 `input_speech_start / input_preview / input_endpoint` 分支
+    继续只负责 transport event 分发，不再持有 preview-state helper body
 - playback runtime 已继续吸收下行播放终态语义：
   - `playback_output_active`
   - `playback_has_work`

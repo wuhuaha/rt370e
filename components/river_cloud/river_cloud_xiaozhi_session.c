@@ -118,6 +118,75 @@ bool river_cloud_xiaozhi_listen_stop_pending(void)
     return g_river_cloud.xiaozhi_listen_stop_pending;
 }
 
+void river_cloud_xiaozhi_copy_optional_text(char *dst,
+                                            size_t dst_size,
+                                            const char *src)
+{
+    if (dst == NULL || dst_size == 0U) {
+        return;
+    }
+    if (src == NULL || src[0] == '\0') {
+        dst[0] = '\0';
+        return;
+    }
+
+    snprintf(dst, dst_size, "%s", src);
+}
+
+void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    if (event->preview_id != NULL && event->preview_id[0] != '\0' &&
+        strcmp(g_river_cloud.xiaozhi_preview_id, event->preview_id) != 0) {
+        river_cloud_xiaozhi_clear_preview_state();
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_id,
+                                           sizeof(g_river_cloud.xiaozhi_preview_id),
+                                           event->preview_id);
+    if (event->text != NULL && event->text[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_text,
+                                               sizeof(g_river_cloud.xiaozhi_preview_text),
+                                               event->text);
+    }
+    if (event->stable_prefix != NULL && event->stable_prefix[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_stable_prefix,
+                                               sizeof(g_river_cloud.xiaozhi_preview_stable_prefix),
+                                               event->stable_prefix);
+    }
+    if (event->source != NULL && event->source[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_preview_source,
+                                               sizeof(g_river_cloud.xiaozhi_preview_source),
+                                               event->source);
+    }
+    if (event->reason != NULL && event->reason[0] != '\0') {
+        river_cloud_xiaozhi_copy_optional_text(
+            g_river_cloud.xiaozhi_preview_endpoint_reason,
+            sizeof(g_river_cloud.xiaozhi_preview_endpoint_reason),
+            event->reason);
+    }
+    if (event->audio_offset_ms != 0U) {
+        g_river_cloud.xiaozhi_preview_audio_offset_ms = event->audio_offset_ms;
+    }
+
+    switch (event->type) {
+    case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
+        g_river_cloud.xiaozhi_preview_speech_started = true;
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
+        g_river_cloud.xiaozhi_preview_final = event->is_final;
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
+        g_river_cloud.xiaozhi_preview_endpoint_candidate = event->candidate;
+        break;
+    default:
+        break;
+    }
+}
+
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     river_voice_duplex_ready_eval_t eval;
