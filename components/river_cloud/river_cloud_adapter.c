@@ -1380,16 +1380,7 @@ static void river_cloud_xiaozhi_finalize_listen_stop_if_ready(void)
             return;
         }
     }
-    g_river_cloud.xiaozhi_listen_stop_pending = false;
-    if (g_river_cloud.xiaozhi_local_close_pending) {
-        g_river_cloud.xiaozhi_listening = false;
-        river_cloud_xiaozhi_apply_post_stop_result_round_policy();
-        return;
-    }
-
-    river_cloud_xiaozhi_emit_session_closed();
-    river_cloud_xiaozhi_round_finish(NULL);
-    river_runtime_stats_snapshot("asr_stream_finish");
+    river_cloud_xiaozhi_apply_listen_stop_completion_round_policy();
 }
 
 static void river_cloud_xiaozhi_complete_active_stream_finish(

@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.211
+- Moved XiaoZhi `listen_stop` completion round-close policy out of the adapter
+  and into session runtime so adapter no longer decides the post-drain
+  `session_closed / round_finish` sequence:
+  - exported:
+    - `river_cloud_xiaozhi_apply_listen_stop_completion_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_finalize_listen_stop_if_ready()` now only keeps
+  the uplink-drained / `listen_stop` transport gating and calls the exported
+  runtime helper for the completion round policy:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.210
 - Moved XiaoZhi `bridge_close` terminal cleanup policy out of the adapter and
   into session runtime so adapter no longer assembles the playback-abort /

@@ -399,11 +399,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - close-session
     - Opus codec close
     这些桥接/transport 尾部动作
+- XiaoZhi `listen_stop` completion round-close 语义也已继续收口到
+  session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_listen_stop_completion_round_policy()`
+  - 该 helper 负责：
+    - clear `listen_stop_pending`
+    - local-close pending 时转交 `post_stop_result`
+    - 否则统一完成 `session_closed / round_finish`
+  - adapter `river_cloud_xiaozhi_finalize_listen_stop_if_ready()` 现在只剩下：
+    - uplink drained 判定
+    - `listen_stop` transport request
+    这些 transport 尾部动作
 
 下一步焦点：
 
-- 继续把 remaining local-clear / follow-up close / close-session 触发路径的
-  terminal ownership 收口进同一个 runtime-owned cause family
+- 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
+  ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
   terminal truth，而不是继续依赖 `tts_stop_pending + playback_active`
   组合猜测终态

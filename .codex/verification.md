@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.211
+Validate that XiaoZhi `listen_stop` completion round-close policy now lives in
+session runtime and adapter only consumes the exported helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'apply_listen_stop_completion_round_policy|finalize_listen_stop_if_ready|post_stop_result_round_policy' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_apply_listen_stop_completion_round_policy(...)`
+  - adapter `river_cloud_xiaozhi_finalize_listen_stop_if_ready()` path now only calls the exported helper for completion round close
+
 ## Step 5.210
 Validate that XiaoZhi `bridge_close` terminal cleanup policy now lives in
 session runtime and adapter only consumes the exported helper:
