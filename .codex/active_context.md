@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.189 remove session playback-state bypass from barge-in gating`
+  - `5.190 make write-failed recovery prefer same-track restart`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -159,6 +159,14 @@ or top-of-tree verification target changes.
     - barge-in text confirmation now consumes one runtime-owned predicate:
       - playback is locally interruptible
       - playback has not already entered a terminal state
+  - fifteenth landed slice on that plan:
+    - XiaoZhi downlink write-fail recovery now tries same-track
+      `flush/restart` first instead of immediately tearing down the whole
+      playback stream
+    - playback service can now recover from `RIVER_PLAYBACK_RECOVERING` back
+      to `RIVER_PLAYBACK_RUNNING`
+    - stop/start is retained only as the fallback path when same-track recover
+      fails
   - aligned the device-side duplex roadmap to the 2026-04-16
     `/root/agent-server` protocol/architecture docs:
     - preview-aware input events

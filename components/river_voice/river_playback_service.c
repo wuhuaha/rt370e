@@ -405,11 +405,14 @@ static river_status_t river_playback_service_stop_locked(bool interrupted, const
 
 static river_status_t river_playback_service_flush_locked(const char *reason)
 {
-    if (!river_playback_service_state_active(g_river_playback_service.stats.state)) {
+    bool recovering = g_river_playback_service.stats.state == RIVER_PLAYBACK_RECOVERING;
+
+    if (!river_playback_service_state_active(g_river_playback_service.stats.state) &&
+        !recovering) {
         return RIVER_OK;
     }
 
-    river_playback_service_record_control_locked("flush", reason);
+    river_playback_service_record_control_locked(recovering ? "recover" : "flush", reason);
     river_playback_service_advance_epoch_locked(reason != NULL ? reason : "flush");
 
     if (g_river_playback_service.ref_owned) {
@@ -431,8 +434,12 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
         river_playback_service_apply_volume_locked();
     }
 
+    if (recovering) {
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
+    }
     g_river_playback_service.stats.flush_count++;
-    RIVER_LOGI("playback flush: stream=%s epoch=%lu",
+    RIVER_LOGI("playback %s: stream=%s epoch=%lu",
+               recovering ? "recover" : "flush",
                g_river_playback_service.stats.stream_name[0] != '\0' ?
                    g_river_playback_service.stats.stream_name :
                    "-",

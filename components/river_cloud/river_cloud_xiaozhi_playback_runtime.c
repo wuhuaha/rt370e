@@ -1265,6 +1265,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                          g_river_cloud.xiaozhi_downlink_task_frame,
                                          mono_bytes,
                                          true) != RIVER_OK) {
+            river_status_t recover_status;
+
             now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
             river_cloud_xiaozhi_note_playback_rebuffer(now_ms);
             g_river_cloud.xiaozhi_downlink_retry_valid = true;
@@ -1276,7 +1278,13 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                        (unsigned long)queued_frames,
                        (unsigned int)river_cloud_xiaozhi_downlink_start_threshold_frames(),
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count);
-            (void)river_playback_service_stop_stream_ex("xiaozhi_playback_write_failed");
+            recover_status =
+                river_playback_service_flush_stream_ex("xiaozhi_playback_write_failed");
+            if (recover_status != RIVER_OK) {
+                RIVER_LOGW("xiaozhi playback recover fallback to stop: status=%d",
+                           (int)recover_status);
+                (void)river_playback_service_stop_stream_ex("xiaozhi_playback_write_failed");
+            }
             rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
             continue;
         }

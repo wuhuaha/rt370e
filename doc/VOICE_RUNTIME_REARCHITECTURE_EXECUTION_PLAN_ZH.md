@@ -352,6 +352,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 不再把一次写失败直接放大成整流重启
 - rebuffer 策略可观测、可度量
 
+已完成事实（进行中）：
+
+- `write_failed` 现已先走同轨 `flush/restart` 恢复，再在失败时退回
+  `stop/start`
+- playback service 已可从 `RIVER_PLAYBACK_RECOVERING` 重新回到
+  `RIVER_PLAYBACK_RUNNING`
+
 ### Step E: 统一 turn timeline 与板端验证
 
 目标：

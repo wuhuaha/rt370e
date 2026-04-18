@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.190
+- Started the downlink/playback recovery-model rebuild by downgrading local
+  `write_failed` from an unconditional stop/start cycle into a same-track
+  recover-first path:
+  - XiaoZhi downlink worker now requests
+    `river_playback_service_flush_stream_ex("xiaozhi_playback_write_failed")`
+    before falling back to `stop_stream`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Playback service flush/restart can now recover from the explicit
+  `RIVER_PLAYBACK_RECOVERING` state instead of only servicing already-active
+  tracks:
+  - recovering state now records a `recover` control
+  - successful recover returns the service to `RIVER_PLAYBACK_RUNNING`
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- This narrows the rebuffer blast radius after one `AudioTrack_Write` failure:
+  - first try same-handle pause/flush/stop/start
+  - only if that fails do we tear down the current playback stream and rebuild
+    from the downlink worker
+
 ## Step 5.189
 - Tightened `session coordinator` barge-in interruption admission so it now
   relies only on `dialog runtime` snapshot truth instead of secretly falling

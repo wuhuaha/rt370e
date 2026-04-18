@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.190
+Validate that playback write recovery now prefers an in-place flush/restart
+instead of always escalating to a full stop/start cycle:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_write_failed|playback recover|recover fallback to stop|RIVER_PLAYBACK_RECOVERING' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - XiaoZhi write-fail recovery now tries `flush_stream_ex(...)` first
+  - playback service can flush/restart from `RIVER_PLAYBACK_RECOVERING`
+  - stop/start is only the fallback when same-track recover fails
+
 ## Step 5.189
 Validate that `session coordinator` barge-in admission now keys off the
 dialog-runtime snapshot instead of falling back to playback-service state:
