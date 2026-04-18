@@ -387,7 +387,9 @@ void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void);
 void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void);
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
-bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
+river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
+                                                              uint32_t pre_roll_frames,
+                                                              bool *opened);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason);

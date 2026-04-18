@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.216
+- Moved XiaoZhi idle reopen gate out of `river_cloud_xiaozhi_stream_push_frame(...)`
+  and into session runtime so the runtime now owns:
+  - wakeword-window reopen eligibility
+  - no-ref reopen rearm / guard gating
+  - open-hold speech-frame accumulation before follow-up round open
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter idle capture path now delegates reopen-open policy to
+  `river_cloud_xiaozhi_maybe_start_followup_round(...)` and keeps only:
+  - listen-stop pending busy guard
+  - pre-roll replay / current frame push
+  - stream-open counters and logs
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.215
 - Moved XiaoZhi terminal close-session tail actions for `network_lost` and
   `bridge_close` out of the adapter and into session runtime so terminal policy

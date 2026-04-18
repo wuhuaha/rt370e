@@ -450,6 +450,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - adapter 对应路径现在只保留：
     - runtime helper 调用
     - 非 terminal-policy 的外围清理或 state sync
+- XiaoZhi idle reopen gate 也已进一步收口到 session runtime：
+  - runtime helper 现在统一拥有：
+    - wakeword-window reopen eligibility 判断
+    - no-ref reopen rearm / guard gating
+    - open-hold speech-frame accumulation 阈值
+  - adapter reopen-open 路径现在只保留：
+    - `listen_stop_pending` busy guard
+    - pre-roll frame 数量读取
+    - pre-roll replay / current frame push
+    - stream_open 计数与日志
 
 下一步焦点：
 

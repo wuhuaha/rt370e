@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.216
+Validate that XiaoZhi idle reopen gating now lives in session runtime and the
+adapter only delegates follow-up-open policy:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '2046,2175p' components/river_cloud/river_cloud_adapter.c
+sed -n '238,346p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'river_cloud_xiaozhi_maybe_start_followup_round|river_cloud_xiaozhi_no_ref_reopen_ready' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter `river_cloud_xiaozhi_stream_push_frame(...)` no longer directly owns:
+  - wakeword-window reopen gating
+  - no-ref reopen gating
+  - open-hold speech-frame counting
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_maybe_start_followup_round(...)`
+- `river_cloud_xiaozhi_no_ref_reopen_ready(...)` is only implemented inside the
+  session runtime source
+
 ## Step 5.215
 Validate that XiaoZhi terminal close-session tail actions for `network_lost`
 and `bridge_close` now live in session runtime:
