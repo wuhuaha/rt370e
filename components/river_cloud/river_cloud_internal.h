@@ -379,6 +379,7 @@ bool river_cloud_xiaozhi_capture_held_by_playback(
     const char **fallback_reason);
 void river_cloud_xiaozhi_apply_tts_start_round_policy(void);
 void river_cloud_xiaozhi_apply_tts_stop_round_policy(void);
+void river_cloud_xiaozhi_apply_reopen_overlap_round_policy(void);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 bool river_cloud_xiaozhi_no_ref_reopen_ready(bool is_speech);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);

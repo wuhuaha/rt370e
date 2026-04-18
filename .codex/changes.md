@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.205
+- Moved XiaoZhi local-close `reopen_overlap` policy out of the adapter and
+  into session runtime so adapter no longer hand-assembles that overlap-close
+  path:
+  - exported:
+    - `river_cloud_xiaozhi_apply_reopen_overlap_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter reopen path now only calls the exported helper when a pending local
+  close overlaps a new open:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.204
 - Moved XiaoZhi `tts_stop` round-close policy out of `river_cloud_adapter.c`
   and into session runtime so the adapter no longer owns the stop-path round

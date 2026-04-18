@@ -157,6 +157,14 @@ void river_cloud_xiaozhi_apply_tts_stop_round_policy(void)
     river_cloud_xiaozhi_arm_playback_stop(RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS);
 }
 
+void river_cloud_xiaozhi_apply_reopen_overlap_round_policy(void)
+{
+    river_cloud_xiaozhi_note_round_finish_request("reopen_overlap");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
+        "reopen_overlap");
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

@@ -343,6 +343,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - playback stop arm
   - adapter 现在只剩下调用这个 runtime helper，不再自己拼 stop-path
     policy body
+- XiaoZhi local-close `reopen_overlap` 语义也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_reopen_overlap_round_policy()`
+  - 该 helper 负责：
+    - 记录 round finish request
+    - 触发 local round close
+  - adapter reopen 分支现在只剩下调用这个 overlap helper
 
 下一步焦点：
 

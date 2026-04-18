@@ -2224,10 +2224,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         }
 
         if (g_river_cloud.xiaozhi_local_close_pending) {
-            river_cloud_xiaozhi_note_round_finish_request("reopen_overlap");
-            river_cloud_xiaozhi_close_local_round_for_cause(
-                RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
-                "reopen_overlap");
+            river_cloud_xiaozhi_apply_reopen_overlap_round_policy();
         }
 
         pre_roll_frames_before_open = g_river_cloud.pre_roll_count_frames;
