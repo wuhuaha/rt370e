@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.198
+- Separated `restart_pending` from generic `ref_missing/ref_idle` AEC truth so
+  the voice/runtime stack can distinguish “playback lane still occupied during
+  a recoverable restart gap” from “reference path is truly absent”:
+  - added a dedicated AEC gate reason:
+    - `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING`
+  - added a dedicated duplex-ready reason:
+    - `RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING`
+  - [include/river/river_voice_runtime_policy.h](/root/ameba-river/include/river/river_voice_runtime_policy.h)
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- XiaoZhi fallback diagnostics now surface that state explicitly instead of
+  folding it into the old generic half-duplex AEC block reasons:
+  - runtime fallback reason string:
+    - `half_duplex_restart_pending`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Fixed-dsb AECM diagnostics now count this gate path separately, so board logs
+  can measure how often playback recovery gaps are being mistaken for real
+  reference-lane loss:
+  - added `restart_pending` counter to the AEC summary
+  - [components/river_voice/river_voice_preproc_fixed_dsb.c](/root/ameba-river/components/river_voice/river_voice_preproc_fixed_dsb.c)
+
 ## Step 5.197
 - Introduced an explicit playback `restart_pending` state so the stack can keep
   treating playback as engaged after a recover-first restart failure without

@@ -250,6 +250,11 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
         return;
     }
 
+    if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING) {
+        eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
+        return;
+    }
+
     if (!river_playback_service_state_active(eval->playback_state)) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK;
         return;
@@ -340,6 +345,12 @@ void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
         return;
     }
 
+    if (aec_eval.reason == RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING) {
+        eval->reason = RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING;
+        eval->aec_reason = aec_eval.reason;
+        return;
+    }
+
     if (aec_eval.uses_native_capture_ref) {
         eval->native_reference_available = native_ref.available;
         eval->native_reference_frames_seen = native_ref.frames_seen;
@@ -401,6 +412,8 @@ const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason
         return "disabled";
     case RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK:
         return "playback_inactive";
+    case RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING:
+        return "playback_restart_pending";
     case RIVER_VOICE_AEC_GATE_BLOCKED_INTERACTION:
         return "interaction_blocked";
     case RIVER_VOICE_AEC_GATE_BLOCKED_REFERENCE_PATH:
@@ -438,6 +451,8 @@ const char *river_voice_runtime_duplex_ready_reason_name(
         return "experiment_off";
     case RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF:
         return "profile_no_ref";
+    case RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING:
+        return "restart_pending";
     case RIVER_VOICE_DUPLEX_READY_REF_IDLE:
         return "ref_idle";
     case RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED:

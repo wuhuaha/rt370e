@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.198
+Validate that `restart_pending` is no longer treated as a generic missing/idle
+reference condition and now surfaces as its own AEC/duplex reason:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'PLAYBACK_RESTART_PENDING|playback_restart_pending|restart_pending|half_duplex_restart_pending' \
+  include/river/river_voice_runtime_policy.h \
+  components/river_voice/river_voice_runtime_policy.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_voice/river_voice_preproc_fixed_dsb.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - voice runtime exports dedicated AEC/duplex `restart_pending` reasons
+  - XiaoZhi fallback mapping exposes `half_duplex_restart_pending`
+  - fixed-dsb AECM summary tracks `restart_pending` separately from generic
+    `block_playback/ref_missing/ref_idle`
+
 ## Step 5.197
 Validate that `restart_pending` is now a first-class playback state and that
 XiaoZhi downlink knows it must fresh-start from that state:

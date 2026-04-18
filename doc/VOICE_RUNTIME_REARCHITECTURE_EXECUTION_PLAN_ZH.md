@@ -427,20 +427,31 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `IDLE`
     - `RESTART_PENDING`
     视为需要 fresh-start 的本地状态，而不是被新的 active 语义卡死
+- AEC / duplex gate 也已开始与该状态对齐，不再把它误折叠为通用
+  `ref_missing/ref_idle`：
+  - 新增 AEC gate reason：
+    - `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING`
+  - 新增 duplex ready reason：
+    - `RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING`
+  - XiaoZhi fallback 原因现在可直接打印：
+    - `half_duplex_restart_pending`
+  - fixed-dsb AECM 统计也新增：
+    - `restart_pending`
+    计数，便于板端确认恢复空窗是否仍在被误判成参考链缺失
 
 下一步焦点：
 
-- 继续把“可恢复的 rebuffer/restart churn”从
-  `error_recovering -> follow_up -> speaking` 的粗状态跳变里拆掉
-- 重点检查 fallback `stop/start` 失败分支是否仍暴露一个 `IDLE` 空窗，
-  让 cloud/runtime 边界短暂丢失 `speaking` 事实
-- 若该 `IDLE` 空窗仍会影响 AEC/VAD 门控，则下一刀需要把“restart pending”
-  也提升成 playback service / runtime 的显式状态，而不是停在 `IDLE`
-- 当前该显式状态已落地，下一刀应转向：
-  - 检查 reference-service / duplex gate 是否仍把 `restart_pending` 误当成
-    “参考链真实缺失 => 可重新开口”
-- 让 `dialog runtime` / `session coordinator` 消费统一 playback runtime
-  状态机，而不是把 recoverable stop/start 当成 fatal playback error 的旁路
+- 继续检查 reference-service / duplex gate 是否仍会在
+  `restart_pending` 期间误触发：
+  - capture reopen
+  - no-ref fallback churn
+  - follow-up / speaking 抖动
+- 继续把“播放链占用”和“参考链已就绪”从更高层 runtime / cloud bridge
+  语义中完全拆开，避免 recovery 空窗重新被其他模块折叠成：
+  - `playback inactive`
+  - `reference missing`
+- 让 `dialog runtime` / `session coordinator` / cloud bridge 最终都只消费
+  一条统一的 playback-runtime 真相，而不是再从局部 active/idle 信号二次猜测
 
 ### Step E: 统一 turn timeline 与板端验证
 

@@ -44,6 +44,8 @@ static const char *river_cloud_xiaozhi_runtime_duplex_fallback_reason(
         return "half_duplex_experiment_disabled";
     case RIVER_VOICE_DUPLEX_READY_PROFILE_NO_REF:
         return "half_duplex_no_playback_reference";
+    case RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING:
+        return "half_duplex_restart_pending";
     case RIVER_VOICE_DUPLEX_READY_REF_IDLE:
         return "half_duplex_ref_idle";
     case RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED:

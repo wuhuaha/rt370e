@@ -49,6 +49,7 @@ typedef struct {
     uint32_t aec_gate_transitions;
     uint32_t aec_gate_disabled;
     uint32_t aec_gate_block_playback;
+    uint32_t aec_gate_block_restart_pending;
     uint32_t aec_gate_block_interaction;
     uint32_t aec_gate_block_reference_path;
     uint32_t aec_ref_missing;
@@ -191,6 +192,9 @@ static void river_voice_preproc_note_gate_reason(
         break;
     case RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK:
         context->aec_gate_block_playback++;
+        break;
+    case RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING:
+        context->aec_gate_block_restart_pending++;
         break;
     case RIVER_VOICE_AEC_GATE_BLOCKED_INTERACTION:
         context->aec_gate_block_interaction++;
@@ -488,11 +492,12 @@ void river_voice_preproc_fixed_dsb_close(river_voice_preproc_t *preproc)
     if (context != 0) {
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
         if (context->experiment_enabled) {
-            RIVER_LOGI("webrtc_aecm summary: used=%lu fallback=%lu disabled=%lu block_playback=%lu block_interaction=%lu block_ref_path=%lu ref_missing=%lu ref_idle=%lu gate_transitions=%lu push_fail=%lu pop_fail=%lu total=%lu",
+            RIVER_LOGI("webrtc_aecm summary: used=%lu fallback=%lu disabled=%lu block_playback=%lu restart_pending=%lu block_interaction=%lu block_ref_path=%lu ref_missing=%lu ref_idle=%lu gate_transitions=%lu push_fail=%lu pop_fail=%lu total=%lu",
                        (unsigned long)context->aec_frames_used,
                        (unsigned long)context->aec_frames_fallback,
                        (unsigned long)context->aec_gate_disabled,
                        (unsigned long)context->aec_gate_block_playback,
+                       (unsigned long)context->aec_gate_block_restart_pending,
                        (unsigned long)context->aec_gate_block_interaction,
                        (unsigned long)context->aec_gate_block_reference_path,
                        (unsigned long)context->aec_ref_missing,

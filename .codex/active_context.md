@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.197 introduce restart_pending playback state`
+  - `5.198 separate restart_pending from generic reference-missing duplex truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -218,6 +218,18 @@ or top-of-tree verification target changes.
   - twenty-first landed slice on that plan:
     - recover-first restart failure no longer escalates into
       `RIVER_PLAYBACK_ERROR` before the runtime can try a normal fresh start
+  - twenty-second landed slice on that plan:
+    - AEC/duplex evaluation now treats `RIVER_PLAYBACK_RESTART_PENDING` as its
+      own runtime reason instead of collapsing it into generic
+      `ref_missing/ref_idle`
+    - the voice runtime now exports:
+      - `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING`
+      - `RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING`
+    - XiaoZhi fallback logs now surface:
+      - `half_duplex_restart_pending`
+    - fixed-dsb AECM summary now counts:
+      - `restart_pending`
+      separately from generic playback-disabled/reference-idle churn
     - playback service now tears down the failed track and returns to
       restartable `IDLE` with a dedicated `recover fallback` path
     - XiaoZhi downlink recovery no longer forces an extra redundant local stop
