@@ -411,6 +411,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - uplink drained 判定
     - `listen_stop` transport request
     这些 transport 尾部动作
+- XiaoZhi ASR round lifecycle 语义也已继续收口到 session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_round_begin()`
+    - `river_cloud_xiaozhi_round_note_packet_sent()`
+  - 这些 helper 现在统一拥有：
+    - round begin
+    - first packet timestamp
+    - packet_sent 计数
+  - adapter 现在只在 uplink-send 和 reopen-open 路径调用它们，不再定义本地实现
 
 下一步焦点：
 

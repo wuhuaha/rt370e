@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.212
+- Moved XiaoZhi ASR round lifecycle ownership out of the adapter and into
+  session runtime so adapter no longer owns local `round_begin / first_packet /
+  packet_sent` transitions:
+  - exported:
+    - `river_cloud_xiaozhi_round_begin(...)`
+    - `river_cloud_xiaozhi_round_note_packet_sent(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter uplink-send and reopen-open paths now only call the exported
+  session-runtime helpers for ASR round lifecycle updates:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.211
 - Moved XiaoZhi `listen_stop` completion round-close policy out of the adapter
   and into session runtime so adapter no longer decides the post-drain

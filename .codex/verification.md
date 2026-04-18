@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.212
+Validate that XiaoZhi ASR round lifecycle now lives in session runtime and
+adapter only consumes the exported helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_round_begin|river_cloud_xiaozhi_round_note_packet_sent' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_round_begin(...)`
+  - session runtime exports `river_cloud_xiaozhi_round_note_packet_sent(...)`
+  - adapter only consumes those exports and no longer defines their bodies locally
+
 ## Step 5.211
 Validate that XiaoZhi `listen_stop` completion round-close policy now lives in
 session runtime and adapter only consumes the exported helper:

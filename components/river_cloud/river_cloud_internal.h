@@ -395,6 +395,8 @@ void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void);
 void river_cloud_xiaozhi_cancel_endpoint_soft_close(const char *trigger);
 void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger,
                                              const char *reason);
+void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames);
+void river_cloud_xiaozhi_round_note_packet_sent(void);
 void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
                                                  const char *reason);
 bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason,

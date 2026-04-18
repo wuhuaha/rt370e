@@ -43,11 +43,9 @@ static river_status_t river_cloud_xiaozhi_control_request(
     river_cloud_xiaozhi_control_op_t op,
     const char *arg);
 static void river_cloud_xiaozhi_process_control_queue(void);
-static void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames);
 static void river_cloud_xiaozhi_complete_active_stream_finish(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason);
-static void river_cloud_xiaozhi_round_note_packet_sent(void);
 static uint32_t river_cloud_xiaozhi_uplink_ready_frames(void);
 #endif
 
@@ -260,49 +258,6 @@ static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_
                (unsigned long)g_river_cloud.xiaozhi_uplink_busy_streak,
                (unsigned long)backoff_ms,
                (unsigned long)g_river_cloud.xiaozhi_uplink_stale_dropped);
-}
-
-static void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames)
-{
-    g_river_cloud.xiaozhi_asr_round_id++;
-    g_river_cloud.xiaozhi_asr_round_active = true;
-    g_river_cloud.xiaozhi_asr_round_started_ms =
-        (uint32_t)rtos_time_get_current_system_time_ms();
-    g_river_cloud.xiaozhi_asr_round_first_packet_ms = 0U;
-    g_river_cloud.xiaozhi_asr_round_pre_roll_frames = pre_roll_frames;
-    g_river_cloud.xiaozhi_asr_round_packets_sent = 0U;
-    g_river_cloud.xiaozhi_asr_round_partial_count = 0U;
-    g_river_cloud.xiaozhi_asr_round_final_count = 0U;
-    g_river_cloud.xiaozhi_asr_round_partial_seen = false;
-    g_river_cloud.xiaozhi_asr_round_final_seen = false;
-    g_river_cloud.xiaozhi_asr_round_busy_base = g_river_cloud.xiaozhi_uplink_busy_count;
-    g_river_cloud.xiaozhi_asr_round_fail_base = g_river_cloud.xiaozhi_uplink_fail_count;
-    g_river_cloud.xiaozhi_asr_round_stale_drop_base =
-        g_river_cloud.xiaozhi_uplink_stale_dropped;
-    g_river_cloud.xiaozhi_asr_round_ring_drop_base =
-        g_river_cloud.xiaozhi_uplink_ring_dropped;
-    g_river_cloud.xiaozhi_asr_round_close_reason[0] = '\0';
-    RIVER_LOGI("xiaozhi asr round begin: id=%lu sid=%s pre_roll_frames=%lu",
-               (unsigned long)g_river_cloud.xiaozhi_asr_round_id,
-               river_cloud_xiaozhi_current_sid() != NULL ?
-                   river_cloud_xiaozhi_current_sid() :
-                   "-",
-               (unsigned long)pre_roll_frames);
-}
-
-static void river_cloud_xiaozhi_round_note_packet_sent(void)
-{
-    if (!g_river_cloud.xiaozhi_asr_round_active) {
-        return;
-    }
-
-    if (g_river_cloud.xiaozhi_asr_round_first_packet_ms == 0U) {
-        g_river_cloud.xiaozhi_asr_round_first_packet_ms =
-            (uint32_t)rtos_time_get_current_system_time_ms();
-    }
-    if (g_river_cloud.xiaozhi_asr_round_packets_sent < UINT32_MAX) {
-        g_river_cloud.xiaozhi_asr_round_packets_sent++;
-    }
 }
 
 static river_status_t river_cloud_xiaozhi_control_execute(
