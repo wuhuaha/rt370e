@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.202
+- Moved XiaoZhi `tts_start` keep-open / round-close policy out of
+  `river_cloud_adapter.c` and into session runtime so the adapter no longer
+  owns that branch-local duplex decision:
+  - exported:
+    - `river_cloud_xiaozhi_apply_tts_start_round_policy(...)`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter TTS-start handling now only calls the exported session-runtime helper
+  and keeps the transport tail glue:
+  - finalize pending text
+  - apply the runtime-owned round policy
+  - cancel playback stop
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.201
 - Added a session-runtime helper for the hot-path
   `capture held during playback` decision so adapter no longer assembles that

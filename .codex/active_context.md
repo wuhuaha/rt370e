@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.201 move capture-held playback predicate into xiaozhi session runtime`
+  - `5.202 move tts_start round policy into xiaozhi session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -227,6 +227,11 @@ or top-of-tree verification target changes.
       - `RIVER_VOICE_DUPLEX_READY_PLAYBACK_RESTART_PENDING`
     - XiaoZhi fallback logs now surface:
       - `half_duplex_restart_pending`
+  - twenty-third landed slice on that plan:
+    - XiaoZhi `tts_start` keep-open / round-close policy now lives in session
+      runtime instead of the adapter
+    - adapter TTS-start handling now only finalizes pending text, calls the
+      exported runtime helper, and keeps the playback-stop cancel tail glue
     - fixed-dsb AECM summary now counts:
       - `restart_pending`
       separately from generic playback-disabled/reference-idle churn

@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.202
+Validate that XiaoZhi `tts_start` keep-open / close policy now lives in
+session runtime and adapter only consumes the exported helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'apply_tts_start_round_policy|tts_start keeps local round open|tts_start falls back to round close' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- static grep confirms:
+  - session runtime exports `river_cloud_xiaozhi_apply_tts_start_round_policy(...)`
+  - the helper owns the keep-open vs round-close logging/policy
+  - adapter only calls the exported helper at `tts_start`
+
 ## Step 5.201
 Validate that the `capture held during playback` predicate now lives behind a
 session-runtime helper and adapter only consumes the exported reducer:

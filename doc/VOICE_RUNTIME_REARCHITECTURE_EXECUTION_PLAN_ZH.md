@@ -317,6 +317,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     三元组，而是只上传 `cause + detail_reason`
   - 这让后续 terminal policy 调整可以稳定落在 playback runtime 一处
     完成，而不是继续在 adapter 分支里复制终态规则
+- XiaoZhi `tts_start` 的 keep-open / round-close 语义也已继续收口到
+  session runtime：
+  - 新增 exported helper：
+    - `river_cloud_xiaozhi_apply_tts_start_round_policy()`
+  - 该 helper 负责：
+    - duplex ready 判定
+    - keep-open logging
+    - fallback close / semantic fallback 记录
+  - adapter 现在只保留：
+    - finalize pending text
+    - 调用 runtime helper
+    - cancel playback stop 的 transport 尾部胶水
+  - 后续若要继续瘦身 adapter，可把这条 `tts_start` 分支的剩余胶水
+    再拆成更细的 session-runtime/transport 边界
 
 下一步焦点：
 
