@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.235
+- Moved XiaoZhi `LLM/TTS` transport-event observation ownership out of
+  `river_cloud_adapter.c` and into session runtime so adapter no longer embeds
+  wake-window extension, pending-text finalize, or TTS round-policy mutation
+  inline:
+  - `river_cloud_xiaozhi_note_llm_observation(...)`
+  - `river_cloud_xiaozhi_note_tts_observation(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the XiaoZhi `LLM/TTS` observation reducers for:
+  - `llm` follow-up window touch, observation log, and round-policy apply
+  - `tts start` pending-text finalize, keep-open policy, and playback-stop
+    cancel sequencing
+  - `tts sentence_start` last-text mutation and sentence-start log
+  - `tts stop` round-stop policy
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_event_handler(...)` now only dispatches XiaoZhi
+  `LLM/TTS` transport events into runtime-owned observation helpers instead of
+  mutating session truth inline:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.234
 - Moved the remaining XiaoZhi uplink-ingress / active-stream-finish helper set
   out of `river_cloud_adapter.c` and into session runtime so adapter no longer

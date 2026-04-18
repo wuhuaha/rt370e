@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-18
+Last Updated: 2026-04-19
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -259,6 +259,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `xiaozhi_pending_text_valid`
     - `xiaozhi_pending_text_finalized`
   - partial ASR 发射与存量文本去重现统一收口到 runtime helper
+- `LLM/TTS` transport observation 也已继续从 adapter 分支下沉到 session
+  runtime：
+  - 新增：
+    - `river_cloud_xiaozhi_note_llm_observation(...)`
+    - `river_cloud_xiaozhi_note_tts_observation(...)`
+  - adapter 的 `RIVER_XIAOZHI_EVENT_LLM/TTS` 分支不再直接内联：
+    - follow-up window touch
+    - `tts_start` pending-text finalize
+    - `tts sentence_start` 的 `last_text` 写入
+    - `tts stop` round policy apply
+  - 这进一步收紧了 `river_cloud_adapter.c` 的角色：
+    - transport event 分发
+    - runtime helper 调用
+    - 避免继续持有 session truth mutation
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：

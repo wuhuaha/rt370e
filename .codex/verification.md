@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.235
+Validate that XiaoZhi `LLM/TTS` transport-event observation now belongs to
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '344,355p' components/river_cloud/river_cloud_internal.h
+sed -n '523,577p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1141,1152p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_llm_observation|note_tts_observation|tts sentence_start|apply_llm_round_policy|apply_tts_stop_round_policy' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_note_llm_observation(...)`
+  - `river_cloud_xiaozhi_note_tts_observation(...)`
+- adapter `RIVER_XIAOZHI_EVENT_LLM/TTS` branches no longer inline:
+  - wake-window touch
+  - pending-text finalize
+  - `last_text` mutation
+  - TTS round-policy transitions
+- XiaoZhi `LLM/TTS` event semantics now live behind runtime-owned reducers
+  instead of adapter-side event-branch logic
+
 ## Step 5.234
 Validate that XiaoZhi uplink ingress and active-stream-finish helpers are now
 owned by session runtime:

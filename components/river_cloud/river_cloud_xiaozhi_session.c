@@ -523,6 +523,54 @@ void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *e
     }
 }
 
+void river_cloud_xiaozhi_note_llm_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, "llm");
+    if (event->emotion != NULL || event->text != NULL) {
+        RIVER_LOGI("xiaozhi llm emotion=%s text=%s",
+                   event->emotion != NULL ? event->emotion : "-",
+                   event->text != NULL ? event->text : "-");
+    }
+    river_cloud_xiaozhi_apply_llm_round_policy();
+}
+
+void river_cloud_xiaozhi_note_tts_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL || event->state == NULL) {
+        return;
+    }
+
+    if (strcmp(event->state, "start") == 0) {
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "tts_start");
+        river_cloud_xiaozhi_finalize_pending_text("tts_start");
+        river_cloud_xiaozhi_apply_tts_start_round_policy();
+        river_cloud_xiaozhi_cancel_playback_stop();
+        return;
+    }
+
+    if (strcmp(event->state, "sentence_start") == 0) {
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "tts_sentence");
+        if (event->text != NULL && event->text[0] != '\0') {
+            snprintf(g_river_cloud.last_text,
+                     sizeof(g_river_cloud.last_text),
+                     "%s",
+                     event->text);
+        }
+        RIVER_LOGI("xiaozhi tts sentence_start: %s", event->text != NULL ? event->text : "-");
+        return;
+    }
+
+    if (strcmp(event->state, "stop") == 0) {
+        river_cloud_xiaozhi_apply_tts_stop_round_policy();
+    }
+}
+
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
 {
     river_voice_duplex_ready_eval_t eval;

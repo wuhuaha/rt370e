@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.234 move XiaoZhi uplink ingress and finish helpers into runtime`
+  - `5.235 move XiaoZhi LLM/TTS observation into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -258,6 +258,18 @@ or top-of-tree verification target changes.
       after `tts_start` policy had already been centralized in session runtime
     - the session-runtime TTS-start surface is now a single exported policy
       helper
+  - latest landed slice on that plan:
+    - XiaoZhi `LLM/TTS` transport-event observation ownership has now also
+      moved from adapter branches into session runtime
+    - adapter `RIVER_XIAOZHI_EVENT_LLM/TTS` handling now only dispatches
+      transport observations to:
+      - `river_cloud_xiaozhi_note_llm_observation(...)`
+      - `river_cloud_xiaozhi_note_tts_observation(...)`
+    - session runtime now owns:
+      - follow-up window touch for `llm/tts start/sentence_start`
+      - pending-text finalize on `tts_start`
+      - `last_text` mutation on `tts sentence_start`
+      - `tts stop` round policy apply
   - twenty-fifth landed slice on that plan:
     - XiaoZhi `tts_stop` round-close policy now lives in session runtime
     - adapter TTS-stop handling now only calls the exported runtime helper
