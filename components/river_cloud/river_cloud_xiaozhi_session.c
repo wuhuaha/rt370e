@@ -197,6 +197,24 @@ void river_cloud_xiaozhi_apply_listen_stop_completion_round_policy(void)
     river_runtime_stats_snapshot("asr_stream_finish");
 }
 
+void river_cloud_xiaozhi_maybe_finalize_listen_stop(uint32_t queued_frames, size_t accum_bytes)
+{
+    river_status_t status;
+
+    if (!g_river_cloud.xiaozhi_listen_stop_pending || queued_frames != 0U || accum_bytes != 0U) {
+        return;
+    }
+
+    if (river_xiaozhi_session_open() && g_river_cloud.xiaozhi_listening) {
+        status = river_cloud_xiaozhi_request_listen_stop();
+        if (status != RIVER_OK) {
+            return;
+        }
+    }
+
+    river_cloud_xiaozhi_apply_listen_stop_completion_round_policy();
+}
+
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
 {
     river_cloud_xiaozhi_finalize_pending_text("transport_closed");

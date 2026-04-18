@@ -460,6 +460,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - pre-roll frame 数量读取
     - pre-roll replay / current frame push
     - stream_open 计数与日志
+- XiaoZhi listen-stop completion 也已收口到 session runtime：
+  - runtime helper 现在统一拥有：
+    - uplink drain-complete 判定
+    - `request_listen_stop()` 时序
+    - listen-stop completion round policy
+  - adapter uplink/stream-finish 路径现在只保留：
+    - queued uplink frame 数采样
+    - pending accum bytes 采样
+    - runtime helper 调用
 
 下一步焦点：
 

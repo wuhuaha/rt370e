@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.217
+- Moved XiaoZhi listen-stop completion policy out of the adapter and into
+  session runtime so the runtime now owns:
+  - drain-complete eligibility based on queued uplink frames and accum bytes
+  - `request_listen_stop()` dispatch timing
+  - `river_cloud_xiaozhi_apply_listen_stop_completion_round_policy()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter uplink/stream-finish paths now only sample uplink drain state and
+  delegate listen-stop completion to runtime:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.216
 - Moved XiaoZhi idle reopen gate out of `river_cloud_xiaozhi_stream_push_frame(...)`
   and into session runtime so the runtime now owns:

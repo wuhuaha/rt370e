@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.216 move xiaozhi idle reopen gate into session runtime`
+  - `5.217 move xiaozhi listen-stop completion into session runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -296,6 +296,11 @@ or top-of-tree verification target changes.
       - wakeword-window reopen eligibility
       - no-ref reopen rearm / guard gating
       - open-hold frame accumulation thresholds
+  - thirty-eighth landed slice on that plan:
+    - XiaoZhi listen-stop completion policy now lives in session runtime
+    - adapter uplink service path now only samples drain state and delegates:
+      - queued uplink frame count
+      - pending accum buffer bytes
   - twenty-third landed slice on that plan:
     - cloud/runtime now export a first-class playback-lane engagement fact:
       - `playback_lane_engaged`

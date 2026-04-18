@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.217
+Validate that XiaoZhi listen-stop completion now lives in session runtime and
+adapter only feeds drain-state facts into the runtime helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '600,660p' components/river_cloud/river_cloud_adapter.c
+sed -n '1318,1342p' components/river_cloud/river_cloud_adapter.c
+sed -n '186,224p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'maybe_finalize_listen_stop|finalize_listen_stop_if_ready' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter no longer defines `finalize_listen_stop_if_ready()`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_maybe_finalize_listen_stop(...)`
+- adapter uplink/stream-finish paths only pass:
+  - queued uplink frame count
+  - pending accum bytes
+
 ## Step 5.216
 Validate that XiaoZhi idle reopen gating now lives in session runtime and the
 adapter only delegates follow-up-open policy:
