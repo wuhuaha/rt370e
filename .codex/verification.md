@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.267
+Validate that downlink restart gating now differentiates upstream starvation
+from local write-failure recovery:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '160,180p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '585,625p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'rebuffer_prefetch_target_needed|start=%u|playback_rebuffer_cause' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- only `upstream_starved` rebuffer recovery keeps the prefetch-sized refill
+  gate
+- `write_failed` recovery no longer inherits that upstream-prefetch wait budget
+- `river xiaozhi status` downlink dump now prints the active `start` threshold
+
 ## Step 5.266
 Validate that XiaoZhi playback recovery now carries an explicit rebuffer cause
 through runtime and snapshot exports:

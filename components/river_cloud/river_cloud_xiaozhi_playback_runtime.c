@@ -28,6 +28,8 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
     return (int16_t)value;
 }
 
+static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void);
+
 const char *river_cloud_xiaozhi_playback_phase_name(
     river_cloud_xiaozhi_playback_phase_t phase)
 {
@@ -201,6 +203,13 @@ bool river_cloud_xiaozhi_playback_has_work(void)
 static void river_cloud_xiaozhi_clear_downlink_starvation_watch(void)
 {
     g_river_cloud.xiaozhi_downlink_starved_since_ms = 0U;
+}
+
+static bool river_cloud_xiaozhi_rebuffer_prefetch_target_needed(void)
+{
+    return g_river_cloud.xiaozhi_playback_rebuffer_pending &&
+           river_cloud_xiaozhi_playback_rebuffer_cause() ==
+               RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED;
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_frame_duration_ms(void)
@@ -406,13 +415,14 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES,
                (unsigned long)reopen_guard_left_ms,
                (unsigned int)river_cloud_xiaozhi_open_hold_frames_required());
-    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums target_ms=%lu meta_gap_ms=%lu rebuffer=%s/%s rebuffer_count=%lu",
+    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums start=%u target_ms=%lu meta_gap_ms=%lu rebuffer=%s/%s rebuffer_count=%lu",
                (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring),
                (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES,
                (unsigned long)g_river_cloud.xiaozhi_downlink_ring_dropped,
                g_river_cloud.xiaozhi_downlink_started ? "running" : "off",
                (unsigned long)g_river_cloud.xiaozhi_downlink_sample_rate,
                (unsigned long)g_river_cloud.xiaozhi_downlink_frame_duration_ms,
+               (unsigned int)river_cloud_xiaozhi_downlink_start_threshold_frames(),
                (unsigned long)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
                (unsigned long)g_river_cloud.xiaozhi_playback_last_meta_gap_ms,
                g_river_cloud.xiaozhi_playback_rebuffer_pending ? "yes" : "no",
@@ -596,7 +606,13 @@ static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void)
         g_river_cloud.xiaozhi_playback_rebuffer_count != 0U) {
         uint32_t frame_ms = river_cloud_xiaozhi_downlink_frame_duration_ms();
 
-        if (frame_ms != 0U && g_river_cloud.xiaozhi_playback_prefetch_target_ms != 0U) {
+        /*
+         * Only upstream starvation should wait for a prefetch-sized refill.
+         * Local write-failure recovery already has buffered audio in hand and
+         * should restart on the tighter base rebuffer gate.
+         */
+        if (river_cloud_xiaozhi_rebuffer_prefetch_target_needed() && frame_ms != 0U &&
+            g_river_cloud.xiaozhi_playback_prefetch_target_ms != 0U) {
             uint32_t prefetch_frames =
                 (g_river_cloud.xiaozhi_playback_prefetch_target_ms + frame_ms - 1U) / frame_ms;
 

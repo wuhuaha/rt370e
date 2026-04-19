@@ -1049,6 +1049,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `write failed`
     - `rebuffer requested`
     多条离散日志反推同一次恢复
+- downlink 再起播门限也已开始真正消费这条 cause truth：
+  - `upstream_starved` 仍可等待 prefetch-sized 回填，避免上游断粮时短队列
+    反复打穿
+  - `write_failed` 不再无条件继承同一套 upstream-prefetch 等待预算，而是
+    回到更紧的本地 rebuffer 门限
+  - runtime downlink dump 现在也会直接打印当前 `start` threshold，便于板端
+    确认是哪一类恢复策略在生效
 - recoverable playback churn 已继续从“局部 active 抖动”提升为显式 runtime
   真相：
   - cloud runtime snapshot 新增：

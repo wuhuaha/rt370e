@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.267
+- Split XiaoZhi downlink restart gating by explicit `rebuffer_cause` instead of
+  forcing `write_failed` and `upstream_starved` to share the same refill
+  threshold:
+  - upstream starvation recovery still waits for prefetch-sized refill when
+    needed
+  - local `write_failed` recovery now uses the tighter base rebuffer gate
+    rather than inheriting the upstream-prefetch wait budget
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Playback status dump now also prints the current downlink `start` threshold so
+  the active restart gate can be verified directly from runtime diagnostics
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.266
 - Introduced an explicit XiaoZhi playback runtime `rebuffer_cause` truth so
   recovery no longer collapses all churn into a single boolean:

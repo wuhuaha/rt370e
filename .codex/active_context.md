@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.266 export explicit playback rebuffer cause truth`
+  - `5.267 split restart gate by playback rebuffer cause`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,15 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - XiaoZhi downlink restart gating now differentiates:
+      - `upstream_starved`
+      - `write_failed`
+      instead of forcing both recovery classes through the same prefetch-sized
+      refill wait
+    - runtime downlink diagnostics now also print the current `start`
+      threshold, so the effective restart gate can be checked directly on the
+      board
+  - previous landed runtime-ownership slice:
     - XiaoZhi playback runtime now also owns an explicit `rebuffer_cause`
       truth:
       - `upstream_starved`
