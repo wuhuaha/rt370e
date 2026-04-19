@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.256
+- Moved the last XiaoZhi `stream_push_frame()` playback wrapper out of
+  `river_cloud_adapter.c` so adapter no longer directly owns:
+  - capture-entry playback gating
+  - capture-exit playback tail
+  around the runtime-owned stream-push session reducer
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime now owns the grouped capture-stream wrapper:
+  - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+  - playback entry gate
+  - runtime-owned stream-push capture reducer dispatch
+  - playback exit tail after successful capture progress
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_xiaozhi_stream_push_frame(...)` is now reduced to input
+  validation plus a single runtime call:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.255
 - Moved the remaining XiaoZhi `stream_push_frame()` capture/session reducer
   out of `river_cloud_adapter.c` so adapter no longer directly owns:

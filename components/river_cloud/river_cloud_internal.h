@@ -451,6 +451,9 @@ river_status_t river_cloud_xiaozhi_apply_stream_push_capture_policy(
     size_t bytes,
     bool is_speech,
     bool *capture_exit_needed);
+river_status_t river_cloud_xiaozhi_apply_capture_stream_policy(const uint8_t *pcm,
+                                                               size_t bytes,
+                                                               bool is_speech);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason);

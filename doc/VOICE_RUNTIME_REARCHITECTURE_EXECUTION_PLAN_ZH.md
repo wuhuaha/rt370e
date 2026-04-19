@@ -896,13 +896,26 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这继续把 realtime capture path 上的 session truth 从 adapter 收回
     runtime，使 adapter 在 XiaoZhi capture 主链上进一步逼近
     `playback entry/exit wrapper + runtime dispatch shell`
+- XiaoZhi `stream_push_frame()` 上最后的 playback wrapper 也已继续从 adapter
+  收口到 runtime：
+  - session runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+  - session runtime 现统一负责：
+    - capture-entry playback gate
+    - stream-push capture reducer dispatch
+    - capture-exit playback tail
+  - adapter 的 `river_cloud_xiaozhi_stream_push_frame(...)` 现不再直接内联：
+    - `apply_capture_entry_playback_policy()`
+    - `apply_capture_exit_playback_policy()`
+  - 这让 XiaoZhi capture 推帧路径在 adapter 中进一步逼近纯壳形态：
+    - 参数校验
+    - runtime helper 调用
 
 下一步焦点：
 
-- 继续把 `river_cloud_xiaozhi_stream_push_frame(...)` 上剩余的 wrapper 收口到
-  runtime，优先审视：
-  - capture-entry / capture-exit playback policy 的最终编排落点
-  - XiaoZhi 与 generic streaming path 的桥接边界
+- 继续审视是否直接移除 `river_cloud_xiaozhi_stream_push_frame(...)` 这一层
+  adapter shim，让 XiaoZhi capture 分支直接走 runtime helper
+- 继续把 XiaoZhi 与 generic streaming path 之间的桥接边界做最终收口
 - 继续把 `river_cloud_asr_audio_open()/close()` 中剩余的 generic bridge
   lifecycle 提炼成稳定边界，重点看：
   - `audio_desc`

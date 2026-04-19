@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.255 move XiaoZhi stream-push capture reducer into runtime`
+  - `5.256 move XiaoZhi stream-push playback wrapper into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -229,6 +229,14 @@ or top-of-tree verification target changes.
       - `river_cloud_log_stream_open_deferred_once(...)`
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
+  - newest landed runtime-ownership slice:
+    - session runtime now also owns the last playback wrapper around the
+      XiaoZhi capture push path:
+      - capture-entry playback gate
+      - capture-exit playback tail
+    - adapter `river_cloud_xiaozhi_stream_push_frame(...)` is now reduced to:
+      - input validation
+      - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
   - eighth landed slice on that plan:
     - terminal `completed` is now gated by `last_segment observed + fully
       heard`, not only by a transient local drain point

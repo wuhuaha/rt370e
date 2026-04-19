@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.256
+Validate that XiaoZhi stream-push playback wrapper now belongs to runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '449,456p' components/river_cloud/river_cloud_internal.h
+sed -n '1035,1043p' components/river_cloud/river_cloud_adapter.c
+sed -n '1633,1654p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'apply_capture_stream_policy|apply_capture_entry_playback_policy|apply_capture_exit_playback_policy' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+- adapter `river_cloud_xiaozhi_stream_push_frame(...)` no longer directly performs:
+  - capture-entry playback gate
+  - capture-exit playback tail
+
 ## Step 5.255
 Validate that XiaoZhi stream-push capture/session policy now belongs to
 session runtime:

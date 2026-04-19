@@ -1630,6 +1630,30 @@ river_status_t river_cloud_xiaozhi_apply_stream_push_capture_policy(
     return RIVER_OK;
 }
 
+river_status_t river_cloud_xiaozhi_apply_capture_stream_policy(const uint8_t *pcm,
+                                                               size_t bytes,
+                                                               bool is_speech)
+{
+    river_status_t status;
+    bool capture_exit_needed = false;
+
+    if (river_cloud_xiaozhi_apply_capture_entry_playback_policy()) {
+        return RIVER_OK;
+    }
+
+    status = river_cloud_xiaozhi_apply_stream_push_capture_policy(pcm,
+                                                                  bytes,
+                                                                  is_speech,
+                                                                  &capture_exit_needed);
+    if (status != RIVER_OK) {
+        return status;
+    }
+    if (capture_exit_needed) {
+        river_cloud_xiaozhi_apply_capture_exit_playback_policy();
+    }
+    return RIVER_OK;
+}
+
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
     return river_cloud_xiaozhi_playback_output_active() ||

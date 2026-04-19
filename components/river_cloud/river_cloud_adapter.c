@@ -1035,30 +1035,11 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
                                                             size_t bytes,
                                                             bool is_speech)
 {
-    river_status_t status;
-
     if (!g_river_cloud.audio_bridge_open || pcm == NULL || bytes != g_river_cloud.frame_bytes) {
         return RIVER_ERR_ARG;
     }
 
-    if (river_cloud_xiaozhi_apply_capture_entry_playback_policy()) {
-        return RIVER_OK;
-    }
-    {
-        bool capture_exit_needed = false;
-
-        status = river_cloud_xiaozhi_apply_stream_push_capture_policy(pcm,
-                                                                      bytes,
-                                                                      is_speech,
-                                                                      &capture_exit_needed);
-        if (status != RIVER_OK) {
-            return status;
-        }
-        if (capture_exit_needed) {
-            river_cloud_xiaozhi_apply_capture_exit_playback_policy();
-        }
-        return RIVER_OK;
-    }
+    return river_cloud_xiaozhi_apply_capture_stream_policy(pcm, bytes, is_speech);
 }
 #endif
 
