@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.263
+Validate that dialog runtime now consumes XiaoZhi playback as phase-first truth:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '113,188p' components/river_core/river_dialog_runtime.c
+sed -n '862,926p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'playback_phase_known|playback_phase_equals|phase-first|playback_output_active' \
+  components/river_core/river_dialog_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- XiaoZhi cloud snapshot exports `playback_active` from playback runtime output
+  semantics
+- dialog runtime playback recovering/active derivation prefers `playback_phase`
+  and only uses service/bool state as fallback when phase is unavailable
+
 ## Step 5.262
 Validate that XiaoZhi playback runtime now exports a stable phase truth source:
 ```bash

@@ -862,7 +862,7 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
 
     snapshot->conversation_window_active = river_cloud_xiaozhi_conversation_window_active();
     snapshot->listening = river_cloud_xiaozhi_listening_active();
-    snapshot->playback_active = g_river_cloud.xiaozhi_playback_active;
+    snapshot->playback_active = river_cloud_xiaozhi_playback_output_active();
     snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
     snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
@@ -919,7 +919,7 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                g_river_cloud.xiaozhi_io_started ? "running" : "off",
                river_xiaozhi_session_open() ? "open" : "closed",
                river_cloud_xiaozhi_listening_active() ? "yes" : "no",
-               g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
+               river_cloud_xiaozhi_playback_output_active() ? "yes" : "no",
                river_cloud_xiaozhi_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
                g_river_cloud.xiaozhi_tts_stop_pending ? "yes" : "no",

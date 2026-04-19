@@ -113,12 +113,40 @@ static bool river_dialog_runtime_playback_terminal_closed_locked(void)
     return g_river_dialog_runtime.snapshot.playback_terminal_state[0] != '\0';
 }
 
+static bool river_dialog_runtime_playback_phase_known_locked(void)
+{
+    return g_river_dialog_runtime.snapshot.playback_phase[0] != '\0';
+}
+
+static bool river_dialog_runtime_playback_phase_equals_locked(const char *phase)
+{
+    return phase != NULL && phase[0] != '\0' &&
+           strcmp(g_river_dialog_runtime.snapshot.playback_phase, phase) == 0;
+}
+
+static bool river_dialog_runtime_playback_phase_engaged_locked(void)
+{
+    return river_dialog_runtime_playback_phase_known_locked() &&
+           !river_dialog_runtime_playback_phase_equals_locked("idle");
+}
+
+static bool river_dialog_runtime_playback_phase_output_active_locked(void)
+{
+    return river_dialog_runtime_playback_phase_equals_locked("playing") ||
+           river_dialog_runtime_playback_phase_equals_locked("draining");
+}
+
+static bool river_dialog_runtime_playback_phase_recovering_locked(void)
+{
+    return river_dialog_runtime_playback_phase_equals_locked("rebuffering");
+}
+
 static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 {
-    return g_river_dialog_runtime.snapshot.playback_state == RIVER_PLAYBACK_RECOVERING ||
+    return river_dialog_runtime_playback_phase_recovering_locked() ||
+           g_river_dialog_runtime.snapshot.playback_state == RIVER_PLAYBACK_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_state ==
                RIVER_PLAYBACK_RESTART_PENDING ||
-           strcmp(g_river_dialog_runtime.snapshot.playback_phase, "rebuffering") == 0 ||
            g_river_dialog_runtime.snapshot.playback_rebuffer_pending;
 }
 
@@ -129,13 +157,24 @@ static bool river_dialog_runtime_compute_playback_active_locked(void)
     bool cloud_playback_active = g_river_dialog_runtime.snapshot.playback_cloud_active;
     bool lane_engaged = g_river_dialog_runtime.snapshot.playback_lane_engaged;
     bool recovering = g_river_dialog_runtime.snapshot.playback_recovering;
+    bool phase_known = river_dialog_runtime_playback_phase_known_locked();
+    bool phase_output_active = river_dialog_runtime_playback_phase_output_active_locked();
+    bool phase_engaged = river_dialog_runtime_playback_phase_engaged_locked();
 
     if (river_dialog_runtime_playback_terminal_closed_locked()) {
         return false;
     }
 
+    if (phase_output_active || phase_engaged || recovering) {
+        return true;
+    }
+
     if (!service_active && !cloud_playback_active && !lane_engaged && !recovering &&
         g_river_dialog_runtime.snapshot.playback_terminal_waiting) {
+        return false;
+    }
+
+    if (phase_known) {
         return false;
     }
 

@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.263
+- Aligned the cloud runtime snapshot with the XiaoZhi playback runtime phase by
+  exporting `playback_active` as output-active semantics instead of the old raw
+  `playback_active` flag:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Switched dialog runtime playback derivation to phase-first semantics:
+  - local helpers now interpret `playback_phase`
+  - `playback_recovering` prefers `rebuffering`
+  - `playback_active` now trusts runtime phase first and only falls back to
+    service/bool compatibility when phase is unavailable
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- This narrows the remaining gap where upper layers could still treat
+  playback-service activity as the primary truth during XiaoZhi recovery/drain
+  windows, even after the playback runtime had exported a stricter phase truth
+
 ## Step 5.262
 - Introduced an explicit XiaoZhi playback runtime phase truth source and
   exported it through the cloud/dialog snapshot path:

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.262 introduce XiaoZhi playback runtime phase truth`
+  - `5.263 make dialog runtime consume playback phase first`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,14 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - dialog runtime playback derivation now treats XiaoZhi playback phase as
+      the first-class truth:
+      - `playback_recovering` prefers `rebuffering`
+      - `playback_active` trusts phase before service/bool compatibility
+    - XiaoZhi cloud runtime snapshot also now exports:
+      - `playback_active = playback_output_active`
+      so upper layers no longer ingest the old raw active bit
+  - previous landed runtime-ownership slice:
     - XiaoZhi playback runtime now owns an explicit `playback_phase` truth:
       - `idle`
       - `prefetching`

@@ -1138,14 +1138,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `playback_phase`
   - 这为后续把 `dialog runtime` / `session runtime` / playback worker
     全部统一到同一条下行真相源上打了基础
+- 上层 dialog/runtime 派生也已开始切到 phase-first：
+  - XiaoZhi cloud snapshot 导出的 `playback_active` 现在对齐为：
+    - `playback_output_active`
+    而不是旧的 raw active bit
+  - dialog runtime 现在优先消费：
+    - `playback_phase`
+    再在 phase 缺席时才回退到 service/bool 兼容逻辑
+  - 这进一步压缩了 recovery/drain 空窗里“上层看到的 playback 真相”
+    与 playback runtime 自身真相之间的偏差
 
 下一步焦点：
 
-- 继续把 dialog/core 对 playback recovering/active 的派生切到 phase-first，
-  避免上层仍同时消费：
-  - service state
-  - local bools
-  - runtime phase
+- 继续把 dialog/core 中剩余的 playback lane / output lane 派生去掉
+  对旧 service-active 兼容路径的常态依赖，只把它保留为 phase 缺席兜底
 - 继续检查 reference-service / duplex gate 是否仍会在
   `restart_pending` 期间误触发：
   - capture reopen
