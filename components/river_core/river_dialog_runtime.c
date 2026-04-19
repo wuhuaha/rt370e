@@ -403,14 +403,38 @@ void river_dialog_runtime_note_asr_session_closed(const char *sid, const char *r
 
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason)
 {
+    bool prev_playback_active;
+    bool prev_playback_recovering;
+    bool prev_error_recovering;
+    river_interaction_state_t prev_interaction_state;
+    river_interaction_state_t next_interaction_state;
+
     if (!river_dialog_runtime_lock()) {
         return;
     }
 
+    prev_playback_active = g_river_dialog_runtime.snapshot.playback_active;
+    prev_playback_recovering = g_river_dialog_runtime.snapshot.playback_recovering;
+    prev_error_recovering = g_river_dialog_runtime.snapshot.error_recovering;
+    prev_interaction_state = g_river_dialog_runtime.snapshot.interaction_state;
     g_river_dialog_runtime.snapshot.playback_state = state;
     river_dialog_runtime_refresh_playback_locked();
     if (state != RIVER_PLAYBACK_ERROR) {
         g_river_dialog_runtime.snapshot.error_recovering = false;
+    }
+    next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();
+    if (river_dialog_runtime_playback_phase_known_locked() &&
+        prev_playback_active == g_river_dialog_runtime.snapshot.playback_active &&
+        prev_playback_recovering == g_river_dialog_runtime.snapshot.playback_recovering &&
+        prev_error_recovering == g_river_dialog_runtime.snapshot.error_recovering &&
+        prev_interaction_state == next_interaction_state) {
+        if (reason != NULL && reason[0] != '\0') {
+            river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
+                                           sizeof(g_river_dialog_runtime.snapshot.reason),
+                                           reason);
+        }
+        river_dialog_runtime_unlock();
+        return;
     }
     river_dialog_runtime_publish_locked(reason != NULL ? reason : "playback_state");
     river_dialog_runtime_unlock();

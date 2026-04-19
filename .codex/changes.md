@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.264
+- Suppressed no-op dialog runtime playback-state publishes when XiaoZhi
+  `playback_phase` is already known and the incoming playback-service state
+  change does not alter any effective playback fact:
+  - `playback_active`
+  - `playback_recovering`
+  - `error_recovering`
+  - derived interaction state
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- This reduces residual upper-layer churn where playback-service state changes
+  could still repeatedly poke dialog runtime during recovery windows even after
+  phase-first truth had already stabilized the effective playback view
+
 ## Step 5.263
 - Aligned the cloud runtime snapshot with the XiaoZhi playback runtime phase by
   exporting `playback_active` as output-active semantics instead of the old raw

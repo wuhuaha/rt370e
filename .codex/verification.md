@@ -1,5 +1,27 @@
 # Verification
 
+## Step 5.264
+Validate that phase-known playback-service updates no longer trigger no-op
+dialog runtime publishes:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '404,438p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_phase_known_locked|prev_playback_active|next_interaction_state' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- when `playback_phase` is known, playback-service state updates only publish if
+  they change effective playback/dialog-runtime facts
+
 ## Step 5.263
 Validate that dialog runtime now consumes XiaoZhi playback as phase-first truth:
 ```bash

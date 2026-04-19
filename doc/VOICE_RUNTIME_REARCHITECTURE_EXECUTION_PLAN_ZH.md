@@ -1147,6 +1147,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     再在 phase 缺席时才回退到 service/bool 兼容逻辑
   - 这进一步压缩了 recovery/drain 空窗里“上层看到的 playback 真相”
     与 playback runtime 自身真相之间的偏差
+- dialog runtime 对底层 playback-service 状态变化的消费也已开始去抖：
+  - 当 `playback_phase` 已知且有效 playback/dialog 事实未变化时，
+    `note_playback_state()` 不再触发一次空 publish
+  - 这减少了 recovery 窗口里“底层状态抖一下，上层也被拍一下”的残余噪声
 
 下一步焦点：
 

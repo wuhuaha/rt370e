@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.263 make dialog runtime consume playback phase first`
+  - `5.264 suppress no-op playback-state publishes under phase truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,13 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - dialog runtime now suppresses playback-state publishes when:
+      - `playback_phase` is already known
+      - and the new playback-service state does not change effective playback
+        or interaction facts
+    - this reduces residual upper-layer churn during recovery windows after
+      phase-first truth is already stable
+  - previous landed runtime-ownership slice:
     - dialog runtime playback derivation now treats XiaoZhi playback phase as
       the first-class truth:
       - `playback_recovering` prefers `rebuffering`
