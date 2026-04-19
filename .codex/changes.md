@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.245
+- Moved the last XiaoZhi control-transport dispatch shell out of
+  `river_cloud_adapter.c` and into runtime so adapter control execution is now
+  a one-line delegating shim:
+  - `river_cloud_xiaozhi_execute_control_transport(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the full XiaoZhi control-op dispatch shell for:
+  - session-side transport control reducers
+  - playback ACK transport reducers
+  - grouped op routing across the runtime-owned helpers
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_control_execute(...)` now only forwards the
+  prepared control request into the runtime-owned reducer and no longer
+  retains any XiaoZhi op-type switch ownership:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.244
 - Moved the remaining XiaoZhi playback ACK transport-control execution out of
   `river_cloud_adapter.c` and into playback runtime so adapter no longer

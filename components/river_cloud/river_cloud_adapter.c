@@ -125,33 +125,7 @@ static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_
 static river_status_t river_cloud_xiaozhi_control_execute(
     const river_cloud_xiaozhi_control_request_t *request)
 {
-    if (request == NULL) {
-        return RIVER_ERR_ARG;
-    }
-
-    switch (request->op) {
-    case RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN:
-        return river_cloud_xiaozhi_execute_open_and_listen_transport(request->arg);
-    case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
-        return river_cloud_xiaozhi_execute_session_control_transport(
-            request->op,
-            request->arg);
-    case RIVER_CLOUD_XIAOZHI_CTRL_ABORT:
-        return river_cloud_xiaozhi_execute_session_control_transport(
-            request->op,
-            request->arg);
-    case RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION:
-        return river_cloud_xiaozhi_execute_session_control_transport(
-            request->op,
-            request->arg);
-    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_STARTED:
-    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK:
-    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED:
-    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED:
-        return river_cloud_xiaozhi_execute_playback_control_transport(request);
-    default:
-        return RIVER_ERR_ARG;
-    }
+    return river_cloud_xiaozhi_execute_control_transport(request);
 }
 
 static river_status_t river_cloud_xiaozhi_control_request(

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.245
+Validate that the XiaoZhi control-op dispatch shell now belongs to runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '352,356p' components/river_cloud/river_cloud_internal.h
+sed -n '193,218p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '125,129p' components/river_cloud/river_cloud_adapter.c
+rg -n 'execute_control_transport|execute_open_and_listen_transport|execute_session_control_transport|execute_playback_control_transport|control_execute\\(' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_execute_control_transport(...)`
+- adapter `river_cloud_xiaozhi_control_execute(...)` now only delegates to the
+  runtime-owned control reducer
+- the control-op `switch` now lives in runtime rather than adapter
+
 ## Step 5.244
 Validate that the XiaoZhi playback ACK transport execution now belongs to
 playback runtime:

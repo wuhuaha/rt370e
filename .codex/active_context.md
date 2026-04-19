@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.244 move XiaoZhi playback ACK transport execution into runtime`
+  - `5.245 move XiaoZhi control transport dispatch shell into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -117,6 +117,13 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_xiaozhi_control_execute(...)` no longer directly
       sends playback ACKs and continues shrinking toward a pure control-dispatch
       shell
+  - newest landed runtime-ownership slice:
+    - session runtime now owns the full XiaoZhi control-op dispatch shell,
+      routing:
+      - session-side transport control
+      - playback ACK transport control
+    - adapter `river_cloud_xiaozhi_control_execute(...)` is now reduced to a
+      one-line runtime call, matching the earlier event-dispatch shrink pattern
     - dialog runtime ingress now only treats `RIVER_PLAYBACK_ERROR` as fatal
       `error_recovering`, while recoverable write churn stays on the
       `playback_recovering` path

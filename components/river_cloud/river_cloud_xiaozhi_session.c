@@ -190,6 +190,34 @@ void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *eve
     }
 }
 
+river_status_t river_cloud_xiaozhi_execute_control_transport(
+    const river_cloud_xiaozhi_control_request_t *request)
+{
+    if (request == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    switch (request->op) {
+    case RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN:
+        return river_cloud_xiaozhi_execute_open_and_listen_transport(request->arg);
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
+    case RIVER_CLOUD_XIAOZHI_CTRL_ABORT:
+    case RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION:
+        return river_cloud_xiaozhi_execute_session_control_transport(request->op,
+                                                                     request->arg);
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_STARTED:
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK:
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED:
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED:
+        return river_cloud_xiaozhi_execute_playback_control_transport(request);
+
+    default:
+        return RIVER_ERR_ARG;
+    }
+}
+
 static void river_cloud_xiaozhi_run_endpoint_local_close_housekeeping(void)
 {
     char endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
