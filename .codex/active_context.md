@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.258 move ASR bridge state allocation/reset into runtime`
+  - `5.259 move generic pre-roll and stream-finish reducers into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,15 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - generic ASR bridge runtime now also owns the shared realtime reducer
+      helpers for:
+      - pre-roll reset
+      - pre-roll store
+      - active-stream finish
+    - adapter now only keeps:
+      - generic `stream_open_and_flush()` reducer
+      - high-level bridge orchestration
+  - previous landed runtime-ownership slice:
     - generic ASR bridge runtime now owns the base capture bridge state
       allocation/reset for:
       - `audio_desc`

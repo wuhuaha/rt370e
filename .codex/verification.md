@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.259
+Validate that generic pre-roll mutation and active-stream finish moved into the
+ASR bridge runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '560,640p' components/river_cloud/river_cloud_adapter.c
+sed -n '60,130p' components/river_cloud/river_cloud_asr_bridge_runtime.c
+rg -n 'river_cloud_stream_finish_active|river_cloud_pre_roll_store|river_cloud_pre_roll_reset' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_asr_bridge_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter no longer defines:
+  - `river_cloud_pre_roll_reset(...)`
+  - `river_cloud_pre_roll_store(...)`
+  - `river_cloud_stream_finish_active(...)`
+- ASR bridge runtime owns those helpers and adapter consumes them through
+  internal declarations
+
 ## Step 5.258
 Validate that base ASR bridge state allocation/reset moved out of adapter:
 ```bash

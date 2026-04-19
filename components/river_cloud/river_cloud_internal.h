@@ -341,6 +341,7 @@ river_status_t river_cloud_prepare_audio_bridge_state(
     uint32_t pre_roll_ms,
     uint32_t post_roll_ms);
 void river_cloud_reset_audio_bridge_state(void);
+river_status_t river_cloud_stream_finish_active(void);
 void river_cloud_pre_roll_store(const uint8_t *pcm);
 void river_cloud_pre_roll_reset(void);
 void river_cloud_request_state_sync(const char *reason);

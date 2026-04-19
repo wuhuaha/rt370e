@@ -931,13 +931,22 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - delegate runtime state prepare/reset
     - invoke backend-specific capture open/close policy
   - 这让 generic bridge lifecycle 和 provider policy 开始显式分层
+- generic realtime capture reducer 也继续向同一 runtime 聚拢：
+  - 迁入 `river_cloud_asr_bridge_runtime.c`：
+    - `river_cloud_pre_roll_reset(...)`
+    - `river_cloud_pre_roll_store(...)`
+    - `river_cloud_stream_finish_active(...)`
+  - adapter 现只残留一个 generic reducer：
+    - `stream_open_and_flush()`
+  - 这让 adapter 在 realtime capture 主链上的职责进一步逼近：
+    - gate / dispatch / orchestration
+    - 而不是具体状态变异
 
 下一步焦点：
 
 - 继续把 XiaoZhi 与 generic streaming path 之间的桥接边界做最终收口
-- 继续把 generic realtime streaming reducer
-  (`pre_roll_store/open_and_flush/finish_active`) 从 adapter 迁到独立 runtime
-  边界
+- 继续把 generic realtime streaming reducer 中最后的
+  `stream_open_and_flush()` 从 adapter 迁到独立 runtime 边界
 - 继续审视 downlink/playback 的 starve/rebuffer 恢复策略，把 repeated
   stop/start 收束成更稳定的 runtime truth 与恢复路径
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal

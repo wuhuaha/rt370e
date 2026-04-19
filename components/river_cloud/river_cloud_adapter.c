@@ -562,34 +562,6 @@ void river_cloud_reset_stream_open_deferred_state(void)
     g_river_cloud.stream_open_defer_time_ready = false;
 }
 
-void river_cloud_pre_roll_reset(void)
-{
-    g_river_cloud.pre_roll_count_frames = 0U;
-    g_river_cloud.pre_roll_write_index_frames = 0U;
-}
-
-void river_cloud_pre_roll_store(const uint8_t *pcm)
-{
-    uint8_t *dst;
-
-    if (g_river_cloud.pre_roll_buffer == NULL || pcm == NULL ||
-        g_river_cloud.pre_roll_capacity_frames == 0U || g_river_cloud.frame_bytes == 0U) {
-        return;
-    }
-
-    dst = g_river_cloud.pre_roll_buffer +
-          ((size_t)g_river_cloud.pre_roll_write_index_frames * g_river_cloud.frame_bytes);
-    memcpy(dst, pcm, g_river_cloud.frame_bytes);
-
-    g_river_cloud.pre_roll_write_index_frames++;
-    if (g_river_cloud.pre_roll_write_index_frames >= g_river_cloud.pre_roll_capacity_frames) {
-        g_river_cloud.pre_roll_write_index_frames = 0U;
-    }
-    if (g_river_cloud.pre_roll_count_frames < g_river_cloud.pre_roll_capacity_frames) {
-        g_river_cloud.pre_roll_count_frames++;
-    }
-}
-
 static river_status_t river_cloud_stream_open_and_flush(void)
 {
     uint32_t read_index;
@@ -646,28 +618,6 @@ static river_status_t river_cloud_stream_open_and_flush(void)
     }
 
     river_cloud_pre_roll_reset();
-    return RIVER_OK;
-}
-
-static river_status_t river_cloud_stream_finish_active(void)
-{
-    river_status_t status;
-
-    if (!g_river_cloud.stream_active || g_river_cloud.provider == NULL) {
-        return RIVER_OK;
-    }
-
-    status = g_river_cloud.provider->stream_finish();
-    if (status == RIVER_OK) {
-        g_river_cloud.stream_close_ok++;
-    } else {
-        g_river_cloud.stream_close_fail++;
-    }
-    g_river_cloud.stream_active = false;
-    g_river_cloud.silence_frames = 0U;
-    g_river_cloud.stream_started_ms = 0U;
-    river_cloud_pre_roll_reset();
-    river_runtime_stats_snapshot("asr_stream_finish");
     return status;
 }
 

@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.259
+- Moved generic realtime capture reducer helpers out of `river_cloud_adapter.c`
+  and into the shared ASR bridge runtime:
+  - `river_cloud_pre_roll_reset(...)`
+  - `river_cloud_pre_roll_store(...)`
+  - `river_cloud_stream_finish_active(...)`
+  - [components/river_cloud/river_cloud_asr_bridge_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_asr_bridge_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter now keeps only the generic `stream_open_and_flush()` reducer on the
+  non-XiaoZhi realtime path, while pre-roll mutation and active-stream finish
+  are owned by the bridge runtime module
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.258
 - Added a generic ASR bridge runtime module so adapter no longer directly owns
   the base capture bridge state allocation/reset for:
