@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.252
+- Moved the XiaoZhi active-stream capture tail policy out of
+  `river_cloud_adapter.c` so adapter no longer directly owns:
+  - `speech_resumed` endpoint-soft-close cancel
+  - `silence_frames` post-push bookkeeping
+  - post-roll/min-active gating
+  - duplex soft-endpoint vs local stream-finish branching
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime now owns the grouped active-stream capture reducer:
+  - `river_cloud_xiaozhi_apply_active_stream_capture_policy(...)`
+  - speech-resumed cancel/reset
+  - silence/post-roll progression
+  - `arm_endpoint_soft_close(...)` vs
+    `complete_active_stream_finish(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter XiaoZhi stream-push path now only pushes PCM and delegates the
+  active-stream capture/session policy to runtime:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.251
 - Moved the XiaoZhi capture-entry playback glue out of
   `river_cloud_adapter.c` so adapter no longer directly owns:

@@ -835,12 +835,28 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - runtime helper 调用
   - 这继续缩小 adapter 在 realtime capture 路径上对 playback 真相的直接
     所有权，使 capture/playback 交界开始稳定落在 playback runtime
+- XiaoZhi active-stream capture tail 也已继续从 adapter 收口到 session runtime：
+  - session runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_active_stream_capture_policy(...)`
+  - session runtime 现统一负责：
+    - `speech_resumed` 的 endpoint-soft-close cancel
+    - `silence_frames` 递进
+    - post-roll/min-active gate
+    - duplex soft-endpoint 与 local stream finish 的分发
+  - adapter 的 `river_cloud_xiaozhi_stream_push_frame(...)` 现不再直接内联：
+    - `cancel_endpoint_soft_close("speech_resumed")`
+    - `silence_frames++`
+    - `duplex_soft_endpoint_enabled()` 分支
+    - `complete_active_stream_finish(...)`
+  - 这继续把 capture path 上的 session truth 和 duplex close 语义从 adapter
+    抽离出来，让 adapter 更接近纯推帧/调度壳
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
-  - capture/duplex path 上仍由 adapter 直接触发的 playback 观察性 glue
+  - `asr_audio_close()` / bridge-close 上仍由 adapter 触发的
+    active-stream-finish 与 capture reset glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

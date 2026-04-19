@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.251 move XiaoZhi capture-entry playback policy into runtime`
+  - `5.252 move XiaoZhi active-stream capture tail into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -187,6 +187,14 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_xiaozhi_stream_push_frame(...)` now only calls:
       - `river_cloud_xiaozhi_apply_capture_entry_playback_policy()`
       - `river_cloud_xiaozhi_apply_capture_exit_playback_policy()`
+  - newest landed runtime-ownership slice:
+    - session runtime now also owns the active-stream capture tail reducer for:
+      - `speech_resumed` endpoint-soft-close cancel
+      - silence/post-roll progression
+      - duplex soft-endpoint vs local stream-finish dispatch
+    - adapter `river_cloud_xiaozhi_stream_push_frame(...)` no longer directly
+      mutates `silence_frames` or branches on
+      `duplex_soft_endpoint_enabled()` after PCM push
   - eighth landed slice on that plan:
     - terminal `completed` is now gated by `last_segment observed + fully
       heard`, not only by a transient local drain point

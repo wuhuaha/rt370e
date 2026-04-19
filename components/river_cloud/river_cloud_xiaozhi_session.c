@@ -1637,6 +1637,34 @@ bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason, size_t r
     return true;
 }
 
+void river_cloud_xiaozhi_apply_active_stream_capture_policy(bool is_speech)
+{
+    if (!g_river_cloud.stream_active) {
+        return;
+    }
+
+    if (is_speech) {
+        river_cloud_xiaozhi_cancel_endpoint_soft_close("speech_resumed");
+        g_river_cloud.silence_frames = 0U;
+        return;
+    }
+
+    g_river_cloud.silence_frames++;
+    if (g_river_cloud.silence_frames < g_river_cloud.post_roll_frames ||
+        (rtos_time_get_current_system_time_ms() - g_river_cloud.stream_started_ms) <
+            RIVER_CLOUD_STREAM_MIN_ACTIVE_MS) {
+        return;
+    }
+
+    if (river_cloud_xiaozhi_duplex_soft_endpoint_enabled()) {
+        river_cloud_xiaozhi_arm_endpoint_soft_close("post_roll", "local_silence");
+    } else {
+        river_cloud_xiaozhi_complete_active_stream_finish(
+            RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL,
+            "local_silence");
+    }
+}
+
 void river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason)

@@ -454,6 +454,7 @@ void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
                                                  const char *reason);
 bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason,
                                                           size_t reason_size);
+void river_cloud_xiaozhi_apply_active_stream_capture_policy(bool is_speech);
 void river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason);
