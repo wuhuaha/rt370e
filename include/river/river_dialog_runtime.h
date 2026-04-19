@@ -64,6 +64,7 @@ typedef struct {
 river_status_t river_dialog_runtime_init(void);
 void river_dialog_runtime_mark_boot_ready(const char *reason);
 void river_dialog_runtime_note_wake_confirmed(const char *reason);
+void river_dialog_runtime_note_wake_confirmed_with_cloud_state(const char *reason);
 void river_dialog_runtime_note_asr_session_started(const char *sid, const char *reason);
 void river_dialog_runtime_note_asr_session_closed(const char *sid, const char *reason);
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason);

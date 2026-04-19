@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.271
+Validate that wake admission now enters dialog runtime through one atomic
+fusion API instead of a coordinator-managed note-then-sync sequence:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '64,70p' include/river/river_dialog_runtime.h
+sed -n '368,398p' components/river_core/river_dialog_runtime.c
+sed -n '128,146p' components/river_core/river_session_coordinator.c
+sed -n '448,458p' components/river_core/river_session_coordinator.c
+rg -n 'wake_confirmed_with_cloud_state|sync_cloud_state\\(\"wakeword_detected\"' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime exports `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+- wake admission success paths use that single API
+- coordinator no longer calls
+  `river_dialog_runtime_sync_cloud_state("wakeword_detected")`
+
 ## Step 5.270
 Validate that XiaoZhi ASR lifecycle sync now comes from runtime-owned
 self-publish paths, while coordinator keeps a provider-capability fallback:

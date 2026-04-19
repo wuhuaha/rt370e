@@ -377,6 +377,25 @@ void river_dialog_runtime_note_wake_confirmed(const char *reason)
     river_dialog_runtime_unlock();
 }
 
+void river_dialog_runtime_note_wake_confirmed_with_cloud_state(const char *reason)
+{
+    river_cloud_runtime_snapshot_t snapshot;
+    bool have_snapshot = false;
+
+    memset(&snapshot, 0, sizeof(snapshot));
+    have_snapshot = river_cloud_adapter_get_runtime_snapshot(&snapshot) == RIVER_OK;
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.wake_confirmed = true;
+    if (have_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
+    }
+    river_dialog_runtime_publish_locked(reason != NULL ? reason : "wakeword_detected");
+    river_dialog_runtime_unlock();
+}
+
 void river_dialog_runtime_note_asr_session_started(const char *sid, const char *reason)
 {
     if (!river_dialog_runtime_lock()) {

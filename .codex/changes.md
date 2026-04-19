@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.271
+- `dialog runtime` now provides an atomic wake-admission fusion entrypoint:
+  - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+  - this lets dialog runtime absorb:
+    - local `wake_confirmed`
+    - current cloud runtime snapshot
+    in one ownership boundary instead of forcing the caller to sequence
+    `note_wake_confirmed()` and `sync_cloud_state()`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `session_coordinator` wake-admission success paths now call that single
+  dialog-runtime entrypoint:
+  - worker wake admission path
+  - inline fallback wake admission path
+  - explicit wakeword `sync_cloud_state("wakeword_detected")` bridge has been
+    removed from coordinator
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.270
 - Added a public cloud capability bit so `river_core` can tell whether the
   active provider/runtime will self-publish runtime state-sync events:

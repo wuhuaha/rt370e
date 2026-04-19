@@ -1207,6 +1207,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `asr_session_closed`
   - `session_coordinator` 只在 provider 不具备这项能力时，才保留
     `sync_cloud_state(...)` 的兼容兜底
+- wake admission 这条 bridge 也已继续向 `dialog runtime` 原子入口收口：
+  - 新增：
+    - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+  - `session_coordinator` 的 wake admission 成功路径现在只调用这一个
+    dialog-runtime API，不再显式串联：
+    - `note_wake_confirmed(...)`
+    - `sync_cloud_state("wakeword_detected")`
 
 下一步焦点：
 
