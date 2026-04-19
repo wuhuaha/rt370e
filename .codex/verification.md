@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.239
+Validate that XiaoZhi `SERVER_HELLO` observation now belongs to session
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '352,356p' components/river_cloud/river_cloud_internal.h
+sed -n '150,162p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1084,1090p' components/river_cloud/river_cloud_adapter.c
+rg -n 'note_server_hello_observation|RIVER_XIAOZHI_EVENT_SERVER_HELLO|xiaozhi_server_sample_rate|xiaozhi_server_frame_duration_ms' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_note_server_hello_observation(...)`
+- adapter `RIVER_XIAOZHI_EVENT_SERVER_HELLO` branch no longer inlines:
+  - server sample-rate sync
+  - server frame-duration sync
+  - session-id copy from transport
+
 ## Step 5.238
 Validate that XiaoZhi `STT` follow-up window touch now belongs to session
 runtime:

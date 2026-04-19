@@ -147,6 +147,20 @@ bool river_cloud_xiaozhi_uplink_active(void)
     return river_cloud_xiaozhi_uplink_keepalive_needed(queued_frames);
 }
 
+void river_cloud_xiaozhi_note_server_hello_observation(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    g_river_cloud.xiaozhi_server_sample_rate =
+        event->sample_rate != 0U ? event->sample_rate : 16000U;
+    g_river_cloud.xiaozhi_server_frame_duration_ms =
+        event->frame_duration_ms != 0U ? event->frame_duration_ms :
+                                         RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+}
+
 void river_cloud_xiaozhi_copy_optional_text(char *dst,
                                             size_t dst_size,
                                             const char *src)

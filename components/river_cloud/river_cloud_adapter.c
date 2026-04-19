@@ -1085,12 +1085,7 @@ static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event
 
     switch (event->type) {
     case RIVER_XIAOZHI_EVENT_SERVER_HELLO:
-        g_river_cloud.xiaozhi_server_sample_rate =
-            event->sample_rate != 0U ? event->sample_rate : 16000U;
-        g_river_cloud.xiaozhi_server_frame_duration_ms =
-            event->frame_duration_ms != 0U ? event->frame_duration_ms :
-                                             RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
-        river_cloud_xiaozhi_copy_session_id_from_transport();
+        river_cloud_xiaozhi_note_server_hello_observation(event);
         break;
     case RIVER_XIAOZHI_EVENT_STT:
         river_cloud_xiaozhi_note_stt_observation(event);

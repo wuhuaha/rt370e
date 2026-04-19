@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.238 move XiaoZhi STT window touch into runtime`
+  - `5.239 move XiaoZhi SERVER_HELLO observation into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -259,13 +259,15 @@ or top-of-tree verification target changes.
     - the session-runtime TTS-start surface is now a single exported policy
       helper
   - latest landed slice on that plan:
-    - XiaoZhi `STT` event handling has also finished collapsing into the
-      session-runtime observation helper
-    - adapter `RIVER_XIAOZHI_EVENT_STT` handling now only dispatches to:
-      - `river_cloud_xiaozhi_note_stt_observation(...)`
-    - session runtime `note_stt_observation(...)` now owns both:
-      - `stt` follow-up window touch
-      - pending-text dedup / partial ASR emission
+    - XiaoZhi `SERVER_HELLO` transport observation has also moved out of
+      `river_cloud_adapter.c` into session runtime
+    - adapter `RIVER_XIAOZHI_EVENT_SERVER_HELLO` handling now only dispatches
+      to:
+      - `river_cloud_xiaozhi_note_server_hello_observation(...)`
+    - session runtime now owns:
+      - server sample-rate truth
+      - server frame-duration truth
+      - session-id sync from transport cache
   - twenty-fifth landed slice on that plan:
     - XiaoZhi `tts_stop` round-close policy now lives in session runtime
     - adapter TTS-stop handling now only calls the exported runtime helper

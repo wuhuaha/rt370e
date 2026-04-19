@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.239
+- Moved the remaining XiaoZhi `SERVER_HELLO` transport-event observation out of
+  `river_cloud_adapter.c` and into session runtime so adapter no longer owns
+  transport sample-rate/frame-duration/session-id synchronization inline:
+  - `river_cloud_xiaozhi_note_server_hello_observation(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the `SERVER_HELLO` observation reducer for:
+  - server sample-rate truth
+  - server frame-duration truth
+  - session-id sync from transport cache
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi `SERVER_HELLO` branch now only dispatches the transport
+  observation into the runtime-owned reducer:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.238
 - Moved the remaining XiaoZhi `STT` event follow-up window touch out of
   `river_cloud_adapter.c` and into the existing session-runtime observation

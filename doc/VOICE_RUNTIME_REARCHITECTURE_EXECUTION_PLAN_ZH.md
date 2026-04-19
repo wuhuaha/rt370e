@@ -302,6 +302,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - pending-text dedup / partial ASR emission
   - adapter 的 `RIVER_XIAOZHI_EVENT_STT` 分支不再在 runtime helper 之前再
     持有一次单独的 `window_touch(...)`
+- `SERVER_HELLO` transport 分支也已继续从 adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_note_server_hello_observation(...)`
+  - session runtime 现统一负责：
+    - server sample-rate/frame-duration 同步
+    - transport session-id 同步
+  - adapter 的 `RIVER_XIAOZHI_EVENT_SERVER_HELLO` 分支不再直接写这些会话
+    启动态事实
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：
