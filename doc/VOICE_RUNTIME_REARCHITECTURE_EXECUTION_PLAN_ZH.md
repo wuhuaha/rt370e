@@ -1121,9 +1121,31 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - no-ref reopen guard
     - downlink queue / rebuffer
   - adapter 不再自行拼接这些下行/播放真相字段
+- playback/downlink 运行态也开始从布尔散点收口为显式 phase truth：
+  - 新增 runtime phase：
+    - `idle`
+    - `prefetching`
+    - `playing`
+    - `rebuffering`
+    - `draining`
+  - `playback_output_active` / `playback_lane_engaged` 现在优先消费这条
+    phase truth，而不是继续从：
+    - `playback_active`
+    - `tts_stop_pending`
+    - playback-service active state
+    临时拼接
+  - cloud runtime snapshot 与 dialog runtime dump 也已开始直接透出：
+    - `playback_phase`
+  - 这为后续把 `dialog runtime` / `session runtime` / playback worker
+    全部统一到同一条下行真相源上打了基础
 
 下一步焦点：
 
+- 继续把 dialog/core 对 playback recovering/active 的派生切到 phase-first，
+  避免上层仍同时消费：
+  - service state
+  - local bools
+  - runtime phase
 - 继续检查 reference-service / duplex gate 是否仍会在
   `restart_pending` 期间误触发：
   - capture reopen

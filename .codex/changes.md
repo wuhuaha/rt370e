@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.262
+- Introduced an explicit XiaoZhi playback runtime phase truth source and
+  exported it through the cloud/dialog snapshot path:
+  - runtime phase now collapses scattered local playback facts into:
+    - `idle`
+    - `prefetching`
+    - `playing`
+    - `rebuffering`
+    - `draining`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- XiaoZhi playback lane predicates now consume that runtime phase instead of
+  re-deriving occupancy from scattered booleans plus playback-service state:
+  - `river_cloud_xiaozhi_playback_output_active()`
+  - `river_cloud_xiaozhi_playback_lane_engaged()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- The phase is now visible to higher layers and diagnostics:
+  - cloud runtime snapshot exports `playback_phase`
+  - dialog runtime snapshot/dump now log cloud playback as `active/phase`
+  - XiaoZhi session dump prints the runtime phase directly
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.261
 - Tightened XiaoZhi downlink rebuffer semantics so `rebuffer_pending` is now a
   real resume gate in the worker instead of only a flag:

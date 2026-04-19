@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.262
+Validate that XiaoZhi playback runtime now exports a stable phase truth source:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '28,95p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '155,175p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '872,910p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '116,132p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_phase|refresh_playback_phase|compute_playback_phase' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_core/river_dialog_runtime.c \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- XiaoZhi playback runtime owns an explicit `playback_phase` reducer/export path
+- cloud/dialog runtime dumps can print cloud playback as:
+  - active flag
+  - runtime phase
+- playback lane occupation is no longer reconstructed from playback-service
+  active state inside the XiaoZhi playback runtime helper
+
 ## Step 5.261
 Validate that XiaoZhi write-failure recovery now waits for a refill threshold
 before resuming writes:

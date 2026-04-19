@@ -52,6 +52,7 @@ typedef struct {
     char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_phase[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_terminal_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];

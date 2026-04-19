@@ -118,6 +118,7 @@ static bool river_dialog_runtime_compute_playback_recovering_locked(void)
     return g_river_dialog_runtime.snapshot.playback_state == RIVER_PLAYBACK_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_state ==
                RIVER_PLAYBACK_RESTART_PENDING ||
+           strcmp(g_river_dialog_runtime.snapshot.playback_phase, "rebuffering") == 0 ||
            g_river_dialog_runtime.snapshot.playback_rebuffer_pending;
 }
 
@@ -255,6 +256,9 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
                                    sizeof(g_river_dialog_runtime.snapshot.accept_reason),
                                    snapshot->accept_reason);
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_phase,
+                                   sizeof(g_river_dialog_runtime.snapshot.playback_phase),
+                                   snapshot->playback_phase);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_terminal_state,
                                    sizeof(g_river_dialog_runtime.snapshot.playback_terminal_state),
                                    snapshot->playback_terminal_state);
@@ -442,13 +446,14 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s cloud_playback=%s lane=%s recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s cloud_playback=%s/%s lane=%s recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
                snapshot.asr_session_active ? "yes" : "no",
                snapshot.playback_active ? "yes" : "no",
                snapshot.playback_cloud_active ? "yes" : "no",
+               snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-",
                snapshot.playback_lane_engaged ? "yes" : "no",
                snapshot.playback_recovering ? "yes" : "no",
                snapshot.playback_terminal_state[0] != '\0' ?
