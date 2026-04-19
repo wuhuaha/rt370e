@@ -433,6 +433,8 @@ void river_cloud_xiaozhi_maybe_finalize_listen_stop(uint32_t queued_frames,
                                                     size_t accum_bytes);
 bool river_cloud_xiaozhi_uplink_keepalive_needed(uint32_t queued_frames);
 bool river_cloud_xiaozhi_uplink_send_ready(void);
+river_status_t river_cloud_xiaozhi_apply_bridge_open_capture_policy(
+    const river_cloud_asr_audio_desc_t *audio);
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void);
 void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void);
 void river_cloud_xiaozhi_apply_bridge_close_capture_policy(void);

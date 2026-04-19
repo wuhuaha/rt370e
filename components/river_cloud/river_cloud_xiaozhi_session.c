@@ -120,6 +120,15 @@ bool river_cloud_xiaozhi_listen_stop_pending(void)
     return g_river_cloud.xiaozhi_listen_stop_pending;
 }
 
+static uint32_t river_cloud_xiaozhi_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms)
+{
+    if (frame_ms == 0U || duration_ms == 0U) {
+        return 0U;
+    }
+
+    return (duration_ms + frame_ms - 1U) / frame_ms;
+}
+
 static bool river_cloud_xiaozhi_io_owner(void)
 {
     return g_river_cloud.xiaozhi_io_task != NULL &&
@@ -280,6 +289,73 @@ bool river_cloud_xiaozhi_uplink_active(void)
 
     queued_frames = river_cloud_xiaozhi_uplink_ready_frames();
     return river_cloud_xiaozhi_uplink_keepalive_needed(queued_frames);
+}
+
+river_status_t river_cloud_xiaozhi_apply_bridge_open_capture_policy(
+    const river_cloud_asr_audio_desc_t *audio)
+{
+    uint32_t xiaozhi_pre_roll_frames;
+    river_status_t status;
+
+    if (audio == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    if (audio->sample_rate != RIVER_XIAOZHI_UPLINK_SAMPLE_RATE ||
+        audio->channels != RIVER_XIAOZHI_UPLINK_CHANNELS ||
+        audio->bits_per_sample != 16U) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    xiaozhi_pre_roll_frames = river_cloud_xiaozhi_ms_to_frames(
+        RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS,
+        audio->frame_ms);
+    if (xiaozhi_pre_roll_frames > 0U &&
+        g_river_cloud.pre_roll_capacity_frames > xiaozhi_pre_roll_frames) {
+        g_river_cloud.pre_roll_capacity_frames = xiaozhi_pre_roll_frames;
+    }
+
+    if (g_river_cloud.xiaozhi_uplink_ring.initialized &&
+        g_river_cloud.xiaozhi_uplink_ring.frame_bytes !=
+            RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX) {
+        river_audio_frame_ring_deinit(&g_river_cloud.xiaozhi_uplink_ring);
+    }
+    if (!g_river_cloud.xiaozhi_uplink_ring.initialized) {
+        status = river_audio_frame_ring_init_with_storage_ex(
+            &g_river_cloud.xiaozhi_uplink_ring,
+            g_river_cloud.xiaozhi_uplink_ring_storage,
+            sizeof(g_river_cloud.xiaozhi_uplink_ring_storage),
+            RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX,
+            RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES,
+            RIVER_AUDIO_FRAME_RING_MODE_SPSC);
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+
+    river_audio_frame_ring_reset(&g_river_cloud.xiaozhi_uplink_ring);
+    g_river_cloud.xiaozhi_uplink_ring_dropped = 0U;
+    g_river_cloud.xiaozhi_uplink_busy_count = 0U;
+    g_river_cloud.xiaozhi_uplink_fail_count = 0U;
+    g_river_cloud.xiaozhi_uplink_stale_dropped = 0U;
+    g_river_cloud.xiaozhi_uplink_timestamp_ms =
+        (uint32_t)rtos_time_get_current_system_time_ms();
+    g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
+    g_river_cloud.xiaozhi_uplink_last_busy_log_ms = 0U;
+    g_river_cloud.xiaozhi_uplink_accum_bytes = 0U;
+    g_river_cloud.xiaozhi_uplink_retry_valid = false;
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+
+    RIVER_LOGI("xiaozhi uplink audio: %luHz/%luch frame=%lums pcm=%luB",
+               (unsigned long)audio->sample_rate,
+               (unsigned long)audio->channels,
+               (unsigned long)RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS,
+               (unsigned long)RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX);
+    RIVER_LOGI("xiaozhi listen gate: pre_roll_cap=%lums open_hold_frames=%u",
+               (unsigned long)(g_river_cloud.pre_roll_capacity_frames * audio->frame_ms),
+               (unsigned int)RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES);
+    return RIVER_OK;
 }
 
 void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *event)

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.254
+Validate that XiaoZhi bridge-open capture/uplink init now belongs to session
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '433,440p' components/river_cloud/river_cloud_internal.h
+sed -n '291,357p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '978,1032p' components/river_cloud/river_cloud_adapter.c
+rg -n 'apply_bridge_open_capture_policy|uplink audio|listen gate|xiaozhi_open_speech_frames = 0U' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_bridge_open_capture_policy(...)`
+- adapter `river_cloud_asr_audio_open()` no longer directly performs:
+  - uplink format gate
+  - XiaoZhi uplink ring init/reset
+  - bridge-open `uplink audio` / `listen gate` logging
+
 ## Step 5.253
 Validate that XiaoZhi bridge-close capture teardown now belongs to session
 runtime:

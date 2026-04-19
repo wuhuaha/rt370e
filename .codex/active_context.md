@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.253 move XiaoZhi bridge-close capture teardown into runtime`
+  - `5.254 move XiaoZhi bridge-open capture/uplink init into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -202,6 +202,18 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_asr_audio_close()` now only calls:
       - `river_cloud_xiaozhi_apply_bridge_close_capture_policy()`
       before its encoder/generic bridge teardown
+  - newest landed runtime-ownership slice:
+    - session runtime now also owns the bridge-open capture/uplink reducer for:
+      - uplink audio format validation
+      - XiaoZhi pre-roll cap normalization
+      - uplink ring lifecycle normalization
+      - uplink timestamp / retry / busy-metric reset
+      - bridge-open listen-gate logging
+    - adapter `river_cloud_asr_audio_open()` now only calls:
+      - `river_cloud_xiaozhi_apply_bridge_open_capture_policy()`
+      around its generic bridge allocation path
+    - adapter `river_cloud_asr_audio_close()` no longer carries a leftover
+      XiaoZhi-only `xiaozhi_open_speech_frames` reset
   - eighth landed slice on that plan:
     - terminal `completed` is now gated by `last_segment observed + fully
       heard`, not only by a transient local drain point

@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.254
+- Moved the remaining XiaoZhi bridge-open capture/uplink init glue out of
+  `river_cloud_adapter.c` so adapter no longer directly owns:
+  - uplink audio format validation
+  - XiaoZhi pre-roll cap normalization
+  - uplink ring init/reset and counter reset
+  - bridge-open listen-gate logging
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime now owns the grouped bridge-open capture/uplink reducer:
+  - `river_cloud_xiaozhi_apply_bridge_open_capture_policy(...)`
+  - uplink ring lifecycle normalization for bridge open
+  - uplink timestamp / retry / busy metrics reset
+  - `xiaozhi_open_speech_frames` reset and listen-gate projection
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_asr_audio_open()` now only delegates the XiaoZhi
+  bridge-open capture/uplink policy to runtime around its generic bridge
+  allocation path, and `river_cloud_asr_audio_close()` no longer carries a
+  leftover XiaoZhi-only `xiaozhi_open_speech_frames` reset:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.253
 - Moved the XiaoZhi bridge-close capture teardown glue out of
   `river_cloud_adapter.c` so adapter no longer directly owns:

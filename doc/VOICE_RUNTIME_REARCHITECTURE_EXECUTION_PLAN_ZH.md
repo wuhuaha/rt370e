@@ -861,13 +861,34 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - bridge-close finish 后再接 terminal-policy 的顺序
   - 这继续压缩 adapter 在 audio-close / bridge-close 路径上的 session truth
     所有权，让 bridge teardown 更接近 runtime-owned reducer + transport shell
+- XiaoZhi bridge-open capture/uplink init 也已继续从 adapter 收口到 session runtime：
+  - session runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_bridge_open_capture_policy(...)`
+  - session runtime 现统一负责：
+    - uplink audio format gate
+    - XiaoZhi pre-roll cap normalization
+    - uplink ring init/reset 的 bridge-open 归一
+    - uplink timestamp / retry / busy 计数器归零
+    - bridge-open `uplink audio` / `listen gate` 日志
+  - adapter 的 `river_cloud_asr_audio_open()` 现不再直接内联：
+    - sample-rate/channel/bit-depth gate
+    - `xiaozhi_uplink_ring` init/reset
+    - `xiaozhi_uplink_*` timestamp/counter reset
+    - `xiaozhi_open_speech_frames = 0`
+  - adapter 的 `river_cloud_asr_audio_close()` 也不再额外带一个 XiaoZhi-only
+    `xiaozhi_open_speech_frames` reset
+  - 这继续把 audio-bridge open/close 路径上的 XiaoZhi capture truth 从
+    adapter 收回 session runtime，让 adapter 更接近 generic bridge shell
 
 下一步焦点：
 
-- 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
-  playback runtime，优先处理：
-  - `asr_audio_close()` 上仍由 adapter 直接重置的
-    `xiaozhi_open_speech_frames` / pre-roll / bridge-open capture glue
+- 继续把 `river_cloud_asr_audio_open()/close()` 中剩余的 generic bridge
+  lifecycle 提炼成稳定边界，优先处理：
+  - `audio_desc`
+  - `frame_bytes`
+  - `pre_roll_buffer`
+  - `pre_roll_capacity_frames`
+  这些仍由 adapter 直接持有的 bridge 生命周期
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
