@@ -323,6 +323,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - runtime helper 调用
   - 这让 adapter 更接近纯 provider/transport 接线层，而 event-type 所有权
     继续稳定落在 runtime
+- XiaoZhi I/O loop 上那层 session-housekeeping glue 也已继续从 adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_run_io_tick_housekeeping(...)`
+    - `river_cloud_xiaozhi_run_post_poll_housekeeping(...)`
+    - `river_cloud_xiaozhi_run_post_uplink_housekeeping(...)`
+  - session runtime 现统一负责：
+    - `io_tick` 的 turn-semantics refresh
+    - window timeout / endpoint soft-close / local-close timeout 组合维护
+    - poll 后 accepted-turn pending-text finalize
+    - uplink 后 playback pending-stop 收尾
+  - adapter 的 `river_cloud_xiaozhi_io_task(...)` 不再直接内联这些会话/播放
+    维护判断，而是只保留：
+    - control queue 调度
+    - websocket poll
+    - uplink service
+    - fairness delay
+  - 这继续把 I/O loop 中的“运行时真相维护”从 adapter 调度壳里抽离出来，
+    让 runtime 统一拥有这些时序 reducer
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：

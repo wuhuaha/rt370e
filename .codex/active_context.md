@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.240 move XiaoZhi transport event dispatch shell into runtime`
+  - `5.241 move XiaoZhi I/O-loop housekeeping glue into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -85,6 +85,13 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_xiaozhi_event_handler(...)` is now reduced to a
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
+  - newest landed runtime-ownership slice:
+    - session runtime now also owns the XiaoZhi I/O-loop housekeeping reducers:
+      - `io_tick` turn/window maintenance
+      - post-poll accepted-turn finalize glue
+      - post-uplink playback/endpoint/local-close housekeeping
+    - adapter `river_cloud_xiaozhi_io_task(...)` now keeps only poll/uplink
+      scheduling order instead of mutating those session/playback truths inline
     - dialog runtime ingress now only treats `RIVER_PLAYBACK_ERROR` as fatal
       `error_recovering`, while recoverable write churn stays on the
       `playback_recovering` path

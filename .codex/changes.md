@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.241
+- Moved the XiaoZhi I/O-loop session-housekeeping glue out of
+  `river_cloud_adapter.c` and into runtime-owned helpers so adapter no longer
+  inlines the `io_tick/poll` maintenance sequence:
+  - `river_cloud_xiaozhi_run_io_tick_housekeeping(...)`
+  - `river_cloud_xiaozhi_run_post_poll_housekeeping(...)`
+  - `river_cloud_xiaozhi_run_post_uplink_housekeeping(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the grouped I/O-loop reducers for:
+  - `io_tick` turn-semantics refresh and conversation-window timeout checks
+  - post-poll accepted-turn pending-text finalize without a second refresh pass
+  - post-uplink playback pending-stop, endpoint soft-close timeout, and local
+    close timeout housekeeping
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter XiaoZhi I/O task is reduced further to transport scheduling order
+  only:
+  - control queue
+  - websocket poll
+  - uplink service
+  - fairness delay
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.240
 - Moved the last XiaoZhi transport-event dispatch shell out of
   `river_cloud_adapter.c` and into session runtime so adapter event callback is

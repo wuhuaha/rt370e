@@ -519,23 +519,11 @@ static void river_cloud_xiaozhi_io_service_uplink(void)
 
 static void river_cloud_xiaozhi_io_task(void *arg)
 {
-    char endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
-
     (void)arg;
 
     for (;;) {
         river_cloud_xiaozhi_process_control_queue();
-        river_cloud_xiaozhi_refresh_turn_semantics("io_tick");
-        river_cloud_xiaozhi_check_window_timeout();
-        endpoint_soft_close_reason[0] = '\0';
-        if (river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(
-                endpoint_soft_close_reason,
-                sizeof(endpoint_soft_close_reason))) {
-            river_cloud_xiaozhi_complete_active_stream_finish(
-                RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT,
-                endpoint_soft_close_reason);
-        }
-        river_cloud_xiaozhi_check_local_close_timeout();
+        river_cloud_xiaozhi_run_io_tick_housekeeping();
 
         if (river_cloud_xiaozhi_io_has_work()) {
             if (river_xiaozhi_session_open()) {
@@ -543,20 +531,10 @@ static void river_cloud_xiaozhi_io_task(void *arg)
             } else {
                 rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_IO_ACTIVE_MS);
             }
-            river_cloud_xiaozhi_refresh_turn_semantics("poll");
-            river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted("accept_reason");
+            river_cloud_xiaozhi_run_post_poll_housekeeping();
             river_cloud_xiaozhi_process_control_queue();
             river_cloud_xiaozhi_io_service_uplink();
-            river_cloud_xiaozhi_playback_check_pending_stop();
-            endpoint_soft_close_reason[0] = '\0';
-            if (river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(
-                    endpoint_soft_close_reason,
-                    sizeof(endpoint_soft_close_reason))) {
-                river_cloud_xiaozhi_complete_active_stream_finish(
-                    RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT,
-                    endpoint_soft_close_reason);
-            }
-            river_cloud_xiaozhi_check_local_close_timeout();
+            river_cloud_xiaozhi_run_post_uplink_housekeeping();
             rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_IO_FAIRNESS_DELAY_MS);
             continue;
         }

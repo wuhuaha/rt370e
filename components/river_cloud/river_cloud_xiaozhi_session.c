@@ -190,6 +190,29 @@ void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *eve
     }
 }
 
+static void river_cloud_xiaozhi_run_endpoint_local_close_housekeeping(void)
+{
+    char endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
+
+    endpoint_soft_close_reason[0] = '\0';
+    if (river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(
+            endpoint_soft_close_reason,
+            sizeof(endpoint_soft_close_reason))) {
+        river_cloud_xiaozhi_complete_active_stream_finish(
+            RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT,
+            endpoint_soft_close_reason);
+    }
+
+    river_cloud_xiaozhi_check_local_close_timeout();
+}
+
+void river_cloud_xiaozhi_run_io_tick_housekeeping(void)
+{
+    river_cloud_xiaozhi_refresh_turn_semantics("io_tick");
+    river_cloud_xiaozhi_check_window_timeout();
+    river_cloud_xiaozhi_run_endpoint_local_close_housekeeping();
+}
+
 void river_cloud_xiaozhi_note_server_hello_observation(const river_xiaozhi_event_t *event)
 {
     if (event == NULL) {
@@ -1659,18 +1682,37 @@ static void river_cloud_xiaozhi_commit_pending_text_finalization(const char *tri
                                 true);
 }
 
-void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trigger)
+static void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(
+    const char *trigger)
 {
     if (!river_cloud_xiaozhi_pending_text_ready_for_finalize()) {
         return;
     }
 
-    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
     if (!river_cloud_xiaozhi_turn_accepted()) {
         return;
     }
 
     river_cloud_xiaozhi_commit_pending_text_finalization(trigger);
+}
+
+void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trigger)
+{
+    river_cloud_xiaozhi_refresh_turn_semantics(trigger);
+    river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(trigger);
+}
+
+void river_cloud_xiaozhi_run_post_poll_housekeeping(void)
+{
+    river_cloud_xiaozhi_refresh_turn_semantics("poll");
+    river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(
+        "accept_reason");
+}
+
+void river_cloud_xiaozhi_run_post_uplink_housekeeping(void)
+{
+    river_cloud_xiaozhi_playback_check_pending_stop();
+    river_cloud_xiaozhi_run_endpoint_local_close_housekeeping();
 }
 
 void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
