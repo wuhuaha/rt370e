@@ -1267,8 +1267,13 @@ void river_cloud_xiaozhi_apply_playback_backend_refresh_policy(void)
     river_cloud_xiaozhi_reset_playback_state();
 }
 
-void river_cloud_xiaozhi_apply_bridge_close_playback_tail(void)
+void river_cloud_xiaozhi_apply_terminal_playback_policy(
+    river_cloud_xiaozhi_playback_abort_cause_t cause)
 {
+    if (river_cloud_xiaozhi_playback_has_work()) {
+        (void)river_cloud_xiaozhi_playback_abort_for_cause(cause, NULL);
+    }
+
     river_opus_decoder_close(&g_river_cloud.xiaozhi_decoder);
 }
 

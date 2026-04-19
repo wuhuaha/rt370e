@@ -1058,7 +1058,6 @@ void river_cloud_asr_audio_close(void)
         }
         river_cloud_xiaozhi_apply_bridge_close_terminal_policy();
         river_opus_encoder_close(&g_river_cloud.xiaozhi_encoder);
-        river_cloud_xiaozhi_apply_bridge_close_playback_tail();
     } else {
         river_cloud_stream_finish_active();
     }

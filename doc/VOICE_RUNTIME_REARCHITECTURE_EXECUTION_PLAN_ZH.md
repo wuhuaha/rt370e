@@ -788,14 +788,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - runtime helper 调用
   - 这继续缩小 adapter 在 playback/downlink 生命周期上的直接所有权，为后续
     把 terminal-close reducer 本身继续回收到 playback runtime 做准备
+- XiaoZhi terminal-close 的 playback reducer 也已继续从 session/runtime 外层收口：
+  - playback runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_terminal_playback_policy(...)`
+  - playback runtime 现统一负责：
+    - `transport_closed / network_lost / bridge_close` 三类 terminal cause 的
+      playback abort gate
+    - terminal decoder teardown tail
+  - session runtime 的 terminal policy 分支现只保留：
+    - session/window/round 的 terminal policy
+    - playback runtime helper 调用
+  - adapter 的 `river_cloud_asr_audio_close()` 现不再在 session runtime policy
+    之后追加一层 playback bridge-close tail
+  - 这让 terminal-close 路径上的 playback 收尾真相进一步收敛到同一个
+    playback runtime reducer，而不再散落在 session runtime 与 adapter 外围
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
-  - transport_closed / network_lost 分支上的 playback/downlink tail action
-  - terminal-close reducer 与 session terminal policy 的进一步解耦
   - capture-path 上仍由 adapter 触发的 playback pending-stop glue
+  - bridge-close / network-lost 之后仍分散在 session reset 路径里的
+    playback-meta/downlink reset 辅助动作
+  - capture/duplex path 上仍由 adapter 直接触发的 playback 观察性 glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

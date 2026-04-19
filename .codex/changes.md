@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.249
+- Moved the XiaoZhi terminal-close playback tail out of session-runtime
+  terminal branches and the adapter bridge-close path so they no longer
+  directly own:
+  - `playback_has_work()` gating before terminal abort
+  - per-cause `playback_abort_for_cause(...)` dispatch in
+    `transport_closed / network_lost / bridge_close`
+  - adapter bridge-close decoder-tail invocation
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Playback runtime now owns the grouped terminal-close playback reducer:
+  - `river_cloud_xiaozhi_apply_terminal_playback_policy(...)`
+  - grouped abort dispatch by typed terminal cause
+  - terminal decoder teardown tail
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime terminal policies and adapter bridge-close path now only
+  call the runtime-owned playback terminal reducer:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.248
 - Moved the remaining XiaoZhi playback backend-refresh and bridge-close tail
   glue out of `river_cloud_adapter.c` and into playback runtime so adapter no

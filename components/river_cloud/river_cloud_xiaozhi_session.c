@@ -1292,22 +1292,16 @@ void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
     river_cloud_xiaozhi_finalize_pending_text("transport_closed");
     river_cloud_xiaozhi_round_finish("transport_closed");
     river_cloud_xiaozhi_window_abort_local("transport_closed");
-    if (river_cloud_xiaozhi_playback_has_work()) {
-        (void)river_cloud_xiaozhi_playback_abort_for_cause(
-            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED,
-            NULL);
-    }
+    river_cloud_xiaozhi_apply_terminal_playback_policy(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED);
     river_cloud_xiaozhi_reset_transport_state(true);
     river_cloud_xiaozhi_check_window_timeout();
 }
 
 void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
 {
-    if (river_cloud_xiaozhi_playback_has_work()) {
-        (void)river_cloud_xiaozhi_playback_abort_for_cause(
-            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST,
-            NULL);
-    }
+    river_cloud_xiaozhi_apply_terminal_playback_policy(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_NETWORK_LOST);
     river_cloud_xiaozhi_round_finish("network_lost");
     river_cloud_xiaozhi_reset_transport_state(false);
     (void)river_cloud_xiaozhi_request_close_session();
@@ -1315,11 +1309,8 @@ void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
 
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void)
 {
-    if (river_cloud_xiaozhi_playback_has_work()) {
-        (void)river_cloud_xiaozhi_playback_abort_for_cause(
-            RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE,
-            NULL);
-    }
+    river_cloud_xiaozhi_apply_terminal_playback_policy(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_BRIDGE_CLOSE);
     river_cloud_xiaozhi_round_finish("bridge_close");
     river_cloud_xiaozhi_reset_transport_state(false);
     (void)river_cloud_xiaozhi_request_close_session();

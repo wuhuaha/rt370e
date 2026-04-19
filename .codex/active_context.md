@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.248 move XiaoZhi playback backend refresh into runtime`
+  - `5.249 move XiaoZhi terminal playback policy into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -155,9 +155,17 @@ or top-of-tree verification target changes.
       - backend refresh / downlink worker bootstrap
       - playback-state reset on backend refresh
       - bridge-close decoder tail teardown
-    - adapter XiaoZhi init / config-refresh / audio-close paths now only call:
+    - adapter XiaoZhi init / config-refresh path now only calls:
       - `river_cloud_xiaozhi_apply_playback_backend_refresh_policy(...)`
-      - `river_cloud_xiaozhi_apply_bridge_close_playback_tail(...)`
+  - newest landed runtime-ownership slice:
+    - playback runtime now also owns the grouped terminal-close playback
+      reducer for:
+      - `transport_closed`
+      - `network_lost`
+      - `bridge_close`
+    - session runtime terminal branches no longer inline playback abort gating,
+      and adapter `river_cloud_asr_audio_close()` no longer appends a separate
+      playback bridge-close tail after calling the session runtime policy
   - eighth landed slice on that plan:
     - terminal `completed` is now gated by `last_segment observed + fully
       heard`, not only by a transient local drain point
