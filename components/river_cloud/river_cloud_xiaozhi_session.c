@@ -1511,6 +1511,125 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
     return RIVER_OK;
 }
 
+static river_status_t river_cloud_xiaozhi_apply_inactive_stream_capture_policy(
+    const uint8_t *pcm,
+    size_t bytes,
+    bool is_speech,
+    bool *activated)
+{
+    river_status_t status;
+    bool followup_opened = false;
+    uint32_t pre_roll_frames_before_open;
+    uint32_t read_index;
+    uint32_t frame_index;
+
+    if (activated != NULL) {
+        *activated = false;
+    }
+
+    river_cloud_pre_roll_store(pcm);
+    pre_roll_frames_before_open = g_river_cloud.pre_roll_count_frames;
+    status = river_cloud_xiaozhi_maybe_start_followup_round(is_speech,
+                                                            pre_roll_frames_before_open,
+                                                            &followup_opened);
+    if (status != RIVER_OK) {
+        g_river_cloud.stream_open_fail++;
+        river_cloud_log_stream_open_deferred_once(status);
+        return status;
+    }
+    if (!followup_opened) {
+        return RIVER_OK;
+    }
+
+    if (pre_roll_frames_before_open == g_river_cloud.pre_roll_capacity_frames) {
+        read_index = g_river_cloud.pre_roll_write_index_frames;
+    } else {
+        read_index = 0U;
+    }
+
+    for (frame_index = 0U; frame_index < pre_roll_frames_before_open; ++frame_index) {
+        const uint8_t *src = g_river_cloud.pre_roll_buffer +
+                             ((size_t)read_index * g_river_cloud.frame_bytes);
+
+        status = river_cloud_xiaozhi_push_pcm(src, g_river_cloud.frame_bytes);
+        if (status != RIVER_OK) {
+            g_river_cloud.stream_feed_fail++;
+            return status;
+        }
+        g_river_cloud.stream_feed_ok++;
+
+        read_index++;
+        if (read_index >= g_river_cloud.pre_roll_capacity_frames) {
+            read_index = 0U;
+        }
+    }
+    river_cloud_pre_roll_reset();
+
+    if (pre_roll_frames_before_open == 0U) {
+        status = river_cloud_xiaozhi_push_pcm(pcm, bytes);
+        if (status != RIVER_OK) {
+            g_river_cloud.stream_feed_fail++;
+            return status;
+        }
+        g_river_cloud.stream_feed_ok++;
+    }
+
+    river_cloud_reset_stream_open_deferred_state();
+    g_river_cloud.stream_active = true;
+    g_river_cloud.stream_open_ok++;
+    g_river_cloud.silence_frames = 0U;
+    g_river_cloud.stream_started_ms = rtos_time_get_current_system_time_ms();
+    RIVER_LOGI("asr stream active: provider=%s pre_roll_frames=%lu",
+               river_cloud_asr_provider_name(),
+               (unsigned long)pre_roll_frames_before_open);
+    river_runtime_stats_snapshot("asr_stream_active");
+
+    if (activated != NULL) {
+        *activated = true;
+    }
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_xiaozhi_apply_stream_push_capture_policy(
+    const uint8_t *pcm,
+    size_t bytes,
+    bool is_speech,
+    bool *capture_exit_needed)
+{
+    river_status_t status;
+
+    if (capture_exit_needed != NULL) {
+        *capture_exit_needed = false;
+    }
+
+    /*
+     * Follow-up window timeout can cascade into websocket/session teardown.
+     * Keep that off the real-time capture path; the dedicated xiaozhi I/O
+     * owner already polls timeout state continuously and owns transport work.
+     */
+    river_cloud_log_time_ready_once();
+
+    if (!g_river_cloud.stream_active) {
+        return river_cloud_xiaozhi_apply_inactive_stream_capture_policy(pcm,
+                                                                        bytes,
+                                                                        is_speech,
+                                                                        capture_exit_needed);
+    }
+
+    status = river_cloud_xiaozhi_push_pcm(pcm, bytes);
+    if (status != RIVER_OK) {
+        g_river_cloud.stream_feed_fail++;
+        return status;
+    }
+    g_river_cloud.stream_feed_ok++;
+
+    river_cloud_xiaozhi_apply_active_stream_capture_policy(is_speech);
+    if (capture_exit_needed != NULL) {
+        *capture_exit_needed = true;
+    }
+    return RIVER_OK;
+}
+
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
     return river_cloud_xiaozhi_playback_output_active() ||

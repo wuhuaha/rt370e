@@ -334,6 +334,9 @@ void river_cloud_seed_time_from_build_if_needed(void);
 void river_cloud_log_time_ready_once(void);
 void river_cloud_log_wake_admission_deferred_once(river_status_t status);
 void river_cloud_reset_wake_admission_deferred_state(void);
+void river_cloud_log_stream_open_deferred_once(river_status_t status);
+void river_cloud_reset_stream_open_deferred_state(void);
+void river_cloud_pre_roll_store(const uint8_t *pcm);
 void river_cloud_pre_roll_reset(void);
 void river_cloud_request_state_sync(const char *reason);
 
@@ -443,6 +446,11 @@ uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
                                                               uint32_t pre_roll_frames,
                                                               bool *opened);
+river_status_t river_cloud_xiaozhi_apply_stream_push_capture_policy(
+    const uint8_t *pcm,
+    size_t bytes,
+    bool is_speech,
+    bool *capture_exit_needed);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason);

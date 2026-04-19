@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.255
+- Moved the remaining XiaoZhi `stream_push_frame()` capture/session reducer
+  out of `river_cloud_adapter.c` so adapter no longer directly owns:
+  - inactive-stream followup-open branching
+  - pre-roll replay into uplink on stream activation
+  - active-stream per-frame feed bookkeeping
+  - `stream_active` activation log / stats transition
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime now owns the grouped stream-push capture reducer:
+  - `river_cloud_xiaozhi_apply_stream_push_capture_policy(...)`
+  - inactive-stream capture-open / pre-roll replay reducer
+  - active-stream PCM feed + `stream_feed_ok/fail` bookkeeping
+  - stream activation `asr stream active` log and stats snapshot
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Generic bridge helpers needed by that runtime reducer are now shared through
+  the internal boundary instead of remaining adapter-local statics:
+  - `river_cloud_log_stream_open_deferred_once(...)`
+  - `river_cloud_reset_stream_open_deferred_state()`
+  - `river_cloud_pre_roll_store(...)`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+
 ## Step 5.254
 - Moved the remaining XiaoZhi bridge-open capture/uplink init glue out of
   `river_cloud_adapter.c` so adapter no longer directly owns:
