@@ -1151,6 +1151,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 当 `playback_phase` 已知且有效 playback/dialog 事实未变化时，
     `note_playback_state()` 不再触发一次空 publish
   - 这减少了 recovery 窗口里“底层状态抖一下，上层也被拍一下”的残余噪声
+- dialog runtime 的 `playback_recovering` 也已同步切到 phase-first：
+  - phase 已知时，不再让：
+    - `RIVER_PLAYBACK_RECOVERING`
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+    直接主导上层 recovering 判断
+  - playback-service recovery state 只保留为 phase 缺席时的兼容兜底
 
 下一步焦点：
 

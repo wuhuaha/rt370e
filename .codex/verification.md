@@ -1,5 +1,27 @@
 # Verification
 
+## Step 5.265
+Validate that dialog runtime `playback_recovering` is phase-first when phase is
+known:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '139,160p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_phase_recovering_locked|playback_phase_known_locked|RESTART_PENDING' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- when `playback_phase` is known, dialog runtime recovering truth no longer
+  depends on playback-service `recovering/restart_pending` states
+
 ## Step 5.264
 Validate that phase-known playback-service updates no longer trigger no-op
 dialog runtime publishes:

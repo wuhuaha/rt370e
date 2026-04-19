@@ -143,8 +143,15 @@ static bool river_dialog_runtime_playback_phase_recovering_locked(void)
 
 static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 {
-    return river_dialog_runtime_playback_phase_recovering_locked() ||
-           g_river_dialog_runtime.snapshot.playback_state == RIVER_PLAYBACK_RECOVERING ||
+    if (river_dialog_runtime_playback_phase_recovering_locked()) {
+        return true;
+    }
+
+    if (river_dialog_runtime_playback_phase_known_locked()) {
+        return g_river_dialog_runtime.snapshot.playback_rebuffer_pending;
+    }
+
+    return g_river_dialog_runtime.snapshot.playback_state == RIVER_PLAYBACK_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_state ==
                RIVER_PLAYBACK_RESTART_PENDING ||
            g_river_dialog_runtime.snapshot.playback_rebuffer_pending;

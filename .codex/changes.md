@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.265
+- Tightened dialog runtime `playback_recovering` to phase-first semantics as
+  well:
+  - once `playback_phase` is known, XiaoZhi recovery truth now comes from
+    phase/rebuffer facts instead of `playback_state == recovering/restart_pending`
+  - playback-service recovery states remain only as fallback when phase is not
+    available
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- This closes a remaining gap where bottom-layer `restart_pending` could still
+  leak into dialog runtime recovering state even after phase truth had already
+  declared playback idle or otherwise stable
+
 ## Step 5.264
 - Suppressed no-op dialog runtime playback-state publishes when XiaoZhi
   `playback_phase` is already known and the incoming playback-service state
