@@ -1,5 +1,28 @@
 # Verification
 
+## Step 5.268
+Validate that playback runtime now self-publishes cloud state sync on playback
+truth changes:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '90,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '688,708p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'request_state_sync\\(|refresh_playback_phase\\(|note_rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback phase transitions directly call `river_cloud_request_state_sync(...)`
+- rebuffer-cause truth can also trigger sync even when phase remains unchanged
+
 ## Step 5.267
 Validate that downlink restart gating now differentiates upstream starvation
 from local write-failure recovery:

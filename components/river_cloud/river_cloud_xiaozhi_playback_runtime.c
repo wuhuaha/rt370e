@@ -92,14 +92,14 @@ static river_cloud_xiaozhi_playback_phase_t river_cloud_xiaozhi_compute_playback
     return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_IDLE;
 }
 
-static void river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
+static bool river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
 {
     river_cloud_xiaozhi_playback_phase_t old_phase = g_river_cloud.xiaozhi_playback_phase;
     river_cloud_xiaozhi_playback_phase_t new_phase =
         river_cloud_xiaozhi_compute_playback_phase();
 
     if (old_phase == new_phase) {
-        return;
+        return false;
     }
 
     g_river_cloud.xiaozhi_playback_phase = new_phase;
@@ -113,6 +113,9 @@ static void river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
                river_cloud_xiaozhi_playback_rebuffer_cause_name(
                    river_cloud_xiaozhi_playback_rebuffer_cause()),
                g_river_cloud.xiaozhi_tts_stop_pending ? "yes" : "no");
+    river_cloud_request_state_sync(reason != NULL && reason[0] != '\0' ? reason :
+                                                                       "playback_phase");
+    return true;
 }
 
 static bool river_cloud_xiaozhi_playback_terminal_open(void)
@@ -685,6 +688,9 @@ static void river_cloud_xiaozhi_note_playback_rebuffer(
 {
     river_cloud_xiaozhi_playback_segment_t *segment =
         river_cloud_xiaozhi_current_playback_segment();
+    river_cloud_xiaozhi_playback_rebuffer_cause_t old_cause =
+        river_cloud_xiaozhi_playback_rebuffer_cause();
+    bool old_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
 
     if (segment != NULL && segment->valid && segment->started && segment->paused_at_ms == 0U) {
         segment->paused_at_ms = paused_at_ms;
@@ -694,7 +700,10 @@ static void river_cloud_xiaozhi_note_playback_rebuffer(
     if (g_river_cloud.xiaozhi_playback_rebuffer_count < UINT32_MAX) {
         g_river_cloud.xiaozhi_playback_rebuffer_count++;
     }
-    river_cloud_xiaozhi_refresh_playback_phase("note_rebuffer");
+    if (!river_cloud_xiaozhi_refresh_playback_phase("note_rebuffer") &&
+        (!old_pending || old_cause != cause)) {
+        river_cloud_request_state_sync("note_rebuffer");
+    }
 }
 
 static void river_cloud_xiaozhi_finish_playback_rebuffer(uint64_t resumed_at_ms)

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.267 split restart gate by playback rebuffer cause`
+  - `5.268 let playback runtime self-publish truth sync`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,13 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime now主动触发 cloud state sync when:
+      - `playback_phase` changes
+      - or rebuffer cause changes without a phase transition
+    - this starts removing another remaining indirection where outer
+      `session_coordinator` playback-state callbacks had to pull a fresh cloud
+      snapshot just to let dialog/core observe playback-runtime truth updates
+  - previous landed runtime-ownership slice:
     - XiaoZhi downlink restart gating now differentiates:
       - `upstream_starved`
       - `write_failed`

@@ -1056,6 +1056,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     回到更紧的本地 rebuffer 门限
   - runtime downlink dump 现在也会直接打印当前 `start` threshold，便于板端
     确认是哪一类恢复策略在生效
+- playback runtime 对上层的 truth 发布也已开始从“被动拉取”转成“主动同步”：
+  - playback phase 变化时，runtime 现在会直接：
+    - `river_cloud_request_state_sync(...)`
+  - rebuffer cause 变化但 phase 未变化时，也会主动同步一次
+  - 这开始去掉一条残余绕路：
+    - 外层先收到 playback-service state
+    - 再反向拉 cloud snapshot
+    才能让 dialog/core 看见 playback-runtime 新真相
 - recoverable playback churn 已继续从“局部 active 抖动”提升为显式 runtime
   真相：
   - cloud runtime snapshot 新增：
@@ -1179,6 +1187,9 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 下一步焦点：
 
+- 继续收紧 `session_coordinator_on_playback_state(...)` 这条本地 playback
+  listener 桥，把它从“拉 cloud snapshot 的中转站”缩到只处理真正还需要的
+ 本地兼容语义
 - 继续把 `playback_rebuffer_cause` 从“已导出诊断真相”推进到“上层可消费的
   typed 恢复语义”，让 dialog/session 不再只知道“正在恢复”，还知道：
   - 是上游供给断档

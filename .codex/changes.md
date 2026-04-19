@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.268
+- XiaoZhi playback runtime now proactively publishes cloud state-sync when its
+  own playback phase truth changes, instead of relying only on the outer
+  playback-service listener path to pull a fresh snapshot later
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Explicit rebuffer-cause changes now also request state-sync even when the
+  phase itself does not change, so upper layers can observe the latest
+  `playback_rebuffer_cause` without waiting for a separate outer poll path
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.267
 - Split XiaoZhi downlink restart gating by explicit `rebuffer_cause` instead of
   forcing `write_failed` and `upstream_starved` to share the same refill
