@@ -802,14 +802,27 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     之后追加一层 playback bridge-close tail
   - 这让 terminal-close 路径上的 playback 收尾真相进一步收敛到同一个
     playback runtime reducer，而不再散落在 session runtime 与 adapter 外围
+- XiaoZhi session reset / session-start 的 playback cleanup policy 也已继续从
+  session runtime 收口：
+  - playback runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_transport_reset_playback_policy()`
+    - `river_cloud_xiaozhi_apply_session_start_playback_policy()`
+  - playback runtime 现统一负责：
+    - transport reset 时的 downlink reset
+    - transport reset 时的 playback meta clear
+    - session start 时的 playback meta clear
+  - session runtime 的 transport reset / open-listen 路径现只保留：
+    - session/window/preview/turn reset
+    - playback runtime helper 调用
+  - 这继续把 session 入口上的 playback/downlink cleanup 真相收回到
+    playback runtime，为后续把 capture-path playback glue 一并移出 adapter
+    做准备
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
   - capture-path 上仍由 adapter 触发的 playback pending-stop glue
-  - bridge-close / network-lost 之后仍分散在 session reset 路径里的
-    playback-meta/downlink reset 辅助动作
   - capture/duplex path 上仍由 adapter 直接触发的 playback 观察性 glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family

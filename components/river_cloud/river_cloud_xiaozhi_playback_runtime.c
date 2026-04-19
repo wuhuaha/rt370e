@@ -367,6 +367,17 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
            sizeof(g_river_cloud.xiaozhi_playback_segments));
 }
 
+void river_cloud_xiaozhi_apply_transport_reset_playback_policy(void)
+{
+    river_cloud_xiaozhi_reset_downlink_state();
+    river_cloud_xiaozhi_clear_playback_meta_state();
+}
+
+void river_cloud_xiaozhi_apply_session_start_playback_policy(void)
+{
+    river_cloud_xiaozhi_clear_playback_meta_state();
+}
+
 void river_cloud_xiaozhi_cancel_playback_stop(void)
 {
     g_river_cloud.xiaozhi_tts_stop_pending = false;

@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.250
+- Moved the XiaoZhi session reset / session-start playback cleanup policy out
+  of `river_cloud_xiaozhi_session.c` so session runtime no longer directly
+  owns:
+  - `river_cloud_xiaozhi_reset_downlink_state()`
+  - `river_cloud_xiaozhi_clear_playback_meta_state()`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Playback runtime now owns the grouped playback cleanup reducers for those
+  entry points:
+  - `river_cloud_xiaozhi_apply_transport_reset_playback_policy()`
+  - `river_cloud_xiaozhi_apply_session_start_playback_policy()`
+  - transport-reset downlink reset + playback-meta clear
+  - session-start playback-meta clear
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session transport reset and open/listen round start now only call the
+  runtime-owned playback policy helpers instead of mutating playback/downlink
+  cleanup state inline:
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+
 ## Step 5.249
 - Moved the XiaoZhi terminal-close playback tail out of session-runtime
   terminal branches and the adapter bridge-close path so they no longer

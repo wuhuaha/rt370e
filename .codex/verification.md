@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.250
+Validate that XiaoZhi session reset / session-start playback cleanup now
+belongs to playback runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '381,386p' components/river_cloud/river_cloud_internal.h
+sed -n '339,379p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2350,2413p' components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'apply_transport_reset_playback_policy|apply_session_start_playback_policy|clear_playback_meta_state|reset_downlink_state' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_transport_reset_playback_policy()`
+  - `river_cloud_xiaozhi_apply_session_start_playback_policy()`
+- session runtime no longer directly calls:
+  - `river_cloud_xiaozhi_reset_downlink_state()`
+  - `river_cloud_xiaozhi_clear_playback_meta_state()`
+  from its transport-reset / session-start branches
+
 ## Step 5.249
 Validate that the XiaoZhi terminal-close playback policy now belongs to
 playback runtime:

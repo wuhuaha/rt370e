@@ -381,6 +381,8 @@ void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_eve
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);
+void river_cloud_xiaozhi_apply_transport_reset_playback_policy(void);
+void river_cloud_xiaozhi_apply_session_start_playback_policy(void);
 void river_cloud_xiaozhi_apply_playback_backend_refresh_policy(void);
 void river_cloud_xiaozhi_playback_start_downlink_if_needed(void);
 void river_cloud_xiaozhi_apply_terminal_playback_policy(
