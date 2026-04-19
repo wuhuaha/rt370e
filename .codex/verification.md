@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.246
+Validate that the XiaoZhi control-request queue path now belongs to session
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '353,370p' components/river_cloud/river_cloud_internal.h
+sed -n '118,432p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '34,220p' components/river_cloud/river_cloud_adapter.c
+rg -n 'process_control_queue|control_request_async|request_open_and_listen|request_listen_stop|request_abort|request_close_session' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_process_control_queue(...)`
+  - `river_cloud_xiaozhi_control_request_async(...)`
+- adapter `river_cloud_xiaozhi_io_task(...)` only drains pending control work
+  through the runtime helper
+- session-side request wrappers and control-queue bookkeeping no longer live in
+  `river_cloud_adapter.c`
+
 ## Step 5.245
 Validate that the XiaoZhi control-op dispatch shell now belongs to runtime:
 ```bash

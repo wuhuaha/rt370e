@@ -287,6 +287,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这使 adapter 在 control path 上也达到了和 event path 类似的形态：
     - transport/control callback 壳
     - runtime 真相与 reducer 所有权
+- XiaoZhi control queue 的提交与 drain 所有权也已继续从 adapter 收口：
+  - session runtime 新增统一 reducer：
+    - `river_cloud_xiaozhi_process_control_queue(...)`
+    - `river_cloud_xiaozhi_control_request_async(...)`
+    - sync `river_cloud_xiaozhi_control_request(...)`
+  - session runtime 现统一负责：
+    - request 初始化
+    - sync/async queue submit
+    - queue read/write index 推进
+    - completion/result 回填
+    - session-side request wrapper 入口
+  - adapter 现不再直接维护：
+    - control queue 写入
+    - control queue drain
+    - completion semaphore 交付
+  - 这让 control path 在 dispatch 之外的队列所有权也继续回到 runtime，
+    adapter 进一步逼近纯 I/O 调度壳
 - adapter 侧剩余的 session 诊断读取也已继续收口：
   - 新增 exported getter：
     - `river_cloud_xiaozhi_local_close_pending()`

@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.246
+- Moved the XiaoZhi control-request submission path out of
+  `river_cloud_adapter.c` and into session runtime so adapter no longer
+  directly owns:
+  - control queue writes
+  - queue high-water accounting
+  - sync completion setup for session-side control requests
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Session runtime now owns the full control-queue reducer path for XiaoZhi:
+  - request initialization
+  - sync request submission
+  - async request submission
+  - queue drain and completion signaling
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- XiaoZhi session-side request wrappers were moved with that queue ownership:
+  - `river_cloud_xiaozhi_request_open_and_listen(...)`
+  - `river_cloud_xiaozhi_request_listen_stop(...)`
+  - `river_cloud_xiaozhi_request_abort(...)`
+  - `river_cloud_xiaozhi_request_close_session(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_io_task(...)` now only invokes the runtime-owned
+  queue drain helper and no longer carries local control-queue logic:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.245
 - Moved the last XiaoZhi control-transport dispatch shell out of
   `river_cloud_adapter.c` and into runtime so adapter control execution is now
