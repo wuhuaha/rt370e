@@ -147,6 +147,49 @@ bool river_cloud_xiaozhi_uplink_active(void)
     return river_cloud_xiaozhi_uplink_keepalive_needed(queued_frames);
 }
 
+void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *event)
+{
+    if (event == NULL) {
+        return;
+    }
+
+    river_cloud_xiaozhi_refresh_turn_semantics("event");
+
+    switch (event->type) {
+    case RIVER_XIAOZHI_EVENT_SERVER_HELLO:
+        river_cloud_xiaozhi_note_server_hello_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_STT:
+        river_cloud_xiaozhi_note_stt_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
+    case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
+    case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
+        river_cloud_xiaozhi_note_input_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_AUDIO_OUT_META:
+        river_cloud_xiaozhi_note_audio_out_meta_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_LLM:
+        river_cloud_xiaozhi_note_llm_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_TTS:
+        river_cloud_xiaozhi_note_tts_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_AUDIO:
+        (void)river_cloud_xiaozhi_playback_handle_audio_event(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_SESSION_CLOSED:
+        river_cloud_xiaozhi_note_session_closed_observation(event);
+        return;
+    case RIVER_XIAOZHI_EVENT_ERROR:
+        river_cloud_xiaozhi_note_error_observation(event);
+        return;
+    default:
+        return;
+    }
+}
+
 void river_cloud_xiaozhi_note_server_hello_observation(const river_xiaozhi_event_t *event)
 {
     if (event == NULL) {

@@ -1076,46 +1076,7 @@ static river_status_t river_cloud_xiaozhi_send_uplink_packet(const uint8_t *pcm,
 static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event, void *user_data)
 {
     (void)user_data;
-
-    if (event == NULL) {
-        return;
-    }
-
-    river_cloud_xiaozhi_refresh_turn_semantics("event");
-
-    switch (event->type) {
-    case RIVER_XIAOZHI_EVENT_SERVER_HELLO:
-        river_cloud_xiaozhi_note_server_hello_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_STT:
-        river_cloud_xiaozhi_note_stt_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
-    case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
-    case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
-        river_cloud_xiaozhi_note_input_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_AUDIO_OUT_META:
-        river_cloud_xiaozhi_note_audio_out_meta_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_LLM:
-        river_cloud_xiaozhi_note_llm_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_TTS:
-        river_cloud_xiaozhi_note_tts_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_AUDIO:
-        (void)river_cloud_xiaozhi_playback_handle_audio_event(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_SESSION_CLOSED:
-        river_cloud_xiaozhi_note_session_closed_observation(event);
-        break;
-    case RIVER_XIAOZHI_EVENT_ERROR:
-        river_cloud_xiaozhi_note_error_observation(event);
-        break;
-    default:
-        break;
-    }
+    river_cloud_xiaozhi_handle_transport_event(event);
 }
 #endif
 

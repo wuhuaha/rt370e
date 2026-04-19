@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.240
+- Moved the last XiaoZhi transport-event dispatch shell out of
+  `river_cloud_adapter.c` and into session runtime so adapter event callback is
+  now transport-only:
+  - `river_cloud_xiaozhi_handle_transport_event(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns both:
+  - the per-event `river_cloud_xiaozhi_refresh_turn_semantics("event")`
+  - the full XiaoZhi transport event switch for:
+    - `SERVER_HELLO`
+    - `STT`
+    - `INPUT_*`
+    - `AUDIO_OUT_META`
+    - `LLM`
+    - `TTS`
+    - `AUDIO`
+    - `SESSION_CLOSED`
+    - `ERROR`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter `river_cloud_xiaozhi_event_handler(...)` now only forwards the raw
+  transport event into the runtime-owned reducer and no longer retains any
+  inline XiaoZhi event-type ownership:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.239
 - Moved the remaining XiaoZhi `SERVER_HELLO` transport-event observation out of
   `river_cloud_adapter.c` and into session runtime so adapter no longer owns

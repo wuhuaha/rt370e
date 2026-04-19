@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.240
+Validate that the XiaoZhi transport-event dispatch shell now belongs to
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '350,354p' components/river_cloud/river_cloud_internal.h
+sed -n '150,193p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1076,1081p' components/river_cloud/river_cloud_adapter.c
+rg -n 'handle_transport_event|refresh_turn_semantics\\(\"event\"\\)|RIVER_XIAOZHI_EVENT_(SERVER_HELLO|STT|INPUT_SPEECH_START|INPUT_PREVIEW|INPUT_ENDPOINT|AUDIO_OUT_META|LLM|TTS|AUDIO|SESSION_CLOSED|ERROR)' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_handle_transport_event(...)`
+- adapter `river_cloud_xiaozhi_event_handler(...)` now only delegates to the
+  runtime-owned transport-event reducer
+- the event-wide `refresh_turn_semantics("event")` and event `switch` live only
+  in session runtime
+
 ## Step 5.239
 Validate that XiaoZhi `SERVER_HELLO` observation now belongs to session
 runtime:

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.239 move XiaoZhi SERVER_HELLO observation into runtime`
+  - `5.240 move XiaoZhi transport event dispatch shell into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -78,6 +78,13 @@ or top-of-tree verification target changes.
   - seventh landed slice on that plan:
     - playback service now exposes an explicit `recovering` state instead of
       collapsing write-path churn into fatal `playback_error`
+  - latest landed runtime-ownership slice:
+    - session runtime now owns the full XiaoZhi transport-event dispatch shell:
+      - per-event `refresh_turn_semantics("event")`
+      - grouped event switch / reducer routing
+    - adapter `river_cloud_xiaozhi_event_handler(...)` is now reduced to a
+      transport callback shim that only forwards `river_xiaozhi_event_t`
+      objects into runtime
     - dialog runtime ingress now only treats `RIVER_PLAYBACK_ERROR` as fatal
       `error_recovering`, while recoverable write churn stays on the
       `playback_recovering` path

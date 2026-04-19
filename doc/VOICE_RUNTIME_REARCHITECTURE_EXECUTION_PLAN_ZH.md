@@ -310,6 +310,19 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport session-id 同步
   - adapter 的 `RIVER_XIAOZHI_EVENT_SERVER_HELLO` 分支不再直接写这些会话
     启动态事实
+- XiaoZhi transport event callback 的最后一层 dispatch 壳也已继续从
+  adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_handle_transport_event(...)`
+  - session runtime 现统一负责：
+    - 每个 transport event 到达时的
+      `river_cloud_xiaozhi_refresh_turn_semantics("event")`
+    - 整个 XiaoZhi transport event switch / reducer dispatch
+  - adapter 的 `river_cloud_xiaozhi_event_handler(...)` 现仅保留：
+    - transport callback 壳
+    - runtime helper 调用
+  - 这让 adapter 更接近纯 provider/transport 接线层，而 event-type 所有权
+    继续稳定落在 runtime
 - `accept_reason` 驱动的 pending-text finalize 判定也已继续从 adapter 收口：
   - 新增 `river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(...)`
   - adapter 的 XiaoZhi I/O poll 路径不再直接检查：
