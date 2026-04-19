@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.258
+Validate that base ASR bridge state allocation/reset moved out of adapter:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,220p' components/river_cloud/river_cloud_asr_bridge_runtime.c
+sed -n '946,1018p' components/river_cloud/river_cloud_adapter.c
+rg -n 'river_cloud_prepare_audio_bridge_state|river_cloud_reset_audio_bridge_state|pre_roll_buffer|audio_desc' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_asr_bridge_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- generic ASR bridge runtime file exists and exports:
+  - `river_cloud_prepare_audio_bridge_state(...)`
+  - `river_cloud_reset_audio_bridge_state()`
+- adapter `river_cloud_asr_audio_open()/close()` no longer directly allocates or frees:
+  - `pre_roll_buffer`
+  - `audio_desc/frame_bytes/post_roll` bridge state
+
 ## Step 5.257
 Validate that XiaoZhi capture dispatch no longer uses an adapter-local shim:
 ```bash

@@ -32,6 +32,7 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_cloud_adapter.c
+    river_cloud_asr_bridge_runtime.c
     river_online_control.c
     river_wifi_station.c
     river_ws_dispatch.c

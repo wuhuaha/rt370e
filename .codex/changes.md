@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.258
+- Added a generic ASR bridge runtime module so adapter no longer directly owns
+  the base capture bridge state allocation/reset for:
+  - `audio_desc`
+  - `frame_bytes`
+  - `pre_roll_buffer`
+  - `pre_roll_capacity_frames`
+  - `post_roll_frames`
+  - `silence_frames`
+  - [components/river_cloud/river_cloud_asr_bridge_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_asr_bridge_runtime.c)
+  - [components/river_cloud/CMakeLists.txt](/root/ameba-river/components/river_cloud/CMakeLists.txt)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_asr_audio_open()/close()` now delegates bridge-state
+  prepare/reset to runtime helpers:
+  - `river_cloud_prepare_audio_bridge_state(...)`
+  - `river_cloud_reset_audio_bridge_state()`
+  which leaves adapter focused on open/close sequencing and backend-specific
+  policy hooks
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.257
 - Removed the XiaoZhi-only adapter shim `river_cloud_xiaozhi_stream_push_frame(...)`
   so the generic capture dispatch now routes directly from

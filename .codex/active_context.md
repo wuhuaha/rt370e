@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.257 remove XiaoZhi stream-push adapter shim`
+  - `5.258 move ASR bridge state allocation/reset into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,18 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - generic ASR bridge runtime now owns the base capture bridge state
+      allocation/reset for:
+      - `audio_desc`
+      - `frame_bytes`
+      - `pre_roll_buffer`
+      - `pre_roll_capacity_frames`
+      - `post_roll_frames`
+      - `silence_frames`
+    - adapter `river_cloud_asr_audio_open()/close()` now delegates to:
+      - `river_cloud_prepare_audio_bridge_state(...)`
+      - `river_cloud_reset_audio_bridge_state()`
+  - previous landed runtime-ownership slice:
     - XiaoZhi capture dispatch no longer uses an adapter-local stream-push
       shim:
       - removed `river_cloud_xiaozhi_stream_push_frame(...)`

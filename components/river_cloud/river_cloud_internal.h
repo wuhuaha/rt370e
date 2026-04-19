@@ -336,6 +336,11 @@ void river_cloud_log_wake_admission_deferred_once(river_status_t status);
 void river_cloud_reset_wake_admission_deferred_state(void);
 void river_cloud_log_stream_open_deferred_once(river_status_t status);
 void river_cloud_reset_stream_open_deferred_state(void);
+river_status_t river_cloud_prepare_audio_bridge_state(
+    const river_cloud_asr_audio_desc_t *audio,
+    uint32_t pre_roll_ms,
+    uint32_t post_roll_ms);
+void river_cloud_reset_audio_bridge_state(void);
 void river_cloud_pre_roll_store(const uint8_t *pcm);
 void river_cloud_pre_roll_reset(void);
 void river_cloud_request_state_sync(const char *reason);

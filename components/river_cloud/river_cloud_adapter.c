@@ -250,15 +250,6 @@ static time_t river_cloud_epoch_from_utc_components(int year,
                     (uint32_t)second);
 }
 
-static uint32_t river_cloud_ms_to_frames(uint32_t duration_ms, uint32_t frame_ms)
-{
-    if (duration_ms == 0U || frame_ms == 0U) {
-        return 0U;
-    }
-
-    return (duration_ms + frame_ms - 1U) / frame_ms;
-}
-
 uint32_t river_cloud_now_utc_seconds(void)
 {
     return river_cloud_system_utc_seconds();
@@ -947,9 +938,9 @@ river_status_t river_cloud_asr_audio_open(const river_cloud_asr_audio_desc_t *au
                                           uint32_t pre_roll_ms,
                                           uint32_t post_roll_ms)
 {
-    size_t pre_roll_bytes;
-#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     river_status_t status;
+#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
+    river_status_t xiaozhi_status;
 #endif
 
     if (audio == NULL || audio->sample_rate == 0U || audio->frame_ms == 0U ||
@@ -958,30 +949,17 @@ river_status_t river_cloud_asr_audio_open(const river_cloud_asr_audio_desc_t *au
     }
 
     river_cloud_asr_audio_close();
-    g_river_cloud.audio_desc = *audio;
-    g_river_cloud.frame_bytes =
-        (size_t)((audio->sample_rate * audio->frame_ms) / 1000U) *
-        audio->channels * (audio->bits_per_sample / 8U);
-    g_river_cloud.pre_roll_capacity_frames =
-        river_cloud_ms_to_frames(pre_roll_ms, audio->frame_ms);
-    g_river_cloud.post_roll_frames =
-        river_cloud_ms_to_frames(post_roll_ms, audio->frame_ms);
-
-    if (g_river_cloud.pre_roll_capacity_frames > 0U) {
-        pre_roll_bytes = (size_t)g_river_cloud.pre_roll_capacity_frames * g_river_cloud.frame_bytes;
-        g_river_cloud.pre_roll_buffer = (uint8_t *)rtos_mem_zmalloc((uint32_t)pre_roll_bytes);
-        if (g_river_cloud.pre_roll_buffer == NULL) {
-            river_cloud_asr_audio_close();
-            return RIVER_ERR_NO_MEMORY;
-        }
+    status = river_cloud_prepare_audio_bridge_state(audio, pre_roll_ms, post_roll_ms);
+    if (status != RIVER_OK) {
+        return status;
     }
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        status = river_cloud_xiaozhi_apply_bridge_open_capture_policy(audio);
-        if (status != RIVER_OK) {
-            river_cloud_asr_audio_close();
-            return status;
+        xiaozhi_status = river_cloud_xiaozhi_apply_bridge_open_capture_policy(audio);
+        if (xiaozhi_status != RIVER_OK) {
+            river_cloud_reset_audio_bridge_state();
+            return xiaozhi_status;
         }
     }
 #endif
@@ -1015,19 +993,7 @@ void river_cloud_asr_audio_close(void)
         g_river_cloud.provider->stream_poll(0U);
     }
 
-    if (g_river_cloud.pre_roll_buffer != NULL) {
-        rtos_mem_free(g_river_cloud.pre_roll_buffer);
-        g_river_cloud.pre_roll_buffer = NULL;
-    }
-
-    g_river_cloud.audio_bridge_open = false;
-    g_river_cloud.stream_active = false;
-    g_river_cloud.pre_roll_capacity_frames = 0U;
-    g_river_cloud.post_roll_frames = 0U;
-    g_river_cloud.frame_bytes = 0U;
-    g_river_cloud.silence_frames = 0U;
-    river_cloud_pre_roll_reset();
-    memset(&g_river_cloud.audio_desc, 0, sizeof(g_river_cloud.audio_desc));
+    river_cloud_reset_audio_bridge_state();
 }
 
 river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,

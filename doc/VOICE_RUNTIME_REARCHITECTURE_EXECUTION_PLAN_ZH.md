@@ -917,16 +917,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这让 XiaoZhi capture 的 runtime truth 更明确：
     - adapter 只保留 generic bridge 入口
     - XiaoZhi provider-specific capture policy 不再在 adapter 内落一个额外壳层
+- generic capture bridge lifecycle 也开始从 adapter 抽离：
+  - 新增 `river_cloud_asr_bridge_runtime.c`
+  - runtime helper 现负责基础 bridge state 的 prepare/reset：
+    - `audio_desc`
+    - `frame_bytes`
+    - `pre_roll_buffer`
+    - `pre_roll_capacity_frames`
+    - `post_roll_frames`
+    - `silence_frames`
+  - adapter `river_cloud_asr_audio_open()/close()` 现只编排：
+    - close old bridge
+    - delegate runtime state prepare/reset
+    - invoke backend-specific capture open/close policy
+  - 这让 generic bridge lifecycle 和 provider policy 开始显式分层
 
 下一步焦点：
 
 - 继续把 XiaoZhi 与 generic streaming path 之间的桥接边界做最终收口
-- 继续把 `river_cloud_asr_audio_open()/close()` 中剩余的 generic bridge
-  lifecycle 提炼成稳定边界，重点看：
-  - `audio_desc`
-  - `frame_bytes`
-  - `pre_roll_buffer`
-  - `pre_roll_capacity_frames`
+- 继续把 generic realtime streaming reducer
+  (`pre_roll_store/open_and_flush/finish_active`) 从 adapter 迁到独立 runtime
+  边界
+- 继续审视 downlink/playback 的 starve/rebuffer 恢复策略，把 repeated
+  stop/start 收束成更稳定的 runtime truth 与恢复路径
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的
