@@ -1051,12 +1051,7 @@ void river_cloud_asr_audio_close(void)
 {
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        if (g_river_cloud.stream_active) {
-            river_cloud_xiaozhi_complete_active_stream_finish(
-                RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL,
-                "bridge_close");
-        }
-        river_cloud_xiaozhi_apply_bridge_close_terminal_policy();
+        river_cloud_xiaozhi_apply_bridge_close_capture_policy();
         river_opus_encoder_close(&g_river_cloud.xiaozhi_encoder);
     } else {
         river_cloud_stream_finish_active();

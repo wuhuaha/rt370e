@@ -850,13 +850,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `complete_active_stream_finish(...)`
   - 这继续把 capture path 上的 session truth 和 duplex close 语义从 adapter
     抽离出来，让 adapter 更接近纯推帧/调度壳
+- XiaoZhi bridge-close capture teardown 也已继续从 adapter 收口到 session runtime：
+  - session runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_bridge_close_capture_policy()`
+  - session runtime 现统一负责：
+    - bridge-close 时是否需要先完成 active stream finish
+    - bridge-close capture finish 与 terminal policy 的时序
+  - adapter 的 `river_cloud_asr_audio_close()` 现不再直接内联：
+    - `complete_active_stream_finish(..., "bridge_close")`
+    - bridge-close finish 后再接 terminal-policy 的顺序
+  - 这继续压缩 adapter 在 audio-close / bridge-close 路径上的 session truth
+    所有权，让 bridge teardown 更接近 runtime-owned reducer + transport shell
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
-  - `asr_audio_close()` / bridge-close 上仍由 adapter 触发的
-    active-stream-finish 与 capture reset glue
+  - `asr_audio_close()` 上仍由 adapter 直接重置的
+    `xiaozhi_open_speech_frames` / pre-roll / bridge-open capture glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

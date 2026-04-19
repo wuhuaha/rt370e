@@ -1307,6 +1307,17 @@ void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void)
     (void)river_cloud_xiaozhi_request_close_session();
 }
 
+void river_cloud_xiaozhi_apply_bridge_close_capture_policy(void)
+{
+    if (g_river_cloud.stream_active) {
+        river_cloud_xiaozhi_complete_active_stream_finish(
+            RIVER_CLOUD_XIAOZHI_STREAM_FINISH_POST_ROLL,
+            "bridge_close");
+    }
+
+    river_cloud_xiaozhi_apply_bridge_close_terminal_policy();
+}
+
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void)
 {
     river_cloud_xiaozhi_apply_terminal_playback_policy(

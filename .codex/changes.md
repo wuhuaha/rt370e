@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.253
+- Moved the XiaoZhi bridge-close capture teardown glue out of
+  `river_cloud_adapter.c` so adapter no longer directly owns:
+  - bridge-close `complete_active_stream_finish(...)` gating
+  - bridge-close sequencing between active-stream finish and terminal policy
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Session runtime now owns the grouped bridge-close capture reducer:
+  - `river_cloud_xiaozhi_apply_bridge_close_capture_policy()`
+  - optional active-stream finish on bridge close
+  - bridge-close terminal policy dispatch
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_asr_audio_close()` now only delegates the XiaoZhi
+  bridge-close session/capture policy to runtime, then closes the encoder and
+  runs generic bridge teardown:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.252
 - Moved the XiaoZhi active-stream capture tail policy out of
   `river_cloud_adapter.c` so adapter no longer directly owns:

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.253
+Validate that XiaoZhi bridge-close capture teardown now belongs to session
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '436,441p' components/river_cloud/river_cloud_internal.h
+sed -n '1308,1327p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1050,1062p' components/river_cloud/river_cloud_adapter.c
+rg -n 'apply_bridge_close_capture_policy|apply_bridge_close_terminal_policy|complete_active_stream_finish\\(|bridge_close' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_bridge_close_capture_policy()`
+- adapter `river_cloud_asr_audio_close()` no longer directly performs:
+  - bridge-close `complete_active_stream_finish(...)`
+  - separate bridge-close terminal-policy sequencing
+
 ## Step 5.252
 Validate that XiaoZhi active-stream capture tail policy now belongs to session
 runtime:

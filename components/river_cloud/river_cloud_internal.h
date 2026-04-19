@@ -435,6 +435,7 @@ bool river_cloud_xiaozhi_uplink_keepalive_needed(uint32_t queued_frames);
 bool river_cloud_xiaozhi_uplink_send_ready(void);
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void);
 void river_cloud_xiaozhi_apply_network_lost_terminal_policy(void);
+void river_cloud_xiaozhi_apply_bridge_close_capture_policy(void);
 void river_cloud_xiaozhi_apply_bridge_close_terminal_policy(void);
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void);
 river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
