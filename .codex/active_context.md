@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.256 move XiaoZhi stream-push playback wrapper into runtime`
+  - `5.257 remove XiaoZhi stream-push adapter shim`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,16 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - XiaoZhi capture dispatch no longer uses an adapter-local stream-push
+      shim:
+      - removed `river_cloud_xiaozhi_stream_push_frame(...)`
+      - `river_cloud_asr_stream_push_frame(...)` now directly calls
+        `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+    - adapter is reduced further to:
+      - shared bridge argument validation
+      - streaming support guard
+      - backend branch to runtime
+  - previous landed runtime-ownership slice:
     - session runtime now also owns the last playback wrapper around the
       XiaoZhi capture push path:
       - capture-entry playback gate

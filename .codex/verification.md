@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.257
+Validate that XiaoZhi capture dispatch no longer uses an adapter-local shim:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1035,1065p' components/river_cloud/river_cloud_adapter.c
+rg -n 'river_cloud_xiaozhi_stream_push_frame|river_cloud_xiaozhi_apply_capture_stream_policy' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- adapter no longer defines:
+  - `river_cloud_xiaozhi_stream_push_frame(...)`
+- `river_cloud_asr_stream_push_frame(...)` directly dispatches XiaoZhi capture to:
+  - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+
 ## Step 5.256
 Validate that XiaoZhi stream-push playback wrapper now belongs to runtime:
 ```bash

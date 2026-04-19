@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.257
+- Removed the XiaoZhi-only adapter shim `river_cloud_xiaozhi_stream_push_frame(...)`
+  so the generic capture dispatch now routes directly from
+  `river_cloud_asr_stream_push_frame(...)` into the runtime-owned helper
+  `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Adapter XiaoZhi capture dispatch is now reduced further to:
+  - shared bridge argument validation
+  - streaming capability check
+  - backend branch to runtime
+  which keeps XiaoZhi capture ownership in runtime instead of a provider-local
+  adapter wrapper
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.256
 - Moved the last XiaoZhi `stream_push_frame()` playback wrapper out of
   `river_cloud_adapter.c` so adapter no longer directly owns:

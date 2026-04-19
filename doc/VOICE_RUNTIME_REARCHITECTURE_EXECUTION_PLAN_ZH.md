@@ -910,11 +910,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这让 XiaoZhi capture 推帧路径在 adapter 中进一步逼近纯壳形态：
     - 参数校验
     - runtime helper 调用
+- 继续前移后，XiaoZhi capture 分支中仅剩的 adapter 本地 shim 也已移除：
+  - 删除 `river_cloud_xiaozhi_stream_push_frame(...)`
+  - `river_cloud_asr_stream_push_frame(...)` 现直接分派：
+    - `river_cloud_xiaozhi_apply_capture_stream_policy(...)`
+  - 这让 XiaoZhi capture 的 runtime truth 更明确：
+    - adapter 只保留 generic bridge 入口
+    - XiaoZhi provider-specific capture policy 不再在 adapter 内落一个额外壳层
 
 下一步焦点：
 
-- 继续审视是否直接移除 `river_cloud_xiaozhi_stream_push_frame(...)` 这一层
-  adapter shim，让 XiaoZhi capture 分支直接走 runtime helper
 - 继续把 XiaoZhi 与 generic streaming path 之间的桥接边界做最终收口
 - 继续把 `river_cloud_asr_audio_open()/close()` 中剩余的 generic bridge
   lifecycle 提炼成稳定边界，重点看：

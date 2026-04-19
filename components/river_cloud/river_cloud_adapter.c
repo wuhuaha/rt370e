@@ -1030,19 +1030,6 @@ void river_cloud_asr_audio_close(void)
     memset(&g_river_cloud.audio_desc, 0, sizeof(g_river_cloud.audio_desc));
 }
 
-#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
-static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
-                                                            size_t bytes,
-                                                            bool is_speech)
-{
-    if (!g_river_cloud.audio_bridge_open || pcm == NULL || bytes != g_river_cloud.frame_bytes) {
-        return RIVER_ERR_ARG;
-    }
-
-    return river_cloud_xiaozhi_apply_capture_stream_policy(pcm, bytes, is_speech);
-}
-#endif
-
 river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
                                                  size_t bytes,
                                                  bool is_speech)
@@ -1058,7 +1045,7 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
 
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     if (river_cloud_xiaozhi_enabled()) {
-        return river_cloud_xiaozhi_stream_push_frame(pcm, bytes, is_speech);
+        return river_cloud_xiaozhi_apply_capture_stream_policy(pcm, bytes, is_speech);
     }
 #endif
 
