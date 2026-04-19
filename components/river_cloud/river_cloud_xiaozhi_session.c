@@ -2050,6 +2050,33 @@ river_status_t river_cloud_xiaozhi_execute_open_and_listen_transport(
     return RIVER_OK;
 }
 
+river_status_t river_cloud_xiaozhi_execute_session_control_transport(
+    river_cloud_xiaozhi_control_op_t op,
+    const char *arg)
+{
+    switch (op) {
+    case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
+        if (river_cloud_xiaozhi_uplink_send_ready()) {
+            return river_xiaozhi_send_listen_stop();
+        }
+        return RIVER_OK;
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_ABORT:
+        if (!river_xiaozhi_session_open()) {
+            return RIVER_OK;
+        }
+        return river_xiaozhi_send_abort(
+            (arg != NULL && arg[0] != '\0') ? arg : NULL);
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION:
+        river_xiaozhi_close_session();
+        return RIVER_OK;
+
+    default:
+        return RIVER_ERR_UNSUPPORTED;
+    }
+}
+
 river_status_t river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames)
 {
     river_status_t status;

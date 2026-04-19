@@ -478,6 +478,9 @@ river_status_t river_cloud_xiaozhi_request_open_and_listen(const char *mode);
 river_status_t river_cloud_xiaozhi_request_listen_stop(void);
 river_status_t river_cloud_xiaozhi_request_abort(const char *reason);
 river_status_t river_cloud_xiaozhi_request_close_session(void);
+river_status_t river_cloud_xiaozhi_execute_session_control_transport(
+    river_cloud_xiaozhi_control_op_t op,
+    const char *arg);
 river_status_t river_cloud_xiaozhi_execute_open_and_listen_transport(
     const char *mode);
 river_status_t river_cloud_xiaozhi_open_session_and_listen(void);

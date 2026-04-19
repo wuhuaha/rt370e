@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.243
+Validate that the remaining XiaoZhi session-side transport control execution
+now belongs to session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '479,485p' components/river_cloud/river_cloud_internal.h
+sed -n '2053,2075p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '135,147p' components/river_cloud/river_cloud_adapter.c
+rg -n 'execute_session_control_transport|CTRL_(LISTEN_STOP|ABORT|CLOSE_SESSION)|send_listen_stop|send_abort|close_session' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_execute_session_control_transport(...)`
+- adapter control executor no longer directly performs:
+  - `listen_stop`
+  - `abort`
+  - `close_session`
+
 ## Step 5.242
 Validate that the XiaoZhi `OPEN_AND_LISTEN` transport execution now belongs to
 session runtime:

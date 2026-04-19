@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.243
+- Moved the remaining XiaoZhi session-side transport control execution out of
+  `river_cloud_adapter.c` and into session runtime so adapter no longer
+  directly executes:
+  - `RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP`
+  - `RIVER_CLOUD_XIAOZHI_CTRL_ABORT`
+  - `RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION`
+  - `river_cloud_xiaozhi_execute_session_control_transport(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the grouped transport reducer for those control ops:
+  - `listen_stop` gating against `river_cloud_xiaozhi_uplink_send_ready()`
+  - `abort` gating against `river_xiaozhi_session_open()`
+  - direct session close transport teardown
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter control executor now only forwards those session-side control ops
+  into the runtime-owned helper:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.242
 - Moved the XiaoZhi `OPEN_AND_LISTEN` transport-control execution shell out of
   `river_cloud_adapter.c` and into session runtime so adapter no longer

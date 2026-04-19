@@ -135,18 +135,17 @@ static river_status_t river_cloud_xiaozhi_control_execute(
     case RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN:
         return river_cloud_xiaozhi_execute_open_and_listen_transport(request->arg);
     case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
-        if (river_cloud_xiaozhi_uplink_send_ready()) {
-            return river_xiaozhi_send_listen_stop();
-        }
-        return RIVER_OK;
+        return river_cloud_xiaozhi_execute_session_control_transport(
+            request->op,
+            request->arg);
     case RIVER_CLOUD_XIAOZHI_CTRL_ABORT:
-        if (!river_xiaozhi_session_open()) {
-            return RIVER_OK;
-        }
-        return river_xiaozhi_send_abort(request->arg[0] != '\0' ? request->arg : NULL);
+        return river_cloud_xiaozhi_execute_session_control_transport(
+            request->op,
+            request->arg);
     case RIVER_CLOUD_XIAOZHI_CTRL_CLOSE_SESSION:
-        river_xiaozhi_close_session();
-        return RIVER_OK;
+        return river_cloud_xiaozhi_execute_session_control_transport(
+            request->op,
+            request->arg);
     case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_STARTED:
         status = river_xiaozhi_send_audio_out_started(request->response_id,
                                                       request->playback_id,

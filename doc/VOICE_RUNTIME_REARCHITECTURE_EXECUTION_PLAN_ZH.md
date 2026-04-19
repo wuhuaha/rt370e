@@ -248,6 +248,19 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - runtime helper 调用
   - 这继续把 control path 上的 transport/session 真相从 adapter 执行体移入
     runtime
+- `LISTEN_STOP / ABORT / CLOSE_SESSION` 这组 session-side transport control
+  执行壳也已继续从 adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_execute_session_control_transport(...)`
+  - session runtime 现统一负责：
+    - `listen_stop` 的 uplink-ready gate
+    - `abort` 的 session-open gate
+    - local close 对应的 transport teardown
+  - adapter 的对应 control 分支现只保留：
+    - control dispatch 壳
+    - runtime helper 调用
+  - 这使 control path 上剩余的 session transport 真相继续从 adapter 执行体
+    下沉到 runtime
 - adapter 侧剩余的 session 诊断读取也已继续收口：
   - 新增 exported getter：
     - `river_cloud_xiaozhi_local_close_pending()`
