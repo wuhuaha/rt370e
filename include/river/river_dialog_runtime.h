@@ -69,6 +69,7 @@ void river_dialog_runtime_note_asr_session_closed(const char *sid, const char *r
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason);
 void river_dialog_runtime_note_error(const char *reason);
 void river_dialog_runtime_clear_error(const char *reason);
+void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data);
 void river_dialog_runtime_sync_cloud_state(const char *reason);
 river_interaction_state_t river_dialog_runtime_interaction_state(void);
 river_status_t river_dialog_runtime_get_snapshot(river_dialog_runtime_snapshot_t *snapshot);

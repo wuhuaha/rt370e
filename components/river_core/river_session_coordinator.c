@@ -96,11 +96,6 @@ static bool river_session_snapshot_playback_interruptible(
            snapshot->playback_terminal_state[0] == '\0';
 }
 
-void river_session_coordinator_sync_interaction_state(const char *reason)
-{
-    river_dialog_runtime_sync_cloud_state(reason);
-}
-
 static void river_session_wakeword_worker(void *param)
 {
     char wake_text[sizeof(g_river_session_coordinator.wakeword.text)];
@@ -422,7 +417,6 @@ void river_session_coordinator_on_playback_state(
     if (state == RIVER_PLAYBACK_ERROR) {
         river_dialog_runtime_note_error("playback_error");
     }
-    river_dialog_runtime_sync_cloud_state(reason);
 }
 
 void river_session_coordinator_on_voice_event(const river_voice_event_t *event)

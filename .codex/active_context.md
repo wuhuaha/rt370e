@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.268 let playback runtime self-publish truth sync`
+  - `5.269 let dialog runtime own cloud sync ingress`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,7 +230,16 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
-    - XiaoZhi playback runtime now主动触发 cloud state sync when:
+    - dialog runtime now directly owns the cloud state-sync ingress callback:
+      - `river_dialog_runtime_on_cloud_state_sync(...)`
+    - `river_app` no longer bridges cloud-state sync just to forward it into
+      dialog runtime
+    - `session_coordinator` playback listener no longer re-pulls the cloud
+      runtime snapshot on every local playback-service state change
+    - the stale `river_session_coordinator_sync_interaction_state(...)` bridge
+      has been removed
+  - previous landed runtime-ownership slice:
+    - XiaoZhi playback runtime now proactively triggers cloud state sync when:
       - `playback_phase` changes
       - or rebuffer cause changes without a phase transition
     - this starts removing another remaining indirection where outer

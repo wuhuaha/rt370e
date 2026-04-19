@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.269
+- `dialog runtime` now directly owns the cloud state-sync callback ingress:
+  - `river_app` registers `river_dialog_runtime_on_cloud_state_sync(...)`
+    straight into `river_cloud_adapter_set_state_sync_handler(...)`
+  - app no longer acts as an intermediate bridge just to forward cloud-state
+    sync into dialog runtime
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- `session_coordinator` playback listener no longer re-pulls the cloud runtime
+  snapshot on every local playback-service state change:
+  - `river_session_coordinator_on_playback_state(...)` now only absorbs local
+    playback-service truth into `dialog runtime`
+  - the stale `river_session_coordinator_sync_interaction_state(...)` bridge
+    has been removed
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+  - [components/river_core/river_session_coordinator.h](/root/ameba-river/components/river_core/river_session_coordinator.h)
+
 ## Step 5.268
 - XiaoZhi playback runtime now proactively publishes cloud state-sync when its
   own playback phase truth changes, instead of relying only on the outer

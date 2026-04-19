@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.269
+Validate that dialog runtime now owns cloud sync ingress directly and that the
+session playback listener no longer pulls cloud snapshot on local playback
+updates:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '60,80p' include/river/river_dialog_runtime.h
+sed -n '468,500p' components/river_core/river_dialog_runtime.c
+sed -n '1,40p' components/river_core/river_app.c
+sed -n '398,430p' components/river_core/river_session_coordinator.c
+rg -n 'set_state_sync_handler|on_cloud_state_sync|sync_cloud_state|sync_interaction_state' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_app.c \
+  components/river_core/river_session_coordinator.c \
+  components/river_core/river_session_coordinator.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- app directly registers `river_dialog_runtime_on_cloud_state_sync(...)`
+- `river_session_coordinator_on_playback_state(...)` no longer calls
+  `river_dialog_runtime_sync_cloud_state(...)`
+- `river_session_coordinator_sync_interaction_state(...)` no longer exists
+
 ## Step 5.268
 Validate that playback runtime now self-publishes cloud state sync on playback
 truth changes:

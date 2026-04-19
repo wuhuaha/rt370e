@@ -22,12 +22,6 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.app"
 
-static void river_app_on_cloud_state_sync(const char *reason, void *user_data)
-{
-    (void)user_data;
-    river_dialog_runtime_sync_cloud_state(reason);
-}
-
 static const char *river_app_dialog_cloud_provider_name(void)
 {
     return river_cloud_asr_provider_name();
@@ -139,7 +133,7 @@ river_status_t river_app_boot(void)
     river_playback_service_register_listener(river_session_coordinator_on_playback_state, NULL);
     river_voice_frontend_set_handler(river_session_coordinator_on_voice_event);
     river_cloud_adapter_set_result_handler(river_session_coordinator_on_cloud_asr_result, NULL);
-    river_cloud_adapter_set_state_sync_handler(river_app_on_cloud_state_sync, NULL);
+    river_cloud_adapter_set_state_sync_handler(river_dialog_runtime_on_cloud_state_sync, NULL);
 
     if (river_voice_frontend_init() != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;

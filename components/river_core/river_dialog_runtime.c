@@ -473,6 +473,12 @@ void river_dialog_runtime_clear_error(const char *reason)
     river_dialog_runtime_unlock();
 }
 
+void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data)
+{
+    (void)user_data;
+    river_dialog_runtime_sync_cloud_state(reason);
+}
+
 void river_dialog_runtime_sync_cloud_state(const char *reason)
 {
     river_cloud_runtime_snapshot_t snapshot;

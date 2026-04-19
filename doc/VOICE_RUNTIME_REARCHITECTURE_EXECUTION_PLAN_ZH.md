@@ -1184,12 +1184,28 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `RIVER_PLAYBACK_RESTART_PENDING`
     直接主导上层 recovering 判断
   - playback-service recovery state 只保留为 phase 缺席时的兼容兜底
+- playback truth 的 cloud->core ingress 也已继续收口到 dialog runtime：
+  - 新增 direct callback：
+    - `river_dialog_runtime_on_cloud_state_sync(...)`
+  - `river_app` 现在直接注册该回调到：
+    - `river_cloud_adapter_set_state_sync_handler(...)`
+  - app 不再充当 cloud-state-sync 的转发桥
+- `session_coordinator_on_playback_state(...)` 这条本地 playback listener
+  也已进一步瘦身：
+  - 不再在每次 playback-service 状态变化后额外调用
+    `river_dialog_runtime_sync_cloud_state(...)`
+  - 该 listener 现在只吸收：
+    - 本地 playback-service truth
+    - 本地 hard playback error
+  - cloud/playback runtime 自身 truth 变化改由 runtime 主动发布 state sync
 
 下一步焦点：
 
-- 继续收紧 `session_coordinator_on_playback_state(...)` 这条本地 playback
-  listener 桥，把它从“拉 cloud snapshot 的中转站”缩到只处理真正还需要的
- 本地兼容语义
+- 继续把 `session_coordinator` 中剩余的 wake / ASR 生命周期 cloud-sync 桥
+  收掉，让 dialog runtime 最终只通过：
+  - direct cloud sync ingress
+  - local playback/asr/wake 事实入口
+  吸收状态，而不是再由 coordinator 混合“写本地 truth + 触发一次云端重拉”
 - 继续把 `playback_rebuffer_cause` 从“已导出诊断真相”推进到“上层可消费的
   typed 恢复语义”，让 dialog/session 不再只知道“正在恢复”，还知道：
   - 是上游供给断档
