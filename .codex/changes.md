@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.248
+- Moved the remaining XiaoZhi playback backend-refresh and bridge-close tail
+  glue out of `river_cloud_adapter.c` and into playback runtime so adapter no
+  longer directly owns:
+  - downlink worker bootstrap on backend init / config refresh
+  - playback-state reset on backend refresh
+  - decoder close on bridge-close teardown
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Playback runtime now owns the adapter-facing lifecycle helpers for those
+  media concerns:
+  - `river_cloud_xiaozhi_apply_playback_backend_refresh_policy(...)`
+  - `river_cloud_xiaozhi_apply_bridge_close_playback_tail(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter XiaoZhi init / config-refresh / bridge-close paths now only call the
+  runtime-owned playback helpers instead of mutating playback lifecycle state
+  inline:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.247
 - Moved the XiaoZhi uplink I/O service loop out of `river_cloud_adapter.c`
   and into session runtime so adapter no longer directly owns:

@@ -1258,6 +1258,20 @@ void river_cloud_xiaozhi_playback_check_pending_stop(void)
     river_cloud_xiaozhi_reset_playback_state();
 }
 
+void river_cloud_xiaozhi_apply_playback_backend_refresh_policy(void)
+{
+    if (g_river_cloud.xiaozhi_enabled) {
+        river_cloud_xiaozhi_playback_start_downlink_if_needed();
+    }
+
+    river_cloud_xiaozhi_reset_playback_state();
+}
+
+void river_cloud_xiaozhi_apply_bridge_close_playback_tail(void)
+{
+    river_opus_decoder_close(&g_river_cloud.xiaozhi_decoder);
+}
+
 river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
     river_cloud_xiaozhi_playback_abort_cause_t cause,
     const char *detail_reason)

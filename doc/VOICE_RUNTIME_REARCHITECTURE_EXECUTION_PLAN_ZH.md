@@ -775,14 +775,27 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - uplink transport send 壳
   - 这使 uplink data plane 上的 pacing 真相也回到 runtime，adapter 进一步逼近
     纯 transport/I/O 调度壳
+- XiaoZhi playback backend refresh / bridge-close tail 也已继续从 adapter 收口：
+  - playback runtime 新增 adapter-facing helper：
+    - `river_cloud_xiaozhi_apply_playback_backend_refresh_policy(...)`
+    - `river_cloud_xiaozhi_apply_bridge_close_playback_tail(...)`
+  - playback runtime 现统一负责：
+    - backend init / config refresh 时的 downlink worker bootstrap
+    - backend refresh 时的 playback-state reset
+    - bridge-close 时的 decoder teardown tail
+  - adapter 的 XiaoZhi init / config-refresh / audio-close 路径现只保留：
+    - session/transport 层动作
+    - runtime helper 调用
+  - 这继续缩小 adapter 在 playback/downlink 生命周期上的直接所有权，为后续
+    把 terminal-close reducer 本身继续回收到 playback runtime 做准备
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
-  - downlink worker start glue
-  - bridge/network terminal 分支上的 playback/downlink tail action
-  - decoder close / reset 的生命周期归口
+  - transport_closed / network_lost 分支上的 playback/downlink tail action
+  - terminal-close reducer 与 session terminal policy 的进一步解耦
+  - capture-path 上仍由 adapter 触发的 playback pending-stop glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.248
+Validate that the XiaoZhi playback backend-refresh and bridge-close tail now
+belong to playback runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '381,390p' components/river_cloud/river_cloud_internal.h
+sed -n '1258,1278p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '724,736p' components/river_cloud/river_cloud_adapter.c
+sed -n '804,814p' components/river_cloud/river_cloud_adapter.c
+sed -n '1054,1064p' components/river_cloud/river_cloud_adapter.c
+rg -n 'apply_playback_backend_refresh_policy|apply_bridge_close_playback_tail|playback_start_downlink_if_needed|reset_playback_state|river_opus_decoder_close' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_playback_backend_refresh_policy(...)`
+  - `river_cloud_xiaozhi_apply_bridge_close_playback_tail(...)`
+- adapter no longer directly calls:
+  - `river_cloud_xiaozhi_playback_start_downlink_if_needed(...)`
+  - `river_cloud_xiaozhi_reset_playback_state(...)`
+  - `river_opus_decoder_close(...)`
+
 ## Step 5.247
 Validate that the XiaoZhi uplink I/O service now belongs to session runtime:
 ```bash
