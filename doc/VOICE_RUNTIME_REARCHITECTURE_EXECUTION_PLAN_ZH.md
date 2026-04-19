@@ -1198,11 +1198,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 本地 playback-service truth
     - 本地 hard playback error
   - cloud/playback runtime 自身 truth 变化改由 runtime 主动发布 state sync
+- `session_coordinator` 中一部分 ASR 生命周期 cloud-sync bridge 也已继续收口：
+  - cloud adapter 新增能力声明：
+    - `river_cloud_adapter_runtime_self_sync_active()`
+  - XiaoZhi session runtime 现在会在以下生命周期事件后主动发布 state sync：
+    - `asr_error`
+    - `asr_session_started`
+    - `asr_session_closed`
+  - `session_coordinator` 只在 provider 不具备这项能力时，才保留
+    `sync_cloud_state(...)` 的兼容兜底
 
 下一步焦点：
 
-- 继续把 `session_coordinator` 中剩余的 wake / ASR 生命周期 cloud-sync 桥
-  收掉，让 dialog runtime 最终只通过：
+- 继续把 `session_coordinator` 中剩余的 wake admission 与其他尚未自发布的
+  cloud-sync 桥收掉，让 dialog runtime 最终只通过：
   - direct cloud sync ingress
   - local playback/asr/wake 事实入口
   吸收状态，而不是再由 coordinator 混合“写本地 truth + 触发一次云端重拉”

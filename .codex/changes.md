@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.270
+- Added a public cloud capability bit so `river_core` can tell whether the
+  active provider/runtime will self-publish runtime state-sync events:
+  - `river_cloud_adapter_runtime_self_sync_active()`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi session runtime now self-publishes cloud state sync for ASR lifecycle
+  events after emitting the corresponding result:
+  - `asr_error`
+  - `asr_session_started`
+  - `asr_session_closed`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- `session_coordinator` now keeps the ASR lifecycle cloud-snapshot pull only as
+  a fallback for providers that do not self-sync runtime truth:
+  - XiaoZhi path no longer re-pulls cloud snapshot from coordinator after those
+    ASR lifecycle events
+  - non-self-sync providers keep the previous compatibility fallback
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.269
 - `dialog runtime` now directly owns the cloud state-sync callback ingress:
   - `river_app` registers `river_dialog_runtime_on_cloud_state_sync(...)`

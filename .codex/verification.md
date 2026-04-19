@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.270
+Validate that XiaoZhi ASR lifecycle sync now comes from runtime-owned
+self-publish paths, while coordinator keeps a provider-capability fallback:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '100,110p' include/river/river_cloud.h
+sed -n '816,830p' components/river_cloud/river_cloud_adapter.c
+sed -n '1224,1238p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2404,2438p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '318,401p' components/river_core/river_session_coordinator.c
+rg -n 'runtime_self_sync_active|request_state_sync\\(\"asr_|sync_cloud_state\\(\"asr_' \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud adapter exports `river_cloud_adapter_runtime_self_sync_active()`
+- XiaoZhi runtime requests state sync on:
+  - `asr_error`
+  - `asr_session_started`
+  - `asr_session_closed`
+- coordinator only keeps `sync_cloud_state(...)` on those ASR lifecycle paths
+  behind the provider fallback branch
+
 ## Step 5.269
 Validate that dialog runtime now owns cloud sync ingress directly and that the
 session playback listener no longer pulls cloud snapshot on local playback

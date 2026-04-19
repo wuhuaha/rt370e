@@ -318,11 +318,15 @@ static void river_session_try_interrupt_playback_on_asr_text(
 void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_t *result,
                                                    void *user_data)
 {
+    bool runtime_self_sync;
+
     (void)user_data;
 
     if (result == NULL) {
         return;
     }
+
+    runtime_self_sync = river_cloud_adapter_runtime_self_sync_active();
 
     switch (result->type) {
     case RIVER_CLOUD_ASR_EVENT_PARTIAL:
@@ -363,7 +367,9 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->message != NULL ? result->message : "-");
         river_dialog_runtime_note_asr_session_closed(result->sid, "asr_error");
         river_dialog_runtime_note_error("asr_error");
-        river_dialog_runtime_sync_cloud_state("asr_error");
+        if (!runtime_self_sync) {
+            river_dialog_runtime_sync_cloud_state("asr_error");
+        }
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
         if (river_session_state_lock()) {
@@ -375,7 +381,9 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
         river_dialog_runtime_note_asr_session_started(result->sid, "asr_session_started");
-        river_dialog_runtime_sync_cloud_state("asr_session_started");
+        if (!runtime_self_sync) {
+            river_dialog_runtime_sync_cloud_state("asr_session_started");
+        }
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
         if (river_session_state_lock()) {
@@ -387,7 +395,9 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
         river_dialog_runtime_note_asr_session_closed(result->sid, "asr_session_closed");
-        river_dialog_runtime_sync_cloud_state("asr_session_closed");
+        if (!runtime_self_sync) {
+            river_dialog_runtime_sync_cloud_state("asr_session_closed");
+        }
         (void)river_interaction_diag_flush_deferred();
         break;
     default:

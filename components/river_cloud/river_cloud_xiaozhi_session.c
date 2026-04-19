@@ -1231,6 +1231,7 @@ void river_cloud_xiaozhi_note_error_observation(const river_xiaozhi_event_t *eve
                                 message,
                                 -1,
                                 true);
+    river_cloud_request_state_sync("asr_error");
 }
 
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
@@ -2410,6 +2411,7 @@ void river_cloud_xiaozhi_emit_session_started(void)
                                 NULL,
                                 0,
                                 false);
+    river_cloud_request_state_sync("asr_session_started");
 }
 
 void river_cloud_xiaozhi_emit_session_closed(void)
@@ -2430,6 +2432,7 @@ void river_cloud_xiaozhi_emit_session_closed(void)
                                 NULL,
                                 0,
                                 false);
+    river_cloud_request_state_sync("asr_session_closed");
 }
 
 void river_cloud_xiaozhi_round_finish(const char *reason)
