@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.244
+- Moved the remaining XiaoZhi playback ACK transport-control execution out of
+  `river_cloud_adapter.c` and into playback runtime so adapter no longer
+  directly sends:
+  - `audio_out.started`
+  - `audio_out.mark`
+  - `audio_out.cleared`
+  - `audio_out.completed`
+  - `river_cloud_xiaozhi_execute_playback_control_transport(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Playback runtime now owns the grouped ACK transport reducer for:
+  - transport send
+  - sent/failed logging
+  - negotiated playback-ack mode and last-error projection on failures
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Adapter control executor now collapses all four `PLAYBACK_*` control ops into
+  one runtime-owned transport helper call:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.243
 - Moved the remaining XiaoZhi session-side transport control execution out of
   `river_cloud_adapter.c` and into session runtime so adapter no longer

@@ -139,6 +139,112 @@ static uint32_t river_cloud_xiaozhi_downlink_max_start_frames(void)
     return RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES - 4U;
 }
 
+river_status_t river_cloud_xiaozhi_execute_playback_control_transport(
+    const river_cloud_xiaozhi_control_request_t *request)
+{
+    river_status_t status;
+
+    if (request == NULL) {
+        return RIVER_ERR_ARG;
+    }
+
+    switch (request->op) {
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_STARTED:
+        status = river_xiaozhi_send_audio_out_started(request->response_id,
+                                                      request->playback_id,
+                                                      request->segment_id);
+        if (status == RIVER_OK) {
+            RIVER_LOGI("xiaozhi playback ack started sent: response_id=%s playback_id=%s segment_id=%s",
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack started send failed: status=%d response_id=%s playback_id=%s segment_id=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        }
+        return status;
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK:
+        status = river_xiaozhi_send_audio_out_mark(request->response_id,
+                                                   request->playback_id,
+                                                   request->segment_id,
+                                                   request->played_duration_ms);
+        if (status == RIVER_OK) {
+            RIVER_LOGI("xiaozhi playback ack mark sent: response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu",
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       (unsigned long)request->played_duration_ms);
+        } else {
+            RIVER_LOGW("xiaozhi playback ack mark send failed: status=%d response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       (unsigned long)request->played_duration_ms,
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        }
+        return status;
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_CLEARED:
+        status = river_xiaozhi_send_audio_out_cleared(request->response_id,
+                                                      request->playback_id,
+                                                      request->segment_id,
+                                                      request->arg);
+        if (status == RIVER_OK) {
+            RIVER_LOGI("xiaozhi playback ack cleared sent: response_id=%s playback_id=%s cleared_after_segment_id=%s reason=%s",
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       request->arg[0] != '\0' ? request->arg : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack cleared send failed: status=%d response_id=%s playback_id=%s cleared_after_segment_id=%s reason=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       request->segment_id[0] != '\0' ? request->segment_id : "-",
+                       request->arg[0] != '\0' ? request->arg : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        }
+        return status;
+
+    case RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED:
+        status = river_xiaozhi_send_audio_out_completed(request->response_id,
+                                                        request->playback_id);
+        if (status == RIVER_OK) {
+            RIVER_LOGI("xiaozhi playback ack completed sent: response_id=%s playback_id=%s",
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-");
+        } else {
+            RIVER_LOGW("xiaozhi playback ack completed send failed: status=%d response_id=%s playback_id=%s negotiated_mode=%s last_err=%s",
+                       (int)status,
+                       request->response_id[0] != '\0' ? request->response_id : "-",
+                       request->playback_id[0] != '\0' ? request->playback_id : "-",
+                       river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                           river_xiaozhi_playback_ack_mode_negotiated() :
+                           "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        }
+        return status;
+
+    default:
+        return RIVER_ERR_UNSUPPORTED;
+    }
+}
+
 void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
 {
     river_voice_duplex_ready_eval_t duplex_eval;

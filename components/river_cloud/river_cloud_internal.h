@@ -375,6 +375,8 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);
 void river_cloud_xiaozhi_playback_start_downlink_if_needed(void);
+river_status_t river_cloud_xiaozhi_execute_playback_control_transport(
+    const river_cloud_xiaozhi_control_request_t *request);
 river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
     const river_xiaozhi_event_t *event);
 uint32_t river_cloud_xiaozhi_playback_queued_frames(void);

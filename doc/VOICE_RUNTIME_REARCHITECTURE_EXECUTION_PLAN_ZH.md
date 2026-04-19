@@ -261,6 +261,19 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - runtime helper 调用
   - 这使 control path 上剩余的 session transport 真相继续从 adapter 执行体
     下沉到 runtime
+- `PLAYBACK_STARTED / MARK / CLEARED / COMPLETED` 这组 playback ACK transport
+  执行壳也已继续从 adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_execute_playback_control_transport(...)`
+  - playback runtime 现统一负责：
+    - 四类 playback ACK transport send
+    - sent/fail 日志
+    - negotiated ack mode / last error 投影
+  - adapter 的对应 control 分支现只保留：
+    - control dispatch 壳
+    - playback runtime helper 调用
+  - 这让 downlink/playback 路径上的 ACK transport 发送权进一步回到
+    playback runtime，自身的 ACK 队列与 ACK 发送不再分散在两个模块
 - adapter 侧剩余的 session 诊断读取也已继续收口：
   - 新增 exported getter：
     - `river_cloud_xiaozhi_local_close_pending()`
