@@ -345,6 +345,9 @@ uint32_t river_cloud_xiaozhi_uplink_ready_frames(void);
 bool river_cloud_xiaozhi_uplink_active(void);
 uint32_t river_cloud_xiaozhi_trim_uplink_stale_frames(uint32_t keep_frames);
 river_status_t river_cloud_xiaozhi_push_pcm(const uint8_t *pcm, size_t pcm_bytes);
+river_status_t river_cloud_xiaozhi_send_uplink_transport(const uint8_t *pcm,
+                                                         size_t pcm_bytes,
+                                                         uint32_t timestamp_ms);
 void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms);
 void river_cloud_xiaozhi_dump_io_status(void);
 void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms);
@@ -356,6 +359,7 @@ river_status_t river_cloud_xiaozhi_execute_control_transport(
 void river_cloud_xiaozhi_process_control_queue(void);
 void river_cloud_xiaozhi_run_io_tick_housekeeping(void);
 void river_cloud_xiaozhi_run_post_poll_housekeeping(void);
+void river_cloud_xiaozhi_run_uplink_io_once(void);
 void river_cloud_xiaozhi_run_post_uplink_housekeeping(void);
 void river_cloud_xiaozhi_note_asr_result_emitted(river_cloud_asr_event_type_t type);
 void river_cloud_xiaozhi_note_server_hello_observation(const river_xiaozhi_event_t *event);

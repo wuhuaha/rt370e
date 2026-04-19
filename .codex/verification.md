@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.247
+Validate that the XiaoZhi uplink I/O service now belongs to session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '345,366p' components/river_cloud/river_cloud_internal.h
+sed -n '196,250p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '659,760p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '32,60p' components/river_cloud/river_cloud_adapter.c
+sed -n '522,536p' components/river_cloud/river_cloud_adapter.c
+rg -n 'run_uplink_io_once|send_uplink_transport|uplink_busy_backoff_ms|log_uplink_backpressure|send_uplink_packet' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_run_uplink_io_once(...)`
+- adapter only retains:
+  - the I/O-task scheduling call into runtime
+  - the thin transport shell `river_cloud_xiaozhi_send_uplink_transport(...)`
+- busy-backoff and backpressure logging helpers no longer live in
+  `river_cloud_adapter.c`
+
 ## Step 5.246
 Validate that the XiaoZhi control-request queue path now belongs to session
 runtime:

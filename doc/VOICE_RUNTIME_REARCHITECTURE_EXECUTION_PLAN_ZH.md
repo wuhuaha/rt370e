@@ -758,9 +758,31 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - transport session open + listening 的 uplink send-ready predicate
   - adapter control/uplink 路径现在统一调用：
     - `river_cloud_xiaozhi_uplink_send_ready()`
+- XiaoZhi uplink I/O service 本体也已继续从 adapter 收口到 session runtime：
+  - session runtime 新增统一 reducer：
+    - `river_cloud_xiaozhi_run_uplink_io_once(...)`
+    - `river_cloud_xiaozhi_send_uplink_transport(...)` 的 transport 壳调用
+  - session runtime 现统一负责：
+    - retry-preserved frame drain
+    - send-ready gate 后的 paced send
+    - busy backoff / backpressure log
+    - stale trim
+    - uplink timestamp 推进
+    - round packet-sent accounting
+  - adapter 的 `river_cloud_xiaozhi_io_task(...)` 现只保留：
+    - websocket poll / control queue / uplink helper 的调度顺序
+    - fairness delay
+    - uplink transport send 壳
+  - 这使 uplink data plane 上的 pacing 真相也回到 runtime，adapter 进一步逼近
+    纯 transport/I/O 调度壳
 
 下一步焦点：
 
+- 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
+  playback runtime，优先处理：
+  - downlink worker start glue
+  - bridge/network terminal 分支上的 playback/downlink tail action
+  - decoder close / reset 的生命周期归口
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

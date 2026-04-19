@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.246 move XiaoZhi control request queue into runtime`
+  - `5.247 move XiaoZhi uplink I/O service into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -138,6 +138,17 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_xiaozhi_io_task(...)` now only invokes the
       runtime-owned queue drain helper instead of directly maintaining queue
       read/write/completion semantics
+  - newest landed runtime-ownership slice:
+    - session runtime now also owns the XiaoZhi uplink I/O service path:
+      - retry-preserved frame drain
+      - send-ready gating
+      - busy backoff / backpressure logging
+      - uplink timestamp advance
+      - round packet-sent accounting
+    - adapter `river_cloud_xiaozhi_io_task(...)` now only schedules the
+      runtime uplink helper, and adapter uplink sending is reduced to the thin
+      transport shell:
+      - `river_cloud_xiaozhi_send_uplink_transport(...)`
   - eighth landed slice on that plan:
     - terminal `completed` is now gated by `last_segment observed + fully
       heard`, not only by a transient local drain point

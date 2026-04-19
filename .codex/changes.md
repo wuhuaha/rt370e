@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.247
+- Moved the XiaoZhi uplink I/O service loop out of `river_cloud_adapter.c`
+  and into session runtime so adapter no longer directly owns:
+  - uplink busy-backoff calculation
+  - backpressure logging
+  - retry-frame drain and resend pacing
+  - uplink timestamp advance and round packet-sent accounting
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Session runtime now owns the full XiaoZhi uplink service reducer path:
+  - `river_cloud_xiaozhi_run_uplink_io_once(...)`
+  - retry-preserved frame drain
+  - send-ready gating
+  - stale-frame trim on send/backpressure paths
+  - transport timestamp progression
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter `river_cloud_xiaozhi_io_task(...)` now only schedules the runtime
+  helper and the transport send shell:
+  - `river_cloud_xiaozhi_run_uplink_io_once(...)`
+  - `river_cloud_xiaozhi_send_uplink_transport(...)`
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.246
 - Moved the XiaoZhi control-request submission path out of
   `river_cloud_adapter.c` and into session runtime so adapter no longer
