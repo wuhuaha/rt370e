@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.260 move generic stream-open reducer into runtime`
+  - `5.261 gate XiaoZhi rebuffer resume on refill threshold`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,13 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - XiaoZhi downlink runtime now treats `rebuffer_pending` as a real write
+      resume gate:
+      - wait for adaptive queued-frame threshold
+      - only clear rebuffer after the threshold is satisfied
+    - this closes a gap where write-failure recovery could flush the playback
+      service and then immediately retry the same frame without enough refill
+  - previous landed runtime-ownership slice:
     - generic ASR bridge runtime now also owns the last generic realtime
       open reducer:
       - `river_cloud_business_time_ready(...)`

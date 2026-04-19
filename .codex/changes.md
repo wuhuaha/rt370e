@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.261
+- Tightened XiaoZhi downlink rebuffer semantics so `rebuffer_pending` is now a
+  real resume gate in the worker instead of only a flag:
+  - worker waits until queued frames reach the adaptive rebuffer threshold
+    before resuming writes
+  - existing active playback sessions only clear rebuffer after that gate is met
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- This directly targets the repeated recovery storm where the worker could
+  `flush` after a write failure and then immediately retry the same frame
+  without refilling enough downlink backlog first
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.260
 - Moved the last generic realtime capture open reducer out of
   `river_cloud_adapter.c` and into the shared ASR bridge runtime:

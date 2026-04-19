@@ -951,6 +951,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 参数校验
     - runtime helper 编排
     - provider/backend 分发
+- downlink/playback 恢复路径也开始收口到更明确的 runtime 语义：
+  - `rebuffer_pending` 不再只是状态标记，而是 downlink worker 的恢复门控
+  - write failure 后若 playback service 仍存活，worker 现会先等待
+    adaptive refill threshold 达标，再继续写入
+  - 这直接针对日志里的 recovery storm：
+    - `write failed -> flush`
+    - 紧接着立刻 retry 同帧
+    - 但此时队列还没补够，容易再次失败
 
 下一步焦点：
 
