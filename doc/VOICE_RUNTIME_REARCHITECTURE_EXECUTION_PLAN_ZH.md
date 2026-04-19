@@ -817,12 +817,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这继续把 session 入口上的 playback/downlink cleanup 真相收回到
     playback runtime，为后续把 capture-path playback glue 一并移出 adapter
     做准备
+- XiaoZhi capture path 上的 playback entry glue 也已继续从 adapter 收口：
+  - playback runtime 新增 grouped helper：
+    - `river_cloud_xiaozhi_apply_capture_entry_playback_policy()`
+    - `river_cloud_xiaozhi_apply_capture_exit_playback_policy()`
+  - playback runtime 现统一负责：
+    - capture 入口的 pending-stop observation
+    - duplex-held capture gate
+    - fallback log
+    - held-capture pre-roll reset
+    - capture 退出后的 pending-stop observation
+  - adapter 的 `river_cloud_xiaozhi_stream_push_frame(...)` 现只保留：
+    - time-ready observation
+    - pre-roll store / replay
+    - followup round open
+    - uplink PCM push
+    - runtime helper 调用
+  - 这继续缩小 adapter 在 realtime capture 路径上对 playback 真相的直接
+    所有权，使 capture/playback 交界开始稳定落在 playback runtime
 
 下一步焦点：
 
 - 继续把 adapter 中剩余的 downlink / playback 生命周期触发入口收口到
   playback runtime，优先处理：
-  - capture-path 上仍由 adapter 触发的 playback pending-stop glue
   - capture/duplex path 上仍由 adapter 直接触发的 playback 观察性 glue
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family

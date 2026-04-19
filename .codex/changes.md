@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.251
+- Moved the XiaoZhi capture-entry playback glue out of
+  `river_cloud_adapter.c` so adapter no longer directly owns:
+  - capture-path `river_cloud_xiaozhi_playback_check_pending_stop()`
+  - duplex hold / fallback logging on capture entry
+  - pre-roll reset when playback keeps capture closed
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- Playback runtime now owns the grouped capture-entry/exit playback policies:
+  - `river_cloud_xiaozhi_apply_capture_entry_playback_policy()`
+  - `river_cloud_xiaozhi_apply_capture_exit_playback_policy()`
+  - capture-entry pending-stop observation
+  - duplex-held capture gate and fallback log
+  - capture-exit pending-stop observation
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter XiaoZhi stream-push path now only wraps pre-roll/followup/uplink
+  scheduling around the runtime-owned playback helpers:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.250
 - Moved the XiaoZhi session reset / session-start playback cleanup policy out
   of `river_cloud_xiaozhi_session.c` so session runtime no longer directly

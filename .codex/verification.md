@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.251
+Validate that XiaoZhi capture-entry playback glue now belongs to playback
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '382,386p' components/river_cloud/river_cloud_internal.h
+sed -n '370,405p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1091,1205p' components/river_cloud/river_cloud_adapter.c
+rg -n 'apply_capture_entry_playback_policy|apply_capture_exit_playback_policy|capture held during playback|playback_check_pending_stop' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exports and implements:
+  - `river_cloud_xiaozhi_apply_capture_entry_playback_policy()`
+  - `river_cloud_xiaozhi_apply_capture_exit_playback_policy()`
+- adapter capture path no longer directly performs:
+  - capture-entry `playback_check_pending_stop()`
+  - duplex-held capture fallback logging
+  - held-capture `pre_roll_reset()`
+
 ## Step 5.250
 Validate that XiaoZhi session reset / session-start playback cleanup now
 belongs to playback runtime:

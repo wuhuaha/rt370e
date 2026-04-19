@@ -1093,40 +1093,20 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
                                                             bool is_speech)
 {
     river_status_t status;
-    river_voice_duplex_ready_eval_t duplex_eval;
-    const char *duplex_fallback_reason;
 
     if (!g_river_cloud.audio_bridge_open || pcm == NULL || bytes != g_river_cloud.frame_bytes) {
         return RIVER_ERR_ARG;
     }
 
-    river_cloud_xiaozhi_playback_check_pending_stop();
+    if (river_cloud_xiaozhi_apply_capture_entry_playback_policy()) {
+        return RIVER_OK;
+    }
     /*
      * Follow-up window timeout can cascade into websocket/session teardown.
      * Keep that off the real-time capture path; the dedicated xiaozhi I/O
      * owner already polls timeout state continuously and owns transport work.
      */
     river_cloud_log_time_ready_once();
-
-    river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
-    if (!g_river_cloud.stream_active &&
-        river_cloud_xiaozhi_capture_held_by_playback(&duplex_eval,
-                                                     &duplex_fallback_reason)) {
-        river_cloud_xiaozhi_note_semantic_fallback(duplex_fallback_reason);
-        RIVER_LOGI("xiaozhi capture held during playback: fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u",
-                   duplex_fallback_reason,
-                   river_xiaozhi_duplex_default_on_allowed() ? "yes" : "no",
-                   duplex_eval.ready ? "yes" : "no",
-                   river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
-                   river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
-                   river_reference_service_state_name(duplex_eval.reference_state),
-                   river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
-                   (unsigned int)duplex_eval.native_reference_peak,
-                   (unsigned int)duplex_eval.native_reference_ratio_q15);
-        g_river_cloud.xiaozhi_open_speech_frames = 0U;
-        river_cloud_pre_roll_reset();
-        return RIVER_OK;
-    }
 
     river_cloud_pre_roll_store(pcm);
     if (!g_river_cloud.stream_active) {
@@ -1190,7 +1170,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
                    river_cloud_asr_provider_name(),
                    (unsigned long)pre_roll_frames_before_open);
         river_runtime_stats_snapshot("asr_stream_active");
-        river_cloud_xiaozhi_playback_check_pending_stop();
+        river_cloud_xiaozhi_apply_capture_exit_playback_policy();
         return RIVER_OK;
     }
 
@@ -1220,7 +1200,7 @@ static river_status_t river_cloud_xiaozhi_stream_push_frame(const uint8_t *pcm,
         }
     }
 
-    river_cloud_xiaozhi_playback_check_pending_stop();
+    river_cloud_xiaozhi_apply_capture_exit_playback_policy();
     return RIVER_OK;
 }
 #endif
