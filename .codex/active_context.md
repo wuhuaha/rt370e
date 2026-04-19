@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.259 move generic pre-roll and stream-finish reducers into runtime`
+  - `5.260 move generic stream-open reducer into runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,16 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - generic ASR bridge runtime now also owns the last generic realtime
+      open reducer:
+      - `river_cloud_business_time_ready(...)`
+      - `river_cloud_stream_open_and_flush(...)`
+    - adapter no longer defines any generic realtime capture reducer body;
+      it now only orchestrates:
+      - validation
+      - runtime helper calls
+      - backend dispatch
+  - previous landed runtime-ownership slice:
     - generic ASR bridge runtime now also owns the shared realtime reducer
       helpers for:
       - pre-roll reset

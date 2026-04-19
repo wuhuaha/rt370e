@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.260
+- Moved the last generic realtime capture open reducer out of
+  `river_cloud_adapter.c` and into the shared ASR bridge runtime:
+  - `river_cloud_business_time_ready(...)`
+  - `river_cloud_stream_open_and_flush(...)`
+  - [components/river_cloud/river_cloud_asr_bridge_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_asr_bridge_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Adapter no longer owns any generic realtime capture reducer implementation;
+  it now consumes bridge-runtime helpers for:
+  - bridge-state prepare/reset
+  - pre-roll mutation
+  - stream-open flush
+  - active-stream finish
+  while keeping only orchestration and backend dispatch
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.259
 - Moved generic realtime capture reducer helpers out of `river_cloud_adapter.c`
   and into the shared ASR bridge runtime:

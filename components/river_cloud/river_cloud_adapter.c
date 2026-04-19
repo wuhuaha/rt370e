@@ -147,15 +147,6 @@ static bool river_cloud_system_time_ready(void)
     return river_cloud_system_utc_seconds() >= RIVER_CLOUD_TIME_READY_EPOCH_MIN;
 }
 
-static bool river_cloud_business_time_ready(void)
-{
-#if RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED
-    return river_cloud_system_time_ready();
-#else
-    return true;
-#endif
-}
-
 static uint32_t river_cloud_estimated_utc_seconds(void)
 {
     uint32_t sec;
@@ -560,65 +551,6 @@ void river_cloud_reset_stream_open_deferred_state(void)
     g_river_cloud.stream_open_defer_status = 0;
     g_river_cloud.stream_open_defer_wifi_connected = false;
     g_river_cloud.stream_open_defer_time_ready = false;
-}
-
-static river_status_t river_cloud_stream_open_and_flush(void)
-{
-    uint32_t read_index;
-    uint32_t frame_index;
-    uint32_t pre_roll_frames;
-    river_status_t status;
-
-    if (g_river_cloud.provider == NULL || !g_river_cloud.provider->supports_streaming()) {
-        return RIVER_ERR_UNSUPPORTED;
-    }
-    if (!river_wifi_station_is_connected()) {
-        return RIVER_ERR_BUSY;
-    }
-
-    river_cloud_start_sntp_if_needed();
-    river_cloud_seed_time_from_build_if_needed();
-    if (!river_cloud_business_time_ready()) {
-        snprintf(g_river_cloud.last_error,
-                 sizeof(g_river_cloud.last_error),
-                 "%s",
-                 "system utc not ready");
-        return RIVER_ERR_BUSY;
-    }
-
-    pre_roll_frames = g_river_cloud.pre_roll_count_frames;
-    status = g_river_cloud.provider->stream_open(&g_river_cloud.audio_desc);
-    if (status != RIVER_OK) {
-        return status;
-    }
-
-    if (pre_roll_frames == 0U) {
-        return RIVER_OK;
-    }
-
-    if (pre_roll_frames == g_river_cloud.pre_roll_capacity_frames) {
-        read_index = g_river_cloud.pre_roll_write_index_frames;
-    } else {
-        read_index = 0U;
-    }
-
-    for (frame_index = 0U; frame_index < pre_roll_frames; ++frame_index) {
-        const uint8_t *src = g_river_cloud.pre_roll_buffer +
-                             ((size_t)read_index * g_river_cloud.frame_bytes);
-
-        status = g_river_cloud.provider->stream_feed(src, g_river_cloud.frame_bytes);
-        if (status != RIVER_OK) {
-            return status;
-        }
-
-        read_index++;
-        if (read_index >= g_river_cloud.pre_roll_capacity_frames) {
-            read_index = 0U;
-        }
-    }
-
-    river_cloud_pre_roll_reset();
-    return status;
 }
 
 river_status_t river_cloud_adapter_init(void)

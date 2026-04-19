@@ -941,14 +941,26 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 这让 adapter 在 realtime capture 主链上的职责进一步逼近：
     - gate / dispatch / orchestration
     - 而不是具体状态变异
+- 最后一个 generic realtime open reducer 也已迁出 adapter：
+  - 迁入 `river_cloud_asr_bridge_runtime.c`：
+    - `river_cloud_business_time_ready(...)`
+    - `river_cloud_stream_open_and_flush(...)`
+  - 这意味着 adapter 侧已不再持有 generic realtime capture reducer 的
+    具体实现
+  - generic capture 主链当前在 adapter 中已逼近纯壳：
+    - 参数校验
+    - runtime helper 编排
+    - provider/backend 分发
 
 下一步焦点：
 
 - 继续把 XiaoZhi 与 generic streaming path 之间的桥接边界做最终收口
-- 继续把 generic realtime streaming reducer 中最后的
-  `stream_open_and_flush()` 从 adapter 迁到独立 runtime 边界
 - 继续审视 downlink/playback 的 starve/rebuffer 恢复策略，把 repeated
   stop/start 收束成更稳定的 runtime truth 与恢复路径
+- 优先进入 downlink/playback 恢复重构，处理：
+  - `write failed -> flush/rebuffer`
+  - `upstream gap -> stop/start`
+  - dialog runtime 与 playback runtime 对“recovering”语义的不一致
 - 继续把 remaining reopen / interrupt / close-session 触发路径的 terminal
   ownership 收口进同一个 runtime-owned cause family
 - 让 `dialog runtime` / `session coordinator` 后续优先消费 runtime 导出的

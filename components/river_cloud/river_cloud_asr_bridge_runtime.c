@@ -1,7 +1,9 @@
 /* Generic ASR capture bridge runtime: frame sizing, pre-roll allocation, and bridge-state reset. */
+#include <stdio.h>
 #include <string.h>
 
 #include "river/river_runtime_stats.h"
+#include "river/river_wifi_station.h"
 
 #include "river_cloud_internal.h"
 
@@ -23,6 +25,15 @@ static size_t river_cloud_asr_frame_bytes(const river_cloud_asr_audio_desc_t *au
 
     return (size_t)((audio->sample_rate * audio->frame_ms) / 1000U) * audio->channels *
            (audio->bits_per_sample / 8U);
+}
+
+bool river_cloud_business_time_ready(void)
+{
+#if RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED
+    return river_cloud_time_ready();
+#else
+    return true;
+#endif
 }
 
 river_status_t river_cloud_prepare_audio_bridge_state(const river_cloud_asr_audio_desc_t *audio,
@@ -60,6 +71,65 @@ river_status_t river_cloud_prepare_audio_bridge_state(const river_cloud_asr_audi
         return RIVER_ERR_NO_MEMORY;
     }
 
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_stream_open_and_flush(void)
+{
+    uint32_t read_index;
+    uint32_t frame_index;
+    uint32_t pre_roll_frames;
+    river_status_t status;
+
+    if (g_river_cloud.provider == NULL || !g_river_cloud.provider->supports_streaming()) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+    if (!river_wifi_station_is_connected()) {
+        return RIVER_ERR_BUSY;
+    }
+
+    river_cloud_start_sntp_if_needed();
+    river_cloud_seed_time_from_build_if_needed();
+    if (!river_cloud_business_time_ready()) {
+        snprintf(g_river_cloud.last_error,
+                 sizeof(g_river_cloud.last_error),
+                 "%s",
+                 "system utc not ready");
+        return RIVER_ERR_BUSY;
+    }
+
+    pre_roll_frames = g_river_cloud.pre_roll_count_frames;
+    status = g_river_cloud.provider->stream_open(&g_river_cloud.audio_desc);
+    if (status != RIVER_OK) {
+        return status;
+    }
+
+    if (pre_roll_frames == 0U) {
+        return RIVER_OK;
+    }
+
+    if (pre_roll_frames == g_river_cloud.pre_roll_capacity_frames) {
+        read_index = g_river_cloud.pre_roll_write_index_frames;
+    } else {
+        read_index = 0U;
+    }
+
+    for (frame_index = 0U; frame_index < pre_roll_frames; ++frame_index) {
+        const uint8_t *src = g_river_cloud.pre_roll_buffer +
+                             ((size_t)read_index * g_river_cloud.frame_bytes);
+
+        status = g_river_cloud.provider->stream_feed(src, g_river_cloud.frame_bytes);
+        if (status != RIVER_OK) {
+            return status;
+        }
+
+        read_index++;
+        if (read_index >= g_river_cloud.pre_roll_capacity_frames) {
+            read_index = 0U;
+        }
+    }
+
+    river_cloud_pre_roll_reset();
     return RIVER_OK;
 }
 
