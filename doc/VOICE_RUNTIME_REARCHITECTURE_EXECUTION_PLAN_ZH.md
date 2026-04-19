@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-19
+Last Updated: 2026-04-20
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -1037,6 +1037,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `target_ms`
   - `meta_gap_ms`
   - `rebuffer_count`
+- rebuffer 本身也已开始从“仅 pending/no-pending”收口为显式原因真相：
+  - 新增 runtime truth：
+    - `playback_rebuffer_cause`
+  - 当前已区分：
+    - `upstream_starved`
+    - `write_failed`
+  - cloud runtime snapshot / dialog runtime snapshot 与诊断日志都已直接导出
+    该 cause，后续不再需要从：
+    - `underrun`
+    - `write failed`
+    - `rebuffer requested`
+    多条离散日志反推同一次恢复
 - recoverable playback churn 已继续从“局部 active 抖动”提升为显式 runtime
   真相：
   - cloud runtime snapshot 新增：
@@ -1160,6 +1172,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 下一步焦点：
 
+- 继续把 `playback_rebuffer_cause` 从“已导出诊断真相”推进到“上层可消费的
+  typed 恢复语义”，让 dialog/session 不再只知道“正在恢复”，还知道：
+  - 是上游供给断档
+  - 还是本地写链路失败
 - 继续把 dialog/core 中剩余的 playback lane / output lane 派生去掉
   对旧 service-active 兼容路径的常态依赖，只把它保留为 phase 缺席兜底
 - 继续检查 reference-service / duplex gate 是否仍会在

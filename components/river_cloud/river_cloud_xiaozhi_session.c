@@ -883,6 +883,14 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
                                            sizeof(snapshot->playback_phase),
                                            river_cloud_xiaozhi_playback_phase_name(
                                                river_cloud_xiaozhi_playback_phase()));
+    river_cloud_xiaozhi_copy_optional_text(
+        snapshot->playback_rebuffer_cause,
+        sizeof(snapshot->playback_rebuffer_cause),
+        river_cloud_xiaozhi_playback_rebuffer_cause() !=
+                RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_NONE ?
+            river_cloud_xiaozhi_playback_rebuffer_cause_name(
+                river_cloud_xiaozhi_playback_rebuffer_cause()) :
+            NULL);
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_terminal_state,
                                            sizeof(snapshot->playback_terminal_state),
                                            g_river_cloud.xiaozhi_playback_terminal_state);
@@ -914,7 +922,7 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
             (g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms - now_ms) :
             0U;
 
-    RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s phase=%s stop_pending=%s close_pending=%s window=%s followup_left_ms=%lu close_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
+    RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s phase=%s rebuffer=%s/%s stop_pending=%s close_pending=%s window=%s followup_left_ms=%lu close_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
                g_river_cloud.xiaozhi_enabled ? "yes" : "no",
                g_river_cloud.xiaozhi_io_started ? "running" : "off",
                river_xiaozhi_session_open() ? "open" : "closed",
@@ -922,6 +930,9 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                river_cloud_xiaozhi_playback_output_active() ? "yes" : "no",
                river_cloud_xiaozhi_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
+               g_river_cloud.xiaozhi_playback_rebuffer_pending ? "yes" : "no",
+               river_cloud_xiaozhi_playback_rebuffer_cause_name(
+                   river_cloud_xiaozhi_playback_rebuffer_cause()),
                g_river_cloud.xiaozhi_tts_stop_pending ? "yes" : "no",
                river_cloud_xiaozhi_local_close_pending() ? "yes" : "no",
                river_cloud_xiaozhi_conversation_window_active() ? "yes" : "no",

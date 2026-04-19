@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.266
+- Introduced an explicit XiaoZhi playback runtime `rebuffer_cause` truth so
+  recovery no longer collapses all churn into a single boolean:
+  - `upstream_starved`
+  - `write_failed`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Exported that cause through the cloud/dialog snapshot path:
+  - cloud runtime snapshot now exposes `playback_rebuffer_cause`
+  - dialog runtime snapshot/dump now preserves and prints the same cause
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- Playback/downlink diagnostics now log recovery cause directly at phase
+  transitions, prefetch/start, rebuffer trigger, resume, and session dump time
+  instead of requiring manual log correlation across multiple branches
+
 ## Step 5.265
 - Tightened dialog runtime `playback_recovering` to phase-first semantics as
   well:

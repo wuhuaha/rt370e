@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.266
+Validate that XiaoZhi playback recovery now carries an explicit rebuffer cause
+through runtime and snapshot exports:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '52,115p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '663,748p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '857,900p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '296,316p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_rebuffer_cause|PLAYBACK_REBUFFER_CAUSE|upstream_starved|write_failed' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_core/river_dialog_runtime.c \
+  components/river_cloud/river_cloud_internal.h \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- XiaoZhi playback runtime exposes explicit rebuffer causes:
+  - `upstream_starved`
+  - `write_failed`
+- cloud/dialog runtime snapshots can export `playback_rebuffer_cause`
+- playback/downlink logs print cause directly on rebuffer trigger/resume paths
+
 ## Step 5.265
 Validate that dialog runtime `playback_recovering` is phase-first when phase is
 known:
