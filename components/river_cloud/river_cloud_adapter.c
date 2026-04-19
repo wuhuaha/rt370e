@@ -133,21 +133,7 @@ static river_status_t river_cloud_xiaozhi_control_execute(
 
     switch (request->op) {
     case RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN:
-        if (!river_xiaozhi_session_open()) {
-            status = river_xiaozhi_open_session();
-            if (status != RIVER_OK) {
-                return status;
-            }
-        }
-        river_cloud_xiaozhi_copy_session_id_from_transport();
-        if (!river_cloud_xiaozhi_listening_active()) {
-            status = river_xiaozhi_send_listen_start(
-                request->arg[0] != '\0' ? request->arg : "auto");
-            if (status != RIVER_OK) {
-                return status;
-            }
-        }
-        return RIVER_OK;
+        return river_cloud_xiaozhi_execute_open_and_listen_transport(request->arg);
     case RIVER_CLOUD_XIAOZHI_CTRL_LISTEN_STOP:
         if (river_cloud_xiaozhi_uplink_send_ready()) {
             return river_xiaozhi_send_listen_stop();

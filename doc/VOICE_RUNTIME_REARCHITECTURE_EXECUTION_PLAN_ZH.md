@@ -236,6 +236,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     executor 内直接写 `xiaozhi_listening = true`
   - session 侧 follow-up / wake admission 调用点也不再各自手工补一次该
     policy，避免成功态归一分散在多个入口
+- `OPEN_AND_LISTEN` 的 transport control 执行壳也已继续从 adapter 收口：
+  - 新增：
+    - `river_cloud_xiaozhi_execute_open_and_listen_transport(...)`
+  - session runtime 现统一负责：
+    - `open_session`
+    - transport session-id sync
+    - `listen_start` 前的 listening truth gate
+  - adapter 的 `RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN` 分支现只保留：
+    - control dispatch 壳
+    - runtime helper 调用
+  - 这继续把 control path 上的 transport/session 真相从 adapter 执行体移入
+    runtime
 - adapter 侧剩余的 session 诊断读取也已继续收口：
   - 新增 exported getter：
     - `river_cloud_xiaozhi_local_close_pending()`

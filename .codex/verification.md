@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.242
+Validate that the XiaoZhi `OPEN_AND_LISTEN` transport execution now belongs to
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '477,483p' components/river_cloud/river_cloud_internal.h
+sed -n '2028,2050p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '125,140p' components/river_cloud/river_cloud_adapter.c
+rg -n 'execute_open_and_listen_transport|request_open_and_listen|copy_session_id_from_transport|send_listen_start|RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN' \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- session runtime exports and implements:
+  - `river_cloud_xiaozhi_execute_open_and_listen_transport(...)`
+- adapter `RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN` branch no longer directly
+  performs:
+  - `open_session`
+  - transport session-id copy
+  - `listen_start` gating
+
 ## Step 5.241
 Validate that the XiaoZhi I/O-loop housekeeping glue now belongs to runtime:
 ```bash

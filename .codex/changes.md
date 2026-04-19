@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.242
+- Moved the XiaoZhi `OPEN_AND_LISTEN` transport-control execution shell out of
+  `river_cloud_adapter.c` and into session runtime so adapter no longer
+  directly opens the websocket session, copies transport session-id state, or
+  gates `listen_start` inline:
+  - `river_cloud_xiaozhi_execute_open_and_listen_transport(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- Session runtime now owns the grouped `OPEN_AND_LISTEN` transport reducer for:
+  - `river_xiaozhi_open_session()`
+  - `river_cloud_xiaozhi_copy_session_id_from_transport()`
+  - `river_cloud_xiaozhi_listening_active()` guard before
+    `river_xiaozhi_send_listen_start(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- Adapter control executor now only forwards the request payload into the
+  runtime-owned transport helper for `RIVER_CLOUD_XIAOZHI_CTRL_OPEN_AND_LISTEN`:
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.241
 - Moved the XiaoZhi I/O-loop session-housekeeping glue out of
   `river_cloud_adapter.c` and into runtime-owned helpers so adapter no longer
