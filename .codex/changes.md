@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.305
+- `river_cloud_xiaozhi_dump_session_status()` 现在改为先读取
+  `river_cloud_runtime_snapshot_t`，再输出会话状态日志：
+  - listening
+  - playback_active
+  - playback_phase
+  - playback_rebuffer_pending/cause
+  - tts_stop_pending
+  - local_close/window remaining
+  - turn_accepted / turn_id / input_state / output_state / barge_in_enabled
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- 这一步让 status dump 继续贴近 runtime 真相源，不再在日志路径中重新拼接
+  playback/turn 事实，也去掉了对 `g_river_cloud.xiaozhi_tts_stop_pending` 的最后一处
+  session-side 直读。
+
 ## Step 5.304
 - `wake admission` 的 pending/retry worker 已从
   `session_coordinator` 抽到新的 core-owned bridge：

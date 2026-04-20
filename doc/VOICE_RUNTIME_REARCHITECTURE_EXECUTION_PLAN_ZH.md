@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.305`
+  - `river_cloud_xiaozhi_dump_session_status()` 已改为先读取
+    `river_cloud_runtime_snapshot_t`
+  - session status dump 中的：
+    - playback active/phase/rebuffer/stop-pending
+    - local close/window remaining
+    - turn semantics
+    现统一消费 runtime snapshot 投影，而不是日志路径自己重拼
+  - 这让 XiaoZhi session 诊断面也继续向 runtime 真相源收口
 - `Step 5.304`
   - wake admission 的 pending/retry worker 已从 `session_coordinator` 抽到新的
     core-owned bridge：
@@ -100,16 +109,13 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续评估 `session_coordinator` 里剩余的：
-    - ASR text logging
-    - interrupt fanout
-    - diag route/flush
-    是否还能进一步拆薄
   - 回到 downlink/playback runtime，继续收紧：
     - `tts_stop_pending`
     - playback stop/reset
     - rebuffer/recovering
     的 owner 边界和状态投影
+  - 继续让 XiaoZhi status/diag 读取优先消费 runtime snapshot / typed helper，
+    减少 session/adapter 侧重新解释 playback truth
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
     local playback / recovering/rebuffer 的 owner 边界彻底稳定
 

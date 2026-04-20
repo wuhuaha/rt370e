@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.305
+Validate that XiaoZhi session-status logging now consumes the runtime snapshot
+instead of manually reconstructing playback/turn truth from raw globals:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'dump_session_status|fill_runtime_snapshot|tts_stop_pending|turn_semantics accepted=' \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '850,920p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_dump_session_status()` now fills a
+  `river_cloud_runtime_snapshot_t` first
+- the dump reads playback/turn state from snapshot fields instead of manually
+  reconstructing them from raw playback globals
+- `g_river_cloud.xiaozhi_tts_stop_pending` is no longer read directly from
+  `river_cloud_xiaozhi_session.c`
+
 ## Step 5.304
 Validate that wake admission queue/retry worker ownership has moved out of
 `session_coordinator` into a dedicated core bridge:

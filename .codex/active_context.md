@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.304 extract wake admission bridge from coordinator`
+  - `5.305 route xiaozhi status dump through runtime snapshot`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,20 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `river_cloud_xiaozhi_dump_session_status()` 现在会先读取
+      `river_cloud_runtime_snapshot_t`
+    - session status dump 中的：
+      - playback active/phase/rebuffer/tts_stop_pending
+      - local_close/window remaining
+      - turn semantics
+      已开始统一走 runtime snapshot 投影，而不是日志路径自己重拼
+    - `xiaozhi_session.c` 已去掉对：
+      - `g_river_cloud.xiaozhi_tts_stop_pending`
+      的最后一处 session-side 直读
+    - 下一步应继续：
+      - 让更多 XiaoZhi diag/status 读取统一消费 runtime snapshot/helper
+      - 把 playback stop/reset/rebuffer 恢复路径继续从 session/adapter 收口
+  - previous runtime-ownership slice:
     - wake admission 的 queued/coalesced/deferred/retry worker 已从
       `session_coordinator` 抽到新的 core-owned bridge：
       - `river_dialog_wake_admission`
@@ -101,9 +115,8 @@ or top-of-tree verification target changes.
       - wake handoff gate
       - ASR 文本 fanout
       的薄壳
-    - 下一步应继续：
-      - 评估 ASR 文本日志/interrupt/diag fanout 是否还能继续拆薄
-      - 转回 downlink/playback runtime，继续消除 stop/start/rebuffer 分裂状态
+    - 该步之后，coordinator 中的 wake admission worker 已完成下沉，后续主焦点
+      已切回 downlink/playback runtime
   - previous runtime-ownership slice:
     - `dialog_cloud_port` 现在会在
       `begin_conversation_window(source)` 成功后，立即把 wake admission success
