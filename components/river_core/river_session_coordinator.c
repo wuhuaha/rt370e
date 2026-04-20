@@ -76,26 +76,6 @@ static void river_session_wakeword_clear_locked(void)
     g_river_session_coordinator.wakeword.text[0] = '\0';
 }
 
-static bool river_session_runtime_snapshot(river_dialog_runtime_snapshot_t *snapshot)
-{
-    if (snapshot == NULL) {
-        return false;
-    }
-    memset(snapshot, 0, sizeof(*snapshot));
-    return river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
-}
-
-static bool river_session_snapshot_playback_interruptible(
-    const river_dialog_runtime_snapshot_t *snapshot)
-{
-    if (snapshot == NULL) {
-        return false;
-    }
-
-    return snapshot->playback_active &&
-           snapshot->playback_terminal_state[0] == '\0';
-}
-
 static void river_session_wakeword_worker(void *param)
 {
     char wake_text[sizeof(g_river_session_coordinator.wakeword.text)];
@@ -208,8 +188,7 @@ static river_status_t river_session_wakeword_worker_init(void)
 
 static river_status_t river_session_schedule_wakeword(const river_voice_event_t *event)
 {
-    river_dialog_runtime_snapshot_t snapshot;
-    bool have_snapshot;
+    const char *block_reason;
 
     if (event == NULL) {
         return RIVER_ERR_ARG;
@@ -220,17 +199,10 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
         return RIVER_ERR_NOT_FOUND;
     }
 
-    have_snapshot = river_session_runtime_snapshot(&snapshot);
-    if (have_snapshot && snapshot.conversation_window_active) {
-        RIVER_LOGI("wakeword ignored: conversation window already active text=%s confidence=%d",
-                   event->text != NULL ? event->text : "-",
-                   event->confidence);
-        return RIVER_OK;
-    }
-    if (have_snapshot &&
-        snapshot.interaction_state != RIVER_INTERACTION_WAKE_MONITORING) {
-        RIVER_LOGI("wakeword ignored: interaction=%s text=%s confidence=%d",
-                   river_interaction_state_name(snapshot.interaction_state),
+    block_reason = river_dialog_runtime_wakeword_admission_block_reason();
+    if (block_reason != NULL) {
+        RIVER_LOGI("wakeword ignored: reason=%s text=%s confidence=%d",
+                   block_reason,
                    event->text != NULL ? event->text : "-",
                    event->confidence);
         return RIVER_OK;
@@ -278,12 +250,8 @@ static void river_session_try_interrupt_playback_on_asr_text(
     const river_cloud_asr_result_t *result)
 {
     bool interrupt_requested;
-    river_dialog_runtime_snapshot_t snapshot;
 
     if (result == NULL || result->text == NULL || result->text[0] == '\0') {
-        return;
-    }
-    if (!river_session_runtime_snapshot(&snapshot)) {
         return;
     }
     if (!river_session_state_lock()) {
@@ -292,19 +260,14 @@ static void river_session_try_interrupt_playback_on_asr_text(
     interrupt_requested = g_river_session_coordinator.barge_in_interrupt_requested;
     river_session_state_unlock();
 
-    if (!snapshot.asr_session_active || interrupt_requested) {
+    if (interrupt_requested) {
         return;
     }
-    if (!river_session_snapshot_playback_interruptible(&snapshot)) {
-        return;
-    }
-    if (snapshot.interaction_state != RIVER_INTERACTION_SPEAKING &&
-        snapshot.interaction_state != RIVER_INTERACTION_BARGE_IN_LISTENING) {
+    if (!river_dialog_runtime_allows_barge_in_interrupt()) {
         return;
     }
 
-    RIVER_LOGI("barge-in text confirmed during playback: interaction=%s sid=%s text=%s -> interrupt tts",
-               river_interaction_state_name(snapshot.interaction_state),
+    RIVER_LOGI("barge-in text confirmed during playback: sid=%s text=%s -> interrupt tts",
                result->sid != NULL ? result->sid : "-",
                result->text);
     if (river_cloud_adapter_interrupt_tts_with_reason("asr_text_confirmed") == RIVER_OK) {

@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.290
+- `session_coordinator` 对 `dialog runtime snapshot` 的两类直接解读已继续收口成
+  typed policy helper 调用：
+  - wakeword 准入判断
+  - ASR text barge-in 打断判断
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- `dialog runtime` 新增 typed policy helper：
+  - `river_dialog_runtime_wakeword_admission_block_reason()`
+  - `river_dialog_runtime_allows_barge_in_interrupt()`
+  - 这让 wakeword/barge-in 的准入语义回到 truth source 内部，而不是继续由
+    coordinator 拉整份 snapshot 再自己拼规则
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `session_coordinator` 已删除：
+  - `river_session_runtime_snapshot(...)`
+  - `river_session_snapshot_playback_interruptible(...)`
+  - wakeword 与 barge-in 路径现在直接消费 dialog runtime policy helper
+  - 这进一步压缩 coordinator 的状态解释权，只保留事件编排与副作用
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.289
 - 云端 ASR lifecycle 事件现在不再先进入 `session_coordinator` 再由它桥接到
   `dialog runtime`：

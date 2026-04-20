@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.290
+Validate that session_coordinator no longer reads dialog-runtime snapshots
+directly for wakeword admission or barge-in interrupt policy, and instead uses
+typed dialog-runtime helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'wakeword_admission_block_reason|allows_barge_in_interrupt' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_session_coordinator.c
+rg -n 'river_session_runtime_snapshot|snapshot_playback_interruptible' \
+  components/river_core/river_session_coordinator.c
+sed -n '188,214p' components/river_core/river_session_coordinator.c
+sed -n '250,272p' components/river_core/river_session_coordinator.c
+sed -n '756,790p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime exposes typed helpers for:
+  - wakeword admission blocking
+  - barge-in interrupt admission
+- session_coordinator no longer contains local snapshot helper functions for
+  those policies
+
 ## Step 5.289
 Validate that cloud ASR lifecycle events now reach dialog runtime directly via
 app wiring instead of being bridged from session_coordinator:

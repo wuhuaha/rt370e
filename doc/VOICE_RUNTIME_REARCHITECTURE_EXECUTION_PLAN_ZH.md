@@ -1262,6 +1262,19 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - barge-in interrupt
     - diag flush
   - 这继续删除一条 coordinator-owned 的 cloud->dialog truth bridge
+- 再往前一步，`session_coordinator` 对 dialog-runtime snapshot 的规则解读也已
+  开始被 typed helper 取代：
+  - wakeword admission 当前改为调用：
+    - `wakeword_admission_block_reason()`
+  - barge-in interrupt 当前改为调用：
+    - `allows_barge_in_interrupt()`
+  - coordinator 不再为了这两条策略去拉整份 snapshot 并自行解释：
+    - `conversation_window_active`
+    - `interaction_state`
+    - `playback_active`
+    - `playback_terminal_state`
+    - `asr_session_active`
+  - 这继续把 admission/interrupt 规则收回 dialog runtime 这个真相源内部
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

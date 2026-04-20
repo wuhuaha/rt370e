@@ -756,6 +756,52 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
     river_dialog_runtime_unlock();
 }
 
+const char *river_dialog_runtime_wakeword_admission_block_reason(void)
+{
+    const char *reason = NULL;
+
+    if (!g_river_dialog_runtime.initialized) {
+        return "runtime_uninitialized";
+    }
+    if (!river_dialog_runtime_lock()) {
+        return "runtime_busy";
+    }
+
+    if (g_river_dialog_runtime.snapshot.conversation_window_active) {
+        reason = "conversation_window_active";
+    } else if (g_river_dialog_runtime.snapshot.interaction_state !=
+               RIVER_INTERACTION_WAKE_MONITORING) {
+        reason = river_interaction_state_name(
+            g_river_dialog_runtime.snapshot.interaction_state);
+    }
+
+    river_dialog_runtime_unlock();
+    return reason;
+}
+
+bool river_dialog_runtime_allows_barge_in_interrupt(void)
+{
+    bool allowed = false;
+
+    if (!g_river_dialog_runtime.initialized) {
+        return false;
+    }
+    if (!river_dialog_runtime_lock()) {
+        return false;
+    }
+
+    allowed = g_river_dialog_runtime.snapshot.asr_session_active &&
+              g_river_dialog_runtime.snapshot.playback_active &&
+              g_river_dialog_runtime.snapshot.playback_terminal_state[0] == '\0' &&
+              (g_river_dialog_runtime.snapshot.interaction_state ==
+                   RIVER_INTERACTION_SPEAKING ||
+               g_river_dialog_runtime.snapshot.interaction_state ==
+                   RIVER_INTERACTION_BARGE_IN_LISTENING);
+
+    river_dialog_runtime_unlock();
+    return allowed;
+}
+
 river_interaction_state_t river_dialog_runtime_interaction_state(void)
 {
     return g_river_dialog_runtime.snapshot.interaction_state;
