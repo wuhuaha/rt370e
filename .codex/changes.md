@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.304
+- `wake admission` 的 pending/retry worker 已从
+  `session_coordinator` 抽到新的 core-owned bridge：
+  - [include/river/river_dialog_wake_admission.h](/root/ameba-river/include/river/river_dialog_wake_admission.h)
+  - [components/river_core/river_dialog_wake_admission.c](/root/ameba-river/components/river_core/river_dialog_wake_admission.c)
+- 新 bridge 现在直接拥有：
+  - wakeword queued/coalesced/deferred/retry
+  - worker unavailable 时的 inline fallback
+  - wake admission block reason 检查
+  - [components/river_core/river_dialog_wake_admission.c](/root/ameba-river/components/river_core/river_dialog_wake_admission.c)
+- `session_coordinator` 已不再维护 wake admission 的：
+  - task
+  - sema/mutex
+  - pending/deferred/confidence/text
+  - 它现在只保留：
+    - wake handoff gate
+    - ASR 文本日志 / interrupt / diag fanout
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- `components/river_core/CMakeLists.txt` 已纳入新的 bridge 源文件：
+  - [components/river_core/CMakeLists.txt](/root/ameba-river/components/river_core/CMakeLists.txt)
+
 ## Step 5.303
 - `dialog_cloud_port` 现在会在 `begin_conversation_window()` 成功后，立即把
   wake admission 成功事实写回 `dialog runtime`：

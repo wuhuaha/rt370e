@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.304`
+  - wake admission 的 pending/retry worker 已从 `session_coordinator` 抽到新的
+    core-owned bridge：
+    - `river_dialog_wake_admission`
+  - 新 bridge 直接拥有：
+    - runtime block-reason check
+    - queued/coalesced/deferred/retry
+    - worker unavailable 时的 inline fallback
+  - `session_coordinator` 已删掉 wake admission 的 task/sema/mutex/pending 状态，
+    继续退成更薄的 handoff + ASR text fanout shell
 - `Step 5.303`
   - `dialog_cloud_port` 现在会在
     `begin_conversation_window()` 成功后，立即把 wake admission success
@@ -90,9 +100,16 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续减少 `session_coordinator` 中残留的 wake admission pending/retry worker
-    状态，把它从“大协调器”进一步收成更窄的 admission bridge/runtime
-  - 继续检查 ASR text/logging 与 control decision 是否仍有可分离的状态
+  - 继续评估 `session_coordinator` 里剩余的：
+    - ASR text logging
+    - interrupt fanout
+    - diag route/flush
+    是否还能进一步拆薄
+  - 回到 downlink/playback runtime，继续收紧：
+    - `tts_stop_pending`
+    - playback stop/reset
+    - rebuffer/recovering
+    的 owner 边界和状态投影
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
     local playback / recovering/rebuffer 的 owner 边界彻底稳定
 

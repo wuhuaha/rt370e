@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.304
+Validate that wake admission queue/retry worker ownership has moved out of
+`session_coordinator` into a dedicated core bridge:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_wake_admission|wakeword queued|wakeword coalesced|wakeword signal already pending' \
+  include/river/river_dialog_wake_admission.h \
+  components/river_core/river_dialog_wake_admission.c \
+  components/river_core/river_session_coordinator.c \
+  components/river_core/CMakeLists.txt
+sed -n '1,80p' include/river/river_dialog_wake_admission.h
+sed -n '1,260p' components/river_core/river_dialog_wake_admission.c
+sed -n '1,180p' components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `session_coordinator` no longer contains the wake admission worker state:
+  - mutex/sema/task
+  - pending/deferred/confidence/text
+- the new bridge owns:
+  - queued/coalesced/deferred retry logs
+  - inline fallback
+  - runtime block-reason check
+- `components/river_core/CMakeLists.txt` includes:
+  - `river_dialog_wake_admission.c`
+
 ## Step 5.303
 Validate that wake admission success now atomically records wake-confirmed truth
 through `dialog_cloud_port` instead of `session_coordinator` manually doing the

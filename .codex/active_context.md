@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.303 atomize wake admission success side effects`
+  - `5.304 extract wake admission bridge from coordinator`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,25 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - wake admission 的 queued/coalesced/deferred/retry worker 已从
+      `session_coordinator` 抽到新的 core-owned bridge：
+      - `river_dialog_wake_admission`
+    - 新 bridge 直接拥有：
+      - block-reason 检查
+      - pending/retry worker
+      - inline fallback
+    - `session_coordinator` 已不再持有：
+      - wake admission task
+      - sema/mutex
+      - pending/deferred/confidence/text
+    - 这一步继续把 coordinator 压回：
+      - wake handoff gate
+      - ASR 文本 fanout
+      的薄壳
+    - 下一步应继续：
+      - 评估 ASR 文本日志/interrupt/diag fanout 是否还能继续拆薄
+      - 转回 downlink/playback runtime，继续消除 stop/start/rebuffer 分裂状态
+  - previous runtime-ownership slice:
     - `dialog_cloud_port` 现在会在
       `begin_conversation_window(source)` 成功后，立即把 wake admission success
       同步写入 `dialog runtime`
@@ -97,9 +116,8 @@ or top-of-tree verification target changes.
       - cloud begin_conversation_window
       - dialog runtime wake_confirmed note
       成为同一条 core-owned 原子 ingress
-    - 下一步应继续检查：
-      - wakeword worker 自身是否还能继续从 coordinator 下沉
-      - wake admission pending/retry 是否能抽成更窄的 bridge/runtime
+    - 该步之后，wake admission success side effects 已原子化，为继续下沉
+      worker/runtime ownership 铺平了边界
   - previous runtime-ownership slice:
     - `dialog_cloud_port` 已补齐：
       - `begin_conversation_window(const char *source)`

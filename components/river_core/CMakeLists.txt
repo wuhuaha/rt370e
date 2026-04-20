@@ -19,6 +19,7 @@ ameba_list_append(private_sources
     river_app.c
     river_dialog_cloud_port.c
     river_dialog_runtime.c
+    river_dialog_wake_admission.c
     river_interaction_state.c
     river_reset_trace.c
     river_session_coordinator.c
