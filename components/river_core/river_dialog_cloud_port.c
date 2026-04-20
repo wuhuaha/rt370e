@@ -11,6 +11,17 @@ typedef struct {
 
 static river_dialog_cloud_port_context_t g_river_dialog_cloud_port;
 
+static const char *river_dialog_cloud_conversation_reason(const char *source)
+{
+    if (source == NULL || source[0] == '\0') {
+        return "conversation_window_opened";
+    }
+    if (strcmp(source, "wakeword") == 0) {
+        return "wakeword_detected";
+    }
+    return source;
+}
+
 river_status_t river_dialog_cloud_port_register(const river_dialog_cloud_port_t *port)
 {
     if (port == NULL) {
@@ -107,6 +118,8 @@ river_status_t river_dialog_cloud_asr_batch_submit_segment(
 
 river_status_t river_dialog_cloud_begin_conversation_window(const char *source)
 {
+    river_status_t status;
+
     if (source == NULL || source[0] == '\0') {
         return RIVER_ERR_ARG;
     }
@@ -115,7 +128,12 @@ river_status_t river_dialog_cloud_begin_conversation_window(const char *source)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    return g_river_dialog_cloud_port.port.begin_conversation_window(source);
+    status = g_river_dialog_cloud_port.port.begin_conversation_window(source);
+    if (status == RIVER_OK) {
+        river_dialog_runtime_note_wake_confirmed_with_cloud_state(
+            river_dialog_cloud_conversation_reason(source));
+    }
+    return status;
 }
 
 river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason)

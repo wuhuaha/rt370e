@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.302 route wake admission through dialog cloud port`
+  - `5.303 atomize wake admission success side effects`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,21 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog_cloud_port` 现在会在
+      `begin_conversation_window(source)` 成功后，立即把 wake admission success
+      同步写入 `dialog runtime`
+    - source -> runtime reason 的归一已集中在 port 内：
+      - `wakeword -> wakeword_detected`
+    - `session_coordinator` 已删除 wake admission success 路径上的手工：
+      - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+    - 这让：
+      - cloud begin_conversation_window
+      - dialog runtime wake_confirmed note
+      成为同一条 core-owned 原子 ingress
+    - 下一步应继续检查：
+      - wakeword worker 自身是否还能继续从 coordinator 下沉
+      - wake admission pending/retry 是否能抽成更窄的 bridge/runtime
+  - previous runtime-ownership slice:
     - `dialog_cloud_port` 已补齐：
       - `begin_conversation_window(const char *source)`
     - `river_app` 已将 wake admission 入口绑定到 concrete adapter，但
@@ -98,9 +113,8 @@ or top-of-tree verification target changes.
       - batch submit
       - interrupt_tts
       共享同一条 stable port 边界
-    - 下一步应继续检查：
-      - `session_coordinator` 是否还能进一步退成纯 wakeword/text fanout
-      - wake_confirmed / open-listen 成功后的 runtime note 是否还能继续原子化
+    - 该步之后，wake admission ingress 已统一走 stable port 边界，为后续继续
+      收口成功 side effects 和 worker shell 做准备
   - previous runtime-ownership slice:
     - `dialog runtime` 现在继续吸收本地 `interrupt_tts` in-flight 真相：
       - snapshot 新增 `tts_interrupt_requested`

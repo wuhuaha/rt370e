@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.303`
+  - `dialog_cloud_port` 现在会在
+    `begin_conversation_window()` 成功后，立即把 wake admission success
+    同步写入 `dialog runtime`
+  - `wakeword -> wakeword_detected` 的 reason 归一已收口到 port 内
+  - `session_coordinator` 不再手工拼：
+    - wake admission success
+    - wake_confirmed runtime note
+  - 这把 `cloud ingress success -> dialog truth update` 收成一次原子操作，
+    继续削弱 coordinator 的 success-side bridge 角色
 - `Step 5.302`
   - `dialog_cloud_port` 已补齐 `begin_conversation_window()`
   - wakeword worker / fallback 路径现已不再从 `session_coordinator` 直连
@@ -80,9 +90,9 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续减少 wake admission 成功后的分散 side effects，把
-    `wake_confirmed + cloud snapshot absorb + publish` 尽量收成更少的 typed 入口
-  - 继续检查 `session_coordinator` 是否还保留可迁移的 stateful worker 逻辑
+  - 继续减少 `session_coordinator` 中残留的 wake admission pending/retry worker
+    状态，把它从“大协调器”进一步收成更窄的 admission bridge/runtime
+  - 继续检查 ASR text/logging 与 control decision 是否仍有可分离的状态
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
     local playback / recovering/rebuffer 的 owner 边界彻底稳定
 

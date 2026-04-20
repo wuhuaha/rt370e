@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.303
+Validate that wake admission success now atomically records wake-confirmed truth
+through `dialog_cloud_port` instead of `session_coordinator` manually doing the
+success-side runtime note:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'conversation_reason|note_wake_confirmed_with_cloud_state|begin_conversation_window\\("wakeword"' \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_core/river_session_coordinator.c
+sed -n '1,60p' components/river_core/river_dialog_cloud_port.c
+sed -n '110,140p' components/river_core/river_dialog_cloud_port.c
+sed -n '72,118p' components/river_core/river_session_coordinator.c
+sed -n '320,336p' components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_cloud_begin_conversation_window()` now:
+  - normalizes the wake reason
+  - records `wake_confirmed` on success
+- `session_coordinator` no longer calls:
+  - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+  on the wake admission success path
+
 ## Step 5.302
 Validate that wakeword admission now enters cloud through the core-owned
 `dialog_cloud_port` instead of `session_coordinator` calling the adapter

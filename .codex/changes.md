@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.303
+- `dialog_cloud_port` 现在会在 `begin_conversation_window()` 成功后，立即把
+  wake admission 成功事实写回 `dialog runtime`：
+  - 新增 source -> runtime reason 归一：
+    - `wakeword -> wakeword_detected`
+  - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+- `session_coordinator` 不再在 wake admission 成功路径手工补
+  `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`：
+  - wakeword worker 成功路径已去掉重复 side effect
+  - inline fallback 也不再自行判断成功后再补 runtime note
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- 这一步把 `wake admission success -> dialog runtime wake_confirmed` 收口成
+  `dialog_cloud_port` 内的一次原子操作，继续减少 coordinator 对 cloud-success
+  副作用的拼装。
+
 ## Step 5.302
 - `dialog_cloud_port` 现已补齐 wake admission 入口：
   - `begin_conversation_window(const char *source)`

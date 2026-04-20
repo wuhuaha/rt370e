@@ -100,8 +100,6 @@ static void river_session_wakeword_worker(void *param)
                     river_session_wakeword_clear_locked();
                     river_session_wakeword_unlock();
                 }
-                river_dialog_runtime_note_wake_confirmed_with_cloud_state(
-                    "wakeword_detected");
                 RIVER_LOGI("wakeword admission accepted: text=%s confidence=%d",
                            wake_text[0] != '\0' ? wake_text : "-",
                            confidence);
@@ -330,10 +328,7 @@ void river_session_coordinator_on_voice_event(const river_voice_event_t *event)
             break;
         }
         RIVER_LOGW("wakeword worker unavailable; falling back to inline admission");
-        if (river_dialog_cloud_begin_conversation_window("wakeword") == RIVER_OK) {
-            river_dialog_runtime_note_wake_confirmed_with_cloud_state(
-                "wakeword_detected");
-        }
+        (void)river_dialog_cloud_begin_conversation_window("wakeword");
         break;
     default:
         RIVER_LOGD("voice event=%d confidence=%d", event->type, event->confidence);
