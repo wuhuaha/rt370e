@@ -1274,6 +1274,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `RIVER_PLAYBACK_IDLE`
   - 这意味着未来即使出现其他共享 `TTS` 优先级流，也不会再因为 priority
     相同就混入 dialog runtime 的 playback / interaction truth
+- 再进一步，dialog runtime 对本地 playback-service coarse state 的剩余依赖也已
+  收口到 ingress 翻译层：
+  - 新增本地 typed truth：
+    - `playback_local_active`
+    - `playback_local_recovering`
+  - 新增入口 helper：
+    - `river_dialog_runtime_apply_local_playback_state_locked(...)`
+  - `playback_active` / `playback_recovering` 的 aggregate reducer 现在消费：
+    - cloud playback phase
+    - local typed playback truth
+    - playback lane / rebuffer pending
+  - 而不再在常态 reducer 内部继续直接分支判断：
+    - `RIVER_PLAYBACK_RECOVERING`
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+    - `river_playback_service_state_active(...)`
+  - status dump 也已同步导出 local playback truth，便于板端继续区分：
+    - 本地 playback callback 还在不在
+    - 还是 cloud playback phase 已完全主导上层真相
 - XiaoZhi downlink 对“上游断供”的恢复入口也已继续前移到 runtime 真相：
   - 新增：
     - `xiaozhi_downlink_last_supply_ms`
@@ -1312,6 +1330,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
   手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
   扩展时白名单再次扩散到 app 装配层
+- 继续评估 dialog runtime 是否还能把最后保留的 `playback_state` 诊断字段也
+  进一步退化成 purely-diagnostic shadow，避免后续代码再次把它当回派生真相
 - 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud
   snapshot”的重复模式，进一步收成更少的 reducer 入口
 - 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，

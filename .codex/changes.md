@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.280
+- `dialog runtime` 现在把本地 playback-service 回调先翻译成 typed local truth，
+  再参与上层 playback 派生，不再在常态计算路径里直接读取 raw
+  `river_playback_state_t`：
+  - 新增 snapshot 字段：
+    - `playback_local_active`
+    - `playback_local_recovering`
+  - 新增入口 helper：
+    - `river_dialog_runtime_apply_local_playback_state_locked(...)`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `playback_active` / `playback_recovering` 的派生现在优先消费：
+  - cloud `playback_phase`
+  - local typed playback truth
+  - cloud `playback_lane_engaged` / `playback_rebuffer_pending`
+  而不是在 reducer 内部继续散落地读旧的 playback-service coarse state
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `dialog_runtime_dump_status()` 现在额外导出本地 playback truth，便于板端继续
+  区分：
+  - local playback callback 还在不在
+  - cloud playback phase 是否已成为主导真相
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.279
 - `dialog runtime` 的本地 playback 入口现在改为消费应用注册的对话流白名单，
   不再把所有 `RIVER_PLAYBACK_PRIO_TTS` 流都当成对话 owned stream：

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.279 tighten dialog runtime playback ownership to registered stream names`
+  - `5.280 collapse dialog runtime local playback enums into typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,19 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - dialog runtime now translates local playback-service callbacks into typed
+      local truth:
+      - `playback_local_active`
+      - `playback_local_recovering`
+    - aggregate playback derivation now consumes:
+      - cloud playback phase
+      - local typed playback truth
+      - lane / rebuffer truth
+      instead of branching directly on raw `RIVER_PLAYBACK_*` enums in the
+      reducer path
+    - `dialog_runtime_dump_status()` now exposes both aggregate playback truth
+      and local playback truth for board-side diagnosis
+  - previous runtime-ownership slice:
     - dialog runtime local playback ingress now consumes only app-registered
       dialog stream names instead of all `RIVER_PLAYBACK_PRIO_TTS` streams
     - `river_app` currently registers:
@@ -93,7 +106,7 @@ or top-of-tree verification target changes.
       - `iflytek_tts`
     - dialog runtime now latches the exact owned stream name so cleared-config
       terminal callbacks stay scoped to the same stream until `IDLE`
-  - previous runtime-ownership slice:
+  - earlier runtime-ownership slice:
     - session runtime now also owns the XiaoZhi I/O-loop housekeeping reducers:
       - `io_tick` turn/window maintenance
       - post-poll accepted-turn finalize glue

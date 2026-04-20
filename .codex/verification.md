@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.280
+Validate that `dialog runtime` now translates local playback-service enums into
+typed local playback truth at ingress, and no longer computes aggregate
+playback state directly from raw `river_playback_state_t` in the normal path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_local_active|playback_local_recovering|apply_local_playback_state_locked' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+sed -n '190,250p' components/river_core/river_dialog_runtime.c
+sed -n '560,600p' components/river_core/river_dialog_runtime.c
+sed -n '718,750p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- local playback callbacks are first translated into:
+  - `playback_local_active`
+  - `playback_local_recovering`
+- `river_dialog_runtime_compute_playback_active_locked(...)` and
+  `river_dialog_runtime_compute_playback_recovering_locked(...)` consume typed
+  local truth plus cloud phase/lane truth, rather than branching directly on
+  `RIVER_PLAYBACK_*` enums in the aggregate reducer path
+- `dialog_runtime_dump_status()` prints both aggregate playback truth and the
+  underlying local playback truth for board-side diagnosis
+
 ## Step 5.279
 Validate that `dialog runtime` now only absorbs app-registered dialog playback
 stream names instead of every `RIVER_PLAYBACK_PRIO_TTS` stream:

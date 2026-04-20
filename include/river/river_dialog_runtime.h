@@ -32,6 +32,8 @@ typedef struct {
     bool conversation_window_active;
     bool cloud_listening;
     bool cloud_stream_active;
+    bool playback_local_active;
+    bool playback_local_recovering;
     bool playback_cloud_active;
     bool playback_lane_engaged;
     bool playback_active;
