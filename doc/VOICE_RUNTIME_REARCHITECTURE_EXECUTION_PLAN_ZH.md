@@ -1214,11 +1214,27 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     dialog-runtime API，不再显式串联：
     - `note_wake_confirmed(...)`
     - `sync_cloud_state("wakeword_detected")`
+- boot / ASR lifecycle 也已进一步完成相同模式的收口：
+  - 新增 `dialog runtime` 原子入口：
+    - `river_dialog_runtime_mark_boot_ready_with_cloud_state(...)`
+    - `river_dialog_runtime_note_asr_session_started_with_cloud_state(...)`
+    - `river_dialog_runtime_note_asr_session_closed_with_cloud_state(...)`
+    - `river_dialog_runtime_note_asr_error_with_cloud_state(...)`
+  - `river_app` 与 `session_coordinator` 已不再保留显式
+    `sync_cloud_state(...)` bridge
+  - 上一切片引入的临时 provider capability API
+    `river_cloud_adapter_runtime_self_sync_active()` 也随之删除
 
 下一步焦点：
 
-- 继续把 `session_coordinator` 中剩余的 wake admission 与其他尚未自发布的
-  cloud-sync 桥收掉，让 dialog runtime 最终只通过：
+- 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud
+  snapshot”的重复模式，进一步收成更少的 reducer 入口
+- 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，
+  让 dialog runtime 真正成为唯一显式真相源
+- 继续把 downlink/playback 侧剩余对旧 playback-service coarse state 的兼容
+  依赖压缩到 phase 缺席兜底
+- 继续把 `session_coordinator` 中剩余的其他非 playback 非 wake 非 ASR 的
+  交互桥审视一遍，让 dialog runtime 最终只通过：
   - direct cloud sync ingress
   - local playback/asr/wake 事实入口
   吸收状态，而不是再由 coordinator 混合“写本地 truth + 触发一次云端重拉”

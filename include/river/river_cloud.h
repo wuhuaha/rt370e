@@ -103,7 +103,6 @@ bool river_cloud_utc_ready(void);
 const char *river_cloud_asr_provider_name(void);
 bool river_cloud_asr_streaming_supported(void);
 bool river_cloud_asr_batch_supported(void);
-bool river_cloud_adapter_runtime_self_sync_active(void);
 river_status_t river_cloud_asr_audio_open(const river_cloud_asr_audio_desc_t *audio,
                                           uint32_t pre_roll_ms,
                                           uint32_t post_roll_ms);

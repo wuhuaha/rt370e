@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.272
+Validate that boot/ASR lifecycle truth now enters dialog runtime through atomic
+cloud-fused APIs and that core-side explicit `sync_cloud_state(...)` bridges are
+gone:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '64,80p' include/river/river_dialog_runtime.h
+sed -n '372,530p' components/river_core/river_dialog_runtime.c
+sed -n '168,176p' components/river_core/river_app.c
+sed -n '348,390p' components/river_core/river_session_coordinator.c
+rg -n 'sync_cloud_state\\(' \
+  components/river_core/river_app.c \
+  components/river_core/river_session_coordinator.c
+rg -n 'mark_boot_ready_with_cloud_state|note_asr_.*with_cloud_state|note_asr_error_with_cloud_state' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_session_coordinator.c \
+  components/river_core/river_app.c
+rg -n 'runtime_self_sync_active' \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_app` and `river_session_coordinator` no longer contain direct
+  `sync_cloud_state(...)` calls
+- dialog runtime exports and uses the new atomic boot/ASR cloud-fused APIs
+- `runtime_self_sync_active` no longer exists
+
 ## Step 5.271
 Validate that wake admission now enters dialog runtime through one atomic
 fusion API instead of a coordinator-managed note-then-sync sequence:

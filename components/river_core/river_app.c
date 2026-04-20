@@ -170,8 +170,7 @@ river_status_t river_app_boot(void)
     }
 #endif
 
-    river_dialog_runtime_mark_boot_ready("boot_ready");
-    river_dialog_runtime_sync_cloud_state("boot_ready");
+    river_dialog_runtime_mark_boot_ready_with_cloud_state("boot_ready");
     river_app_print_status();
     river_runtime_stats_snapshot("boot_ready");
     return RIVER_OK;

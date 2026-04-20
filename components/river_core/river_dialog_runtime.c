@@ -46,6 +46,17 @@ static void river_dialog_runtime_copy_text(char *dst, size_t dst_size, const cha
     dst[dst_size - 1U] = '\0';
 }
 
+static bool river_dialog_runtime_capture_cloud_snapshot(
+    river_cloud_runtime_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
+        return false;
+    }
+
+    memset(snapshot, 0, sizeof(*snapshot));
+    return river_cloud_adapter_get_runtime_snapshot(snapshot) == RIVER_OK;
+}
+
 static river_dialog_input_lane_t river_dialog_runtime_parse_input_lane(const char *state)
 {
     if (state == NULL || state[0] == '\0') {
@@ -366,6 +377,24 @@ void river_dialog_runtime_mark_boot_ready(const char *reason)
     river_dialog_runtime_unlock();
 }
 
+void river_dialog_runtime_mark_boot_ready_with_cloud_state(const char *reason)
+{
+    river_cloud_runtime_snapshot_t snapshot;
+    bool have_snapshot = river_dialog_runtime_capture_cloud_snapshot(&snapshot);
+
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.boot_ready = true;
+    g_river_dialog_runtime.snapshot.wake_confirmed = false;
+    if (have_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
+    }
+    river_dialog_runtime_publish_locked(reason != NULL ? reason : "boot_ready");
+    river_dialog_runtime_unlock();
+}
+
 void river_dialog_runtime_note_wake_confirmed(const char *reason)
 {
     if (!river_dialog_runtime_lock()) {
@@ -380,10 +409,7 @@ void river_dialog_runtime_note_wake_confirmed(const char *reason)
 void river_dialog_runtime_note_wake_confirmed_with_cloud_state(const char *reason)
 {
     river_cloud_runtime_snapshot_t snapshot;
-    bool have_snapshot = false;
-
-    memset(&snapshot, 0, sizeof(snapshot));
-    have_snapshot = river_cloud_adapter_get_runtime_snapshot(&snapshot) == RIVER_OK;
+    bool have_snapshot = river_dialog_runtime_capture_cloud_snapshot(&snapshot);
     if (!river_dialog_runtime_lock()) {
         return;
     }
@@ -414,6 +440,31 @@ void river_dialog_runtime_note_asr_session_started(const char *sid, const char *
     river_dialog_runtime_unlock();
 }
 
+void river_dialog_runtime_note_asr_session_started_with_cloud_state(const char *sid,
+                                                                    const char *reason)
+{
+    river_cloud_runtime_snapshot_t snapshot;
+    bool have_snapshot = river_dialog_runtime_capture_cloud_snapshot(&snapshot);
+
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.asr_session_active = true;
+    g_river_dialog_runtime.snapshot.error_recovering = false;
+    g_river_dialog_runtime.snapshot.wake_confirmed = false;
+    if (sid != NULL && sid[0] != '\0') {
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
+                                       sizeof(g_river_dialog_runtime.snapshot.session_id),
+                                       sid);
+    }
+    if (have_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
+    }
+    river_dialog_runtime_publish_locked(reason != NULL ? reason : "asr_session_started");
+    river_dialog_runtime_unlock();
+}
+
 void river_dialog_runtime_note_asr_session_closed(const char *sid, const char *reason)
 {
     if (!river_dialog_runtime_lock()) {
@@ -428,6 +479,54 @@ void river_dialog_runtime_note_asr_session_closed(const char *sid, const char *r
                                        sid);
     }
     river_dialog_runtime_publish_locked(reason != NULL ? reason : "asr_session_closed");
+    river_dialog_runtime_unlock();
+}
+
+void river_dialog_runtime_note_asr_session_closed_with_cloud_state(const char *sid,
+                                                                   const char *reason)
+{
+    river_cloud_runtime_snapshot_t snapshot;
+    bool have_snapshot = river_dialog_runtime_capture_cloud_snapshot(&snapshot);
+
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.asr_session_active = false;
+    g_river_dialog_runtime.snapshot.wake_confirmed = false;
+    if (sid != NULL && sid[0] != '\0') {
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
+                                       sizeof(g_river_dialog_runtime.snapshot.session_id),
+                                       sid);
+    }
+    if (have_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
+    }
+    river_dialog_runtime_publish_locked(reason != NULL ? reason : "asr_session_closed");
+    river_dialog_runtime_unlock();
+}
+
+void river_dialog_runtime_note_asr_error_with_cloud_state(const char *sid, const char *reason)
+{
+    river_cloud_runtime_snapshot_t snapshot;
+    bool have_snapshot = river_dialog_runtime_capture_cloud_snapshot(&snapshot);
+
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.asr_session_active = false;
+    g_river_dialog_runtime.snapshot.error_recovering = true;
+    g_river_dialog_runtime.snapshot.wake_confirmed = false;
+    if (sid != NULL && sid[0] != '\0') {
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
+                                       sizeof(g_river_dialog_runtime.snapshot.session_id),
+                                       sid);
+    }
+    if (have_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
+    }
+    river_dialog_runtime_publish_locked(reason != NULL ? reason : "asr_error");
     river_dialog_runtime_unlock();
 }
 
@@ -502,8 +601,7 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
 {
     river_cloud_runtime_snapshot_t snapshot;
 
-    memset(&snapshot, 0, sizeof(snapshot));
-    if (river_cloud_adapter_get_runtime_snapshot(&snapshot) != RIVER_OK) {
+    if (!river_dialog_runtime_capture_cloud_snapshot(&snapshot)) {
         return;
     }
     if (!river_dialog_runtime_lock()) {

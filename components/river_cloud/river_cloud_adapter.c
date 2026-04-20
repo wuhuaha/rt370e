@@ -816,16 +816,6 @@ bool river_cloud_asr_batch_supported(void)
            g_river_cloud.provider->supports_batch();
 }
 
-bool river_cloud_adapter_runtime_self_sync_active(void)
-{
-#if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
-    if (river_cloud_xiaozhi_enabled()) {
-        return true;
-    }
-#endif
-    return false;
-}
-
 river_status_t river_cloud_asr_audio_open(const river_cloud_asr_audio_desc_t *audio,
                                           uint32_t pre_roll_ms,
                                           uint32_t post_roll_ms)

@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.272
+- `dialog runtime` now owns atomic cloud-fused entrypoints for the remaining
+  boot/ASR lifecycle facts:
+  - `river_dialog_runtime_mark_boot_ready_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_session_started_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_session_closed_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_error_with_cloud_state(...)`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_app` and `session_coordinator` no longer keep any explicit
+  `sync_cloud_state(...)` bridge calls:
+  - boot-ready now enters dialog runtime through the atomic boot API
+  - ASR lifecycle now enters dialog runtime through atomic cloud-fused ASR APIs
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- Removed the temporary provider capability API
+  `river_cloud_adapter_runtime_self_sync_active()` because coordinator no
+  longer needs provider-specific sync fallback logic
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+
 ## Step 5.271
 - `dialog runtime` now provides an atomic wake-admission fusion entrypoint:
   - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
