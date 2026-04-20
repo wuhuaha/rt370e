@@ -105,6 +105,19 @@ river_status_t river_dialog_cloud_asr_batch_submit_segment(
     return g_river_dialog_cloud_port.port.asr_batch_submit_segment(pcm, bytes, segment);
 }
 
+river_status_t river_dialog_cloud_begin_conversation_window(const char *source)
+{
+    if (source == NULL || source[0] == '\0') {
+        return RIVER_ERR_ARG;
+    }
+    if (!g_river_dialog_cloud_port.registered ||
+        g_river_dialog_cloud_port.port.begin_conversation_window == NULL) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    return g_river_dialog_cloud_port.port.begin_conversation_window(source);
+}
+
 river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason)
 {
     river_status_t status;

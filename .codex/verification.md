@@ -1,5 +1,41 @@
 # Verification
 
+## Step 5.302
+Validate that wakeword admission now enters cloud through the core-owned
+`dialog_cloud_port` instead of `session_coordinator` calling the adapter
+directly:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'begin_conversation_window\\(|river_cloud_adapter_begin_conversation_window|river_dialog_cloud_begin_conversation_window' \
+  include/river/river_dialog_cloud_port.h \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_core/river_app.c \
+  components/river_core/river_session_coordinator.c
+sed -n '16,64p' include/river/river_dialog_cloud_port.h
+sed -n '92,132p' components/river_core/river_dialog_cloud_port.c
+sed -n '72,110p' components/river_core/river_app.c
+sed -n '84,120p' components/river_core/river_session_coordinator.c
+sed -n '324,340p' components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_cloud_port_t` exports:
+  - `begin_conversation_window`
+- `river_dialog_cloud_begin_conversation_window()` exists and validates
+  `source`
+- `session_coordinator` no longer calls:
+  - `river_cloud_adapter_begin_conversation_window()`
+- wakeword worker and inline fallback both use:
+  - `river_dialog_cloud_begin_conversation_window("wakeword")`
+
 ## Step 5.301
 Validate that local interrupt-in-flight truth is now owned by `dialog runtime`
 instead of by `session_coordinator`:

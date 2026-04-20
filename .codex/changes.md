@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.302
+- `dialog_cloud_port` 现已补齐 wake admission 入口：
+  - `begin_conversation_window(const char *source)`
+  - [include/river/river_dialog_cloud_port.h](/root/ameba-river/include/river/river_dialog_cloud_port.h)
+  - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+- `river_app` 已把该入口绑定到具体 cloud adapter：
+  - `river_app_dialog_cloud_begin_conversation_window()`
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- `session_coordinator` 的 wakeword worker / fallback 路径现已改走
+  `river_dialog_cloud_begin_conversation_window()`：
+  - `session_coordinator` 不再直接调用
+    `river_cloud_adapter_begin_conversation_window()`
+  - 这继续减少了 core 层对 concrete adapter 的直连，wake admission 入口开始与
+    ASR / interrupt 一样统一走 core-owned dialog cloud port
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.301
 - `dialog runtime` 现在直接拥有本地 `interrupt_tts` in-flight 真相：
   - snapshot 新增 `tts_interrupt_requested`

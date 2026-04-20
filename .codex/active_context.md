@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.301 move interrupt in-flight truth into dialog runtime`
+  - `5.302 route wake admission through dialog cloud port`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,22 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog_cloud_port` 已补齐：
+      - `begin_conversation_window(const char *source)`
+    - `river_app` 已将 wake admission 入口绑定到 concrete adapter，但
+      `session_coordinator` 本身不再直接调用
+      `river_cloud_adapter_begin_conversation_window()`
+    - wakeword worker / fallback 路径现在统一通过：
+      - `river_dialog_cloud_begin_conversation_window("wakeword")`
+    - 这让 core 层剩余的 wake admission cloud ingress 也开始与：
+      - ASR audio open/push
+      - batch submit
+      - interrupt_tts
+      共享同一条 stable port 边界
+    - 下一步应继续检查：
+      - `session_coordinator` 是否还能进一步退成纯 wakeword/text fanout
+      - wake_confirmed / open-listen 成功后的 runtime note 是否还能继续原子化
+  - previous runtime-ownership slice:
     - `dialog runtime` 现在继续吸收本地 `interrupt_tts` in-flight 真相：
       - snapshot 新增 `tts_interrupt_requested`
       - `allows_barge_in_interrupt()` 现同时检查：
@@ -98,11 +114,6 @@ or top-of-tree verification target changes.
       - `state_lock`
     - ASR 文本触发的 barge-in interrupt 改为消费 `dialog_cloud_port` +
       `dialog runtime` policy，不再由 coordinator 自己维护本地 latch
-    - 下一步应继续检查：
-      - wakeword/open-listen admission 是否还能从 `session_coordinator`
-        继续移出 `river_cloud_adapter` 直连
-      - `dialog_cloud_port` 是否需要补齐 `begin_conversation_window`
-        之类的 core-owned entrance
   - previous runtime-ownership slice:
     - `dialog runtime` 现在继续直接吸收 XiaoZhi round/window typed truth：
       - `listen_stop_pending`

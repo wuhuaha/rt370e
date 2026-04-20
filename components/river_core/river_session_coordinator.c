@@ -94,7 +94,7 @@ static void river_session_wakeword_worker(void *param)
             confidence = g_river_session_coordinator.wakeword.confidence;
             river_session_wakeword_unlock();
 
-            status = river_cloud_adapter_begin_conversation_window("wakeword");
+            status = river_dialog_cloud_begin_conversation_window("wakeword");
             if (status == RIVER_OK) {
                 if (river_session_wakeword_lock()) {
                     river_session_wakeword_clear_locked();
@@ -330,7 +330,7 @@ void river_session_coordinator_on_voice_event(const river_voice_event_t *event)
             break;
         }
         RIVER_LOGW("wakeword worker unavailable; falling back to inline admission");
-        if (river_cloud_adapter_begin_conversation_window("wakeword") == RIVER_OK) {
+        if (river_dialog_cloud_begin_conversation_window("wakeword") == RIVER_OK) {
             river_dialog_runtime_note_wake_confirmed_with_cloud_state(
                 "wakeword_detected");
         }

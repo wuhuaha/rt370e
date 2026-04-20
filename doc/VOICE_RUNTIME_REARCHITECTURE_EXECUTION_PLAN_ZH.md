@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.302`
+  - `dialog_cloud_port` 已补齐 `begin_conversation_window()`
+  - wakeword worker / fallback 路径现已不再从 `session_coordinator` 直连
+    `river_cloud_adapter_begin_conversation_window()`
+  - wake admission 这条 core -> cloud ingress 现在开始与：
+    - ASR stream open/push
+    - batch submit
+    - interrupt_tts
+    共享同一条 stable port 边界
 - `Step 5.301`
   - `dialog runtime` 已开始直接拥有本地 interrupt in-flight 真相：
     - `tts_interrupt_requested`
@@ -71,10 +80,9 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续减少 `session_coordinator` 对 wake admission / open-listen 的 adapter
-    直连桥接
-  - 评估把 `begin_conversation_window` 也补进 `dialog_cloud_port`，让 wakeword
-    admission 彻底走 core-owned port/runtime 边界
+  - 继续减少 wake admission 成功后的分散 side effects，把
+    `wake_confirmed + cloud snapshot absorb + publish` 尽量收成更少的 typed 入口
+  - 继续检查 `session_coordinator` 是否还保留可迁移的 stateful worker 逻辑
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
     local playback / recovering/rebuffer 的 owner 边界彻底稳定
 
