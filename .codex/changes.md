@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.277
+- XiaoZhi playback runtime now records the timestamp of the last successful
+  downlink supply instead of treating starvation as an `queued=0`-only event:
+  - added:
+    - `xiaozhi_downlink_last_supply_ms`
+  - successful `audio_event` ring writes now refresh that supply timestamp
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Upstream-starvation rebuffering now uses a low-water + supply-gap model:
+  - added low-water helper:
+    - `river_cloud_xiaozhi_downlink_starved_low_water_frames()`
+  - `river_cloud_xiaozhi_maybe_rebuffer_starved(...)` now consumes:
+    - queued frames
+    - last supply timestamp
+    - adaptive starvation wait
+  - diagnostics now expose:
+    - `supply_gap_ms`
+    - `queued`
+    - `low`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- The downlink worker now checks starvation before the queue fully drains and
+  no longer clears the starvation watch on every non-zero queue/write loop,
+  which lets the runtime convert part of the old
+  `underrun -> write_failed -> flush/restart` path into an earlier controlled
+  `upstream_starved` rebuffer
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.276
 - Tightened `dialog runtime` local playback ingress so it only absorbs
   dialog-related playback-service streams instead of every shared local

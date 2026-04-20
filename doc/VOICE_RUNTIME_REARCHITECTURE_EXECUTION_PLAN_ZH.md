@@ -1262,9 +1262,25 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `audio_echo` 这类共享 playback-service debug stream
       不再污染 dialog runtime 的 playback / interaction 派生
     - 同时不会因为终态回调里 `config == NULL` 而丢掉已拥有 TTS 流的收尾
+- XiaoZhi downlink 对“上游断供”的恢复入口也已继续前移到 runtime 真相：
+  - 新增：
+    - `xiaozhi_downlink_last_supply_ms`
+  - starvation helper 现不再只在 `queued=0` 时才开始判断，而是结合：
+    - low-water queued frames
+    - adaptive starvation wait
+    - last successful supply gap
+    触发 `upstream_starved` rebuffer
+  - downlink worker 也不再在每次非零队列 / 成功写入循环后立即清掉 starvation
+    watch，因此 runtime 可以在真正 `write_failed` 前保留连续的断供观察窗口
+  - 这条切片的目标就是把日志里一部分：
+    - `underrun -> write_failed -> flush/restart`
+    提前改造成更可控的：
+    - `upstream_starved -> rebuffer`
 
 下一步焦点：
 
+- 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
+  逐步压缩本地 flush/restart 在常态恢复路径中的占比
 - 继续把 dialog runtime 的本地 playback 入口从“按 priority 过滤”推进到
   “按来源/ownership 分类”的更强 typed truth，避免未来其他 TTS 类共享流再次
   混入对话真相

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.276 tighten dialog runtime local playback ingress ownership`
+  - `5.277 move xiaozhi starvation rebuffer to low-water supply-gap truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -255,6 +255,17 @@ or top-of-tree verification target changes.
       - `RECOVERING`
       - `RESTART_PENDING`
       - `IDLE`
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink runtime now records explicit last-supply timing for
+      playback starvation truth:
+      - `xiaozhi_downlink_last_supply_ms`
+    - upstream-starvation rebuffering is now triggered from:
+      - low-water queued frames
+      - adaptive supply-gap timing
+      instead of waiting only for `queued=0`
+    - the downlink worker no longer clears starvation watch state on every
+      non-zero queue/write loop, which lets runtime keep a continuous starvation
+      observation window before `write_failed`
   - previous landed runtime-ownership slice:
     - dialog runtime now directly owns the local playback-service listener
       ingress:

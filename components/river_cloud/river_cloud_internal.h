@@ -260,6 +260,7 @@ typedef struct {
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_downlink_starved_since_ms;
+    uint64_t xiaozhi_downlink_last_supply_ms;
     uint64_t xiaozhi_playback_last_meta_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;

@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.277
+Validate that XiaoZhi downlink starvation is now detected from low-water queue
+plus supply-gap timing, not only after the queue fully drains:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'downlink_last_supply_ms|starved_low_water_frames|maybe_rebuffer_starved' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '720,880p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1838,1928p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime keeps `xiaozhi_downlink_last_supply_ms` as explicit supply
+  truth
+- starvation helper uses:
+  - queued frames
+  - low-water threshold
+  - supply-gap timing
+  together before triggering `upstream_starved`
+- downlink worker invokes starvation detection before the old `queued==0`
+  branch and no longer clears the starvation watch on every successful loop
+
 ## Step 5.276
 Validate that `dialog runtime` now ignores shared non-dialog playback-service
 streams and only absorbs local TTS-priority playback truth:
