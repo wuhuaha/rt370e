@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.279
+- `dialog runtime` 的本地 playback 入口现在改为消费应用注册的对话流白名单，
+  不再把所有 `RIVER_PLAYBACK_PRIO_TTS` 流都当成对话 owned stream：
+  - 新增 API：
+    - `river_dialog_runtime_register_playback_stream(const char *stream_name)`
+  - `river_app` 启动时当前注册：
+    - `xiaozhi_tts`
+    - `iflytek_tts`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- 一旦吸收某个已注册 dialog playback stream，runtime 现在会锁存该 stream
+  name，并且只继续吸收这个 stream 自己的终态回调直到 `RIVER_PLAYBACK_IDLE`：
+  - 新增：
+    - `local_playback_stream_name`
+    - `dialog_playback_streams[...]`
+    - `river_dialog_runtime_matches_owned_playback_stream_locked(...)`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这继续收紧了 `dialog runtime` 的本地 playback 真相边界：
+  - 未来即使再出现其他共享 `TTS` 优先级流，也不会仅因 priority 相同就混入
+    dialog-runtime 的 playback / interaction truth
+  - 同时仍保留已拥有 stream 在 `config == NULL` 终态回调上的 clean close 行为
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.278
 - XiaoZhi playback runtime now classifies a subset of `write_failed` events as
   upstream starvation when the low-water queue budget has already been eaten by

@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.279
+Validate that `dialog runtime` now only absorbs app-registered dialog playback
+stream names instead of every `RIVER_PLAYBACK_PRIO_TTS` stream:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'register_playback_stream|local_playback_stream_name|dialog_playback_streams|matches_owned_playback_stream' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_app.c
+sed -n '1,110p' components/river_core/river_dialog_runtime.c
+sed -n '415,470p' components/river_core/river_dialog_runtime.c
+sed -n '610,650p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_app` registers the current dialog playback streams:
+  - `xiaozhi_tts`
+  - `iflytek_tts`
+- `river_dialog_runtime_on_playback_state(...)` only absorbs locally owned
+  playback truth for registered stream names and keeps terminal cleanup scoped
+  to the latched stream name until `RIVER_PLAYBACK_IDLE`
+- no fallback path remains that treats every `RIVER_PLAYBACK_PRIO_TTS` stream as
+  dialog-owned by default
+
 ## Step 5.278
 Validate that `write_failed` recovery now routes low-water supply-gap cases
 through the existing `upstream_starved` stop/rebuffer path instead of always

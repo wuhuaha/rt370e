@@ -1262,6 +1262,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `audio_echo` 这类共享 playback-service debug stream
       不再污染 dialog runtime 的 playback / interaction 派生
     - 同时不会因为终态回调里 `config == NULL` 而丢掉已拥有 TTS 流的收尾
+- 进一步地，这条本地 playback ingress 现在已从“按 priority 粗分类”收紧到
+  “按 app 注册的 dialog stream 白名单”：
+  - 新增：
+    - `river_dialog_runtime_register_playback_stream(...)`
+  - `river_app` 启动时当前注册：
+    - `xiaozhi_tts`
+    - `iflytek_tts`
+  - dialog runtime 现在会锁存已拥有的精确 `stream_name`，并且只继续吸收同一
+    stream 的 cleared-config 终态直到：
+    - `RIVER_PLAYBACK_IDLE`
+  - 这意味着未来即使出现其他共享 `TTS` 优先级流，也不会再因为 priority
+    相同就混入 dialog runtime 的 playback / interaction truth
 - XiaoZhi downlink 对“上游断供”的恢复入口也已继续前移到 runtime 真相：
   - 新增：
     - `xiaozhi_downlink_last_supply_ms`
@@ -1297,9 +1309,9 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
-- 继续把 dialog runtime 的本地 playback 入口从“按 priority 过滤”推进到
-  “按来源/ownership 分类”的更强 typed truth，避免未来其他 TTS 类共享流再次
-  混入对话真相
+- 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
+  手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
+  扩展时白名单再次扩散到 app 装配层
 - 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud
   snapshot”的重复模式，进一步收成更少的 reducer 入口
 - 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，

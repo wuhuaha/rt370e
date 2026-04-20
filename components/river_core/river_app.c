@@ -22,6 +22,9 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.app"
 
+#define RIVER_APP_DIALOG_PLAYBACK_STREAM_XIAOZHI_TTS  "xiaozhi_tts"
+#define RIVER_APP_DIALOG_PLAYBACK_STREAM_IFLYTEK_TTS  "iflytek_tts"
+
 static const char *river_app_dialog_cloud_provider_name(void)
 {
     return river_cloud_asr_provider_name();
@@ -129,6 +132,12 @@ river_status_t river_app_boot(void)
     }
     if (river_dialog_cloud_port_register(&g_river_app_dialog_cloud_port) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
+    }
+    if (river_dialog_runtime_register_playback_stream(
+            RIVER_APP_DIALOG_PLAYBACK_STREAM_XIAOZHI_TTS) != RIVER_OK ||
+        river_dialog_runtime_register_playback_stream(
+            RIVER_APP_DIALOG_PLAYBACK_STREAM_IFLYTEK_TTS) != RIVER_OK) {
+        return RIVER_ERR_NO_MEMORY;
     }
     river_playback_service_register_listener(river_dialog_runtime_on_playback_state, NULL);
     river_voice_frontend_set_handler(river_session_coordinator_on_voice_event);
