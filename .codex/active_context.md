@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.312 project playback backend ownership truth`
+  - `5.313 resync playback ingress with cloud runtime truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 的 playback ingress 现在会先抓取当前 cloud runtime
+      snapshot，再吸收本地 playback state callback
+    - `managed recovery` / `interrupt latch clear` / interaction 派生现在都基于
+      同一时刻的 playback owner truth，而不是前一次残留的 cloud playback 视图
+    - 这一步继续削弱了本地 `RIVER_PLAYBACK_*` listener 作为 aggregate truth
+      source 的地位
   - created a dedicated runtime re-architecture track for the recurring
     device-side latency / playback churn issues:
     - architecture review:
@@ -85,7 +92,7 @@ or top-of-tree verification target changes.
     - adapter `river_cloud_xiaozhi_event_handler(...)` is now reduced to a
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
-  - newest landed runtime-ownership slice:
+  - previous runtime-ownership slice:
     - cloud playback runtime snapshot 已继续补齐 backend ownership truth：
       - `playback_backend_owned`
       - `playback_backend_restart_pending`

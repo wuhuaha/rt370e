@@ -694,6 +694,8 @@ void river_dialog_runtime_note_tts_interrupt_requested(const char *reason)
 static void river_dialog_runtime_note_playback_state(river_playback_state_t state,
                                                      const char *reason)
 {
+    river_cloud_runtime_snapshot_t cloud_snapshot;
+    bool have_cloud_snapshot = river_dialog_runtime_capture_cloud_snapshot(&cloud_snapshot);
     bool prev_playback_active;
     bool prev_playback_recovering;
     bool prev_error_recovering;
@@ -710,6 +712,9 @@ static void river_dialog_runtime_note_playback_state(river_playback_state_t stat
     prev_playback_recovering = g_river_dialog_runtime.snapshot.playback_recovering;
     prev_error_recovering = g_river_dialog_runtime.snapshot.error_recovering;
     prev_interaction_state = g_river_dialog_runtime.snapshot.interaction_state;
+    if (have_cloud_snapshot) {
+        river_dialog_runtime_apply_cloud_snapshot_locked(&cloud_snapshot);
+    }
     river_dialog_runtime_apply_local_playback_state_locked(state);
     river_dialog_runtime_refresh_playback_locked();
     if (state == RIVER_PLAYBACK_ERROR) {

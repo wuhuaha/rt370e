@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.313
+Validate that `dialog_runtime` now resyncs the current cloud runtime snapshot
+before absorbing a local playback-service state edge:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '694,732p' components/river_core/river_dialog_runtime.c
+rg -n 'have_cloud_snapshot|apply_cloud_snapshot_locked\\(&cloud_snapshot\\)' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_note_playback_state(...)` now:
+  - captures a fresh `river_cloud_runtime_snapshot_t`
+  - applies that snapshot before the local `river_playback_state_t`
+  - continues to use the merged truth for managed-recovery and interaction
+    derivation
+
 ## Step 5.312
 Validate that playback backend ownership and restart-pending truth are now
 projected through the cloud/runtime snapshot and consumed by `dialog_runtime`

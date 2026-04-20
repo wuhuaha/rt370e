@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.313`
+  - `dialog_runtime` 的 playback listener ingress 现在会先抓取当前 cloud
+    runtime snapshot，再吸收本地 playback state callback
+  - 这让：
+    - `managed_recovery`
+    - `tts_interrupt_requested` 清理
+    - interaction 派生
+    都基于同一时刻的 playback owner truth
+  - 本地 `RIVER_PLAYBACK_*` callback 继续从 aggregate truth source 退回为：
+    - local backend shadow
+    - playback ingress signal
 - `Step 5.312`
   - cloud playback runtime snapshot 已继续补齐 backend ownership truth：
     - `playback_backend_owned`
@@ -1746,6 +1757,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
   手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
   扩展时白名单再次扩散到 app 装配层
+- 继续把 `dialog_runtime` 里剩余“playback listener 先改本地态、再等后续
+  cloud sync 修正”的路径改成同一次 reducer 内完成 truth merge，避免：
+  - stale cloud snapshot
+  - local edge 抢跑 aggregate 派生
 - 继续评估 dialog runtime 是否还能把最后保留的 `playback_state` 诊断字段也
   进一步退化成 purely-diagnostic shadow，避免后续代码再次把它当回派生真相
 - 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud

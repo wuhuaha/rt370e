@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.313
+- `dialog_runtime` 的 playback listener ingress 现在会先拉取当前 cloud
+  runtime snapshot，再吸收本地 playback service 边沿：
+  - `managed_recovery`
+  - `interrupt latch clear`
+  - interaction 派生
+  都会基于同一时刻的 playback owner truth，而不是只看上一次残留的
+  cloud playback 视图
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把本地 `RIVER_PLAYBACK_*` callback 从“粗粒度真相源”降级成：
+  - local backend shadow
+  - typed playback ingress signal
+  真正的 aggregate playback truth 继续优先来自 cloud/playback runtime snapshot。
+
 ## Step 5.312
 - cloud playback runtime snapshot 继续补齐 backend ownership truth：
   - `playback_backend_owned`
