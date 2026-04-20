@@ -36,6 +36,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
 static void river_dialog_runtime_publish_locked(const char *reason);
 static bool river_dialog_runtime_output_turn_engaged_locked(void);
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
+static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -123,10 +124,12 @@ static void river_dialog_runtime_apply_cloud_event_locked(
     switch (event) {
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_BOOT_READY:
         g_river_dialog_runtime.snapshot.boot_ready = true;
+        g_river_dialog_runtime.snapshot.wake_admission_pending = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_WAKE_CONFIRMED:
+        g_river_dialog_runtime.snapshot.wake_admission_pending = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = true;
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_SESSION_STARTED:
@@ -598,6 +601,11 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     }
 }
 
+static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending)
+{
+    g_river_dialog_runtime.snapshot.wake_admission_pending = pending;
+}
+
 river_status_t river_dialog_runtime_init(void)
 {
     if (g_river_dialog_runtime.initialized) {
@@ -684,6 +692,32 @@ void river_dialog_runtime_on_cloud_asr_result(const river_cloud_asr_result_t *re
     default:
         break;
     }
+}
+
+void river_dialog_runtime_note_wake_admission_pending(void)
+{
+    if (!g_river_dialog_runtime.initialized) {
+        return;
+    }
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    river_dialog_runtime_set_wake_admission_pending_locked(true);
+    river_dialog_runtime_unlock();
+}
+
+void river_dialog_runtime_clear_wake_admission_pending(void)
+{
+    if (!g_river_dialog_runtime.initialized) {
+        return;
+    }
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    river_dialog_runtime_set_wake_admission_pending_locked(false);
+    river_dialog_runtime_unlock();
 }
 
 void river_dialog_runtime_note_tts_interrupt_requested(const char *reason)
@@ -832,6 +866,9 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
 
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void)
 {
+    if (g_river_dialog_runtime.snapshot.wake_admission_pending) {
+        return "wake_admission_pending";
+    }
     if (g_river_dialog_runtime.snapshot.conversation_window_active) {
         return "conversation_window_active";
     }
@@ -941,11 +978,12 @@ void river_dialog_runtime_dump_status(void)
     playback_state = g_river_dialog_runtime.playback_state;
     river_dialog_runtime_unlock();
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
                snapshot.asr_session_active ? "yes" : "no",
+               snapshot.wake_admission_pending ? "yes" : "no",
                snapshot.playback_active ? "yes" : "no",
                playback_local_active ? "yes" : "no",
                river_dialog_runtime_local_playback_state_name(playback_state),

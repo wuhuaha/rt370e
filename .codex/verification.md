@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.331
+Validate that pending wake admission is now surfaced by `dialog_runtime`, and
+that wakeword gating blocks repeated detections while the admission bridge is
+already retrying a queued wake:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'wake_admission_pending|note_wake_admission_pending|clear_wake_admission_pending|wakeword_block_reason_locked' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_dialog_wake_admission.c
+sed -n '24,40p' include/river/river_dialog_runtime.h
+sed -n '120,150p' components/river_core/river_dialog_runtime.c
+sed -n '694,724p' components/river_core/river_dialog_runtime.c
+sed -n '866,883p' components/river_core/river_dialog_runtime.c
+sed -n '248,260p' components/river_core/river_dialog_wake_admission.c
+sed -n '128,149p' components/river_core/river_dialog_wake_admission.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_snapshot_t` now exposes:
+  - `wake_admission_pending`
+- `dialog_runtime` exports:
+  - `river_dialog_runtime_note_wake_admission_pending()`
+  - `river_dialog_runtime_clear_wake_admission_pending()`
+- `river_dialog_runtime_wakeword_block_reason_locked()` now returns:
+  - `wake_admission_pending`
+  when a queued wake is still retrying
+- `wake_admission` bridge raises runtime pending on first queue, and clears it
+  on accept / terminal failure
+
 ## Step 5.330
 Validate that wakeword handoff blocking is now decided inside the core wake
 admission bridge, and that `session_coordinator` no longer reads the KWS-private

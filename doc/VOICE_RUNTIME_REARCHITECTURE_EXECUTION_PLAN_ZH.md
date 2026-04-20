@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.331`
+  - `dialog_runtime` snapshot 现在已显式吸收：
+    - `wake_admission_pending`
+  - `wake_admission` bridge 会在：
+    - 首次 queued
+    - accepted
+    - terminal failed
+    时同步维护这条 runtime truth
+  - wakeword gating 也开始直接消费 `wake_admission_pending`：
+    - bridge 已有待处理 wake 时，KWS detection / wake admission 不再继续放行
+      重复 wake
+  - 这一步继续把 wake admission 从“bridge 内部重试队列的局部事实”推进到
+    `dialog_runtime` 也显式持有的真相，从而减少重复检测和被动 coalesce
 - `Step 5.330`
   - `session_coordinator` 已不再在 wakeword 事件上直接读取
     `river_voice_kws_wake_handoff_block_reason()`

@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.330 unify wake handoff blocking at wake admission boundary`
+  - `5.331 surface pending wake admission in dialog runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 现在已显式吸收 `wake_admission_pending`
+    - wakeword detection / admission gating 会直接把
+      `wake_admission_pending` 当成阻断真相
+    - `wake_admission` bridge 在 queued / accepted / failed 转移上同步维护这条
+      runtime truth
+    - 这一步继续把 wake admission 从“bridge 内部局部 pending/retry 状态”
+      推进到“runtime 也显式知道已有待处理 wake”，从而减少重复检测和被动 coalesce
   - newest landed runtime-ownership slice:
     - `session_coordinator` 已不再直接读取
       `river_voice_kws_wake_handoff_block_reason()`

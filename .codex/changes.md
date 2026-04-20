@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.331
+- `dialog_runtime` snapshot 现在显式吸收 `wake_admission_pending`：
+  - 新增 `river_dialog_runtime_snapshot_t.wake_admission_pending`
+  - 新增：
+    - `river_dialog_runtime_note_wake_admission_pending()`
+    - `river_dialog_runtime_clear_wake_admission_pending()`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- wakeword gating 现在会把“已有待处理 wake admission”视为统一阻断真相：
+  - `river_dialog_runtime_wakeword_block_reason_locked()` 新增
+    `wake_admission_pending`
+  - 这意味着 KWS detection / wake admission 不再在 bridge 已排队重试时继续放行重复 wake
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `wake_admission` bridge 在状态转移时同步维护 runtime 真相：
+  - 首次 `wakeword queued` 时抬起 `wake_admission_pending`
+  - `wakeword admission accepted` / `failed` 时清掉 `wake_admission_pending`
+  - [components/river_core/river_dialog_wake_admission.c](/root/ameba-river/components/river_core/river_dialog_wake_admission.c)
+- 这一步继续把 wake admission 从：
+  - bridge 内部独占的 pending/retry 局部状态
+  - runtime 只知道“当前是否能准入”
+  推进到：
+  - runtime 也显式知道“已经有一个 wake 在待处理重试”
+  - wakeword gating 能直接消费这条真相，减少重复检测和被动 coalesce
+
 ## Step 5.330
 - `session_coordinator` 不再在收到 `RIVER_VOICE_EVENT_WAKEWORD` 时直接读取
   `river_voice_kws_wake_handoff_block_reason()`：

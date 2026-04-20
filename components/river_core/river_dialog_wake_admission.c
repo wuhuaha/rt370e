@@ -132,6 +132,7 @@ static void river_dialog_wake_admission_worker(void *param)
                     river_dialog_wake_admission_clear_locked();
                     river_dialog_wake_admission_unlock();
                 }
+                river_dialog_runtime_clear_wake_admission_pending();
                 RIVER_LOGI("wakeword admission accepted: text=%s confidence=%d",
                            wake_text[0] != '\0' ? wake_text : "-",
                            confidence);
@@ -143,6 +144,7 @@ static void river_dialog_wake_admission_worker(void *param)
                     river_dialog_wake_admission_clear_locked();
                     river_dialog_wake_admission_unlock();
                 }
+                river_dialog_runtime_clear_wake_admission_pending();
                 RIVER_LOGE("wakeword admission failed: status=%d text=%s confidence=%d",
                            (int)status,
                            wake_text[0] != '\0' ? wake_text : "-",
@@ -252,6 +254,7 @@ river_status_t river_dialog_wake_admission_submit(const char *text, int confiden
     g_river_dialog_wake_admission.pending = true;
     g_river_dialog_wake_admission.deferred_logged = false;
     river_dialog_wake_admission_unlock();
+    river_dialog_runtime_note_wake_admission_pending();
 
     RIVER_LOGI("wakeword queued text=%s confidence=%d",
                wake_text[0] != '\0' ? wake_text : "-",
