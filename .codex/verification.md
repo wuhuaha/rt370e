@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.296
+Validate that `dialog_cloud_port` now treats `dialog runtime` as the truth
+source for conversation-window visibility:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,160p' components/river_core/river_dialog_cloud_port.c
+rg -n 'conversation_window_active' \
+  components/river_core/river_app.c \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_cloud_conversation_window_active()` first tries
+  `river_dialog_runtime_get_snapshot()` and consumes
+  `snapshot.conversation_window_active`
+- the old cloud-port callback remains only as a fallback path
+
 ## Step 5.295
 Validate that playback-side `rebuffer_pending` reads and `no_ref reopen`
 reset semantics are now owned by the playback runtime:

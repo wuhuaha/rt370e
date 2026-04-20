@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.295 keep playback auxiliary reads/resets inside playback runtime`
+  - `5.296 make dialog runtime the window truth source for voice`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,13 +86,18 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `river_dialog_cloud_conversation_window_active()` 已优先读取
+      `dialog runtime` snapshot
+    - voice/KWS 侧 follow-up window 判定开始由 dialog runtime 对外提供
+    - cloud adapter callback 退为 runtime 不可用时的 fallback
+  - previous runtime-ownership slice:
     - session 已不再直读：
       - `xiaozhi_playback_rebuffer_pending`
       - `xiaozhi_playback_active`
     - transport reset / session start / playback start 这些路径对
       `no_ref reopen` 的 reset 也统一走 playback runtime
     - `xiaozhi_session.c` 进一步只消费 typed playback helper
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - `endpoint_soft_close` 状态机已并入 playback runtime
     - session 现在只通过 typed helper 读取：
       - pending

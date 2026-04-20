@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.296
+- `river_dialog_cloud_conversation_window_active()` 现在优先读取
+  `dialog runtime` 快照中的 `conversation_window_active`，而不是直接透传
+  cloud adapter：
+  - `river_dialog_runtime_get_snapshot()`
+  - `snapshot.conversation_window_active`
+  - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+- 这样 voice/KWS 侧通过 dialog cloud port 观察 follow-up window 时，开始以
+  `dialog runtime` 作为真相源；旧的 cloud port callback 仅保留为 runtime
+  不可用时的 fallback。
+
 ## Step 5.295
 - `xiaozhi_session.c` 继续停止直读 playback 内部字段：
   - runtime status dump 改为通过

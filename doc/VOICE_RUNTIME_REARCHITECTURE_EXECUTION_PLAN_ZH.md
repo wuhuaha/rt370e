@@ -1322,6 +1322,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `reset_playback_state()`
   - 这样 `no_ref reopen` 从“状态解释在 runtime、reset 却散在 session”
     继续推进到同一 owner
+- 再下一步，voice 侧 follow-up window 的观测也开始通过 dialog runtime 出口：
+  - `river_dialog_cloud_conversation_window_active()` 优先读取
+    `river_dialog_runtime_get_snapshot()`
+  - 使用 `snapshot.conversation_window_active` 作为对外真相
+  - cloud adapter 暂时保留为 fallback，避免 runtime 未初始化时失能
+  - 这让 voice/KWS 不再把“窗口是否打开”直接绑死在 cloud adapter 回调上
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`
