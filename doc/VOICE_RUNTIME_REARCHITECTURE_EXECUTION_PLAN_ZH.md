@@ -1276,9 +1276,25 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `underrun -> write_failed -> flush/restart`
     提前改造成更可控的：
     - `upstream_starved -> rebuffer`
+- 进一步地，`write_failed` 本身也已开始被压缩成“剩余硬故障”语义：
+  - 新增：
+    - `river_cloud_xiaozhi_write_failed_prefers_starved_rebuffer(...)`
+  - 当 `write_failed` 发生时，runtime 现会先看：
+    - low-water queue
+    - supply gap
+    - 当前队列预算
+  - 若该失败已经明显符合上游断供语义，则直接走：
+    - `upstream_starved`
+    - `stop/rebuffer`
+    而不是继续统一走：
+    - `flush/restart`
+  - 这进一步减少了“同一个供给断档既先记为 starvation，又在写入点再被当成
+    本地写链路故障”的语义折叠
 
 下一步焦点：
 
+- 继续把本地 `flush/restart` 收窄到更少的真正硬故障场景，并评估是否还能把
+  某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
 - 继续把 dialog runtime 的本地 playback 入口从“按 priority 过滤”推进到

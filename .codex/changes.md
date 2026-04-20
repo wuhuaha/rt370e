@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.278
+- XiaoZhi playback runtime now classifies a subset of `write_failed` events as
+  upstream starvation when the low-water queue budget has already been eaten by
+  the supply gap:
+  - added:
+    - `river_cloud_xiaozhi_write_failed_prefers_starved_rebuffer(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- The `write_failed` recovery branch now chooses between two typed recovery
+  paths instead of always forcing local `flush/restart`:
+  - `upstream_starved`:
+    - `stop_stream_ex("xiaozhi_playback_starved_write")`
+  - residual local write failure:
+    - `flush_stream_ex("xiaozhi_playback_write_failed")`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Recovery diagnostics now expose the reclassified context directly from the
+  write-failure site:
+  - `queued`
+  - `low`
+  - `supply_gap_ms`
+  - `recovery=stop|flush`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.277
 - XiaoZhi playback runtime now records the timestamp of the last successful
   downlink supply instead of treating starvation as an `queued=0`-only event:

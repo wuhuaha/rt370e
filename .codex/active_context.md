@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.277 move xiaozhi starvation rebuffer to low-water supply-gap truth`
+  - `5.278 collapse supply-gap write failures into upstream-starved recovery`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -266,6 +266,17 @@ or top-of-tree verification target changes.
     - the downlink worker no longer clears starvation watch state on every
       non-zero queue/write loop, which lets runtime keep a continuous starvation
       observation window before `write_failed`
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime now treats low-water supply-gap `write_failed`
+      events as `upstream_starved` recovery instead of always forcing local
+      `flush/restart`
+    - the write-failure branch now explicitly selects:
+      - `recovery=stop`
+      - `recovery=flush`
+      and logs the chosen path together with:
+      - `queued`
+      - `low`
+      - `supply_gap_ms`
   - previous landed runtime-ownership slice:
     - dialog runtime now directly owns the local playback-service listener
       ingress:

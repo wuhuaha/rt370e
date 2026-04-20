@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.278
+Validate that `write_failed` recovery now routes low-water supply-gap cases
+through the existing `upstream_starved` stop/rebuffer path instead of always
+forcing local flush/restart:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'write_failed_prefers_starved_rebuffer|xiaozhi_playback_starved_write|recovery=%s' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '878,915p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1990,2055p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exposes a dedicated helper that reclassifies
+  low-water/supply-gap `write_failed` events as `upstream_starved`
+- the write-failure recovery branch selects:
+  - `stop`
+  - or `flush`
+  based on that typed decision
+- diagnostics print the chosen recovery path and the supply-gap context
+
 ## Step 5.277
 Validate that XiaoZhi downlink starvation is now detected from low-water queue
 plus supply-gap timing, not only after the queue fully drains:
