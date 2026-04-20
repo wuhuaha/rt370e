@@ -801,6 +801,8 @@ river_status_t river_playback_service_write(const uint8_t *playback,
 
 river_status_t river_playback_service_stop_stream_ex(const char *reason)
 {
+    river_status_t status;
+
     if (!g_river_playback_service.initialized) {
         return RIVER_OK;
     }
@@ -809,14 +811,19 @@ river_status_t river_playback_service_stop_stream_ex(const char *reason)
         return RIVER_ERR_BUSY;
     }
 
-    (void)river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_STOP, false, 0.0f, reason);
+    status = river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_STOP,
+                                                   false,
+                                                   0.0f,
+                                                   reason);
 
     rtos_mutex_give(g_river_playback_service.lock);
-    return RIVER_OK;
+    return status;
 }
 
 river_status_t river_playback_service_interrupt_stream_ex(const char *reason)
 {
+    river_status_t status;
+
     if (!g_river_playback_service.initialized) {
         return RIVER_OK;
     }
@@ -825,14 +832,19 @@ river_status_t river_playback_service_interrupt_stream_ex(const char *reason)
         return RIVER_ERR_BUSY;
     }
 
-    (void)river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_INTERRUPT, false, 0.0f, reason);
+    status = river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_INTERRUPT,
+                                                   false,
+                                                   0.0f,
+                                                   reason);
 
     rtos_mutex_give(g_river_playback_service.lock);
-    return RIVER_OK;
+    return status;
 }
 
 river_status_t river_playback_service_flush_stream_ex(const char *reason)
 {
+    river_status_t status;
+
     if (!g_river_playback_service.initialized) {
         return RIVER_OK;
     }
@@ -841,14 +853,19 @@ river_status_t river_playback_service_flush_stream_ex(const char *reason)
         return RIVER_ERR_BUSY;
     }
 
-    (void)river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_FLUSH, false, 0.0f, reason);
+    status = river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_FLUSH,
+                                                   false,
+                                                   0.0f,
+                                                   reason);
 
     rtos_mutex_give(g_river_playback_service.lock);
-    return RIVER_OK;
+    return status;
 }
 
 river_status_t river_playback_service_recover_stream_ex(const char *reason)
 {
+    river_status_t status;
+
     if (!g_river_playback_service.initialized) {
         return RIVER_OK;
     }
@@ -857,13 +874,13 @@ river_status_t river_playback_service_recover_stream_ex(const char *reason)
         return RIVER_ERR_BUSY;
     }
 
-    (void)river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_RECOVER,
-                                                false,
-                                                0.0f,
-                                                reason);
+    status = river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_RECOVER,
+                                                   false,
+                                                   0.0f,
+                                                   reason);
 
     rtos_mutex_give(g_river_playback_service.lock);
-    return RIVER_OK;
+    return status;
 }
 
 river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason)

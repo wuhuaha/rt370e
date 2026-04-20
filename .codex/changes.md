@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.282
+- XiaoZhi downlink/playback runtime 现在把“累计重缓冲次数”和“当前恢复门槛历史”
+  拆开维护，避免历史 recover 永久放大后续 start gate：
+  - 新增：
+    - `xiaozhi_playback_rebuffer_streak`
+    - `river_cloud_xiaozhi_playback_rebuffer_history_active()`
+  - `xiaozhi_playback_rebuffer_count` 继续保留为累计诊断计数
+  - `downlink_start_threshold_frames()` 改为只消费 active rebuffer history
+    `streak`，而不是把累计总次数直接拿来抬高未来所有 restart 门槛
+  - 在 segment 被完整播完后，runtime 会显式清掉该 `streak`，让播放链在
+    “已经稳定跑完整段”的事实出现后回到更紧的起播门限
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- XiaoZhi playback 诊断日志也同步切到新的双指标语义：
+  - `rebuffer_total`
+  - `streak`
+  - 这让板端日志可以区分：
+    - 当前 response 到现在一共 rebuffer 了几次
+    - 当前恢复门槛是不是仍被连续 recover 历史抬高
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- playback service 的 `stop/interrupt/flush/recover` public wrapper 现在会真实
+  返回底层 control 结果，不再把内部失败静默吞掉后统一回 `RIVER_OK`：
+  - 这意味着上层终于可以准确看到：
+    - `recover` 是否真的原地成功
+    - 是否已经退化到 `RESTART_PENDING` / `ERR_BUSY`
+  - XiaoZhi runtime 里的 `recover_status` 日志也因此从“理论上会打印”变成了
+    真正可触发的诊断入口
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+
 ## Step 5.281
 - playback service 现在暴露显式的 `recover` 控制语义，而不再只让上层在
   `stop` / `flush` 之间自己猜测恢复方式：

@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.282
+Validate that XiaoZhi playback now separates cumulative rebuffer diagnostics
+from the active restart-threshold history, and that playback-service control
+wrappers propagate the real control result upward:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'xiaozhi_playback_rebuffer_streak|rebuffer_total|rebuffer streak cleared|playback_rebuffer_history_active' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'river_playback_service_(stop|interrupt|flush|recover)_stream_ex|return status;' \
+  components/river_voice/river_playback_service.c
+sed -n '660,830p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '800,890p' components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- XiaoZhi playback runtime exposes:
+  - cumulative `xiaozhi_playback_rebuffer_count`
+  - active threshold-history `xiaozhi_playback_rebuffer_streak`
+- downlink start-threshold logic consumes the active history `streak` rather
+  than permanently amplifying future starts from the cumulative total count
+- a fully-heard segment clears the active rebuffer `streak`
+- playback-service `stop/interrupt/flush/recover` wrappers return the real
+  `river_playback_service_control_locked(...)` status instead of always
+  reporting success
+
 ## Step 5.281
 Validate that XiaoZhi rebuffer recovery now routes through a unified
 playback-service `recover` semantic instead of mixing `stop` and `flush`:

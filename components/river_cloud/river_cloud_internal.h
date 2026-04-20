@@ -272,6 +272,7 @@ typedef struct {
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
     uint32_t xiaozhi_playback_rebuffer_count;
+    uint32_t xiaozhi_playback_rebuffer_streak;
     uint32_t xiaozhi_playback_last_meta_gap_ms;
     uint32_t xiaozhi_playback_prefetch_target_ms;
     uint32_t xiaozhi_playback_segment_head;

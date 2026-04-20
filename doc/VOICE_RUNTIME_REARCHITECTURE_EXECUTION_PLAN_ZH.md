@@ -1336,6 +1336,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - residual `write_failed`
   - 这继续压缩了日志里可见的 stop/start 风暴，把更多恢复留在同一条 backend
     生命周期里完成
+- 再往前一步，XiaoZhi downlink/playback 的 rebuffer 真相也已继续拆细：
+  - `xiaozhi_playback_rebuffer_count` 继续保留为累计诊断计数
+  - 新增：
+    - `xiaozhi_playback_rebuffer_streak`
+  - start-threshold 抬高逻辑现在只消费 active history：
+    - `streak`
+    而不再把累计总次数直接当成未来所有 restart 的门槛放大器
+  - 当某个 segment 被完整播完时，runtime 会显式清掉该 `streak`，把
+    “已经稳定播完整段”的事实转成后续更紧的起播门限
+  - 这意味着后续板端日志终于能区分：
+    - 当前 response 到现在总共 rebuffer 了多少次
+    - 当前 start gate 仍是否被连续 recover 历史抬高
+  - 对应日志语义也同步改成：
+    - `rebuffer_total`
+    - `streak`
+- playback service 的 control wrapper 也已继续纠正一层假成功语义：
+  - `stop/interrupt/flush/recover` 现在不再吞掉底层 control 的返回值后统一
+    回 `RIVER_OK`
+  - 这让上层 finally 可以正确观察：
+    - recover 是否真的原地成功
+    - 还是已经掉到 `RESTART_PENDING` / `ERR_BUSY`
+  - 也让 downlink runtime 里原本保留的 `recover_status` fallback 诊断终于
+    成为真实可触发的观察点，而不是永远打印不到的死分支
 
 下一步焦点：
 
@@ -1343,6 +1366,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
+- 继续评估是否要把“长段/慢供给”的 cautious start gate 从当前的 active
+  recovery history 再推进成显式 typed prefetch policy，而不是继续只靠：
+  - base start frames
+  - rebuffer streak
 - 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
   手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
   扩展时白名单再次扩散到 app 装配层

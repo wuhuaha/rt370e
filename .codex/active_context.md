@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.281 unify XiaoZhi rebuffer recovery on playback-service recover`
+  - `5.282 split XiaoZhi rebuffer total diagnostics from active restart history`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,27 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime now separates:
+      - cumulative rebuffer diagnostics
+      - active restart-threshold history
+      through:
+      - `xiaozhi_playback_rebuffer_count`
+      - `xiaozhi_playback_rebuffer_streak`
+    - start-threshold inflation now keys off the active `streak` instead of the
+      cumulative total, and a fully-heard segment clears that `streak`
+    - playback diagnostics now log both:
+      - `rebuffer_total`
+      - `streak`
+    - playback-service public control wrappers for:
+      - `stop`
+      - `interrupt`
+      - `flush`
+      - `recover`
+      now propagate the real underlying control result to callers
+    - this removes one more false-success path in the downlink recovery model
+      and prevents old rebuffer history from permanently biasing later
+      playback starts within the same response
+  - previous runtime-ownership slice:
     - playback service now exposes explicit recover semantics:
       - `recover_stream_ex`
       - `recover_stream`
