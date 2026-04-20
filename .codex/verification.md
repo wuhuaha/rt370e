@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.317
+Validate that `dialog_runtime` now routes all remaining local playback shadow
+behavior through explicit `phase unknown` fallback helpers instead of mixing
+`playback_local_*` directly into the normal playback derivation path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'local_playback_shadow_(active|recovering)_fallback|playback_local_(active|recovering)' \
+  components/river_core/river_dialog_runtime.c
+sed -n '248,340p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog_runtime` exposes explicit helpers for:
+  - local active fallback
+  - local recovering fallback
+- `compute_playback_active_locked()` / `compute_playback_recovering_locked()`
+  no longer directly mix `playback_local_*` into the phase-known path
+
 ## Step 5.316
 Validate that playback owner now exports typed terminal-wait truth, and that
 `dialog_runtime` only suppresses effective speaking on true tail waits rather

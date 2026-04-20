@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.317
+- `dialog_runtime` 已把剩余 local playback shadow 的 active/recovering 参与面
+  显式收口到 `phase unknown` fallback helper：
+  - `river_dialog_runtime_local_playback_shadow_active_fallback_locked()`
+  - `river_dialog_runtime_local_playback_shadow_recovering_fallback_locked()`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `compute_playback_active_locked()` 与 `compute_playback_recovering_locked()` 不再内联
+  混合 `playback_local_*` 和 cloud/runtime truth：
+  - phase 已知时，local shadow 不再进入常态派生
+  - phase 缺席时，才退化回本地 shadow
+- interrupt-clear 的 local shadow 阻断路径也改为复用同一 helper，避免未来再次把
+  `playback_local_active` 从 phase-missing fallback 重新扩散回常态逻辑。
+- 这一步继续把 `dialog_runtime` 中的 local playback shadow 明确降级成：
+  - purely-diagnostic local signal
+  - phase-missing fallback
+  而不是与 playback owner truth 并列的常态行为输入。
+
 ## Step 5.316
 - cloud playback runtime 现在把 terminal wait 从“布尔 + 文本原因”提升成
   typed truth：

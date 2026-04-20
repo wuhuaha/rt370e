@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.317`
+  - `dialog_runtime` 已把剩余 local playback shadow 的：
+    - active fallback
+    - recovering fallback
+    收口到显式 `phase unknown` helper
+  - `compute_playback_active_locked()` /
+    `compute_playback_recovering_locked()` 不再直接混合 `playback_local_*` 与
+    cloud/runtime truth
+  - interrupt-clear 的 local shadow 阻断也已复用同一 fallback helper
+  - 这一步继续把 local playback shadow 压回 phase-missing fallback，而不是常态
+    派生输入
 - `Step 5.316`
   - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
     typed truth：
@@ -214,6 +225,12 @@ Branch: `agent-server-v2`
     - recovering
     - interrupt clear
     - speaking projection
+  - 继续检查 `dialog_runtime` 是否还能把最后保留的：
+    - `playback_state`
+    - `playback_local_active`
+    - `playback_local_recovering`
+    进一步退化成 purely-diagnostic shadow，只保留 stream-ownership ingress 所需的
+    最小本地匹配能力
   - 继续把 `playback_terminal_wait_kind` 从“已导出 typed truth”推进到更上层可消费
     语义，例如：
     - follow-up reopen

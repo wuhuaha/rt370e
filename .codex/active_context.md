@@ -15,12 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.316 export typed terminal-wait truth into dialog runtime`
+  - `5.317 isolate local playback shadow to phase-missing helpers`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 已把剩余 local playback shadow 的：
+      - active fallback
+      - recovering fallback
+      收口到显式 `phase unknown` helper
+    - `compute_playback_active_locked()` /
+      `compute_playback_recovering_locked()` 不再直接把
+      `playback_local_*` 混入 phase-known 常态派生
+    - interrupt-clear 的 local shadow 阻断路径也已复用同一 fallback helper
+    - 这一步继续把 local playback shadow 压回：
+      - purely-diagnostic local signal
+      - phase-missing fallback
+  - previous runtime-ownership slice:
     - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
       typed truth：
       - `playback_terminal_wait_kind`
@@ -34,7 +46,7 @@ or top-of-tree verification target changes.
       当成真正的尾段等待；`await_last_segment_meta` 不再被误压成尾段静默
       投影
     - 这一步继续减少了 core 对 generic `terminal_waiting` 的过度二次解释
-  - previous runtime-ownership slice:
+  - newest landed runtime-ownership slice:
     - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
       `playback_local_active` 阻断 interrupt latch 清理
     - local playback shadow 现在进一步退回到 `phase unknown` 的兜底路径
