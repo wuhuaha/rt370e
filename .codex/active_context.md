@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.329 remove obsolete conversation-window cloud-port side channel`
+  - `5.330 unify wake handoff blocking at wake admission boundary`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `session_coordinator` 已不再直接读取
+      `river_voice_kws_wake_handoff_block_reason()`
+    - `wake_admission_submit()` 现在会先吸收 KWS handoff debug blocker，
+      再吸收 `dialog_runtime` 的 wakeword admission blocker
+    - wakeword 的 blocked / queued / coalesced 日志也已统一收口到
+      `wake_admission` 入口
+    - 这一步继续把唤醒接力从“协调器先做一层 KWS 私有判定、准入桥再做一层
+      runtime 判定”，收口成 core-owned 的单一提交边界
   - newest landed runtime-ownership slice:
     - `dialog_cloud_port` 上已无消费者的 `conversation_window_active`
       侧门已被删除

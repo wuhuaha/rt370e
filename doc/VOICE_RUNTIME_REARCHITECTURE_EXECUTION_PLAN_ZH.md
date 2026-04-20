@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-20
+Last Updated: 2026-04-21
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.330`
+  - `session_coordinator` 已不再在 wakeword 事件上直接读取
+    `river_voice_kws_wake_handoff_block_reason()`
+  - `wake_admission` 提交入口现在统一裁决唤醒接力阻塞：
+    - 先吸收 KWS 本地 debug / tensor-dump handoff blocker
+    - 再吸收 `dialog_runtime` 的 wakeword admission blocker
+  - wakeword 的：
+    - `handoff blocked`
+    - `queued`
+    - `coalesced while pending`
+    日志也已统一收口到 `wake_admission` 边界
+  - 这一步继续把 wakeword 接力从“协调器上的前置私有判定 + 准入桥上的 runtime
+    判定”收口到 core-owned 的单一提交/准入边界
 - `Step 5.329`
   - `dialog_cloud_port` 上已无消费者的
     `conversation_window_active` 查询侧门已删除

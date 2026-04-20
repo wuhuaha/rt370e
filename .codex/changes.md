@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.330
+- `session_coordinator` 不再在收到 `RIVER_VOICE_EVENT_WAKEWORD` 时直接读取
+  `river_voice_kws_wake_handoff_block_reason()`：
+  - 协调器现在只负责把 wakeword 事件提交到
+    `river_dialog_wake_admission_submit(...)`
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+- `wake_admission` 提交入口现在统一裁决唤醒接力阻塞原因：
+  - 新增 `river_dialog_wake_admission_submit_block_reason()`
+  - 先吸收 KWS 本地 handoff debug blocker
+  - 再吸收 `dialog_runtime` 的 wakeword admission blocker
+  - [components/river_core/river_dialog_wake_admission.c](/root/ameba-river/components/river_core/river_dialog_wake_admission.c)
+- wakeword handoff 的日志语义也收口到同一处：
+  - `wakeword handoff blocked`
+  - `wakeword queued`
+  - `wakeword coalesced while pending`
+  现在都由 `wake_admission` 统一输出
+- 这一步继续把 wakeword 从：
+  - `session_coordinator` 上的 KWS 私有前置判定
+  - `wake_admission` 内的 runtime admission 判定
+  收口成 core-owned 的单一提交/准入边界
+
 ## Step 5.329
 - `dialog_cloud_port` 已删除无消费者的 `conversation_window_active` 侧门：
   - 移除 `river_dialog_cloud_port_t.conversation_window_active`

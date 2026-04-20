@@ -8,7 +8,6 @@
 #include "river/river_dialog_wake_admission.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
-#include "river/river_voice_kws.h"
 #include "river_session_coordinator.h"
 
 #undef RIVER_LOG_TAG
@@ -100,22 +99,12 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
 
 void river_session_coordinator_on_voice_event(const river_voice_event_t *event)
 {
-    const char *block_reason;
-
     if (event == NULL) {
         return;
     }
 
     switch (event->type) {
     case RIVER_VOICE_EVENT_WAKEWORD:
-        block_reason = river_voice_kws_wake_handoff_block_reason();
-        if (block_reason != NULL) {
-            RIVER_LOGW("wakeword handoff held: reason=%s text=%s confidence=%d",
-                       block_reason,
-                       event->text != NULL ? event->text : "-",
-                       event->confidence);
-            break;
-        }
         (void)river_dialog_wake_admission_submit(event->text, event->confidence);
         break;
     default:

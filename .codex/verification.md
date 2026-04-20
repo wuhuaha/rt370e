@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.330
+Validate that wakeword handoff blocking is now decided inside the core wake
+admission bridge, and that `session_coordinator` no longer reads the KWS-private
+handoff blocker directly:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_voice_kws_wake_handoff_block_reason|wakeword handoff blocked|river_dialog_wake_admission_submit' \
+  components/river_core/river_session_coordinator.c \
+  components/river_core/river_dialog_wake_admission.c \
+  include/river/river_voice_kws.h
+sed -n '96,122p' components/river_core/river_session_coordinator.c
+sed -n '54,74p' components/river_core/river_dialog_wake_admission.c
+sed -n '206,222p' components/river_core/river_dialog_wake_admission.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `components/river_core/river_session_coordinator.c` no longer references:
+  - `river_voice_kws_wake_handoff_block_reason()`
+- `components/river_core/river_dialog_wake_admission.c` now owns the combined
+  handoff/admission blocker via:
+  - `river_dialog_wake_admission_submit_block_reason()`
+- wakeword handoff blocked / queued / coalesced logs are now emitted from the
+  same core admission boundary instead of being split across coordinator and
+  admission bridge
+
 ## Step 5.329
 Validate that the obsolete `conversation_window_active` cloud-port side channel
 has been removed, and that `dialog_cloud_port` now only keeps command ingress:

@@ -9,6 +9,7 @@
 #include "river/river_dialog_runtime.h"
 #include "river/river_dialog_wake_admission.h"
 #include "river/river_log.h"
+#include "river/river_voice_kws.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.session"
@@ -51,6 +52,16 @@ static void river_dialog_wake_admission_clear_locked(void)
     g_river_dialog_wake_admission.deferred_logged = false;
     g_river_dialog_wake_admission.confidence = 0;
     g_river_dialog_wake_admission.text[0] = '\0';
+}
+
+static const char *river_dialog_wake_admission_submit_block_reason(void)
+{
+    const char *reason = river_voice_kws_wake_handoff_block_reason();
+
+    if (reason != NULL) {
+        return reason;
+    }
+    return river_dialog_runtime_wakeword_admission_block_reason();
 }
 
 static river_status_t river_dialog_wake_admission_try_inline(const char *text,
@@ -197,9 +208,9 @@ river_status_t river_dialog_wake_admission_submit(const char *text, int confiden
     const char *block_reason;
     const char *wake_text = text != NULL ? text : "";
 
-    block_reason = river_dialog_runtime_wakeword_admission_block_reason();
+    block_reason = river_dialog_wake_admission_submit_block_reason();
     if (block_reason != NULL) {
-        RIVER_LOGI("wakeword ignored: reason=%s text=%s confidence=%d",
+        RIVER_LOGI("wakeword handoff blocked: reason=%s text=%s confidence=%d",
                    block_reason,
                    wake_text[0] != '\0' ? wake_text : "-",
                    confidence);
