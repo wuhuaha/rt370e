@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.274 let dialog runtime directly own the playback listener`
+  - `5.275 tighten xiaozhi playback backend ownership truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -230,6 +230,21 @@ or top-of-tree verification target changes.
       - `river_cloud_reset_stream_open_deferred_state()`
       - `river_cloud_pre_roll_store(...)`
   - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime now owns an explicit typed playback-backend
+      truth for local backend ownership:
+      - `detached`
+      - `owned_active`
+      - `foreign_active`
+      - `restart_pending`
+    - downlink start/rebuffer/pending-stop/abort paths now consume that typed
+      backend state instead of scattering raw checks across:
+      - `xiaozhi_playback_active`
+      - `river_playback_service_active()`
+      - `RIVER_PLAYBACK_RESTART_PENDING`
+    - this prevents XiaoZhi cleanup/recovery paths from treating a foreign
+      active playback stream as XiaoZhi-owned, and gives logs a direct
+      ownership signal for future board traces
+  - previous landed runtime-ownership slice:
     - dialog runtime now directly owns the local playback-service listener
       ingress:
       - `river_dialog_runtime_on_playback_state(...)`

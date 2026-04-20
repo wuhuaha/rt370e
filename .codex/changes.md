@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.275
+- XiaoZhi playback runtime now maintains an explicit local playback-backend
+  truth instead of scattering raw checks across:
+  - `xiaozhi_playback_active`
+  - `river_playback_service_active()`
+  - `RIVER_PLAYBACK_RESTART_PENDING`
+  - added backend states:
+    - `detached`
+    - `owned_active`
+    - `foreign_active`
+    - `restart_pending`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Downlink start/rebuffer/terminal cleanup now consume that typed backend
+  state, which makes ownership boundaries explicit:
+  - rebuffer starvation now only watches an `owned_active` backend
+  - rebuffer resume now only auto-finishes when XiaoZhi still owns the running
+    backend
+  - pending-stop and abort paths no longer treat any active playback-service
+    stream as XiaoZhi-owned
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- Playback diagnostics now print backend ownership directly in phase/start/
+  status/abort logs so future board traces can separate:
+  - XiaoZhi-owned playback churn
+  - foreign stream takeover
+  - restart-pending recovery
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.274
 - `dialog runtime` now directly owns the local playback-service listener
   ingress:

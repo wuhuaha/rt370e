@@ -1232,6 +1232,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     `river_cloud_adapter_runtime_self_sync_active()` 也随之删除
 - 进一步地，旧的 local-only boot/wake/ASR `dialog_runtime` 入口也已删除，
   避免同一类 truth 同时保留“旧直写入口 + 新融合入口”两套表面
+- playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
+  - 新增 typed backend state：
+    - `detached`
+    - `owned_active`
+    - `foreign_active`
+    - `restart_pending`
+  - downlink worker、rebuffer、pending-stop、abort 现都统一消费这条
+    backend truth，而不是分别混用：
+    - `xiaozhi_playback_active`
+    - `river_playback_service_active()`
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+  - 这修正了一个重要边界问题：
+    - XiaoZhi cleanup/recovery path 不再把“外部占用的活跃播放流”误当成
+      自己的后端去 stop/interrupt
+  - 诊断日志现在也直接暴露 backend ownership，便于后续板端继续区分：
+    - XiaoZhi-owned churn
+    - foreign takeover
+    - restart-pending recovery
 
 下一步焦点：
 
@@ -1243,6 +1261,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   dialog runtime”的薄桥接入口，能删则删，不能删则继续收敛成 typed reducer
 - 继续把 downlink/playback 侧剩余对旧 playback-service coarse state 的兼容
   依赖压缩到 phase 缺席兜底
+- 继续把 playback runtime 内部剩余直接依赖 raw playback-service state 的
+  判定压缩到 backend-truth helper 或更上层 phase truth：
+  - 减少 worker/start path 上零散 `state/active` 读取
+  - 让“是否需要 restart / 是否只是 foreign active”不再散落
 - 继续把 `session_coordinator` 中剩余的其他非 playback 非 wake 非 ASR 的
   交互桥审视一遍，让 dialog runtime 最终只通过：
   - direct cloud sync ingress
