@@ -330,6 +330,15 @@ static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
            snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING;
 }
 
+static bool river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked(void)
+{
+    if (river_dialog_runtime_playback_phase_known_locked()) {
+        return false;
+    }
+
+    return g_river_dialog_runtime.snapshot.playback_local_active;
+}
+
 static bool river_dialog_runtime_output_speaking_effective_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -515,7 +524,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         !snapshot->playback_active &&
         !snapshot->playback_lane_engaged &&
         g_river_dialog_runtime.snapshot.output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
-        !g_river_dialog_runtime.snapshot.playback_local_active) {
+        !river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked()) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
     river_dialog_runtime_refresh_playback_locked();

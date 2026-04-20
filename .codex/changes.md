@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.315
+- `dialog_runtime` 进一步收紧了 local playback shadow 的参与范围：
+  - 当 cloud/runtime snapshot 已声明 `playback_phase_known` 时，
+    `playback_local_active` 不再阻断 `tts_interrupt_requested` 的清理
+  - 本地 playback shadow 现在只在 phase 缺席兜底时参与这条 interrupt clear
+    判定
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 `dialog_runtime` 的行为层从本地 playback listener shadow
+  收回到 playback owner 导出的 typed truth。
+
 ## Step 5.314
 - `dialog_runtime` 已不再要求 app 在启动时手工注册 dialog playback stream 名称：
   - 删除 `river_dialog_runtime_register_playback_stream(...)`

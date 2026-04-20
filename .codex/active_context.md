@@ -15,12 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.314 remove app-side dialog playback stream whitelist`
+  - `5.315 limit local playback shadow to phase-missing fallback`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
+      `playback_local_active` 阻断 interrupt latch 清理
+    - local playback shadow 现在进一步退回到 `phase unknown` 的兜底路径
+    - 这一步继续减少了 core 行为层对本地 playback listener shadow 的常态依赖
+  - previous runtime-ownership slice:
     - `dialog_runtime` 已删除 app 侧 dialog playback stream 注册依赖
     - dialog playback ingress 现在直接按 `RIVER_PLAYBACK_PRIO_TTS` 识别
     - `river_app_boot()` 不再装配 `xiaozhi_tts` / `iflytek_tts` 白名单

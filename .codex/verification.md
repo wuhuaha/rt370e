@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.315
+Validate that `dialog_runtime` now lets cloud/playback owner truth clear the
+interrupt latch whenever playback phase is known, without being blocked by the
+local playback shadow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'local_playback_shadow_blocks_interrupt_clear|playback_local_active' \
+  components/river_core/river_dialog_runtime.c
+sed -n '340,365p' components/river_core/river_dialog_runtime.c
+sed -n '530,555p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog_runtime` contains an explicit helper that limits local playback shadow
+  to the `phase unknown` fallback path
+- `apply_cloud_snapshot_locked(...)` no longer lets `playback_local_active`
+  block interrupt-latch clear once `playback_phase_known` is true
+
 ## Step 5.314
 Validate that `dialog_runtime` no longer depends on app-side stream-name
 registration and now classifies dialog playback directly by TTS priority:

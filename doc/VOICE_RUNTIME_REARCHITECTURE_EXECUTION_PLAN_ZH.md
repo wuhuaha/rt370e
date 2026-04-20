@@ -26,6 +26,11 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.315`
+  - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
+    `playback_local_active` 阻断 interrupt latch 清理
+  - local playback shadow 现在进一步退回到 `phase unknown` 兜底路径
+  - 这一步继续压缩了 core 行为层对本地 playback listener shadow 的常态依赖
 - `Step 5.314`
   - `dialog_runtime` 已删除对 app 侧 dialog playback stream 白名单注册的依赖
   - dialog playback ingress 现在直接按 `RIVER_PLAYBACK_PRIO_TTS` 识别
@@ -1767,6 +1772,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 非对话类 TTS
   - 多 provider 并行 TTS
   时重新把判定逻辑扩散回 core/app
+- 继续把 local playback shadow 从剩余行为路径里剥离：
+  - interrupt clear
+  - interaction fallback
+  - error/recovery 兜底
+  最终只保留在 `playback phase unknown` 的退化模式下
 - 继续把 `dialog_runtime` 里剩余“playback listener 先改本地态、再等后续
   cloud sync 修正”的路径改成同一次 reducer 内完成 truth merge，避免：
   - stale cloud snapshot
