@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.332`
+  - XiaoZhi playback 在 `upstream_starved` 场景下已不再默认走本地
+    `recover`
+  - `upstream gap rebuffer` 与 starved `write_failed` 现在都会优先执行：
+    - `stop_stream_ex(...)`
+    - runtime-owned `rebuffer_pause`
+  - 只有当本地 `stop_stream_ex(...)` 自身失败时，runtime 才会回退到
+    `river_playback_service_recover_stream_ex(...)`
+  - 这一步把常见“上游断粮”从 playback-service 的
+    `RECOVERING -> flush/restart` 语义里拆开，让 residual 硬 `write_failed`
+    才继续保留 recover 语义
 - `Step 5.331`
   - `dialog_runtime` snapshot 现在已显式吸收：
     - `wake_admission_pending`
@@ -1425,8 +1436,12 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 已完成事实（进行中）：
 
-- `write_failed` 现已先走同轨 `flush/restart` 恢复，再在失败时退回
-  `stop/start`
+- `upstream_starved` 现已优先走：
+  - `stop/rebuffer`
+  - runtime-owned detached restart
+  而不再默认先走同轨 `flush/restart`
+- residual 硬 `write_failed` 继续走 playback-service 的 recover-first
+  路径，并仅在 recover 失败时退回 fresh start
 - playback service 已可从 `RIVER_PLAYBACK_RECOVERING` 重新回到
   `RIVER_PLAYBACK_RUNNING`
 - 下行本地预取/重缓冲门限已按当前板端问题重建：
@@ -1841,7 +1856,7 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `flush/restart`
   - 这进一步减少了“同一个供给断档既先记为 starvation，又在写入点再被当成
     本地写链路故障”的语义折叠
-- 再下一步，downlink/playback 的 recoverable 恢复动作也已继续统一：
+- 再下一步，downlink/playback 的 recoverable 恢复动作也已继续收口：
   - playback service 新增显式 recover 语义：
     - `river_playback_service_recover_stream_ex(...)`
   - recover 会先显式推进到：
@@ -1849,14 +1864,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     再复用现有 in-place flush/restart 路径，并在失败时保留：
     - `RIVER_PLAYBACK_RESTART_PENDING`
     兜底
-  - XiaoZhi runtime 现在不再在 recoverable rebuffer 路径上混用：
-    - `stop_stream_ex(...)`
-    - `flush_stream_ex(...)`
-  - 而是统一通过 playback-service recover 处理：
-    - `upstream_starved`
+  - XiaoZhi runtime 现在把 recover 保留给：
     - residual `write_failed`
-  - 这继续压缩了日志里可见的 stop/start 风暴，把更多恢复留在同一条 backend
-    生命周期里完成
+    - 本地 `stop/rebuffer` 失败后的兜底恢复
+  - `upstream_starved` 常态路径已改为：
+    - `stop_stream_ex(...)`
+    - runtime-owned `rebuffer_pending`
+    - 达到 start gate 后再正常 fresh start
+  - 这让常见上游断粮不再被重新折叠回本地 flush/restart，同时仍保留
+    playback-service recover 处理剩余硬故障
 - 再往前一步，XiaoZhi downlink/playback 的 rebuffer 真相也已继续拆细：
   - `xiaozhi_playback_rebuffer_count` 继续保留为累计诊断计数
   - 新增：

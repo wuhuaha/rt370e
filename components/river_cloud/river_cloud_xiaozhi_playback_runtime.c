@@ -1116,7 +1116,7 @@ void river_cloud_xiaozhi_reset_playback_state(void)
     river_cloud_xiaozhi_refresh_playback_phase("reset_playback_state");
 }
 
-static void river_cloud_xiaozhi_pause_playback_for_segment_gap(void)
+static void river_cloud_xiaozhi_mark_playback_backend_paused(const char *reason)
 {
     g_river_cloud.xiaozhi_playback_active = false;
     river_cloud_xiaozhi_cancel_playback_stop();
@@ -1125,7 +1125,27 @@ static void river_cloud_xiaozhi_pause_playback_for_segment_gap(void)
     river_cloud_xiaozhi_clear_followup_reopen_state();
     g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     (void)river_cloud_xiaozhi_refresh_start_gate();
-    river_cloud_xiaozhi_refresh_playback_phase("segment_gap_pause");
+    river_cloud_xiaozhi_refresh_playback_phase(reason);
+}
+
+static void river_cloud_xiaozhi_pause_playback_for_segment_gap(void)
+{
+    river_cloud_xiaozhi_mark_playback_backend_paused("segment_gap_pause");
+}
+
+static void river_cloud_xiaozhi_pause_playback_for_rebuffer(void)
+{
+    river_cloud_xiaozhi_mark_playback_backend_paused("rebuffer_pause");
+}
+
+static river_status_t river_cloud_xiaozhi_stop_playback_for_rebuffer(const char *reason)
+{
+    river_status_t status = river_playback_service_stop_stream_ex(reason);
+
+    if (status == RIVER_OK) {
+        river_cloud_xiaozhi_pause_playback_for_rebuffer();
+    }
+    return status;
 }
 
 void river_cloud_xiaozhi_reset_downlink_state(void)
@@ -1370,7 +1390,11 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
                (unsigned int)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count,
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_streak);
-    (void)river_playback_service_recover_stream_ex("xiaozhi_playback_starved");
+    if (river_cloud_xiaozhi_stop_playback_for_rebuffer("xiaozhi_playback_starved") !=
+        RIVER_OK) {
+        RIVER_LOGW("xiaozhi playback upstream gap stop failed: fallback=recover");
+        (void)river_playback_service_recover_stream_ex("xiaozhi_playback_starved");
+    }
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
     return true;
 }
@@ -2556,7 +2580,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                                                           &supply_gap_ms)) {
                 recover_cause = RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED;
                 recover_reason = "xiaozhi_playback_starved_write";
-                recover_path = "recover";
+                recover_path = "stop_rebuffer";
             }
             river_cloud_xiaozhi_note_playback_rebuffer(
                 now_ms,
@@ -2586,7 +2610,19 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count,
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_streak,
                        recover_path);
-            recover_status = river_playback_service_recover_stream_ex(recover_reason);
+            if (recover_cause == RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED) {
+                recover_status =
+                    river_cloud_xiaozhi_stop_playback_for_rebuffer(recover_reason);
+                if (recover_status != RIVER_OK) {
+                    RIVER_LOGW("xiaozhi playback stop rebuffer fallback to recover: cause=%s status=%d",
+                               river_cloud_playback_rebuffer_cause_name(recover_cause),
+                               (int)recover_status);
+                    recover_status =
+                        river_playback_service_recover_stream_ex(recover_reason);
+                }
+            } else {
+                recover_status = river_playback_service_recover_stream_ex(recover_reason);
+            }
             if (recover_status != RIVER_OK) {
                 RIVER_LOGW("xiaozhi playback recover fallback to fresh start: cause=%s status=%d",
                            river_cloud_playback_rebuffer_cause_name(recover_cause),

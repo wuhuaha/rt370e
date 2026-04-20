@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.332
+- XiaoZhi downlink/playback 现在把 `upstream_starved` 的本地 backend 动作从
+  同轨 `recover` 改成了显式 `stop/rebuffer`：
+  - 新增：
+    - `river_cloud_xiaozhi_pause_playback_for_rebuffer()`
+    - `river_cloud_xiaozhi_stop_playback_for_rebuffer()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- starvation helper 与 `write_failed` 的 starved 分支现在都优先走同一条轻量
+  pause/detach 路径：
+  - `upstream gap rebuffer` 不再直接调用
+    `river_playback_service_recover_stream_ex(...)`
+  - 当 `write_failed` 已明显符合断供语义时，日志中的 `recovery=` 现改为
+    `stop_rebuffer`
+  - 只有在 `stop_stream_ex(...)` 自身失败时，才回退到原有 recover 路径
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步把常见的“上游断粮”从本地 playback-service 的 `RECOVERING` 语义里拆了
+  出来：
+  - rebuffer 真相继续由 playback runtime 持有
+  - local backend 在 starved 场景下会退出到可正常再起播的 detached/idle 状态
+  - residual 硬 `write_failed` 才继续使用 playback-service recover
+  - 这继续压缩了日志里的 `underrun -> write_failed -> flush/restart` 抖动链
+
 ## Step 5.331
 - `dialog_runtime` snapshot 现在显式吸收 `wake_admission_pending`：
   - 新增 `river_dialog_runtime_snapshot_t.wake_admission_pending`

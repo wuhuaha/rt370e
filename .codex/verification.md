@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.332
+Validate that XiaoZhi playback now treats `upstream_starved` as `stop/rebuffer`,
+while keeping playback-service `recover` reserved for residual hard
+`write_failed` cases:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'stop_playback_for_rebuffer|pause_playback_for_rebuffer|recovery=stop_rebuffer|upstream gap stop failed|stop rebuffer fallback to recover' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1118,1157p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1360,1398p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2550,2618p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now exposes:
+  - `river_cloud_xiaozhi_pause_playback_for_rebuffer()`
+  - `river_cloud_xiaozhi_stop_playback_for_rebuffer()`
+- `upstream gap rebuffer` now first tries:
+  - `stop_stream_ex(...)`
+  - runtime-owned `rebuffer_pause`
+  instead of immediately going through playback-service recover
+- `write_failed` logs now print:
+  - `recovery=stop_rebuffer`
+  when the failure is reclassified as `upstream_starved`
+- only failed `stop_stream_ex(...)` attempts fall back to:
+  - `river_playback_service_recover_stream_ex(...)`
+
 ## Step 5.331
 Validate that pending wake admission is now surfaced by `dialog_runtime`, and
 that wakeword gating blocks repeated detections while the admission bridge is

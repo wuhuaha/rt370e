@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.331 surface pending wake admission in dialog runtime`
+  - `5.332 split upstream-starved rebuffer from local playback recover`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback 在 `upstream_starved` 场景下已不再默认走同轨
+      `recover`
+    - `upstream gap rebuffer` 与 starved `write_failed` 现在都会优先执行：
+      - `stop_stream_ex(...)`
+      - runtime-owned `rebuffer_pause`
+    - 只有在本地 stop 自身失败时，才会回退到 playback-service recover
+    - 这一步把常见上游断粮从本地 `RECOVERING/flush-restart` 语义里拆开，
+      让 residual 硬 `write_failed` 才继续保留 recover 语义
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 现在已显式吸收 `wake_admission_pending`
     - wakeword detection / admission gating 会直接把
