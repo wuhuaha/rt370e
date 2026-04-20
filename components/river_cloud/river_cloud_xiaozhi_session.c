@@ -1580,28 +1580,10 @@ river_status_t river_cloud_xiaozhi_apply_capture_stream_policy(const uint8_t *pc
     return RIVER_OK;
 }
 
-static bool river_cloud_xiaozhi_output_speaking_active(void)
-{
-    return river_cloud_xiaozhi_playback_output_active() ||
-           (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") == 0);
-}
-
 void river_cloud_xiaozhi_apply_open_and_listen_session_policy(void)
 {
     g_river_cloud.xiaozhi_listening = true;
     g_river_cloud.xiaozhi_listen_stop_pending = false;
-}
-
-bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void)
-{
-    return river_cloud_xiaozhi_output_speaking_active() &&
-           river_cloud_xiaozhi_playback_allows_vad_open();
-}
-
-bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void)
-{
-    return g_river_cloud.stream_active &&
-           river_cloud_xiaozhi_duplex_soft_endpoint_enabled();
 }
 
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason)

@@ -1287,6 +1287,13 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
       也不再散落在 session 文件中
   - `xiaozhi_session.c` 进一步退化为 transport/session 编排层，而不是下行播放
     判定层
+- 同一方向再推进一步，soft-endpoint / uplink continuation 语义也已移到
+  playback runtime：
+  - `duplex_soft_endpoint_enabled()`
+  - `duplex_speaking_uplink_continuation_active()`
+  - `output_speaking_active()`
+  - 这继续减少 `xiaozhi_session.c` 对“server speaking + playback active”
+    组合语义的持有，改由 downlink runtime 解释
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

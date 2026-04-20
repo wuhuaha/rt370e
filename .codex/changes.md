@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.292
+- playback runtime 继续接管 `soft endpoint` 语义：
+  - `river_cloud_xiaozhi_duplex_soft_endpoint_enabled()`
+  - `river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active()`
+  - `river_cloud_xiaozhi_output_speaking_active()` 也随之移到
+    `river_cloud_xiaozhi_playback_runtime.c`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- 这一步把“server speaking / playback active 时是否允许 soft endpoint 与 uplink
+  continuation” 的判定继续从 session 文件剥离，交给 downlink runtime 持有。
+- `xiaozhi_session.c` 继续缩减为 round/window/session 编排层，不再持有
+  playback-driven duplex continuation 规则。
+
 ## Step 5.291
 - `XiaoZhi` 的 playback/duplex admission helper 继续从
   `river_cloud_xiaozhi_session.c` 收口到

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.291 move playback/duplex admission helpers into playback runtime`
+  - `5.292 move soft-endpoint duplex helpers into playback runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,13 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - playback runtime now also owns:
+      - `duplex_soft_endpoint_enabled()`
+      - `duplex_speaking_uplink_continuation_active()`
+      - local `output_speaking_active()`
+    - this keeps speaking-output / soft-endpoint continuation semantics on the
+      downlink runtime side instead of in `xiaozhi_session.c`
+  - previous runtime-ownership slice:
     - playback-side duplex admission helpers now live in
       `river_cloud_xiaozhi_playback_runtime.c`:
       - `playback_allows_vad_open()`
@@ -94,7 +101,7 @@ or top-of-tree verification target changes.
     - `xiaozhi_session.c` no longer owns those playback/downlink rules
     - this keeps AEC/VAD admission and `tts_start` round-close policy attached
       to the downlink runtime truth owner
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - session_coordinator no longer reads dialog-runtime snapshots directly for:
       - wakeword admission
       - barge-in interrupt

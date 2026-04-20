@@ -359,6 +359,24 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
         "tts_start");
 }
 
+static bool river_cloud_xiaozhi_output_speaking_active(void)
+{
+    return river_cloud_xiaozhi_playback_output_active() ||
+           (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") == 0);
+}
+
+bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void)
+{
+    return river_cloud_xiaozhi_output_speaking_active() &&
+           river_cloud_xiaozhi_playback_allows_vad_open();
+}
+
+bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void)
+{
+    return g_river_cloud.stream_active &&
+           river_cloud_xiaozhi_duplex_soft_endpoint_enabled();
+}
+
 static void river_cloud_xiaozhi_clear_downlink_starvation_watch(void)
 {
     g_river_cloud.xiaozhi_downlink_starved_since_ms = 0U;

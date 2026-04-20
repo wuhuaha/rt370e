@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.292
+Validate that soft-endpoint / speaking-uplink continuation helpers are now
+owned by the playback runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'duplex_soft_endpoint_enabled|duplex_speaking_uplink_continuation_active|output_speaking_active' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '321,380p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1578,1605p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `soft endpoint` / speaking-uplink continuation helpers live in:
+  - `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` no longer implements
+  those helpers
+
 ## Step 5.291
 Validate that XiaoZhi playback/duplex admission helpers are now owned by the
 playback runtime instead of `river_cloud_xiaozhi_session.c`:
