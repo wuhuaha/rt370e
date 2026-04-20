@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.324`
+  - playback owner 新增显式段间等待 phase：
+    - `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+    - `waiting_segment`
+  - XiaoZhi downlink/playback runtime 现在会在“当前 segment 已播完，但下一段还未到达”
+    时主动 pause backend，并把 phase 收口到 `waiting_segment`
+  - known segment 已存在但音频尚未入 ring 时，phase 继续维持 `prefetching`，
+    不再短暂掉回 `idle`
+  - 这一步直接把 inter-segment 供给间隙从：
+    - `idle`
+    - `underrun`
+    - `write_failed`
+    之间的隐式漂移，收口到显式 typed playback truth
 - `Step 5.323`
   - playback owner 的 `backend state` 已从“两个分裂的布尔投影”收口成公共
     typed truth：

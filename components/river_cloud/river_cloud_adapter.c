@@ -52,6 +52,8 @@ const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase)
         return "idle";
     case RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING:
         return "prefetching";
+    case RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT:
+        return "waiting_segment";
     case RIVER_CLOUD_PLAYBACK_PHASE_PLAYING:
         return "playing";
     case RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING:

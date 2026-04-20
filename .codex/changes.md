@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.324
+- playback owner 新增显式 `waiting_segment` phase：
+  - `river_cloud_playback_phase_t` 增加 `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+  - `river_cloud_playback_phase_name(...)` 新增 `waiting_segment`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 现在会显式区分“当前段已播完，但下一段还未到”：
+  - 新增 `playback_waiting_next_segment()` 判定
+  - known segment 已到但音频尚未入 ring 时，phase 继续保持 `prefetching`
+  - 段间空窗则进入 `waiting_segment`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- downlink worker 现在会在段间空窗时主动 pause playback backend：
+  - 队列耗尽且仍在同一 response 中等待下一段时，先 `stop_stream`
+  - 随后转入 `waiting_segment`
+  - 不再继续把这类 inter-segment gap 被动拖到本地 `underrun/write_failed`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步直接把下行恢复模型里的一个关键歧义拆开：
+  - `waiting_segment` 表示上游下一段尚未供给
+  - `rebuffering/write_failed` 只保留给真正没被前置拦住的恢复路径
+
 ## Step 5.323
 - playback owner 的 `backend state` 已从“两个分裂的布尔投影”收口成公共 typed
   truth：

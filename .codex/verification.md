@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.324
+Validate that playback owner now exports an explicit inter-segment wait phase,
+and that XiaoZhi downlink pauses the backend proactively on segment gaps
+instead of only falling through to underrun/write-failed recovery:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'WAITING_SEGMENT|waiting_segment|segment_gap_pause|playback_waiting_next_segment' \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '80,112p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1098,1206p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2448,2468p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_cloud_playback_phase_t` includes:
+  - `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+- `river_cloud_playback_phase_name(...)` returns:
+  - `waiting_segment`
+- XiaoZhi playback runtime enters `waiting_segment` when当前段已播完、backend 已主动
+  pause、但下一段尚未供给
+- downlink worker includes an explicit `segment_gap_pause` branch before the old
+  write-failed recovery path
+
 ## Step 5.323
 Validate that playback owner now exports a public typed backend state, and that
 `dialog_runtime` consumes that enum instead of exposing split backend booleans

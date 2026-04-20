@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.323 export playback backend state as public typed truth`
+  - `5.324 introduce explicit waiting-segment playback phase`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback owner 新增了显式段间等待 phase：
+      - `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+      - `waiting_segment`
+    - XiaoZhi downlink/playback runtime 现在会在“当前 segment 已播完、下一段尚未到达”
+      时主动 pause backend，并把 phase 收口到 `waiting_segment`
+    - 这让 inter-segment 供给间隙不再默认继续滑入：
+      - `underrun`
+      - `playback_write_failed`
+      - `rebuffer requested`
+      这条本地恢复路径
+    - 这一步继续把 downlink/playback 的恢复模型从“被动等本地故障”推进到
+      “先显式承认上游段间等待”
   - newest landed runtime-ownership slice:
     - playback owner 的 `backend state` 已从两个跨层布尔投影收口成公共
       typed truth：
