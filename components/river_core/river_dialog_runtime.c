@@ -507,6 +507,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         snapshot->playback_terminal_wait_kind;
     g_river_dialog_runtime.snapshot.playback_rebuffer_cause_kind =
         snapshot->playback_rebuffer_cause_kind;
+    g_river_dialog_runtime.snapshot.playback_start_policy_kind =
+        snapshot->playback_start_policy_kind;
     g_river_dialog_runtime.snapshot.turn_accepted = snapshot->turn_accepted;
     g_river_dialog_runtime.snapshot.barge_in_enabled_known =
         snapshot->barge_in_enabled_known;
@@ -526,10 +528,6 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_phase,
                                    sizeof(g_river_dialog_runtime.snapshot.playback_phase),
                                    snapshot->playback_phase);
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.snapshot.playback_start_policy,
-        sizeof(g_river_dialog_runtime.snapshot.playback_start_policy),
-        snapshot->playback_start_policy);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_terminal_state,
                                    sizeof(g_river_dialog_runtime.snapshot.playback_terminal_state),
                                    snapshot->playback_terminal_state);
@@ -910,9 +908,7 @@ void river_dialog_runtime_dump_status(void)
                snapshot.playback_phase_known ? "yes" : "no",
                snapshot.playback_backend_owned ? "yes" : "no",
                snapshot.playback_backend_restart_pending ? "yes" : "no",
-               snapshot.playback_start_policy[0] != '\0' ?
-                   snapshot.playback_start_policy :
-                   "-",
+               river_cloud_playback_start_policy_name(snapshot.playback_start_policy_kind),
                (unsigned long)snapshot.playback_start_frames,
                (unsigned long)snapshot.playback_prefetch_frames,
                snapshot.playback_start_cautious_history ? "yes" : "no",

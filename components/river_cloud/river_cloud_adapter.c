@@ -45,6 +45,22 @@ const char *river_cloud_playback_rebuffer_cause_name(
     }
 }
 
+const char *river_cloud_playback_start_policy_name(
+    river_cloud_playback_start_policy_t policy)
+{
+    switch (policy) {
+    case RIVER_CLOUD_PLAYBACK_START_POLICY_REBUFFER_FAST:
+        return "rebuffer_fast";
+    case RIVER_CLOUD_PLAYBACK_START_POLICY_PREFETCH_SEGMENT:
+        return "segment_prefetch";
+    case RIVER_CLOUD_PLAYBACK_START_POLICY_PREFETCH_STARVED:
+        return "starved_prefetch";
+    case RIVER_CLOUD_PLAYBACK_START_POLICY_BASELINE:
+    default:
+        return "baseline";
+    }
+}
+
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event, void *user_data);
 #endif

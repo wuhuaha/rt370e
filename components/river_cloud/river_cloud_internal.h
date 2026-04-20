@@ -271,7 +271,7 @@ typedef struct {
     uint32_t xiaozhi_playback_rebuffer_streak;
     uint32_t xiaozhi_playback_last_meta_gap_ms;
     uint32_t xiaozhi_playback_prefetch_target_ms;
-    uint32_t xiaozhi_playback_start_policy;
+    river_cloud_playback_start_policy_t xiaozhi_playback_start_policy;
     uint32_t xiaozhi_playback_start_frames;
     uint32_t xiaozhi_playback_prefetch_frames;
     bool xiaozhi_playback_start_cautious_history;
@@ -431,7 +431,6 @@ const char *river_cloud_xiaozhi_playback_phase_name(
 river_cloud_playback_rebuffer_cause_t
 river_cloud_xiaozhi_playback_rebuffer_cause(void);
 bool river_cloud_xiaozhi_playback_rebuffer_pending(void);
-const char *river_cloud_xiaozhi_playback_start_policy_name(uint32_t policy);
 bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_lane_engaged(void);
 bool river_cloud_xiaozhi_playback_has_work(void);

@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.320`
+  - playback owner 的 `start policy` 已从 XiaoZhi 私有 enum 提升成公共
+    typed truth：
+    - `river_cloud_playback_start_policy_t`
+    - `playback_start_policy_kind`
+  - `dialog_runtime` 的公开 snapshot 已删除字符串：
+    - `playback_start_policy`
+    并改为直接吸收 `playback_start_policy_kind`
+  - 这一步继续把 downlink/playback 的启动门限决策从私有 enum / 跨层文本字段，
+    收口到公共 owner typed truth
 - `Step 5.319`
   - playback owner 的 `rebuffer cause` 已从 XiaoZhi 私有 enum 提升成公共
     typed truth：
@@ -245,9 +255,9 @@ Branch: `agent-server-v2`
     - 评估 `playback_local_active/recovering/state` 是否还能收成一个更小的
       private shadow 表达
   - 继续把 cloud/runtime snapshot 里的 playback 文本诊断字段向 typed truth 收口：
-    - `playback_start_policy`
     - `playback_terminal_reason`
     - `playback_rebuffer_cause` 在 cloud public snapshot 中的剩余诊断角色
+    - `playback_start_policy` 在 cloud public snapshot 中的剩余诊断角色
   - 继续把 downlink/playback 的恢复流程从“write failed -> stop/start reuse”整理成
     更稳定的 owner 状态机：
     - rebuffer enter

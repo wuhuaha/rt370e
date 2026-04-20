@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.320
+- playback owner 的 `start policy` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
+  - 新增 `river_cloud_playback_start_policy_t`
+  - 新增 `river_cloud_playback_start_policy_name(...)`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 已改为直接维护并导出公共 `start policy`：
+  - 删除私有 `river_cloud_xiaozhi_playback_start_policy_t`
+  - `xiaozhi_playback_start_policy` 内部状态改为公共 enum
+  - `playback_runtime_snapshot` 显式填充 `playback_start_policy_kind`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 公开 snapshot 已不再暴露字符串 `playback_start_policy`：
+  - 改为吸收并导出 `playback_start_policy_kind`
+  - `dialog_runtime_dump_status()` 也改为直接打印 typed policy
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 downlink/playback 的启动门限决策从 owner 内部私有 enum 与跨层
+  字符串外抛，收口为公共 typed truth。
+
 ## Step 5.319
 - playback owner 的 `rebuffer cause` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
   - 新增 `river_cloud_playback_rebuffer_cause_t`
