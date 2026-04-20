@@ -435,6 +435,7 @@ const char *river_cloud_xiaozhi_playback_phase_name(
     river_cloud_xiaozhi_playback_phase_t phase);
 river_cloud_xiaozhi_playback_rebuffer_cause_t
 river_cloud_xiaozhi_playback_rebuffer_cause(void);
+bool river_cloud_xiaozhi_playback_rebuffer_pending(void);
 const char *river_cloud_xiaozhi_playback_rebuffer_cause_name(
     river_cloud_xiaozhi_playback_rebuffer_cause_t cause);
 const char *river_cloud_xiaozhi_playback_start_policy_name(uint32_t policy);

@@ -1310,6 +1310,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 直接读/清零这组内部字段
   - 这让 soft-endpoint 与 speaking-uplink continuation 的配套状态也回到同一个
     downlink truth owner
+- 再往前推进一步后，session 对 playback 辅助状态的残余直读继续被削掉：
+  - runtime status dump 通过 `playback_rebuffer_pending()` 读取 rebuffer
+    状态
+  - transport-closed 观测通过 `playback_output_active()` 读取播放活跃态
+  - transport reset 不再手工清 `no_ref reopen` 这组字段
+  - 这组 reset 现统一收口到 playback runtime：
+    - `apply_transport_reset_playback_policy()`
+    - `apply_session_start_playback_policy()`
+    - `mark_playback_started()`
+    - `reset_playback_state()`
+  - 这样 `no_ref reopen` 从“状态解释在 runtime、reset 却散在 session”
+    继续推进到同一 owner
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

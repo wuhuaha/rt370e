@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.295
+- `xiaozhi_session.c` 继续停止直读 playback 内部字段：
+  - runtime status dump 改为通过
+    `river_cloud_xiaozhi_playback_rebuffer_pending()` 读取 rebuffer 状态
+  - transport closed 观测日志改为通过
+    `river_cloud_xiaozhi_playback_output_active()` 读取播放活跃态
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- playback runtime 新增 typed helper：
+  - `river_cloud_xiaozhi_playback_rebuffer_pending()`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `no_ref reopen` reset 语义继续回收至 playback runtime：
+  - `apply_transport_reset_playback_policy()`
+  - `apply_session_start_playback_policy()`
+  - `mark_playback_started()`
+  - `reset_playback_state()`
+  - `xiaozhi_session.c` 不再在 transport reset 路径手工清这组字段
+
 ## Step 5.294
 - `endpoint_soft_close` 状态机已从 `river_cloud_xiaozhi_session.c` 收口到
   `river_cloud_xiaozhi_playback_runtime.c`：

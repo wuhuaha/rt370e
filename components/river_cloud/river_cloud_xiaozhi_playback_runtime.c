@@ -162,6 +162,11 @@ river_cloud_xiaozhi_playback_rebuffer_cause(void)
     return g_river_cloud.xiaozhi_playback_rebuffer_cause;
 }
 
+bool river_cloud_xiaozhi_playback_rebuffer_pending(void)
+{
+    return g_river_cloud.xiaozhi_playback_rebuffer_pending;
+}
+
 static river_cloud_xiaozhi_playback_phase_t river_cloud_xiaozhi_compute_playback_phase(void)
 {
     if (g_river_cloud.xiaozhi_tts_stop_pending) {
@@ -290,6 +295,13 @@ bool river_cloud_xiaozhi_playback_has_work(void)
     return river_cloud_xiaozhi_playback_lane_engaged() ||
            river_cloud_xiaozhi_playback_queued_frames() != 0U ||
            g_river_cloud.xiaozhi_playback_meta_valid;
+}
+
+static void river_cloud_xiaozhi_clear_followup_reopen_state(void)
+{
+    g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
+    g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
+    g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
 }
 
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
@@ -1025,11 +1037,13 @@ void river_cloud_xiaozhi_apply_transport_reset_playback_policy(void)
 {
     river_cloud_xiaozhi_reset_downlink_state();
     river_cloud_xiaozhi_clear_playback_meta_state();
+    river_cloud_xiaozhi_clear_followup_reopen_state();
 }
 
 void river_cloud_xiaozhi_apply_session_start_playback_policy(void)
 {
     river_cloud_xiaozhi_clear_playback_meta_state();
+    river_cloud_xiaozhi_clear_followup_reopen_state();
 }
 
 void river_cloud_xiaozhi_cancel_playback_stop(void)
@@ -1053,9 +1067,7 @@ void river_cloud_xiaozhi_mark_playback_started(void)
     g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     river_cloud_xiaozhi_clear_playback_terminal_wait();
     river_cloud_xiaozhi_cancel_playback_stop();
-    g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
-    g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
-    g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+    river_cloud_xiaozhi_clear_followup_reopen_state();
     river_cloud_xiaozhi_refresh_playback_phase("playback_started");
 }
 
@@ -1090,9 +1102,7 @@ void river_cloud_xiaozhi_reset_playback_state(void)
                    (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS,
                    (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES);
     } else if (!had_playback_activity || duplex_ready_seen) {
-        g_river_cloud.xiaozhi_no_ref_reopen_rearm = false;
-        g_river_cloud.xiaozhi_no_ref_reopen_silence_frames = 0U;
-        g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
+        river_cloud_xiaozhi_clear_followup_reopen_state();
     }
     g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     (void)river_cloud_xiaozhi_refresh_start_gate();

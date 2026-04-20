@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.295
+Validate that playback-side `rebuffer_pending` reads and `no_ref reopen`
+reset semantics are now owned by the playback runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_rebuffer_pending\\(|clear_followup_reopen_state|apply_transport_reset_playback_policy|apply_session_start_playback_policy|mark_playback_started|reset_playback_state|no_ref_reopen_' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '150,320p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1028,1110p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '895,910p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2350,2372p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_session.c` no longer directly reads
+  `xiaozhi_playback_rebuffer_pending` or clears `xiaozhi_no_ref_reopen_*`
+  fields
+- `river_cloud_xiaozhi_playback_runtime.c` owns both the typed read helper and
+  the reset policy for follow-up reopen state
+
 ## Step 5.294
 Validate that `endpoint_soft_close` logic is now owned by the playback runtime,
 with session reading it through typed helpers:

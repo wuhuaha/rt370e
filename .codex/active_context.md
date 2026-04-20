@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.294 move endpoint_soft_close state machine into playback runtime`
+  - `5.295 keep playback auxiliary reads/resets inside playback runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,13 +86,20 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - session 已不再直读：
+      - `xiaozhi_playback_rebuffer_pending`
+      - `xiaozhi_playback_active`
+    - transport reset / session start / playback start 这些路径对
+      `no_ref reopen` 的 reset 也统一走 playback runtime
+    - `xiaozhi_session.c` 进一步只消费 typed playback helper
+  - previous runtime-ownership slice:
     - `endpoint_soft_close` 状态机已并入 playback runtime
     - session 现在只通过 typed helper 读取：
       - pending
       - remaining_ms
       - reason
     - session_close / transport_reset 这类路径也不再手工清空这组字段
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - `no-ref reopen/open_hold` gating now sits with playback runtime:
       - `open_hold_frames_required()`
       - `playback_followup_reopen_ready()`
