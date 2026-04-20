@@ -1198,6 +1198,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 本地 playback-service truth
     - 本地 hard playback error
   - cloud/playback runtime 自身 truth 变化改由 runtime 主动发布 state sync
+- 这条本地 playback listener 入口也已最终完成收口：
+  - 新增：
+    - `river_dialog_runtime_on_playback_state(...)`
+  - `river_app` 现在直接把它注册到：
+    - `river_playback_service_register_listener(...)`
+  - `session_coordinator_on_playback_state(...)` 已删除
+  - 这意味着 playback-service -> core 的本地事实入口也已和
+    cloud-state-sync 一样，直接进入 dialog runtime，而不是再经过 coordinator
 - `session_coordinator` 中一部分 ASR 生命周期 cloud-sync bridge 也已继续收口：
   - XiaoZhi session runtime 现在会在以下生命周期事件后主动发布 state sync：
     - `asr_error`
@@ -1231,6 +1239,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   snapshot”的重复模式，进一步收成更少的 reducer 入口
 - 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，
   让 dialog runtime 真正成为唯一显式真相源
+- 继续检查 `session_coordinator` 是否还保留其他只做“转发本地事实到
+  dialog runtime”的薄桥接入口，能删则删，不能删则继续收敛成 typed reducer
 - 继续把 downlink/playback 侧剩余对旧 playback-service coarse state 的兼容
   依赖压缩到 phase 缺席兜底
 - 继续把 `session_coordinator` 中剩余的其他非 playback 非 wake 非 ASR 的

@@ -511,6 +511,29 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     river_dialog_runtime_unlock();
 }
 
+void river_dialog_runtime_on_playback_state(river_playback_state_t state,
+                                            const river_playback_stream_config_t *config,
+                                            void *user_data)
+{
+    const char *reason;
+
+    (void)config;
+    (void)user_data;
+
+    reason = "playback_state";
+    if (state == RIVER_PLAYBACK_RECOVERING ||
+        state == RIVER_PLAYBACK_RESTART_PENDING) {
+        reason = "playback_recovering";
+    } else if (state == RIVER_PLAYBACK_ERROR) {
+        reason = "playback_error";
+    }
+
+    river_dialog_runtime_note_playback_state(state, reason);
+    if (state == RIVER_PLAYBACK_ERROR) {
+        river_dialog_runtime_note_error("playback_error");
+    }
+}
+
 void river_dialog_runtime_note_error(const char *reason)
 {
     if (!river_dialog_runtime_lock()) {

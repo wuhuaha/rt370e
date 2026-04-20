@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.274
+- `dialog runtime` now directly owns the local playback-service listener
+  ingress:
+  - added:
+    - `river_dialog_runtime_on_playback_state(...)`
+  - `river_app` now registers that callback straight into
+    `river_playback_service_register_listener(...)`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- Removed the now-obsolete playback listener bridge from
+  `session_coordinator`:
+  - removed:
+    - `river_session_coordinator_on_playback_state(...)`
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+  - [components/river_core/river_session_coordinator.h](/root/ameba-river/components/river_core/river_session_coordinator.h)
+
 ## Step 5.273
 - Removed the now-unused local-only `dialog_runtime` boot/wake/ASR entrypoints
   after all active callers had moved to the atomic cloud-fused APIs:

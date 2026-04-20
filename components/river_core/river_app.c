@@ -130,7 +130,7 @@ river_status_t river_app_boot(void)
     if (river_dialog_cloud_port_register(&g_river_app_dialog_cloud_port) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
     }
-    river_playback_service_register_listener(river_session_coordinator_on_playback_state, NULL);
+    river_playback_service_register_listener(river_dialog_runtime_on_playback_state, NULL);
     river_voice_frontend_set_handler(river_session_coordinator_on_voice_event);
     river_cloud_adapter_set_result_handler(river_session_coordinator_on_cloud_asr_result, NULL);
     river_cloud_adapter_set_state_sync_handler(river_dialog_runtime_on_cloud_state_sync, NULL);

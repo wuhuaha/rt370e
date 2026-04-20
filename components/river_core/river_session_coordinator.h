@@ -8,9 +8,6 @@
 #include "river/river_voice.h"
 
 river_status_t river_session_coordinator_init(void);
-void river_session_coordinator_on_playback_state(river_playback_state_t state,
-                                                 const river_playback_stream_config_t *config,
-                                                 void *user_data);
 void river_session_coordinator_on_voice_event(const river_voice_event_t *event);
 void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_t *result,
                                                    void *user_data);
