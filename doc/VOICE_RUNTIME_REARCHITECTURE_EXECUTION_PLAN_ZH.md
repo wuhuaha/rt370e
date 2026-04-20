@@ -26,6 +26,11 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.299`
+  - `open_session_and_listen() / start_followup_round() /
+    maybe_start_followup_round() / begin_conversation_window()` 已并入
+    `river_cloud_xiaozhi_round_runtime.c`
+  - 这让 round runtime 从“关停/超时 owner”继续扩展成“round 启停 owner”
 - `Step 5.296`
   - `river_dialog_cloud_conversation_window_active()` 已优先读取
     `dialog runtime` snapshot，voice/KWS 侧 follow-up window 开始切向
@@ -44,8 +49,7 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续把 wake admission / follow-up reopen / open-listen round 启停写路径
-    收口到 round runtime
+  - 继续把 round/window typed truth 更直接投影到 `dialog runtime`
   - 让 dialog runtime 直接消费 round/window typed truth，而不是继续从
     cloud session 层拼装派生语义
 

@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.299
+- 继续把 XiaoZhi 的 round 启动路径从
+  `river_cloud_xiaozhi_session.c` 并入
+  `river_cloud_xiaozhi_round_runtime.c`：
+  - `open_session_and_listen()`
+  - `start_followup_round()`
+  - `maybe_start_followup_round()`
+  - `begin_conversation_window()`
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+- `round runtime` 现在同时拥有：
+  - round/window 读 helper
+  - post-commit wait / local-close defer
+  - local close / timeout / reset
+  - follow-up reopen / wake admission / open-listen round 启动
+- `river_cloud_xiaozhi_session.c` 继续退化为：
+  - transport event reducer
+  - semantic/turn state
+  - uplink / capture 主流程
+  - 其内部已不再内联 wake admission / follow-up reopen 的 round 启动状态机
+
 ## Step 5.298
 - 继续把 XiaoZhi 的 round close/reset/timeout/post-commit wait 语义收口到
   `river_cloud_xiaozhi_round_runtime.c`：

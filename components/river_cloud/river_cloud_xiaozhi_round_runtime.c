@@ -1,6 +1,7 @@
 /* 小智 round/window runtime：收口 listening/window/listen-stop/local-close 状态。 */
 #include "river/river_log.h"
 #include "river/river_runtime_stats.h"
+#include "river/river_wifi_station.h"
 
 #include "river_cloud_internal.h"
 
@@ -377,5 +378,197 @@ void river_cloud_xiaozhi_check_window_timeout(void)
     }
 
     river_cloud_xiaozhi_window_close("followup_timeout");
+}
+
+river_status_t river_cloud_xiaozhi_open_session_and_listen(void)
+{
+    river_status_t status;
+
+    status = river_cloud_xiaozhi_request_open_and_listen("auto");
+    if (status != RIVER_OK) {
+        return status;
+    }
+    river_xiaozhi_clear_session_update_cache();
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+
+    /*
+     * A fresh follow-up listen/asr round must re-arm the conversation window.
+     * Otherwise the shorter post-TTS tail timer can expire while the user has
+     * already started the next utterance, causing the websocket to close
+     * immediately after this ASR round finishes.
+     */
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                     "asr_session_start");
+    river_cloud_xiaozhi_clear_pending_text();
+    river_cloud_xiaozhi_clear_preview_state();
+    river_cloud_xiaozhi_clear_turn_semantics_state();
+    river_cloud_xiaozhi_apply_session_start_playback_policy();
+    river_cloud_xiaozhi_emit_session_started();
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames)
+{
+    river_status_t status;
+
+    if (!river_xiaozhi_session_open()) {
+        river_cloud_xiaozhi_window_abort_local("followup_transport_unavailable");
+        river_cloud_xiaozhi_check_window_timeout();
+        return RIVER_ERR_BUSY;
+    }
+
+    if (river_cloud_xiaozhi_local_close_pending()) {
+        river_cloud_xiaozhi_apply_reopen_overlap_round_policy();
+    }
+
+    status = river_cloud_xiaozhi_open_session_and_listen();
+    if (status != RIVER_OK) {
+        return status;
+    }
+    if (g_river_cloud.xiaozhi_asr_round_active) {
+        river_cloud_xiaozhi_round_finish("reopen_overlap");
+    }
+    river_cloud_xiaozhi_round_begin(pre_roll_frames);
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
+                                                              uint32_t pre_roll_frames,
+                                                              bool *opened)
+{
+    river_status_t status;
+    uint32_t open_hold_frames;
+
+    if (opened != NULL) {
+        *opened = false;
+    }
+
+    if (river_cloud_xiaozhi_listen_stop_pending()) {
+        return RIVER_ERR_BUSY;
+    }
+
+    if (!river_cloud_xiaozhi_conversation_window_active() &&
+        river_cloud_xiaozhi_idle_requires_wakeword()) {
+        g_river_cloud.xiaozhi_open_speech_frames = 0U;
+        return RIVER_OK;
+    }
+
+    if (!river_cloud_xiaozhi_playback_followup_reopen_ready(is_speech)) {
+        g_river_cloud.xiaozhi_open_speech_frames = 0U;
+        return RIVER_OK;
+    }
+
+    open_hold_frames = river_cloud_xiaozhi_open_hold_frames_required();
+    if (!is_speech) {
+        g_river_cloud.xiaozhi_open_speech_frames = 0U;
+        return RIVER_OK;
+    }
+
+    if (g_river_cloud.xiaozhi_open_speech_frames < UINT32_MAX) {
+        g_river_cloud.xiaozhi_open_speech_frames++;
+    }
+    if (g_river_cloud.xiaozhi_open_speech_frames < open_hold_frames) {
+        return RIVER_OK;
+    }
+
+    status = river_cloud_xiaozhi_start_followup_round(pre_roll_frames);
+    if (status != RIVER_OK) {
+        g_river_cloud.xiaozhi_open_speech_frames = 0U;
+        return status;
+    }
+
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    if (opened != NULL) {
+        *opened = true;
+    }
+    return RIVER_OK;
+}
+
+river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
+{
+    river_status_t status;
+    const char *reason = (source != NULL && source[0] != '\0') ? source : "-";
+    bool was_listening;
+
+    if (!g_river_cloud.initialized || !g_river_cloud.xiaozhi_enabled) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    river_cloud_start_sntp_if_needed();
+    river_cloud_seed_time_from_build_if_needed();
+    if (!river_wifi_station_is_connected()) {
+        river_cloud_log_wake_admission_deferred_once(RIVER_ERR_BUSY);
+        return RIVER_ERR_BUSY;
+    }
+    if (!river_cloud_wake_admission_time_ready()) {
+        river_cloud_log_wake_admission_deferred_once(RIVER_ERR_BUSY);
+        return RIVER_ERR_BUSY;
+    }
+    river_cloud_reset_wake_admission_deferred_state();
+    if (RIVER_CLOUD_BUSINESS_TIME_WAIT_REQUIRED &&
+        !river_cloud_time_ready() &&
+        g_river_cloud.time_seeded_from_build &&
+        !g_river_cloud.wake_admission_estimate_announced) {
+        g_river_cloud.wake_admission_estimate_announced = true;
+        RIVER_LOGI("wake admission proceeding with build-seeded utc estimate");
+    }
+
+    RIVER_LOGI("xiaozhi wake admission begin: source=%s session=%s listening=%s window=%s sid=%s",
+               reason,
+               river_xiaozhi_session_open() ? "open" : "closed",
+               river_cloud_xiaozhi_listening_active() ? "yes" : "no",
+               river_cloud_xiaozhi_conversation_window_active() ? "open" : "closed",
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+    RIVER_LOGI("xiaozhi wake admission policy: source=%s default_on=%s default_reason=%s voice_collaboration=%s server_endpoint=%s/%s preview_events=%s playback_ack=%s",
+               reason,
+               river_xiaozhi_duplex_default_on_allowed() ? "yes" : "no",
+               river_xiaozhi_duplex_default_fallback_reason() != NULL ?
+                   river_xiaozhi_duplex_default_fallback_reason() :
+                   "-",
+               river_xiaozhi_discovery_voice_collaboration_advertised() ? "yes" : "no",
+               river_xiaozhi_discovery_server_endpoint_available() ? "yes" : "no",
+               river_xiaozhi_discovery_server_endpoint_enabled() ? "yes" : "no",
+               river_xiaozhi_preview_events_negotiated() ? "yes" : "no",
+               river_xiaozhi_playback_ack_mode_negotiated() != NULL ?
+                   river_xiaozhi_playback_ack_mode_negotiated() :
+                   "-");
+
+    was_listening = river_cloud_xiaozhi_listening_active();
+    status = river_cloud_xiaozhi_request_open_and_listen("auto");
+    if (status != RIVER_OK) {
+        if (!river_xiaozhi_session_open()) {
+            RIVER_LOGW("xiaozhi wake admission open_session failed: source=%s status=%d last_err=%s",
+                       reason,
+                       (int)status,
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        } else {
+            RIVER_LOGW("xiaozhi wake admission listen_start failed: source=%s status=%d sid=%s last_err=%s",
+                       reason,
+                       (int)status,
+                       river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-",
+                       river_xiaozhi_last_error() != NULL ? river_xiaozhi_last_error() : "-");
+        }
+        return status;
+    }
+    river_xiaozhi_clear_session_update_cache();
+    river_cloud_xiaozhi_copy_session_id_from_transport();
+    RIVER_LOGI("xiaozhi wake admission transport ready: source=%s sid=%s",
+               reason,
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+    if (!was_listening && river_cloud_xiaozhi_listening_active()) {
+        RIVER_LOGI("xiaozhi wake admission listen_start sent: source=%s sid=%s",
+                   reason,
+                   river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+    }
+
+    river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, reason);
+    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    river_cloud_pre_roll_reset();
+    RIVER_LOGI("xiaozhi wake admission ready: source=%s listening=%s window=%s sid=%s",
+               reason,
+               river_cloud_xiaozhi_listening_active() ? "yes" : "no",
+               river_cloud_xiaozhi_conversation_window_active() ? "open" : "closed",
+               river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
+    return RIVER_OK;
 }
 #endif
