@@ -873,7 +873,7 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
                (unsigned int)river_cloud_xiaozhi_downlink_start_threshold_frames(),
                (unsigned int)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count);
-    (void)river_playback_service_stop_stream_ex("xiaozhi_playback_starved");
+    (void)river_playback_service_recover_stream_ex("xiaozhi_playback_starved");
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
     return true;
 }
@@ -2003,7 +2003,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                 river_cloud_xiaozhi_downlink_starved_low_water_frames();
             river_status_t recover_status;
             const char *recover_reason = "xiaozhi_playback_write_failed";
-            const char *recover_path = "flush";
+            const char *recover_path = "recover";
 
             now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
             if (river_cloud_xiaozhi_write_failed_prefers_starved_rebuffer(queued_frames,
@@ -2011,7 +2011,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                                                           &supply_gap_ms)) {
                 recover_cause = RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED;
                 recover_reason = "xiaozhi_playback_starved_write";
-                recover_path = "stop";
+                recover_path = "recover";
             }
             river_cloud_xiaozhi_note_playback_rebuffer(
                 now_ms,
@@ -2036,10 +2036,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                        (unsigned int)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count,
                        recover_path);
-            recover_status = recover_cause ==
-                                     RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED ?
-                                 river_playback_service_stop_stream_ex(recover_reason) :
-                                 river_playback_service_flush_stream_ex(recover_reason);
+            recover_status = river_playback_service_recover_stream_ex(recover_reason);
             if (recover_status != RIVER_OK) {
                 RIVER_LOGW("xiaozhi playback recover fallback to fresh start: cause=%s status=%d",
                            river_cloud_xiaozhi_playback_rebuffer_cause_name(recover_cause),

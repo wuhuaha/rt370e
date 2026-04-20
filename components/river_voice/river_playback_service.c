@@ -40,6 +40,7 @@ typedef enum {
     RIVER_PLAYBACK_CONTROL_STOP = 0,
     RIVER_PLAYBACK_CONTROL_INTERRUPT,
     RIVER_PLAYBACK_CONTROL_FLUSH,
+    RIVER_PLAYBACK_CONTROL_RECOVER,
     RIVER_PLAYBACK_CONTROL_DUCK
 } river_playback_control_cmd_t;
 
@@ -463,6 +464,19 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
     return RIVER_OK;
 }
 
+static river_status_t river_playback_service_recover_locked(const char *reason)
+{
+    if (!river_playback_service_state_active(g_river_playback_service.stats.state) &&
+        g_river_playback_service.stats.state != RIVER_PLAYBACK_RECOVERING) {
+        return RIVER_OK;
+    }
+
+    if (g_river_playback_service.stats.state != RIVER_PLAYBACK_RECOVERING) {
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_RECOVERING);
+    }
+    return river_playback_service_flush_locked(reason);
+}
+
 static river_status_t river_playback_service_set_duck_locked(bool enabled, float gain, const char *reason)
 {
     if (!river_playback_service_state_active(g_river_playback_service.stats.state)) {
@@ -508,6 +522,8 @@ static river_status_t river_playback_service_control_locked(river_playback_contr
         return river_playback_service_stop_locked(true, reason);
     case RIVER_PLAYBACK_CONTROL_FLUSH:
         return river_playback_service_flush_locked(reason);
+    case RIVER_PLAYBACK_CONTROL_RECOVER:
+        return river_playback_service_recover_locked(reason);
     case RIVER_PLAYBACK_CONTROL_DUCK:
         return river_playback_service_set_duck_locked(enabled, gain, reason);
     default:
@@ -831,6 +847,25 @@ river_status_t river_playback_service_flush_stream_ex(const char *reason)
     return RIVER_OK;
 }
 
+river_status_t river_playback_service_recover_stream_ex(const char *reason)
+{
+    if (!g_river_playback_service.initialized) {
+        return RIVER_OK;
+    }
+
+    if (rtos_mutex_take(g_river_playback_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+        return RIVER_ERR_BUSY;
+    }
+
+    (void)river_playback_service_control_locked(RIVER_PLAYBACK_CONTROL_RECOVER,
+                                                false,
+                                                0.0f,
+                                                reason);
+
+    rtos_mutex_give(g_river_playback_service.lock);
+    return RIVER_OK;
+}
+
 river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason)
 {
     river_status_t status;
@@ -865,6 +900,11 @@ river_status_t river_playback_service_interrupt_stream(void)
 river_status_t river_playback_service_flush_stream(void)
 {
     return river_playback_service_flush_stream_ex(NULL);
+}
+
+river_status_t river_playback_service_recover_stream(void)
+{
+    return river_playback_service_recover_stream_ex(NULL);
 }
 
 river_status_t river_playback_service_set_ducking(bool enabled, float gain)

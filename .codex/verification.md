@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.281
+Validate that XiaoZhi rebuffer recovery now routes through a unified
+playback-service `recover` semantic instead of mixing `stop` and `flush`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'recover_stream_ex|recover_stream\\(|CONTROL_RECOVER|recover_locked' \
+  include/river/river_playback_service.h \
+  components/river_voice/river_playback_service.c
+rg -n 'xiaozhi_playback_starved|recovery=%s|recover_stream_ex' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '410,470p' components/river_voice/river_playback_service.c
+sed -n '860,880p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1990,2048p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback service exposes explicit recover APIs and an internal recover control
+- recover transitions playback into `RIVER_PLAYBACK_RECOVERING` before reusing
+  the in-place flush/restart path
+- XiaoZhi starvation and write-failed rebuffer recovery both call
+  `river_playback_service_recover_stream_ex(...)`
+- XiaoZhi recovery diagnostics now print `recovery=recover`
+
 ## Step 5.280
 Validate that `dialog runtime` now translates local playback-service enums into
 typed local playback truth at ingress, and no longer computes aggregate

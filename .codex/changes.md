@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.281
+- playback service 现在暴露显式的 `recover` 控制语义，而不再只让上层在
+  `stop` / `flush` 之间自己猜测恢复方式：
+  - 新增 API：
+    - `river_playback_service_recover_stream_ex(...)`
+    - `river_playback_service_recover_stream()`
+  - 新增内部 control：
+    - `RIVER_PLAYBACK_CONTROL_RECOVER`
+  - recover 路径会先把状态推进到 `RIVER_PLAYBACK_RECOVERING`，再复用原有
+    in-place flush/restart 逻辑，并在失败时保留 `RESTART_PENDING` 兜底
+  - [include/river/river_playback_service.h](/root/ameba-river/include/river/river_playback_service.h)
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- XiaoZhi downlink/playback runtime 现在把两类 rebuffer 恢复统一收口到
+  playback-service recover 语义：
+  - `upstream_starved`
+  - residual `write_failed`
+  - 这意味着 runtime 不再在 recoverable rebuffer 路径上混用：
+    - `stop_stream_ex(...)`
+    - `flush_stream_ex(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 板端恢复日志语义也同步收口：
+  - rebuffer diagnostics 现在统一打印 `recovery=recover`
+  - `upstream_starved` 不再默认走一次完整 local stop/close，再由 worker
+    重新 start 的重路径
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.280
 - `dialog runtime` 现在把本地 playback-service 回调先翻译成 typed local truth，
   再参与上层 playback 派生，不再在常态计算路径里直接读取 raw

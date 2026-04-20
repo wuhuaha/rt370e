@@ -1320,6 +1320,22 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `flush/restart`
   - 这进一步减少了“同一个供给断档既先记为 starvation，又在写入点再被当成
     本地写链路故障”的语义折叠
+- 再下一步，downlink/playback 的 recoverable 恢复动作也已继续统一：
+  - playback service 新增显式 recover 语义：
+    - `river_playback_service_recover_stream_ex(...)`
+  - recover 会先显式推进到：
+    - `RIVER_PLAYBACK_RECOVERING`
+    再复用现有 in-place flush/restart 路径，并在失败时保留：
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+    兜底
+  - XiaoZhi runtime 现在不再在 recoverable rebuffer 路径上混用：
+    - `stop_stream_ex(...)`
+    - `flush_stream_ex(...)`
+  - 而是统一通过 playback-service recover 处理：
+    - `upstream_starved`
+    - residual `write_failed`
+  - 这继续压缩了日志里可见的 stop/start 风暴，把更多恢复留在同一条 backend
+    生命周期里完成
 
 下一步焦点：
 

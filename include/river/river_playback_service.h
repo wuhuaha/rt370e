@@ -88,10 +88,12 @@ river_status_t river_playback_service_write(const uint8_t *playback,
 river_status_t river_playback_service_stop_stream_ex(const char *reason);
 river_status_t river_playback_service_interrupt_stream_ex(const char *reason);
 river_status_t river_playback_service_flush_stream_ex(const char *reason);
+river_status_t river_playback_service_recover_stream_ex(const char *reason);
 river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason);
 river_status_t river_playback_service_stop_stream(void);
 river_status_t river_playback_service_interrupt_stream(void);
 river_status_t river_playback_service_flush_stream(void);
+river_status_t river_playback_service_recover_stream(void);
 river_status_t river_playback_service_set_ducking(bool enabled, float gain);
 river_playback_state_t river_playback_service_state(void);
 uint32_t river_playback_service_epoch(void);
