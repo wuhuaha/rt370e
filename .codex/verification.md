@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.288
+Validate that playback-owned cloud snapshot fields are now filled by the
+XiaoZhi playback runtime helper instead of being manually assembled in the
+session runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'fill_playback_runtime_snapshot|fill_runtime_snapshot' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '640,700p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '857,900p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exposes one helper that fills playback-owned cloud snapshot
+  fields
+- session runtime no longer manually assembles playback phase / rebuffer / start
+  gate / terminal fields inline
+
 ## Step 5.287
 Validate that dialog runtime boot/wake/ASR cloud-backed entrypoints now share
 one internal reducer path instead of hand-writing duplicate snapshot/apply/publish

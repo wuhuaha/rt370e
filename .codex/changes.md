@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.288
+- XiaoZhi cloud runtime snapshot 中属于 playback/downlink 的字段，现已继续从
+  `session.c` 下沉回 playback runtime 自己填充：
+  - 新增 playback-owned snapshot helper：
+    - `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- playback runtime 现在统一负责向 cloud snapshot 投影下列播放真相：
+  - `playback_active`
+  - `playback_lane_engaged`
+  - `playback_rebuffer_pending`
+  - `playback_terminal_waiting`
+  - `tts_stop_pending`
+  - `playback_phase`
+  - `playback_rebuffer_cause`
+  - `playback_start_policy`
+  - `playback_terminal_state`
+  - `playback_terminal_reason`
+  - `playback_terminal_wait_reason`
+  - `playback_start_frames`
+  - `playback_prefetch_frames`
+  - `playback_start_cautious_history`
+  - 这让 playback 真相对 cloud snapshot 的投影 ownership 与 status dump
+    ownership 更一致，继续压缩 `session.c` 对播放内部细节的代管
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_fill_runtime_snapshot(...)` 现在只保留会话/turn 语义的
+  填充，并调用 playback runtime helper 吸收播放字段：
+  - `conversation_window_active`
+  - `listening`
+  - `turn_accepted`
+  - `barge_in_enabled`
+  - `session_id` / `turn_id` / `accept_reason`
+  - `input_state` / `output_state`
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+
 ## Step 5.287
 - `dialog runtime` 内部的 boot / wake / ASR cloud-backed 入口已继续收口成
   单一 typed reducer，而不再各自重复执行：

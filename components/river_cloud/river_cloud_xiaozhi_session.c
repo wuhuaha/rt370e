@@ -862,11 +862,7 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
 
     snapshot->conversation_window_active = river_cloud_xiaozhi_conversation_window_active();
     snapshot->listening = river_cloud_xiaozhi_listening_active();
-    snapshot->playback_active = river_cloud_xiaozhi_playback_output_active();
-    snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
-    snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
-    snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
-    snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
+    river_cloud_xiaozhi_fill_playback_runtime_snapshot(snapshot);
     snapshot->turn_accepted = g_river_cloud.xiaozhi_turn_accepted;
     snapshot->barge_in_enabled_known = g_river_cloud.xiaozhi_transport_barge_in_enabled_known;
     snapshot->barge_in_enabled = g_river_cloud.xiaozhi_transport_barge_in_enabled;
@@ -879,44 +875,12 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
     river_cloud_xiaozhi_copy_optional_text(snapshot->accept_reason,
                                            sizeof(snapshot->accept_reason),
                                            g_river_cloud.xiaozhi_accept_reason);
-    river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,
-                                           sizeof(snapshot->playback_phase),
-                                           river_cloud_xiaozhi_playback_phase_name(
-                                               river_cloud_xiaozhi_playback_phase()));
-    river_cloud_xiaozhi_copy_optional_text(
-        snapshot->playback_rebuffer_cause,
-        sizeof(snapshot->playback_rebuffer_cause),
-        river_cloud_xiaozhi_playback_rebuffer_cause() !=
-                RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_NONE ?
-            river_cloud_xiaozhi_playback_rebuffer_cause_name(
-                river_cloud_xiaozhi_playback_rebuffer_cause()) :
-            NULL);
-    river_cloud_xiaozhi_copy_optional_text(
-        snapshot->playback_start_policy,
-        sizeof(snapshot->playback_start_policy),
-        g_river_cloud.xiaozhi_playback_start_frames != 0U ?
-            river_cloud_xiaozhi_playback_start_policy_name(
-                g_river_cloud.xiaozhi_playback_start_policy) :
-            NULL);
-    river_cloud_xiaozhi_copy_optional_text(snapshot->playback_terminal_state,
-                                           sizeof(snapshot->playback_terminal_state),
-                                           g_river_cloud.xiaozhi_playback_terminal_state);
-    river_cloud_xiaozhi_copy_optional_text(snapshot->playback_terminal_reason,
-                                           sizeof(snapshot->playback_terminal_reason),
-                                           g_river_cloud.xiaozhi_playback_clear_reason);
-    river_cloud_xiaozhi_copy_optional_text(snapshot->playback_terminal_wait_reason,
-                                           sizeof(snapshot->playback_terminal_wait_reason),
-                                           g_river_cloud.xiaozhi_playback_terminal_wait_reason);
     river_cloud_xiaozhi_copy_optional_text(snapshot->input_state,
                                            sizeof(snapshot->input_state),
                                            g_river_cloud.xiaozhi_input_state);
     river_cloud_xiaozhi_copy_optional_text(snapshot->output_state,
                                            sizeof(snapshot->output_state),
                                            g_river_cloud.xiaozhi_output_state);
-    snapshot->playback_start_frames = g_river_cloud.xiaozhi_playback_start_frames;
-    snapshot->playback_prefetch_frames = g_river_cloud.xiaozhi_playback_prefetch_frames;
-    snapshot->playback_start_cautious_history =
-        g_river_cloud.xiaozhi_playback_start_cautious_history;
 }
 
 void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)

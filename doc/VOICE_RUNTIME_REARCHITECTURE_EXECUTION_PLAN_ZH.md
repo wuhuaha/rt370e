@@ -1450,6 +1450,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `playback_phase`
     - `rebuffer_cause`
     的同时，也能看到当前真正生效的起播门限链路
+- 再进一步，cloud runtime snapshot 里属于 playback/downlink 的字段也已开始
+  由 playback runtime 自己投影：
+  - 新增 helper：
+    - `fill_playback_runtime_snapshot(...)`
+  - `session.c` 不再手工拼接：
+    - playback phase
+    - rebuffer cause
+    - terminal state
+    - start-gate fields
+  - 这继续减少 `session runtime` 对 playback 内部细节的代管，让：
+    - playback truth
+    - playback snapshot projection
+    - playback status diagnostics
+    三者 ownership 更一致
 
 下一步焦点：
 
