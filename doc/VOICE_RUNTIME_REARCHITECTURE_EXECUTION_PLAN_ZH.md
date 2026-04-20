@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.328`
+  - `dialog_runtime` 已开始统一导出 wakeword detection gating：
+    - `wakeword_detection_block_reason`
+    - `allows_wakeword_detection`
+  - wakeword detection 与 wake admission 现在共享同一条内部阻断真相，
+    不再分别维护：
+    - KWS 自己的 `conversation_window + interaction_state` 判定
+    - wake admission 的 runtime block reason
+  - `river_voice_kws_detection_allowed()` 已改为直接消费 `dialog_runtime`
+    导出的统一结论
+  - 这一步继续把 wakeword 入口从分裂的 raw gating，收口到
+    `dialog runtime` 真相源
 - `Step 5.327`
   - `dialog_runtime` 现在新增统一的 `output_turn_quiesced` 派生，用来表示：
     - 当前 output turn 已真正静止
@@ -333,6 +345,10 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续让 follow-up reopen / wake admission retry / wakeword handoff 统一消费：
+    - `wakeword_detection_block_reason`
+    - `output_turn_engaged`
+    而不是在各模块继续各自拼 coarse 条件
   - 继续把 follow-up / wake admission 对 output-turn 的阻断语义，
     与新的：
     - `output_turn_engaged`

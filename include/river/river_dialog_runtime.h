@@ -89,6 +89,8 @@ void river_dialog_runtime_on_playback_state(river_playback_state_t state,
                                             void *user_data);
 void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data);
 void river_dialog_runtime_sync_cloud_state(const char *reason);
+const char *river_dialog_runtime_wakeword_detection_block_reason(void);
+bool river_dialog_runtime_allows_wakeword_detection(void);
 const char *river_dialog_runtime_wakeword_admission_block_reason(void);
 bool river_dialog_runtime_allows_barge_in_interrupt(void);
 river_interaction_state_t river_dialog_runtime_interaction_state(void);

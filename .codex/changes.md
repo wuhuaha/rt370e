@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.328
+- `dialog_runtime` 新增统一的 wakeword-detection 阻断接口：
+  - `river_dialog_runtime_wakeword_detection_block_reason()`
+  - `river_dialog_runtime_allows_wakeword_detection()`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- wakeword detection 与 wake admission 现在复用同一条内部阻断真相：
+  - `river_dialog_runtime_wakeword_block_reason_locked()`
+  - `conversation_window_active`
+  - `cloud_local_close_pending`
+  - `cloud_listen_stop_pending`
+  - 非 `wake_monitoring` 的 interaction state
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_voice_kws_detection_allowed()` 已不再自己拼：
+  - `river_dialog_cloud_conversation_window_active()`
+  - `river_interaction_state_get() == RIVER_INTERACTION_WAKE_MONITORING`
+  而是直接消费 `dialog_runtime` 的统一结论
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+- KWS alignment busy 日志也改为直接打印 `wakeword_detection_block_reason`，
+  不再重复暴露一套独立的 interaction/window 原因拼装
+  - [components/river_voice/river_voice_kws.cc](/root/ameba-river/components/river_voice/river_voice_kws.cc)
+- 这一步继续把 wakeword 相关 gating 从：
+  - KWS 一套 raw 条件
+  - wake admission 一套 runtime 条件
+  收口到 `dialog runtime` 的单一真相源
+
 ## Step 5.327
 - `dialog_runtime` 新增统一的 interrupt-clear 判定：
   - `river_dialog_runtime_output_turn_quiesced_locked()`

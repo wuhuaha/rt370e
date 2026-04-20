@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.328
+Validate that wakeword detection gating is now exported by `dialog_runtime`,
+and that KWS consumes the same truth source as wake admission:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'wakeword_detection_block_reason|allows_wakeword_detection|wakeword_block_reason_locked' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_voice/river_voice_kws.cc
+sed -n '830,885p' components/river_core/river_dialog_runtime.c
+sed -n '2452,2466p' components/river_voice/river_voice_kws.cc
+sed -n '4638,4648p' components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog_runtime` exports:
+  - `river_dialog_runtime_wakeword_detection_block_reason()`
+  - `river_dialog_runtime_allows_wakeword_detection()`
+- wakeword detection and wake admission both route through the same internal
+  `wakeword_block_reason_locked()` truth
+- `river_voice_kws_detection_allowed()` no longer directly checks:
+  - `river_dialog_cloud_conversation_window_active()`
+  - `river_interaction_state_get() == RIVER_INTERACTION_WAKE_MONITORING`
+
 ## Step 5.327
 Validate that `tts_interrupt_requested` clearing now goes through a unified
 `output_turn_quiesced` predicate in both local-playback and cloud-sync paths:

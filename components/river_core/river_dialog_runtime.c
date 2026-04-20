@@ -35,6 +35,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     const river_cloud_runtime_snapshot_t *snapshot);
 static void river_dialog_runtime_publish_locked(const char *reason);
 static bool river_dialog_runtime_output_turn_engaged_locked(void);
+static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -829,9 +830,28 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
     river_dialog_runtime_unlock();
 }
 
-const char *river_dialog_runtime_wakeword_admission_block_reason(void)
+static const char *river_dialog_runtime_wakeword_block_reason_locked(void)
 {
-    const char *reason = NULL;
+    if (g_river_dialog_runtime.snapshot.conversation_window_active) {
+        return "conversation_window_active";
+    }
+    if (g_river_dialog_runtime.snapshot.cloud_local_close_pending) {
+        return "cloud_local_close_pending";
+    }
+    if (g_river_dialog_runtime.snapshot.cloud_listen_stop_pending) {
+        return "cloud_listen_stop_pending";
+    }
+    if (g_river_dialog_runtime.snapshot.interaction_state !=
+        RIVER_INTERACTION_WAKE_MONITORING) {
+        return river_interaction_state_name(
+            g_river_dialog_runtime.snapshot.interaction_state);
+    }
+    return NULL;
+}
+
+const char *river_dialog_runtime_wakeword_detection_block_reason(void)
+{
+    const char *reason;
 
     if (!g_river_dialog_runtime.initialized) {
         return "runtime_uninitialized";
@@ -840,20 +860,19 @@ const char *river_dialog_runtime_wakeword_admission_block_reason(void)
         return "runtime_busy";
     }
 
-    if (g_river_dialog_runtime.snapshot.conversation_window_active) {
-        reason = "conversation_window_active";
-    } else if (g_river_dialog_runtime.snapshot.cloud_local_close_pending) {
-        reason = "cloud_local_close_pending";
-    } else if (g_river_dialog_runtime.snapshot.cloud_listen_stop_pending) {
-        reason = "cloud_listen_stop_pending";
-    } else if (g_river_dialog_runtime.snapshot.interaction_state !=
-               RIVER_INTERACTION_WAKE_MONITORING) {
-        reason = river_interaction_state_name(
-            g_river_dialog_runtime.snapshot.interaction_state);
-    }
-
+    reason = river_dialog_runtime_wakeword_block_reason_locked();
     river_dialog_runtime_unlock();
     return reason;
+}
+
+bool river_dialog_runtime_allows_wakeword_detection(void)
+{
+    return river_dialog_runtime_wakeword_detection_block_reason() == NULL;
+}
+
+const char *river_dialog_runtime_wakeword_admission_block_reason(void)
+{
+    return river_dialog_runtime_wakeword_detection_block_reason();
 }
 
 bool river_dialog_runtime_allows_barge_in_interrupt(void)

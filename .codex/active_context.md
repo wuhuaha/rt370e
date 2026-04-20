@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.327 unify interrupt clear on output-turn quiesced truth`
+  - `5.328 unify KWS wakeword gating on dialog runtime truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - wakeword detection 与 wake admission 现在共享同一条
+      `dialog_runtime` 阻断真相
+    - `dialog_runtime` 已导出：
+      - `river_dialog_runtime_wakeword_detection_block_reason()`
+      - `river_dialog_runtime_allows_wakeword_detection()`
+    - `river_voice_kws_detection_allowed()` 已不再自行拼
+      `conversation_window + interaction_state`
+    - 这一步继续把 wakeword gating 从 voice/KWS 层的 raw 条件判断，
+      收口到 `dialog runtime` 的统一结论
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 现在已把 `tts_interrupt_requested` 的清理条件统一收口到：
       - `output_turn_quiesced`
