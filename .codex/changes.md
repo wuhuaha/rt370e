@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.309
+- `dialog_runtime` 不再暴露公开的 playback-state 侧门：
+  - `river_dialog_runtime_note_playback_state(...)` 已从公开头文件删除
+  - 本地 playback 真相现在继续只经由：
+    - `river_dialog_runtime_on_playback_state(...)`
+    这条 listener ingress 进入 runtime
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `dialog_runtime` 清理 `tts_interrupt_requested` 的条件也进一步收紧：
+  - 本地 playback listener 若只看到 `RIVER_PLAYBACK_IDLE`，
+    不会再立刻无条件清掉 interrupt latch
+  - 当 cloud playback 真相仍显示：
+    - playback_active
+    - playback_recovering
+    - playback_lane_engaged
+    - tts_stop_pending
+    - playback_terminal_waiting
+    之一时，latch 会继续保留
+  - 只有 aggregate playback truth 真正收口后，local idle 才能清掉这条 in-flight truth
+- 这一步把：
+  - local playback listener edge
+  - interrupt latch clear policy
+  进一步绑定到 `dialog_runtime` 聚合真相，而不是单独依赖本地 service 的瞬时 `IDLE`
+  回调。
+
 ## Step 5.308
 - 删除了已无调用的 `dialog_runtime` 外部错误侧门接口：
   - `river_dialog_runtime_note_error(...)`

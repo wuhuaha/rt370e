@@ -369,6 +369,22 @@ static void river_dialog_runtime_refresh_playback_locked(void)
         river_dialog_runtime_compute_playback_active_locked();
 }
 
+static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
+{
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+
+    if (!river_dialog_runtime_playback_phase_known_locked()) {
+        return true;
+    }
+
+    return !snapshot->playback_active &&
+           !snapshot->playback_recovering &&
+           !snapshot->tts_stop_pending &&
+           !snapshot->playback_terminal_waiting &&
+           !snapshot->playback_lane_engaged &&
+           snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING;
+}
+
 static bool river_dialog_runtime_output_speaking_effective_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -695,7 +711,8 @@ void river_dialog_runtime_note_tts_interrupt_requested(const char *reason)
     river_dialog_runtime_unlock();
 }
 
-void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason)
+static void river_dialog_runtime_note_playback_state(river_playback_state_t state,
+                                                     const char *reason)
 {
     bool prev_playback_active;
     bool prev_playback_recovering;
@@ -726,7 +743,8 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     } else {
         g_river_dialog_runtime.snapshot.error_recovering = false;
     }
-    if (state == RIVER_PLAYBACK_IDLE ||
+    if ((state == RIVER_PLAYBACK_IDLE &&
+         river_dialog_runtime_local_idle_clears_tts_interrupt_locked()) ||
         (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }

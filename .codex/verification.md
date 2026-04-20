@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.309
+Validate that local playback truth now enters `dialog_runtime` only through the
+listener ingress, and that a local `RIVER_PLAYBACK_IDLE` no longer clears the
+interrupt latch while cloud playback truth still says the lane is engaged:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_runtime_note_playback_state' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components
+rg -n 'local_idle_clears_tts_interrupt|playback_terminal_waiting|playback_lane_engaged' \
+  components/river_core/river_dialog_runtime.c
+sed -n '330,390p' components/river_core/river_dialog_runtime.c
+sed -n '710,750p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_note_playback_state` no longer appears in:
+  - the public header
+  - any external repo caller
+- `dialog_runtime` contains an explicit `local_idle_clears_tts_interrupt`
+  guard
+- local `RIVER_PLAYBACK_IDLE` only clears `tts_interrupt_requested` after the
+  aggregate playback truth says the lane is truly closed, instead of clearing
+  immediately on every local idle edge
+
 ## Step 5.308
 Validate that `dialog_runtime` no longer exposes unused coarse external error
 mutation APIs, and that the remaining error semantics stay behind reducer /

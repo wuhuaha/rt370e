@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.308 remove unused dialog runtime error side-door`
+  - `5.309 narrow playback ingress and interrupt clear policy`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,18 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 已删除公开的 playback-state 侧门：
+      - `river_dialog_runtime_note_playback_state(...)`
+    - 本地 playback 真相现在继续只经由：
+      - `river_dialog_runtime_on_playback_state(...)`
+      这条 listener ingress 进入 runtime
+    - 本地 `RIVER_PLAYBACK_IDLE` 也不再无条件清掉：
+      - `tts_interrupt_requested`
+    - 若 cloud playback 真相仍显示 lane engaged / rebuffer / stop-pending /
+      terminal-waiting，interrupt latch 会继续保留，直到聚合 playback truth
+      真正收口
+    - 这一步继续压缩了“本地 playback service 瞬时边缘事件直接改写 runtime”的范围
+  - previous runtime-ownership slice:
     - `dialog_runtime` 已删除未再使用的外部错误入口：
       - `river_dialog_runtime_note_error(...)`
       - `river_dialog_runtime_clear_error(...)`

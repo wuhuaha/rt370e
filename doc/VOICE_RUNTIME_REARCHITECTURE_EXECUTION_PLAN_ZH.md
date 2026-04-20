@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.309`
+  - `dialog_runtime` 已删除公开的 playback-state 侧门：
+    - `river_dialog_runtime_note_playback_state(...)`
+  - 本地 playback 真相继续只保留：
+    - `river_dialog_runtime_on_playback_state(...)`
+    这条 listener ingress
+  - local `RIVER_PLAYBACK_IDLE` 也不再无条件清掉 interrupt latch；
+    若 cloud playback 真相仍显示 lane engaged / rebuffer / stop-pending /
+    terminal-waiting，`tts_interrupt_requested` 会继续保留
+  - 这一步继续把 interrupt clear policy 绑定到 aggregate playback truth，
+    而不是本地 service 的瞬时 idle 边缘
 - `Step 5.308`
   - `dialog_runtime` 已删除未再使用的外部错误入口：
     - `river_dialog_runtime_note_error(...)`
@@ -136,6 +147,8 @@ Branch: `agent-server-v2`
 - 当前下一焦点：
   - 继续排查 `dialog_runtime` 对本地 playback service 边缘事件的剩余依赖，
     把它们降级成 typed local signal，而不是 coarse interaction/error 推导入口
+  - 继续把 playback terminal / interrupt clear / recovery policy 往
+    playback runtime owner 输出的 typed truth 收口，减少 core 侧再做字符串/边缘重解释
   - 回到 downlink/playback runtime，继续收紧：
     - `tts_stop_pending`
     - playback stop/reset
