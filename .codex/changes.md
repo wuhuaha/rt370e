@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.294
+- `endpoint_soft_close` 状态机已从 `river_cloud_xiaozhi_session.c` 收口到
+  `river_cloud_xiaozhi_playback_runtime.c`：
+  - `clear_endpoint_soft_close_state()`
+  - `cancel_endpoint_soft_close()`
+  - `note_interrupt_hint()`
+  - `arm_endpoint_soft_close()`
+  - `poll_endpoint_soft_close_timeout()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- playback runtime 新增 typed read helper，避免 session 继续直读内部字段：
+  - `endpoint_soft_close_pending()`
+  - `endpoint_soft_close_remaining_ms()`
+  - `endpoint_soft_close_reason()`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- `xiaozhi_session.c` 现在只消费上述 helper，并在 reset/session_close 路径调用
+  `clear_endpoint_soft_close_state()`，不再自行清零这组字段。
+
 ## Step 5.293
 - `no-ref reopen/open_hold` 语义开始并回 playback runtime：
   - `river_cloud_xiaozhi_open_hold_frames_required()` 已从

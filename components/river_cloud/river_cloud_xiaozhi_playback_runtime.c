@@ -377,6 +377,124 @@ bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void)
            river_cloud_xiaozhi_duplex_soft_endpoint_enabled();
 }
 
+bool river_cloud_xiaozhi_endpoint_soft_close_pending(void)
+{
+    return g_river_cloud.xiaozhi_endpoint_soft_close_pending;
+}
+
+uint64_t river_cloud_xiaozhi_endpoint_soft_close_remaining_ms(uint64_t now_ms)
+{
+    if (!g_river_cloud.xiaozhi_endpoint_soft_close_pending ||
+        g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms <= now_ms) {
+        return 0U;
+    }
+
+    return g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms - now_ms;
+}
+
+const char *river_cloud_xiaozhi_endpoint_soft_close_reason(void)
+{
+    return g_river_cloud.xiaozhi_endpoint_soft_close_reason[0] != '\0' ?
+               g_river_cloud.xiaozhi_endpoint_soft_close_reason :
+               NULL;
+}
+
+void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void)
+{
+    g_river_cloud.xiaozhi_endpoint_soft_close_pending = false;
+    g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms = 0U;
+    g_river_cloud.xiaozhi_endpoint_soft_close_reason[0] = '\0';
+}
+
+void river_cloud_xiaozhi_cancel_endpoint_soft_close(const char *trigger)
+{
+    if (!river_cloud_xiaozhi_endpoint_soft_close_pending()) {
+        return;
+    }
+
+    RIVER_LOGI("xiaozhi deferred local close cancelled: trigger=%s reason=%s",
+               trigger != NULL ? trigger : "-",
+               river_cloud_xiaozhi_endpoint_soft_close_reason() != NULL ?
+                   river_cloud_xiaozhi_endpoint_soft_close_reason() :
+                   "-");
+    river_cloud_xiaozhi_clear_endpoint_soft_close_state();
+}
+
+void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger, const char *reason)
+{
+    if (!river_cloud_xiaozhi_duplex_soft_endpoint_enabled()) {
+        return;
+    }
+
+    RIVER_LOGI("xiaozhi interrupt hint: trigger=%s reason=%s preview_id=%s stream=%s playback=%s",
+               trigger != NULL ? trigger : "-",
+               reason != NULL ? reason : "-",
+               g_river_cloud.xiaozhi_preview_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_preview_id :
+                   "-",
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+}
+
+void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger, const char *reason)
+{
+    if (!river_cloud_xiaozhi_duplex_soft_endpoint_enabled() ||
+        !g_river_cloud.stream_active ||
+        g_river_cloud.xiaozhi_listen_stop_pending ||
+        river_cloud_xiaozhi_endpoint_soft_close_pending()) {
+        return;
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_endpoint_soft_close_reason,
+                                           sizeof(g_river_cloud.xiaozhi_endpoint_soft_close_reason),
+                                           reason);
+    g_river_cloud.xiaozhi_endpoint_soft_close_pending = true;
+    g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms =
+        (uint64_t)rtos_time_get_current_system_time_ms() +
+        (uint64_t)RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS;
+    RIVER_LOGI("xiaozhi hint-only endpoint: trigger=%s reason=%s wait_ms=%u stream=%s playback=%s",
+               trigger != NULL ? trigger : "-",
+               river_cloud_xiaozhi_endpoint_soft_close_reason() != NULL ?
+                   river_cloud_xiaozhi_endpoint_soft_close_reason() :
+                   "-",
+               (unsigned int)RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS,
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+}
+
+bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason, size_t reason_size)
+{
+    uint64_t now_ms;
+
+    if (!river_cloud_xiaozhi_endpoint_soft_close_pending()) {
+        return false;
+    }
+
+    if (!g_river_cloud.stream_active || g_river_cloud.xiaozhi_listen_stop_pending) {
+        river_cloud_xiaozhi_clear_endpoint_soft_close_state();
+        return false;
+    }
+
+    if (river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active()) {
+        return false;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (river_cloud_xiaozhi_endpoint_soft_close_remaining_ms(now_ms) != 0U) {
+        return false;
+    }
+
+    river_cloud_xiaozhi_copy_optional_text(
+        reason,
+        reason_size,
+        river_cloud_xiaozhi_endpoint_soft_close_reason() != NULL ?
+            river_cloud_xiaozhi_endpoint_soft_close_reason() :
+            "server_endpoint_candidate");
+    RIVER_LOGI("xiaozhi deferred local close resolved: trigger=endpoint_soft_close_timeout reason=%s",
+               reason != NULL && reason[0] != '\0' ? reason : "-");
+    return true;
+}
+
 uint32_t river_cloud_xiaozhi_open_hold_frames_required(void)
 {
     if (!g_river_cloud.xiaozhi_window_active ||

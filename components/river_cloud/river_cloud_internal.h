@@ -498,6 +498,9 @@ river_status_t river_cloud_xiaozhi_apply_capture_stream_policy(const uint8_t *pc
                                                                bool is_speech);
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void);
 bool river_cloud_xiaozhi_duplex_speaking_uplink_continuation_active(void);
+bool river_cloud_xiaozhi_endpoint_soft_close_pending(void);
+uint64_t river_cloud_xiaozhi_endpoint_soft_close_remaining_ms(uint64_t now_ms);
+const char *river_cloud_xiaozhi_endpoint_soft_close_reason(void);
 void river_cloud_xiaozhi_note_round_finish_request(const char *reason);
 void river_cloud_xiaozhi_clear_endpoint_soft_close_state(void);
 void river_cloud_xiaozhi_cancel_endpoint_soft_close(const char *trigger);

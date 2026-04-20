@@ -1299,6 +1299,17 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `playback_followup_reopen_ready(bool is_speech)`
   - `maybe_start_followup_round()` 不再直接实现 reopen guard/rearm 细节
   - 这把此前“runtime 写 reopen 状态、session 再单独解释”的 split-brain 继续收口
+- `endpoint_soft_close` 这组延迟关闭状态机也已并入 playback runtime：
+  - `clear/cancel/note_interrupt_hint/arm/poll`
+  - 并补了 typed read helper：
+    - `pending()`
+    - `remaining_ms()`
+    - `reason()`
+  - `xiaozhi_session.c` 不再：
+    - 直接实现这组状态机
+    - 直接读/清零这组内部字段
+  - 这让 soft-endpoint 与 speaking-uplink continuation 的配套状态也回到同一个
+    downlink truth owner
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

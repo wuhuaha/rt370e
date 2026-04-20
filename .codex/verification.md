@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.294
+Validate that `endpoint_soft_close` logic is now owned by the playback runtime,
+with session reading it through typed helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'endpoint_soft_close_(pending|remaining_ms|reason)\\(|clear_endpoint_soft_close_state|cancel_endpoint_soft_close|note_interrupt_hint|arm_endpoint_soft_close|poll_endpoint_soft_close_timeout' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '380,500p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '890,940p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `endpoint_soft_close` implementation helpers live in:
+  - `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` only consumes typed
+  helpers instead of directly implementing or reading that state machine
+
 ## Step 5.293
 Validate that `no-ref reopen/open_hold` logic is now owned by the playback
 runtime:
