@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.285
+- XiaoZhi playback start gate 现在不再只是调用点里的现算 helper，而是下沉成
+  playback runtime 自己维护的稳定快照真相：
+  - 新增 runtime snapshot 字段：
+    - `xiaozhi_playback_start_policy`
+    - `xiaozhi_playback_start_frames`
+    - `xiaozhi_playback_prefetch_frames`
+    - `xiaozhi_playback_start_cautious_history`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- runtime 现在显式区分三类 start-gate helper 角色：
+  - `build_start_gate()` 负责从底层事实构造门限
+  - `refresh_start_gate()` 负责在状态变更点刷新快照
+  - `current_start_gate()` 负责让 worker / status / start / rebuffer 日志都读取
+    同一份 runtime snapshot
+  - 这让 start gate 进一步贴近“runtime owned truth”，不再由多个调用点各自拿
+    原始字段现拼
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- start gate 快照会在真正影响门限的状态变更点被刷新：
+  - playback meta 清理
+  - playback/downlink reset
+  - rebuffer note / rebuffer finish
+  - clean segment 清掉 `streak`
+  - `audio.out.meta` 更新 prefetch 目标
+  - downlink frame duration 变更
+  - 这保证“长段慢供给 + 恢复历史 + 当前 frame_ms”三类事实进入同一条
+    runtime snapshot，而不是由读路径临时重建
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.284
 - XiaoZhi downlink/playback 的起播门限现在统一收口到显式 typed prefetch
   policy，而不是继续把“基础门限 / starvation 预取 / 恢复历史抬高”散落在多处

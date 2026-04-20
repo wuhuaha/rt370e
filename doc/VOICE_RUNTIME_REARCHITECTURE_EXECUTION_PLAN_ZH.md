@@ -1397,6 +1397,26 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `policy`
     - `cautious`
     - `prefetch_frames`
+- 在此基础上，typed start-gate 也已继续从“内部现算 helper”收口成 runtime
+  snapshot 真相：
+  - runtime 现区分：
+    - `build_start_gate()`
+    - `refresh_start_gate()`
+    - `current_start_gate()`
+  - 当前 gate 会写入 playback runtime 自身状态：
+    - `start_policy`
+    - `start_frames`
+    - `prefetch_frames`
+    - `cautious_history`
+  - 影响 gate 的状态变更点现在都会主动刷新 snapshot，例如：
+    - meta clear
+    - downlink/playback reset
+    - rebuffer enter/finish
+    - clean segment 清掉 `streak`
+    - meta prefetch 目标更新
+    - frame-duration 变化
+  - 这让 worker / start / status / rebuffer diagnostics 读取的是同一份
+    runtime-owned gate truth，而不是各自拿原始字段重建
 
 下一步焦点：
 
@@ -1404,12 +1424,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
-- 继续把 typed prefetch/start-gate 从“内部 helper 收口”推进成更稳定的
-  runtime fact，评估是否需要把：
-  - 当前 policy
-  - 当前 start_frames
-  - 当前 prefetch_frames
-  进一步导出给更上层状态/诊断，而不是继续在 runtime 内多处现算
+- 继续评估是否要把当前 start-gate snapshot 再进一步上推成 cloud/dialog
+  可消费的显式诊断真相，避免这条门限信息只能停留在 playback runtime 内部
 - 继续检查 `segment_prefetch` 是否还需要纳入更多段级真相，例如：
   - 当前 segment 的恢复历史
   - 相邻 meta 到达抖动

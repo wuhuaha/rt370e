@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.285
+Validate that XiaoZhi playback start gating is now stored as a runtime snapshot
+and refreshed at gate-affecting state transitions instead of being recomputed
+independently at each reader:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'xiaozhi_playback_start_policy|xiaozhi_playback_start_frames|xiaozhi_playback_prefetch_frames|xiaozhi_playback_start_cautious_history' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'build_start_gate|refresh_start_gate|current_start_gate' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '340,430p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '650,820p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1188,1358p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1998,2020p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the cloud runtime state struct stores the current start-gate snapshot
+- playback runtime exposes distinct helpers for:
+  - building
+  - refreshing
+  - reading
+  the start gate
+- gate-affecting state transitions refresh the snapshot instead of letting each
+  reader re-derive it from raw fields
+- downlink worker / playback start / diagnostics consume the shared current
+  snapshot
+
 ## Step 5.284
 Validate that XiaoZhi downlink start gating is now derived from a single typed
 prefetch policy and that slow segment cadence can raise the start gate even
