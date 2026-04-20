@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.311`
+  - `dialog_runtime` 已不再依赖 playback phase 字符串做行为判断
+  - `"playing" / "draining" / "rebuffering"` 等文本现在只保留给诊断输出
+  - playback active / recovering / managed-recovery 的派生继续只消费：
+    - `playback_cloud_active`
+    - `playback_lane_engaged`
+    - `playback_rebuffer_pending`
+    - `playback_phase_known`
+    - `playback_terminal_closed`
+  - 这让 core 行为层继续从字符串解释退回到 typed playback truth
 - `Step 5.310`
   - cloud playback runtime snapshot 新增 typed bool：
     - `playback_phase_known`

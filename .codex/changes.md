@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.311
+- `dialog_runtime` 已不再依赖 playback phase 字符串做行为判断：
+  - 删除了内部对
+    - `"playing"`
+    - `"draining"`
+    - `"rebuffering"`
+    这些 phase 文本的行为分支
+  - `playback_phase` 现在只保留给诊断投影
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- playback 相关派生现在只消费 typed truth：
+  - `playback_cloud_active`
+  - `playback_lane_engaged`
+  - `playback_rebuffer_pending`
+  - `playback_phase_known`
+  - `playback_terminal_closed`
+- 这一步意味着 `dialog_runtime` 的行为面已进一步从
+  “读 playback phase 字符串” 退到 “读 playback owner 导出的布尔真相”。
+
 ## Step 5.310
 - cloud playback runtime snapshot 新增 typed playback truth：
   - `playback_phase_known`

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.311
+Validate that `dialog_runtime` no longer branches on playback phase strings for
+its playback behavior, and instead only consumes typed playback truth from the
+runtime snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_phase_equals_locked|playback_phase_output_active_locked|playback_phase_recovering_locked|playback_phase_engaged_locked' \
+  components/river_core/river_dialog_runtime.c
+sed -n '260,340p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the old playback-phase string behavior helpers no longer exist in
+  `dialog_runtime`
+- playback-active / recovering / managed-recovery derivation now only reads
+  typed snapshot truth such as:
+  - `playback_cloud_active`
+  - `playback_lane_engaged`
+  - `playback_rebuffer_pending`
+  - `playback_phase_known`
+  - `playback_terminal_closed`
+
 ## Step 5.310
 Validate that cloud playback runtime now exports typed `phase_known` /
 `terminal_closed` truth, and that `dialog_runtime` consumes those booleans
