@@ -26,6 +26,12 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.329`
+  - `dialog_cloud_port` 上已无消费者的
+    `conversation_window_active` 查询侧门已删除
+  - app 装配层不再为 cloud port 注册这条 callback
+  - 这意味着 `conversation_window` 读取真相继续彻底留在 `dialog_runtime`，
+    而 `dialog_cloud_port` 更接近纯 command / ingress 边界
 - `Step 5.328`
   - `dialog_runtime` 已开始统一导出 wakeword detection gating：
     - `wakeword_detection_block_reason`
@@ -345,6 +351,8 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续删除 cloud-port / coordinator / voice 层剩余的旧查询侧门，优先清理：
+    - 仍只是为 fallback 保留、但已无真实消费者的 runtime 查询接口
   - 继续让 follow-up reopen / wake admission retry / wakeword handoff 统一消费：
     - `wakeword_detection_block_reason`
     - `output_turn_engaged`

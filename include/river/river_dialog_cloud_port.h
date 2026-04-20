@@ -33,7 +33,6 @@ typedef struct {
                                                const river_voice_segment_desc_t *segment);
     river_status_t (*begin_conversation_window)(const char *source);
     river_status_t (*interrupt_tts_with_reason)(const char *reason);
-    bool (*conversation_window_active)(void);
 } river_dialog_cloud_port_t;
 
 river_status_t river_dialog_cloud_port_register(const river_dialog_cloud_port_t *port);
@@ -54,6 +53,5 @@ river_status_t river_dialog_cloud_asr_batch_submit_segment(
     const river_voice_segment_desc_t *segment);
 river_status_t river_dialog_cloud_begin_conversation_window(const char *source);
 river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason);
-bool river_dialog_cloud_conversation_window_active(void);
 
 #endif

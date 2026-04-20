@@ -86,11 +86,6 @@ static river_status_t river_app_dialog_cloud_interrupt_tts_with_reason(const cha
     return river_cloud_adapter_interrupt_tts_with_reason(reason);
 }
 
-static bool river_app_dialog_cloud_conversation_window_active(void)
-{
-    return river_cloud_adapter_conversation_window_active();
-}
-
 static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result,
                                           void *user_data)
 {
@@ -109,7 +104,6 @@ static const river_dialog_cloud_port_t g_river_app_dialog_cloud_port = {
     .asr_batch_submit_segment = river_app_dialog_cloud_asr_batch_submit_segment,
     .begin_conversation_window = river_app_dialog_cloud_begin_conversation_window,
     .interrupt_tts_with_reason = river_app_dialog_cloud_interrupt_tts_with_reason,
-    .conversation_window_active = river_app_dialog_cloud_conversation_window_active,
 };
 
 river_status_t river_app_boot(void)

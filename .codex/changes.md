@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.329
+- `dialog_cloud_port` 已删除无消费者的 `conversation_window_active` 侧门：
+  - 移除 `river_dialog_cloud_port_t.conversation_window_active`
+  - 删除 `river_dialog_cloud_conversation_window_active()`
+  - [include/river/river_dialog_cloud_port.h](/root/ameba-river/include/river/river_dialog_cloud_port.h)
+  - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+- app 装配层同步删除这条已失效的 cloud-port wiring：
+  - `river_app_dialog_cloud_conversation_window_active()`
+  - `g_river_app_dialog_cloud_port.conversation_window_active`
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- 这一步意味着 `conversation_window` 的读取真相已经彻底回到 `dialog_runtime`：
+  - `dialog_cloud_port` 现在只保留 command / ingress 调用面
+  - 不再保留一条额外的 conversation-window 查询侧门
+
 ## Step 5.328
 - `dialog_runtime` 新增统一的 wakeword-detection 阻断接口：
   - `river_dialog_runtime_wakeword_detection_block_reason()`

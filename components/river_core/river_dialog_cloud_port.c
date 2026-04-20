@@ -154,16 +154,3 @@ river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason)
     }
     return status;
 }
-
-bool river_dialog_cloud_conversation_window_active(void)
-{
-    river_dialog_runtime_snapshot_t snapshot;
-
-    if (river_dialog_runtime_get_snapshot(&snapshot) == RIVER_OK) {
-        return snapshot.conversation_window_active;
-    }
-
-    return g_river_dialog_cloud_port.registered &&
-           g_river_dialog_cloud_port.port.conversation_window_active != NULL &&
-           g_river_dialog_cloud_port.port.conversation_window_active();
-}

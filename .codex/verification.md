@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.329
+Validate that the obsolete `conversation_window_active` cloud-port side channel
+has been removed, and that `dialog_cloud_port` now only keeps command ingress:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'conversation_window_active' \
+  include/river/river_dialog_cloud_port.h \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_core/river_app.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `include/river/river_dialog_cloud_port.h` no longer declares:
+  - `river_dialog_cloud_conversation_window_active()`
+  - `river_dialog_cloud_port_t.conversation_window_active`
+- app cloud-port registration no longer wires a conversation-window callback
+- conversation-window query truth remains owned by `dialog_runtime`, not by an
+  extra cloud-port fallback
+
 ## Step 5.328
 Validate that wakeword detection gating is now exported by `dialog_runtime`,
 and that KWS consumes the same truth source as wake admission:

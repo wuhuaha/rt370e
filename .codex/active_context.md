@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.328 unify KWS wakeword gating on dialog runtime truth`
+  - `5.329 remove obsolete conversation-window cloud-port side channel`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_cloud_port` 上已无消费者的 `conversation_window_active`
+      侧门已被删除
+    - app 装配层也已同步移除对应 callback wiring
+    - `conversation_window` 的读取真相现继续只归 `dialog_runtime` 所有
+    - 这一步继续压缩了 cloud-port 上残留的旧查询侧门，让 port 更接近纯 command
+      ingress 边界
   - newest landed runtime-ownership slice:
     - wakeword detection 与 wake admission 现在共享同一条
       `dialog_runtime` 阻断真相
