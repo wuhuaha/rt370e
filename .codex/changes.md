@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.326
+- `dialog_runtime` 现在显式区分：
+  - 有声 playback active
+  - 输出 turn 仍被占用、但当前可能只是 silent gap
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部 helper：
+  - `river_dialog_runtime_playback_waiting_segment_locked()`
+  - `river_dialog_runtime_output_turn_engaged_locked()`
+  - 用来把 `waiting_segment` 从粗粒度 `playback_active` 推导里拆出来
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_compute_playback_active_locked()` 现在不会再仅因
+  `playback_lane_engaged=yes` 且 phase=`waiting_segment` 就继续把
+  `playback_active` 维持为 `true`
+  - 段间静默不再伪装成“本地仍有有声播放”
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_allows_barge_in_interrupt()` 与 interaction 派生现在改为
+  依赖 `output turn engaged`，而不是错误依赖 `playback_active`
+  - 这意味着 `waiting_segment` 下虽然 `playback_active` 会下降，
+    但用户仍可对尚未结束的 response 触发 barge-in interrupt
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_output_speaking_effective_locked()` 现在会显式压低
+  `waiting_segment` 下的 silent-gap speaking 投影，避免把“静默段间隙”继续误当成
+  有声播放本身
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.325
 - `waiting_segment` 现在被明确视为“response 尚未结束，但本地正处于段间静默空窗”：
   - 新增 `river_cloud_xiaozhi_playback_silent_gap_allows_vad_open()`

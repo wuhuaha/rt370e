@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.326`
+  - `dialog_runtime` 现在开始显式区分：
+    - 本地有声 playback active
+    - output turn 仍被占用，但当前只是 `waiting_segment` silent gap
+  - `compute_playback_active_locked()` 不再只因
+    `playback_lane_engaged=yes` 且 phase=`waiting_segment` 就继续把
+    `playback_active` 维持为 `true`
+  - interaction 派生与 `allows_barge_in_interrupt()` 现在改为消费新的
+    `output_turn_engaged` 语义：
+    - silent gap 不再伪装成 audible playback
+    - 但 response 尚未结束时，barge-in interrupt 仍然可用
+  - 这一步继续把 `dialog_runtime` 从 coarse playback-active 投影推进到更准确的
+    “audible playback vs output-turn ownership” 分离模型
 - `Step 5.325`
   - `waiting_segment` 不再只是一条显式 playback phase，也开始直接参与
     duplex / capture 语义
@@ -310,6 +323,15 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续检查 `dialog_runtime` 清 interrupt / speaking/follow-up 投影时，
+    是否仍残留对：
+    - raw `output_lane == speaking`
+    - `playback_lane_engaged`
+    的粗粒度依赖
+  - 继续把 `waiting_segment` 的静默语义推广到更多上层派生：
+    - interrupt clear
+    - follow-up reopen
+    - wake admission block / release 细节
   - 继续让 `dialog_runtime` / interaction / output lane 显式消费
     `waiting_segment`：
     - 区分“response 仍在继续”

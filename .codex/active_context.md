@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.325 let waiting_segment release silent-gap capture hold`
+  - `5.326 split waiting-segment audible playback from output-turn ownership`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 现在已显式区分：
+      - 有声 playback active
+      - output turn 仍被占用、但当前处于 silent gap
+    - `waiting_segment` 不再仅因 `playback_lane_engaged` 就继续把
+      `playback_active` 维持为 `true`
+    - `river_dialog_runtime_allows_barge_in_interrupt()` 与 interaction 派生
+      已改为依赖新的 output-turn-engaged 语义，而不是把 silent gap 伪装成
+      `playback_active`
+    - 这一步继续把 `dialog runtime` 从“用错误的 active 投影维持 barge-in”推进到
+      “显式区分 audible playback 与 response turn ownership”
   - newest landed runtime-ownership slice:
     - `waiting_segment` 不再只是一条诊断/phase 真相，也开始直接参与 duplex /
       capture 语义

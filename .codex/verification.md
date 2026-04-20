@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.326
+Validate that `dialog_runtime` now distinguishes audible playback from
+interruptible output-turn ownership during `waiting_segment`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_waiting_segment_locked|output_turn_engaged_locked|WAITING_SEGMENT|allows_barge_in_interrupt' \
+  components/river_core/river_dialog_runtime.c
+sed -n '248,450p' components/river_core/river_dialog_runtime.c
+sed -n '860,875p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_compute_playback_active_locked()` no longer keeps
+  `playback_active=true` solely because:
+  - `playback_lane_engaged=yes`
+  - `playback_phase_kind=RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+- `river_dialog_runtime_allows_barge_in_interrupt()` now keys off
+  `output_turn_engaged_locked()` instead of directly keying off
+  `snapshot.playback_active`
+- `river_dialog_runtime_output_speaking_effective_locked()` suppresses the
+  `waiting_segment` silent gap from being projected as audible speaking
+
 ## Step 5.325
 Validate that `waiting_segment` now releases silent-gap capture/VAD hold instead
 of continuing to look like a playback AEC block:
