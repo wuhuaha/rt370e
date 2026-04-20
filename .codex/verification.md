@@ -1,5 +1,47 @@
 # Verification
 
+## Step 5.333
+Validate that playback-service `RECOVERING` is now projected as a cloud-owned
+backend truth, and that XiaoZhi downlink no longer mistakes this state for a
+fresh-startable detached backend:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'OWNED_RECOVERING|owned_recovering' \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '70,78p' include/river/river_cloud.h
+sed -n '68,82p' components/river_cloud/river_cloud_adapter.c
+sed -n '40,75p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2258,2274p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2516,2533p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '291,311p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud playback backend enum now exposes:
+  - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING`
+- backend state name dump now prints:
+  - `owned_recovering`
+- XiaoZhi playback runtime maps local `RIVER_PLAYBACK_RECOVERING` to
+  `owned_recovering` when the current backend is still owned by XiaoZhi
+- downlink worker and `start_playback_if_needed(...)` no longer try fresh start
+  while backend state is `owned_recovering`
+- `dialog_runtime` now treats:
+  - `owned_recovering`
+  - `restart_pending`
+  as cloud-owned managed recovery truth before falling back to local playback
+  shadow
+
 ## Step 5.332
 Validate that XiaoZhi playback now treats `upstream_starved` as `stop/rebuffer`,
 while keeping playback-service `recover` reserved for residual hard

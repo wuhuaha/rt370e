@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.333
+- playback runtime 现在把本地 playback-service 的 `RIVER_PLAYBACK_RECOVERING`
+  上推成了 cloud-owned typed backend truth：
+  - 公共 enum 新增：
+    - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING`
+  - backend 状态名新增：
+    - `owned_recovering`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi playback runtime 现在会在“本地 stream 仍由自己持有，但 playback service
+  已进入 `RECOVERING`”时导出这条 backend truth：
+  - `river_cloud_xiaozhi_playback_backend_state()` 新增 `owned_recovering`
+    映射
+  - downlink worker 在 `owned_recovering` 下不再误走 fresh start
+  - `start_playback_if_needed(...)` 也会直接返回 `busy`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 的 `playback_recovering` 常态判断也开始直接消费 cloud
+  backend truth：
+  - `playback_recovering` 现在会把：
+    - `playback_rebuffer_pending`
+    - `owned_recovering`
+    - `restart_pending`
+    统一视为 managed recovery
+  - `playback_error_is_managed_recovery_locked()` 也同步吸收
+    `owned_recovering`
+  - 这一步继续把 `dialog runtime` 对本地 playback coarse state 的 recovering
+    依赖压缩到 phase-unknown fallback
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.332
 - XiaoZhi downlink/playback 现在把 `upstream_starved` 的本地 backend 动作从
   同轨 `recover` 改成了显式 `stop/rebuffer`：

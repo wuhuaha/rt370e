@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.332 split upstream-starved rebuffer from local playback recover`
+  - `5.333 project playback recovering as owned backend truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback runtime 现在会把本地 playback-service 的
+      `RIVER_PLAYBACK_RECOVERING` 上推成 cloud-owned backend truth：
+      - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING`
+    - XiaoZhi downlink worker 在 `owned_recovering` 时不再误走 fresh start
+    - `dialog_runtime` 的 `playback_recovering` 常态也开始直接消费：
+      - `owned_recovering`
+      - `restart_pending`
+    - 这一步继续把 recovering 语义从本地 playback listener shadow 推进到
+      playback runtime 自己导出的 typed truth
   - newest landed runtime-ownership slice:
     - XiaoZhi playback 在 `upstream_starved` 场景下已不再默认走同轨
       `recover`

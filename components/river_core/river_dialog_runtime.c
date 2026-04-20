@@ -291,6 +291,10 @@ static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locke
 static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 {
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
+           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
+           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
            river_dialog_runtime_local_playback_shadow_recovering_fallback_locked();
 }
 
@@ -301,6 +305,8 @@ static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
     }
 
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
+           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
            g_river_dialog_runtime.snapshot.playback_cloud_active ||

@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.333`
+  - playback runtime 现在会把本地 playback-service 的
+    `RIVER_PLAYBACK_RECOVERING` 上推成 cloud-owned backend truth：
+    - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING`
+    - `owned_recovering`
+  - XiaoZhi downlink worker 在 `owned_recovering` 时不再误把 backend 当成
+    可 fresh-start 的 detached/foreign 状态
+  - `dialog_runtime` 的 `playback_recovering` 常态也开始直接消费：
+    - `owned_recovering`
+    - `restart_pending`
+    只把 local playback shadow 留给 `phase unknown` 退化兜底
+  - 这一步继续把 recovering 语义从本地 playback listener shadow 推进到
+    playback runtime 自己导出的 typed truth
 - `Step 5.332`
   - XiaoZhi playback 在 `upstream_starved` 场景下已不再默认走本地
     `recover`
@@ -1873,6 +1886,15 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 达到 start gate 后再正常 fresh start
   - 这让常见上游断粮不再被重新折叠回本地 flush/restart，同时仍保留
     playback-service recover 处理剩余硬故障
+- playback-service 的 `RECOVERING` 语义也已进一步上推到 playback runtime：
+  - 新增公共 backend truth：
+    - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING`
+  - `dialog_runtime` 的 `playback_recovering` 常态现在会直接消费：
+    - `playback_rebuffer_pending`
+    - `owned_recovering`
+    - `restart_pending`
+  - 这继续压缩了 core 对本地 coarse playback state 的 recovering 依赖，把
+    local shadow 更明确地收敛到 phase-unknown fallback
 - 再往前一步，XiaoZhi downlink/playback 的 rebuffer 真相也已继续拆细：
   - `xiaozhi_playback_rebuffer_count` 继续保留为累计诊断计数
   - 新增：
