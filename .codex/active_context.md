@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.311 remove phase-string behavior branching`
+  - `5.312 project playback backend ownership truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,14 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - cloud playback runtime snapshot 已继续补齐 backend ownership truth：
+      - `playback_backend_owned`
+      - `playback_backend_restart_pending`
+    - `dialog_runtime` 已开始直接消费这两条 typed truth
+    - local `IDLE` 清 interrupt latch 与 managed recovery 分类都已开始受
+      backend restart-pending 保护
+    - 这一步继续降低了 core 对本地 playback listener 瞬时边缘事件的依赖
+  - previous runtime-ownership slice:
     - `dialog_runtime` 已不再依赖 playback phase 字符串做行为判断
     - `"playing" / "draining" / "rebuffering"` 这些文本现在只保留给日志投影
     - playback active / recovering / managed-recovery 派生已进一步只消费 typed

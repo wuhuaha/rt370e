@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.312`
+  - cloud playback runtime snapshot 已继续补齐 backend ownership truth：
+    - `playback_backend_owned`
+    - `playback_backend_restart_pending`
+  - `dialog_runtime` 已开始直接消费这两条 typed truth
+  - local `IDLE` 清 interrupt latch 与 managed recovery 分类也已开始受
+    backend restart-pending 保护
+  - 这让 core 继续从“本地 listener 瞬时状态”退回到“playback owner 输出真相”
 - `Step 5.311`
   - `dialog_runtime` 已不再依赖 playback phase 字符串做行为判断
   - `"playing" / "draining" / "rebuffering"` 等文本现在只保留给诊断输出

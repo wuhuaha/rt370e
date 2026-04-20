@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.312
+- cloud playback runtime snapshot 继续补齐 backend ownership truth：
+  - `playback_backend_owned`
+  - `playback_backend_restart_pending`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 已开始直接吸收这两条 typed truth：
+  - `managed_recovery` 判定现在显式覆盖 `backend_restart_pending`
+  - local `IDLE` 清 interrupt latch 时也会额外确认 backend 不在 restart-pending
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 runtime 对“本地 playback listener 瞬时状态”的依赖往
+  playback owner 输出的 backend truth 收口。
+
 ## Step 5.311
 - `dialog_runtime` 已不再依赖 playback phase 字符串做行为判断：
   - 删除了内部对

@@ -42,6 +42,8 @@ typedef struct {
     bool playback_rebuffer_pending;
     bool playback_recovering;
     bool playback_phase_known;
+    bool playback_backend_owned;
+    bool playback_backend_restart_pending;
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
     bool tts_stop_pending;

@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.312
+Validate that playback backend ownership and restart-pending truth are now
+projected through the cloud/runtime snapshot and consumed by `dialog_runtime`
+policy:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_backend_owned|playback_backend_restart_pending' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '920,950p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '300,340p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud/runtime snapshot structs expose:
+  - `playback_backend_owned`
+  - `playback_backend_restart_pending`
+- XiaoZhi playback runtime fills both booleans from backend-state owned truth
+- `dialog_runtime` uses `playback_backend_restart_pending` in:
+  - managed recovery classification
+  - interrupt-latch clear policy
+
 ## Step 5.311
 Validate that `dialog_runtime` no longer branches on playback phase strings for
 its playback behavior, and instead only consumes typed playback truth from the

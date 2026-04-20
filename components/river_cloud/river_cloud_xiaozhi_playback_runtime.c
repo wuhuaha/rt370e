@@ -917,14 +917,21 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
 void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     river_cloud_runtime_snapshot_t *snapshot)
 {
+    river_cloud_xiaozhi_playback_backend_state_t backend_state;
+
     if (snapshot == NULL) {
         return;
     }
 
+    backend_state = river_cloud_xiaozhi_playback_backend_state();
     snapshot->playback_active = river_cloud_xiaozhi_playback_output_active();
     snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
     snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
     snapshot->playback_phase_known = true;
+    snapshot->playback_backend_owned =
+        river_cloud_xiaozhi_playback_backend_owned(backend_state);
+    snapshot->playback_backend_restart_pending =
+        backend_state == RIVER_CLOUD_XIAOZHI_PLAYBACK_BACKEND_RESTART_PENDING;
     snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
     snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;

@@ -299,6 +299,7 @@ static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
     }
 
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
+           g_river_dialog_runtime.snapshot.playback_backend_restart_pending ||
            g_river_dialog_runtime.snapshot.playback_cloud_active ||
            g_river_dialog_runtime.snapshot.playback_lane_engaged;
 }
@@ -350,6 +351,7 @@ static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
     return !snapshot->playback_active &&
            !snapshot->playback_recovering &&
            !snapshot->tts_stop_pending &&
+           !snapshot->playback_backend_restart_pending &&
            !snapshot->playback_terminal_waiting &&
            !snapshot->playback_lane_engaged &&
            snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING;
@@ -470,6 +472,10 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         snapshot->playback_rebuffer_pending;
     g_river_dialog_runtime.snapshot.playback_phase_known =
         snapshot->playback_phase_known;
+    g_river_dialog_runtime.snapshot.playback_backend_owned =
+        snapshot->playback_backend_owned;
+    g_river_dialog_runtime.snapshot.playback_backend_restart_pending =
+        snapshot->playback_backend_restart_pending;
     g_river_dialog_runtime.snapshot.playback_terminal_closed =
         snapshot->playback_terminal_closed;
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
@@ -888,7 +894,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_owned=%s backend_restart_pending=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -906,6 +912,8 @@ void river_dialog_runtime_dump_status(void)
                    (snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-") :
                    "-",
                snapshot.playback_phase_known ? "yes" : "no",
+               snapshot.playback_backend_owned ? "yes" : "no",
+               snapshot.playback_backend_restart_pending ? "yes" : "no",
                snapshot.playback_start_policy[0] != '\0' ?
                    snapshot.playback_start_policy :
                    "-",
