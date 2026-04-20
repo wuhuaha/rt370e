@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.289
+- 云端 ASR lifecycle 事件现在不再先进入 `session_coordinator` 再由它桥接到
+  `dialog runtime`：
+  - 新增 `dialog runtime` 直接消费云端 ASR result 的入口：
+    - `river_dialog_runtime_on_cloud_asr_result(...)`
+  - 该入口当前直接吸收：
+    - `SESSION_STARTED`
+    - `SESSION_CLOSED`
+    - `ERROR`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- app 现在把 cloud ASR result 扇出给：
+  - `dialog runtime`
+  - `session_coordinator`
+  其中：
+  - `dialog runtime` 负责 lifecycle truth
+  - `session_coordinator` 继续只负责：
+    - partial/final 文本日志
+    - barge-in 打断
+    - interaction diag flush
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- `session_coordinator` 已删除对以下 lifecycle 桥接调用：
+  - `note_asr_session_started_with_cloud_state(...)`
+  - `note_asr_session_closed_with_cloud_state(...)`
+  - `note_asr_error_with_cloud_state(...)`
+  - 这继续把 `session_coordinator` 从“真相桥接层”压回“文本/策略辅助层”
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.288
 - XiaoZhi cloud runtime snapshot 中属于 playback/downlink 的字段，现已继续从
   `session.c` 下沉回 playback runtime 自己填充：

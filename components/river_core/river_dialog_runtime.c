@@ -598,6 +598,34 @@ void river_dialog_runtime_note_asr_error_with_cloud_state(const char *sid, const
                                             reason);
 }
 
+void river_dialog_runtime_on_cloud_asr_result(const river_cloud_asr_result_t *result,
+                                              void *user_data)
+{
+    (void)user_data;
+
+    if (result == NULL) {
+        return;
+    }
+
+    switch (result->type) {
+    case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
+        river_dialog_runtime_note_asr_session_started_with_cloud_state(
+            result->sid,
+            "asr_session_started");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
+        river_dialog_runtime_note_asr_session_closed_with_cloud_state(
+            result->sid,
+            "asr_session_closed");
+        break;
+    case RIVER_CLOUD_ASR_EVENT_ERROR:
+        river_dialog_runtime_note_asr_error_with_cloud_state(result->sid, "asr_error");
+        break;
+    default:
+        break;
+    }
+}
+
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason)
 {
     bool prev_playback_active;

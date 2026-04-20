@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.289
+Validate that cloud ASR lifecycle events now reach dialog runtime directly via
+app wiring instead of being bridged from session_coordinator:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_app_on_cloud_asr_result|river_dialog_runtime_on_cloud_asr_result|set_result_handler' \
+  components/river_core/river_app.c \
+  components/river_core/river_dialog_runtime.c \
+  include/river/river_dialog_runtime.h
+rg -n 'note_asr_session_started_with_cloud_state|note_asr_session_closed_with_cloud_state|note_asr_error_with_cloud_state' \
+  components/river_core/river_session_coordinator.c
+sed -n '88,104p' components/river_core/river_app.c
+sed -n '601,626p' components/river_core/river_dialog_runtime.c
+sed -n '349,387p' components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- app installs one ASR result fanout that forwards lifecycle to dialog runtime
+- session_coordinator no longer calls dialog-runtime ASR lifecycle APIs
+- dialog runtime directly consumes `SESSION_STARTED` / `SESSION_CLOSED` / `ERROR`
+  from cloud ASR results
+
 ## Step 5.288
 Validate that playback-owned cloud snapshot fields are now filled by the
 XiaoZhi playback runtime helper instead of being manually assembled in the

@@ -361,7 +361,6 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->code,
                    result->sid != NULL ? result->sid : "-",
                    result->message != NULL ? result->message : "-");
-        river_dialog_runtime_note_asr_error_with_cloud_state(result->sid, "asr_error");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
         if (river_session_state_lock()) {
@@ -372,8 +371,6 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
-        river_dialog_runtime_note_asr_session_started_with_cloud_state(result->sid,
-                                                                       "asr_session_started");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
         if (river_session_state_lock()) {
@@ -384,9 +381,6 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
-        river_dialog_runtime_note_asr_session_closed_with_cloud_state(
-            result->sid,
-            "asr_session_closed");
         (void)river_interaction_diag_flush_deferred();
         break;
     default:

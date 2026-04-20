@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.288 move playback-owned cloud snapshot fill back into playback runtime`
+  - `5.289 route cloud ASR lifecycle directly into dialog runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,13 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - cloud ASR lifecycle no longer needs session_coordinator as a truth bridge
+    - app now fans out ASR results so:
+      - dialog runtime absorbs lifecycle truth directly
+      - session_coordinator keeps only text/barge-in/diag side effects
+    - this removes another coordinator-owned cloud->dialog bridge and keeps the
+      lifecycle truth closer to dialog runtime itself
+  - previous runtime-ownership slice:
     - XiaoZhi playback runtime now directly fills playback-owned fields in
       `river_cloud_runtime_snapshot_t`
     - `river_cloud_xiaozhi_session.c` no longer hand-assembles playback phase /
@@ -93,7 +100,7 @@ or top-of-tree verification target changes.
     - this keeps playback snapshot projection ownership aligned with:
       - playback status dump ownership
       - playback phase/rebuffer/start-gate runtime truth ownership
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - dialog runtime boot / wake / ASR cloud-backed ingress now shares one
       internal typed reducer instead of five handwritten
       capture-mutate-publish paths
@@ -103,7 +110,7 @@ or top-of-tree verification target changes.
       - publish reason selection
     - this further reduces truth-source drift inside dialog runtime itself and
       keeps cloud-backed ingress aligned with the long-term reducer architecture
-  - older runtime-ownership slice:
+  - earlier runtime-ownership slice:
     - XiaoZhi playback start-gate snapshot is now exported through:
       - `river_cloud_runtime_snapshot_t`
       - `river_dialog_runtime_snapshot_t`
@@ -119,7 +126,7 @@ or top-of-tree verification target changes.
       - rebuffer cause
       - current start/prefetch gate
       from one runtime chain
-  - earlier runtime-ownership slice:
+  - prior runtime-ownership slice:
     - XiaoZhi playback start gate is now stored as a runtime-owned snapshot
       instead of being re-derived independently at each read site
     - runtime now splits start-gate ownership into:

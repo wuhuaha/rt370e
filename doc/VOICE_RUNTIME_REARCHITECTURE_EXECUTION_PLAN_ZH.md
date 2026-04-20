@@ -1248,6 +1248,20 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 写局部事实
     - publish
     路径，进一步逼近真正 reducer-only 的真相源结构
+- 进一步地，cloud ASR lifecycle 事件现在也已不再依赖
+  `session_coordinator` 做桥接：
+  - app 当前直接把 cloud ASR result fanout 给：
+    - `dialog runtime`
+    - `session_coordinator`
+  - 其中 `dialog runtime` 直接吸收：
+    - `SESSION_STARTED`
+    - `SESSION_CLOSED`
+    - `ERROR`
+  - `session_coordinator` 仅保留：
+    - partial/final 文本日志
+    - barge-in interrupt
+    - diag flush
+  - 这继续删除一条 coordinator-owned 的 cloud->dialog truth bridge
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

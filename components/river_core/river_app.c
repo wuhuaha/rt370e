@@ -89,6 +89,14 @@ static bool river_app_dialog_cloud_conversation_window_active(void)
     return river_cloud_adapter_conversation_window_active();
 }
 
+static void river_app_on_cloud_asr_result(const river_cloud_asr_result_t *result,
+                                          void *user_data)
+{
+    (void)user_data;
+    river_dialog_runtime_on_cloud_asr_result(result, NULL);
+    river_session_coordinator_on_cloud_asr_result(result, NULL);
+}
+
 static const river_dialog_cloud_port_t g_river_app_dialog_cloud_port = {
     .provider_name = river_app_dialog_cloud_provider_name,
     .asr_streaming_supported = river_app_dialog_cloud_asr_streaming_supported,
@@ -141,7 +149,7 @@ river_status_t river_app_boot(void)
     }
     river_playback_service_register_listener(river_dialog_runtime_on_playback_state, NULL);
     river_voice_frontend_set_handler(river_session_coordinator_on_voice_event);
-    river_cloud_adapter_set_result_handler(river_session_coordinator_on_cloud_asr_result, NULL);
+    river_cloud_adapter_set_result_handler(river_app_on_cloud_asr_result, NULL);
     river_cloud_adapter_set_state_sync_handler(river_dialog_runtime_on_cloud_state_sync, NULL);
 
     if (river_voice_frontend_init() != RIVER_OK) {
