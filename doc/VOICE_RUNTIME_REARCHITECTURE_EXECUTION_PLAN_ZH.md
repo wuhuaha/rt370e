@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.327`
+  - `dialog_runtime` 现在新增统一的 `output_turn_quiesced` 派生，用来表示：
+    - 当前 output turn 已真正静止
+    - 已可安全清理 `tts_interrupt_requested`
+  - 本地 playback idle 清 interrupt 与 cloud snapshot sync 清 interrupt
+    现已复用同一 helper，不再各自拼一套 raw 条件
+  - cloud sync 路径也已改成先 `refresh_playback`，再按新的 quiesced truth
+    决定是否清 interrupt latch
+  - 这一步继续把 interrupt-clear policy 从粗粒度边缘条件，收口到
+    `dialog_runtime` 的统一派生真相
 - `Step 5.326`
   - `dialog_runtime` 现在开始显式区分：
     - 本地有声 playback active
@@ -323,9 +333,14 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续把 follow-up / wake admission 对 output-turn 的阻断语义，
+    与新的：
+    - `output_turn_engaged`
+    - `output_turn_quiesced`
+    对齐，避免后续仍回退到 raw `interaction_state` / raw lane 判定
   - 继续检查 `dialog_runtime` 清 interrupt / speaking/follow-up 投影时，
     是否仍残留对：
-    - raw `output_lane == speaking`
+      - raw `output_lane == speaking`
     - `playback_lane_engaged`
     的粗粒度依赖
   - 继续把 `waiting_segment` 的静默语义推广到更多上层派生：

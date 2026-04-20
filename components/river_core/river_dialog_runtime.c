@@ -34,6 +34,7 @@ static river_dialog_runtime_context_t g_river_dialog_runtime;
 static void river_dialog_runtime_apply_cloud_snapshot_locked(
     const river_cloud_runtime_snapshot_t *snapshot);
 static void river_dialog_runtime_publish_locked(const char *reason);
+static bool river_dialog_runtime_output_turn_engaged_locked(void);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -340,22 +341,25 @@ static void river_dialog_runtime_refresh_playback_locked(void)
         river_dialog_runtime_compute_playback_active_locked();
 }
 
-static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
+static bool river_dialog_runtime_output_turn_quiesced_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
 
-    if (!river_dialog_runtime_playback_phase_known_locked()) {
-        return true;
-    }
-
-    return !snapshot->playback_active &&
+    return !river_dialog_runtime_output_turn_engaged_locked() &&
            !snapshot->playback_recovering &&
            !snapshot->tts_stop_pending &&
            snapshot->playback_backend_state_kind !=
                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING &&
-           !snapshot->playback_terminal_waiting &&
-           !snapshot->playback_lane_engaged &&
-           snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING;
+           !snapshot->playback_terminal_waiting;
+}
+
+static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
+{
+    if (!river_dialog_runtime_playback_phase_known_locked()) {
+        return true;
+    }
+
+    return river_dialog_runtime_output_turn_quiesced_locked();
 }
 
 static bool river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked(void)
@@ -586,14 +590,11 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     if (river_dialog_runtime_cloud_round_active_locked()) {
         g_river_dialog_runtime.snapshot.asr_session_active = true;
     }
-    if (!snapshot->tts_stop_pending &&
-        !snapshot->playback_active &&
-        !snapshot->playback_lane_engaged &&
-        g_river_dialog_runtime.snapshot.output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
+    river_dialog_runtime_refresh_playback_locked();
+    if (river_dialog_runtime_output_turn_quiesced_locked() &&
         !river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked()) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
-    river_dialog_runtime_refresh_playback_locked();
 }
 
 river_status_t river_dialog_runtime_init(void)

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.327
+Validate that `tts_interrupt_requested` clearing now goes through a unified
+`output_turn_quiesced` predicate in both local-playback and cloud-sync paths:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'output_turn_quiesced_locked|local_idle_clears_tts_interrupt_locked|tts_interrupt_requested = false' \
+  components/river_core/river_dialog_runtime.c
+sed -n '340,375p' components/river_core/river_dialog_runtime.c
+sed -n '585,600p' components/river_core/river_dialog_runtime.c
+sed -n '736,748p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_output_turn_quiesced_locked()` exists and is reused by:
+  - `river_dialog_runtime_local_idle_clears_tts_interrupt_locked()`
+  - cloud snapshot sync clear path
+- cloud snapshot sync now refreshes playback-derived truth before clearing
+  `tts_interrupt_requested`
+- `tts_interrupt_requested` clear policy is no longer split across two raw
+  condition sets
+
 ## Step 5.326
 Validate that `dialog_runtime` now distinguishes audible playback from
 interruptible output-turn ownership during `waiting_segment`:

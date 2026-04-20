@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.327
+- `dialog_runtime` 新增统一的 interrupt-clear 判定：
+  - `river_dialog_runtime_output_turn_quiesced_locked()`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_local_idle_clears_tts_interrupt_locked()` 不再自己拼：
+  - `playback_active`
+  - `playback_lane_engaged`
+  - `output_lane == speaking`
+  这些 raw 条件，而是复用 `output_turn_quiesced` 语义
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- cloud snapshot sync 路径现在也改为：
+  - 先 `refresh_playback`
+  - 再用同一条 `output_turn_quiesced` helper 清 `tts_interrupt_requested`
+  - 不再在 refresh 前基于 raw snapshot 字段各自拼装清理条件
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步把 `tts_interrupt_requested` 的清理语义继续从：
+  - 本地 callback 一套
+  - cloud sync 一套
+  收口到“output turn 已真正静止”的统一 owner 派生
+
 ## Step 5.326
 - `dialog_runtime` 现在显式区分：
   - 有声 playback active
