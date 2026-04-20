@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.293
+Validate that `no-ref reopen/open_hold` logic is now owned by the playback
+runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_followup_reopen_ready|open_hold_frames_required|no_ref_reopen_ready' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '380,455p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1388,1422p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `open_hold_frames_required()` and follow-up reopen gating now live in:
+  - `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` no longer implements
+  `no_ref_reopen_ready()`
+
 ## Step 5.292
 Validate that soft-endpoint / speaking-uplink continuation helpers are now
 owned by the playback runtime:

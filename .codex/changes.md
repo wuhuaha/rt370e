@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.293
+- `no-ref reopen/open_hold` 语义开始并回 playback runtime：
+  - `river_cloud_xiaozhi_open_hold_frames_required()` 已从
+    `river_cloud_xiaozhi_session.c` 移入
+    `river_cloud_xiaozhi_playback_runtime.c`
+  - 新增 typed helper：
+    - `river_cloud_xiaozhi_playback_followup_reopen_ready(bool is_speech)`
+  - `maybe_start_followup_round()` 不再自己维护 `no_ref_reopen` 的
+    guard/rearm 状态机，只调用 playback runtime helper
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- 这一步把同一套 `no-ref reopen` 状态从“runtime 写一半、session 解一半”改成由
+  playback runtime 统一持有和解释。
+
 ## Step 5.292
 - playback runtime 继续接管 `soft endpoint` 语义：
   - `river_cloud_xiaozhi_duplex_soft_endpoint_enabled()`

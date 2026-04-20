@@ -1294,6 +1294,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - `output_speaking_active()`
   - 这继续减少 `xiaozhi_session.c` 对“server speaking + playback active”
     组合语义的持有，改由 downlink runtime 解释
+- 继续下推后，`no-ref reopen/open_hold` 这组也开始统一到 playback runtime：
+  - `open_hold_frames_required()`
+  - `playback_followup_reopen_ready(bool is_speech)`
+  - `maybe_start_followup_round()` 不再直接实现 reopen guard/rearm 细节
+  - 这把此前“runtime 写 reopen 状态、session 再单独解释”的 split-brain 继续收口
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`
