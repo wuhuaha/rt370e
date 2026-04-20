@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.308
+Validate that `dialog_runtime` no longer exposes unused coarse external error
+mutation APIs, and that the remaining error semantics stay behind reducer /
+snapshot ingress:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_runtime_note_error|river_dialog_runtime_clear_error' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  /root/ameba-river
+sed -n '80,100p' include/river/river_dialog_runtime.h
+sed -n '780,820p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_note_error` and
+  `river_dialog_runtime_clear_error` no longer appear in:
+  - the public header
+  - the runtime implementation
+  - any remaining repo callers
+- `dialog_runtime` error semantics continue to enter through:
+  - playback-state ingestion
+  - cloud/runtime sync
+
 ## Step 5.307
 Validate that managed playback recovery no longer clears the local
 `tts_interrupt_requested` latch just because the local playback service emitted

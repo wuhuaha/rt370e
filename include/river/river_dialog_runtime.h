@@ -88,8 +88,6 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
 void river_dialog_runtime_on_playback_state(river_playback_state_t state,
                                             const river_playback_stream_config_t *config,
                                             void *user_data);
-void river_dialog_runtime_note_error(const char *reason);
-void river_dialog_runtime_clear_error(const char *reason);
 void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data);
 void river_dialog_runtime_sync_cloud_state(const char *reason);
 const char *river_dialog_runtime_wakeword_admission_block_reason(void);

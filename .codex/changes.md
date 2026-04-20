@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.308
+- 删除了已无调用的 `dialog_runtime` 外部错误侧门接口：
+  - `river_dialog_runtime_note_error(...)`
+  - `river_dialog_runtime_clear_error(...)`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步明确了 `dialog_runtime` 的错误语义入口：
+  - 由 cloud/runtime snapshot 同步驱动
+  - 由 playback state ingest/reducer 驱动
+  - 不再保留一个可被外部任意调用的 coarse error mutation API
+- 这样可以继续压缩“从真相源之外粗暴抬高/清空 error_recovering”的回归面，
+  避免未来又把 `dialog_runtime` 退回成可随意改写的共享状态盒子。
+
 ## Step 5.307
 - `dialog_runtime` 在 managed playback recovery 中不再因为本地
   `RIVER_PLAYBACK_ERROR` 顺手清掉 `tts_interrupt_requested`：

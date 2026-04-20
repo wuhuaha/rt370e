@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.308`
+  - `dialog_runtime` 已删除未再使用的外部错误入口：
+    - `river_dialog_runtime_note_error(...)`
+    - `river_dialog_runtime_clear_error(...)`
+  - 这让 coarse `error_recovering` 不再能从真相源外部被任意抬起或清空
+  - `dialog_runtime` 的错误语义现继续收口到：
+    - playback state reducer
+    - cloud/runtime snapshot sync
 - `Step 5.307`
   - `dialog_runtime` 在 managed playback recovery 中不再提前清掉
     `tts_interrupt_requested`
@@ -126,6 +134,8 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续排查 `dialog_runtime` 对本地 playback service 边缘事件的剩余依赖，
+    把它们降级成 typed local signal，而不是 coarse interaction/error 推导入口
   - 回到 downlink/playback runtime，继续收紧：
     - `tts_stop_pending`
     - playback stop/reset

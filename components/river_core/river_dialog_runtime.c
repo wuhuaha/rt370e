@@ -793,28 +793,6 @@ void river_dialog_runtime_on_playback_state(river_playback_state_t state,
     river_dialog_runtime_note_playback_state(state, reason);
 }
 
-void river_dialog_runtime_note_error(const char *reason)
-{
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    g_river_dialog_runtime.snapshot.error_recovering = true;
-    river_dialog_runtime_publish_locked(reason != NULL ? reason : "runtime_error");
-    river_dialog_runtime_unlock();
-}
-
-void river_dialog_runtime_clear_error(const char *reason)
-{
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    g_river_dialog_runtime.snapshot.error_recovering = false;
-    river_dialog_runtime_publish_locked(reason != NULL ? reason : "error_cleared");
-    river_dialog_runtime_unlock();
-}
-
 void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data)
 {
     (void)user_data;
