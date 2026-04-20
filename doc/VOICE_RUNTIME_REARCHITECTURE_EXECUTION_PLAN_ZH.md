@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.307`
+  - `dialog_runtime` 在 managed playback recovery 中不再提前清掉
+    `tts_interrupt_requested`
+  - 这让：
+    - managed rebuffer/recovering
+    - local interrupt in-flight latch
+    在恢复窗口内保持一致，避免重复 barge-in interrupt
 - `Step 5.306`
   - `dialog_runtime` 现在会把“managed playback recovery 中出现的本地
     `RIVER_PLAYBACK_ERROR`”吸收到 `playback_recovering`
@@ -124,6 +131,8 @@ Branch: `agent-server-v2`
     - playback stop/reset
     - rebuffer/recovering
     的 owner 边界和状态投影
+  - 继续减少 `dialog_runtime` 对本地 playback service 边缘事件的副作用扩散，
+    让 interrupt/error/recovering 更稳地围绕 playback truth owner 收敛
   - 继续减少 `dialog_runtime` 对本地 playback service error 信号的粗粒度放大，
     优先以 cloud playback runtime 的 managed recovery truth 驱动交互态
   - 继续让 XiaoZhi status/diag 读取优先消费 runtime snapshot / typed helper，

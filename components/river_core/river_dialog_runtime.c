@@ -700,6 +700,7 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     bool prev_playback_active;
     bool prev_playback_recovering;
     bool prev_error_recovering;
+    bool managed_recovery = false;
     river_interaction_state_t prev_interaction_state;
     river_interaction_state_t next_interaction_state;
     const char *effective_reason = reason;
@@ -715,7 +716,8 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     river_dialog_runtime_apply_local_playback_state_locked(state);
     river_dialog_runtime_refresh_playback_locked();
     if (state == RIVER_PLAYBACK_ERROR) {
-        if (river_dialog_runtime_playback_error_is_managed_recovery_locked()) {
+        managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
+        if (managed_recovery) {
             g_river_dialog_runtime.snapshot.error_recovering = false;
             effective_reason = "playback_recovering";
         } else {
@@ -724,7 +726,8 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     } else {
         g_river_dialog_runtime.snapshot.error_recovering = false;
     }
-    if (state == RIVER_PLAYBACK_IDLE || state == RIVER_PLAYBACK_ERROR) {
+    if (state == RIVER_PLAYBACK_IDLE ||
+        (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
     next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();

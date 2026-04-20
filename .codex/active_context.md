@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.306 fold managed playback errors into recovery truth`
+  - `5.307 keep interrupt latch during managed playback recovery`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,15 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 现在在 managed playback recovery 中保留
+      `tts_interrupt_requested`
+    - 本地 `RIVER_PLAYBACK_ERROR` 若只是 playback runtime 管理下的恢复路径，
+      不会再把 interrupt in-flight latch 提前清空
+    - 这进一步避免了 recovery 窗口里的重复 barge-in interrupt
+    - 下一步应继续：
+      - 让更多本地 playback service 边缘信号只作为 playback runtime 内部细节
+      - 继续把 stop/reset/rebuffer 的 coarse 解释从 core 侧挤掉
+  - previous runtime-ownership slice:
     - `dialog_runtime` 现在会把“受 cloud playback runtime 管理的本地
       playback_error”吸收到 `playback_recovering`
     - 若 cloud playback truth 已表明当前仍在：
@@ -99,9 +108,7 @@ or top-of-tree verification target changes.
     - 这一步直接针对日志里频繁出现的：
       - `speaking -> error_recovering -> speaking`
       状态风暴做收口
-    - 下一步应继续：
-      - 把更多 playback stop/reset/rebuffer 恢复判定继续锁进 playback truth owner
-      - 检查 dialog runtime 是否还能进一步弱化对本地 playback error 的依赖
+    - 该步之后，`speaking -> error_recovering -> speaking` 这类风暴已继续被压缩
   - previous runtime-ownership slice:
     - `river_cloud_xiaozhi_dump_session_status()` 现在会先读取
       `river_cloud_runtime_snapshot_t`

@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.307
+- `dialog_runtime` 在 managed playback recovery 中不再因为本地
+  `RIVER_PLAYBACK_ERROR` 顺手清掉 `tts_interrupt_requested`：
+  - 仅当 playback 真正进入：
+    - `idle`
+    - 或 unmanaged `playback_error`
+    时才清掉 interrupt in-flight latch
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步避免了 playback runtime 正在 rebuffer/recovering 时，
+  `dialog_runtime` 又过早重新放开重复 barge-in interrupt。
+
 ## Step 5.306
 - `dialog_runtime` 现在会区分“真正的 playback error”与“managed recovery 中的本地
   playback_error”：

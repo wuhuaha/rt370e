@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.307
+Validate that managed playback recovery no longer clears the local
+`tts_interrupt_requested` latch just because the local playback service emitted
+`RIVER_PLAYBACK_ERROR`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'managed_recovery|tts_interrupt_requested = false|RIVER_PLAYBACK_IDLE \\|\\|' \
+  components/river_core/river_dialog_runtime.c
+sed -n '700,740p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog_runtime` only clears `tts_interrupt_requested` when playback is truly
+  idle or on an unmanaged playback error
+- managed recovery keeps the interrupt in-flight latch intact
+
 ## Step 5.306
 Validate that dialog runtime no longer turns managed playback recovery into a
 separate `error_recovering` path just because the local playback service emits
