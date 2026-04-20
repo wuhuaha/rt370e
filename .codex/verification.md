@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.316
+Validate that playback owner now exports typed terminal-wait truth, and that
+`dialog_runtime` only suppresses effective speaking on true tail waits rather
+than on every generic `terminal_waiting` state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_terminal_wait_kind|RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '217,260p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1540,1565p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '339,370p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud/runtime snapshot structs expose:
+  - `playback_terminal_wait_kind`
+- XiaoZhi playback runtime maps completion wait into explicit typed variants:
+  - `LAST_SEGMENT_META`
+  - `QUEUE_DRAIN`
+  - `LAST_SEGMENT_TAIL`
+- `dialog_runtime` no longer treats every `playback_terminal_waiting` state as
+  a tail wait; only queue-drain / last-tail waits suppress effective speaking
+
 ## Step 5.315
 Validate that `dialog_runtime` now lets cloud/playback owner truth clear the
 interrupt latch whenever playback phase is known, without being blocked by the

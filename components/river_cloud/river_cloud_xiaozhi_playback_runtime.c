@@ -217,20 +217,42 @@ static bool river_cloud_xiaozhi_playback_terminal_open(void)
     return g_river_cloud.xiaozhi_playback_terminal_state[0] == '\0';
 }
 
+static const char *river_cloud_playback_terminal_wait_kind_name(
+    river_cloud_playback_terminal_wait_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_META:
+        return "await_last_segment_meta";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN:
+        return "await_segment_queue_drain";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL:
+        return "await_last_segment_tail";
+    default:
+        return NULL;
+    }
+}
+
 static void river_cloud_xiaozhi_clear_playback_terminal_wait(void)
 {
     g_river_cloud.xiaozhi_playback_terminal_waiting = false;
+    g_river_cloud.xiaozhi_playback_terminal_wait_kind =
+        RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE;
     g_river_cloud.xiaozhi_playback_terminal_wait_reason[0] = '\0';
 }
 
-static void river_cloud_xiaozhi_set_playback_terminal_wait(const char *reason)
+static void river_cloud_xiaozhi_set_playback_terminal_wait(
+    river_cloud_playback_terminal_wait_kind_t kind)
 {
-    if (reason == NULL || reason[0] == '\0') {
+    const char *reason = river_cloud_playback_terminal_wait_kind_name(kind);
+
+    if (kind == RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE || reason == NULL ||
+        reason[0] == '\0') {
         river_cloud_xiaozhi_clear_playback_terminal_wait();
         return;
     }
 
     g_river_cloud.xiaozhi_playback_terminal_waiting = true;
+    g_river_cloud.xiaozhi_playback_terminal_wait_kind = kind;
     river_cloud_xiaozhi_copy_optional_text(
         g_river_cloud.xiaozhi_playback_terminal_wait_reason,
         sizeof(g_river_cloud.xiaozhi_playback_terminal_wait_reason),
@@ -934,6 +956,8 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
         backend_state == RIVER_CLOUD_XIAOZHI_PLAYBACK_BACKEND_RESTART_PENDING;
     snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
+    snapshot->playback_terminal_wait_kind =
+        g_river_cloud.xiaozhi_playback_terminal_wait_kind;
     snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,
                                            sizeof(snapshot->playback_phase),
@@ -1516,27 +1540,28 @@ static bool river_cloud_xiaozhi_playback_completed_ready(void)
                   g_river_cloud.xiaozhi_playback_segment_id) == 0;
 }
 
-static const char *river_cloud_xiaozhi_playback_completed_wait_reason(void)
+static river_cloud_playback_terminal_wait_kind_t
+river_cloud_xiaozhi_playback_completed_wait_kind(void)
 {
     river_cloud_xiaozhi_playback_segment_t *segment;
 
     if (!river_cloud_xiaozhi_playback_last_segment_observed()) {
-        return "await_last_segment_meta";
+        return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_META;
     }
 
     segment = river_cloud_xiaozhi_current_playback_segment();
     if (segment != NULL) {
-        return "await_segment_queue_drain";
+        return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN;
     }
     if (g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id[0] == '\0') {
-        return "await_last_segment_tail";
+        return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL;
     }
     if (strcmp(g_river_cloud.xiaozhi_playback_last_fully_heard_segment_id,
                g_river_cloud.xiaozhi_playback_segment_id) != 0) {
-        return "await_last_segment_tail";
+        return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL;
     }
 
-    return NULL;
+    return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE;
 }
 
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
@@ -1910,7 +1935,7 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
     river_status_t status;
     river_cloud_xiaozhi_playback_segment_t *segment;
     uint64_t now_ms;
-    const char *wait_reason;
+    river_cloud_playback_terminal_wait_kind_t wait_kind;
 
     if (!g_river_cloud.xiaozhi_playback_meta_valid ||
         !river_cloud_xiaozhi_playback_terminal_open()) {
@@ -1920,8 +1945,8 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
 
     river_cloud_xiaozhi_update_playback_ack_progress();
     if (!river_cloud_xiaozhi_playback_completed_ready()) {
-        wait_reason = river_cloud_xiaozhi_playback_completed_wait_reason();
-        river_cloud_xiaozhi_set_playback_terminal_wait(wait_reason);
+        wait_kind = river_cloud_xiaozhi_playback_completed_wait_kind();
+        river_cloud_xiaozhi_set_playback_terminal_wait(wait_kind);
         return false;
     }
     river_cloud_xiaozhi_clear_playback_terminal_wait();

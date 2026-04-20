@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.316`
+  - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
+    typed truth：
+    - `playback_terminal_wait_kind`
+  - XiaoZhi playback owner 现在直接区分：
+    - `await_last_segment_meta`
+    - `await_segment_queue_drain`
+    - `await_last_segment_tail`
+  - `dialog_runtime` 已开始直接消费这条 truth，只在：
+    - queue drain
+    - last segment tail
+    下压低 speaking 投影；`await_last_segment_meta` 不再被误判成已经进入尾段等待
+  - 这一步继续把 core 的 terminal-wait 解释权收回 playback owner
 - `Step 5.315`
   - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
     `playback_local_active` 阻断 interrupt latch 清理
@@ -195,6 +208,17 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续把 `dialog_runtime` 里剩余 generic terminal-wait / local playback shadow
+    兼容路径压缩到 phase-missing fallback：
+    - active
+    - recovering
+    - interrupt clear
+    - speaking projection
+  - 继续把 `playback_terminal_wait_kind` 从“已导出 typed truth”推进到更上层可消费
+    语义，例如：
+    - follow-up reopen
+    - interrupt clear hold
+    - terminal close/complete policy
   - 继续排查 `dialog_runtime` 对本地 playback service 边缘事件的剩余依赖，
     把它们降级成 typed local signal，而不是 coarse interaction/error 推导入口
   - 继续把 playback terminal / interrupt clear / recovery policy 往

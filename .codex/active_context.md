@@ -15,12 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.315 limit local playback shadow to phase-missing fallback`
+  - `5.316 export typed terminal-wait truth into dialog runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
+      typed truth：
+      - `playback_terminal_wait_kind`
+    - XiaoZhi owner 直接输出：
+      - `await_last_segment_meta`
+      - `await_segment_queue_drain`
+      - `await_last_segment_tail`
+    - `dialog_runtime` 已开始直接消费这条 typed wait truth，只把：
+      - queue drain
+      - last segment tail
+      当成真正的尾段等待；`await_last_segment_meta` 不再被误压成尾段静默
+      投影
+    - 这一步继续减少了 core 对 generic `terminal_waiting` 的过度二次解释
+  - previous runtime-ownership slice:
     - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
       `playback_local_active` 阻断 interrupt latch 清理
     - local playback shadow 现在进一步退回到 `phase unknown` 的兜底路径

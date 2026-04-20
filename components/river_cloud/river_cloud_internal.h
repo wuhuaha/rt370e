@@ -230,6 +230,7 @@ typedef struct {
     river_cloud_xiaozhi_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;
     bool xiaozhi_playback_rebuffer_pending;
     bool xiaozhi_playback_terminal_waiting;
+    river_cloud_playback_terminal_wait_kind_t xiaozhi_playback_terminal_wait_kind;
     bool xiaozhi_playback_duplex_ready_seen;
     bool xiaozhi_tts_stop_pending;
     bool xiaozhi_listen_stop_pending;

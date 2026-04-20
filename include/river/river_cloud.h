@@ -59,6 +59,13 @@ typedef void (*river_cloud_state_sync_handler_t)(const char *reason,
 #define RIVER_CLOUD_RUNTIME_REASON_MAX   64U
 #define RIVER_CLOUD_RUNTIME_STATE_MAX    32U
 
+typedef enum {
+    RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE = 0,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_META,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL
+} river_cloud_playback_terminal_wait_kind_t;
+
 typedef struct {
     bool available;
     bool conversation_window_active;
@@ -74,6 +81,7 @@ typedef struct {
     bool playback_backend_restart_pending;
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
+    river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     bool tts_stop_pending;
     bool turn_accepted;
     bool barge_in_enabled_known;

@@ -46,6 +46,7 @@ typedef struct {
     bool playback_backend_restart_pending;
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
+    river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     bool tts_stop_pending;
     bool tts_interrupt_requested;
     bool turn_accepted;

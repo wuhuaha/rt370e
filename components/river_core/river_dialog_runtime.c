@@ -339,6 +339,17 @@ static bool river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_lo
     return g_river_dialog_runtime.snapshot.playback_local_active;
 }
 
+static bool river_dialog_runtime_terminal_wait_suppresses_speaking_locked(void)
+{
+    switch (g_river_dialog_runtime.snapshot.playback_terminal_wait_kind) {
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN:
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static bool river_dialog_runtime_output_speaking_effective_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -350,6 +361,7 @@ static bool river_dialog_runtime_output_speaking_effective_locked(void)
         return false;
     }
     if (snapshot->playback_terminal_waiting &&
+        river_dialog_runtime_terminal_wait_suppresses_speaking_locked() &&
         !snapshot->playback_active &&
         !snapshot->playback_recovering) {
         return false;
@@ -463,6 +475,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
     g_river_dialog_runtime.snapshot.playback_terminal_waiting =
         snapshot->playback_terminal_waiting;
+    g_river_dialog_runtime.snapshot.playback_terminal_wait_kind =
+        snapshot->playback_terminal_wait_kind;
     g_river_dialog_runtime.snapshot.turn_accepted = snapshot->turn_accepted;
     g_river_dialog_runtime.snapshot.barge_in_enabled_known =
         snapshot->barge_in_enabled_known;
@@ -843,7 +857,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_owned=%s backend_restart_pending=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_owned=%s backend_restart_pending=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),

@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.316
+- cloud playback runtime 现在把 terminal wait 从“布尔 + 文本原因”提升成
+  typed truth：
+  - 新增 `playback_terminal_wait_kind`
+  - XiaoZhi playback owner 直接输出：
+    - `await_last_segment_meta`
+    - `await_segment_queue_drain`
+    - `await_last_segment_tail`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` snapshot 同步吸收这条 typed terminal-wait 真相，并开始用它区分：
+  - 真实尾段等待
+  - 仍在等待 last-segment meta 的非尾段等待
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `dialog_runtime` 现在只会在：
+  - `await_segment_queue_drain`
+  - `await_last_segment_tail`
+  这两类 terminal wait 下压低 `output_lane=speaking` 的有效投影；
+  `await_last_segment_meta` 不再被误当成“已经进入尾段静默等待”。
+- 这一步继续把 core 行为层从 generic `playback_terminal_waiting` 的过度解释，
+  收回到 playback owner 导出的 typed terminal truth。
+
 ## Step 5.315
 - `dialog_runtime` 进一步收紧了 local playback shadow 的参与范围：
   - 当 cloud/runtime snapshot 已声明 `playback_phase_known` 时，
