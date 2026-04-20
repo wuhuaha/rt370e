@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.285 snapshot XiaoZhi playback start gate as runtime-owned truth`
+  - `5.286 push XiaoZhi playback start-gate snapshot up to cloud/dialog runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,22 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - XiaoZhi playback start-gate snapshot is now exported through:
+      - `river_cloud_runtime_snapshot_t`
+      - `river_dialog_runtime_snapshot_t`
+    - session snapshot fill no longer needs to reconstruct that gate; it simply
+      projects the runtime-owned snapshot fields upward:
+      - `playback_start_policy`
+      - `playback_start_frames`
+      - `playback_prefetch_frames`
+      - `playback_start_cautious_history`
+    - dialog runtime status now prints the active gate truth directly, so board
+      diagnostics can correlate:
+      - playback phase
+      - rebuffer cause
+      - current start/prefetch gate
+      from one runtime chain
+  - previous runtime-ownership slice:
     - XiaoZhi playback start gate is now stored as a runtime-owned snapshot
       instead of being re-derived independently at each read site
     - runtime now splits start-gate ownership into:
@@ -101,7 +117,7 @@ or top-of-tree verification target changes.
       - downlink frame-duration update
     - this keeps worker/start/rebuffer diagnostics on the same gate truth and
       removes one more class of “同一时刻不同调用点各自现算出不同门限”的 drift
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - XiaoZhi downlink start gating now comes from one explicit typed prefetch
       policy helper instead of being split across scattered threshold
       heuristics:

@@ -78,11 +78,15 @@ typedef struct {
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_phase[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_rebuffer_cause[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_start_policy[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char input_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char output_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    uint32_t playback_start_frames;
+    uint32_t playback_prefetch_frames;
+    bool playback_start_cautious_history;
 } river_cloud_runtime_snapshot_t;
 
 river_status_t river_cloud_adapter_init(void);

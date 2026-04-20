@@ -377,6 +377,10 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         g_river_dialog_runtime.snapshot.playback_rebuffer_cause,
         sizeof(g_river_dialog_runtime.snapshot.playback_rebuffer_cause),
         snapshot->playback_rebuffer_cause);
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_start_policy,
+        sizeof(g_river_dialog_runtime.snapshot.playback_start_policy),
+        snapshot->playback_start_policy);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_terminal_state,
                                    sizeof(g_river_dialog_runtime.snapshot.playback_terminal_state),
                                    snapshot->playback_terminal_state);
@@ -394,6 +398,12 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.output_state_text,
                                    sizeof(g_river_dialog_runtime.snapshot.output_state_text),
                                    snapshot->output_state);
+    g_river_dialog_runtime.snapshot.playback_start_frames =
+        snapshot->playback_start_frames;
+    g_river_dialog_runtime.snapshot.playback_prefetch_frames =
+        snapshot->playback_prefetch_frames;
+    g_river_dialog_runtime.snapshot.playback_start_cautious_history =
+        snapshot->playback_start_cautious_history;
     g_river_dialog_runtime.snapshot.input_lane =
         river_dialog_runtime_parse_input_lane(snapshot->input_state);
     g_river_dialog_runtime.snapshot.output_lane =
@@ -727,7 +737,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -742,6 +752,12 @@ void river_dialog_runtime_dump_status(void)
                        snapshot.playback_state == RIVER_PLAYBACK_ERROR ? "error" : "unknown",
                snapshot.playback_cloud_active ? "yes" : "no",
                snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-",
+               snapshot.playback_start_policy[0] != '\0' ?
+                   snapshot.playback_start_policy :
+                   "-",
+               (unsigned long)snapshot.playback_start_frames,
+               (unsigned long)snapshot.playback_prefetch_frames,
+               snapshot.playback_start_cautious_history ? "yes" : "no",
                snapshot.playback_lane_engaged ? "yes" : "no",
                snapshot.playback_recovering ? "yes" : "no",
                snapshot.playback_rebuffer_cause[0] != '\0' ?

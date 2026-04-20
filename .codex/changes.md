@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.286
+- XiaoZhi playback runtime 已保存的 `start gate` 真相，现已继续上推到
+  cloud/dialog runtime 的公开 snapshot，而不再只能停留在 playback runtime
+  内部：
+  - cloud runtime snapshot 新增：
+    - `playback_start_policy`
+    - `playback_start_frames`
+    - `playback_prefetch_frames`
+    - `playback_start_cautious_history`
+  - dialog runtime snapshot 同步新增同名字段
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+- XiaoZhi session 对 cloud runtime snapshot 的填充现在直接投影 playback
+  runtime 已锁存的 start-gate snapshot：
+  - 不重新计算门限
+  - 只把 runtime 已经拥有的：
+    - policy
+    - start_frames
+    - prefetch_frames
+    - cautious_history
+    继续向上透出
+  - 这保证 dialog/core 消费到的仍是同一份 runtime-owned truth，而不是
+    session 层二次派生的近似值
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- dialog runtime 现在会吸收并输出这组 start-gate 诊断真相：
+  - `apply_cloud_snapshot_locked()` 同步保存这组字段
+  - `river_dialog_runtime_dump_status()` 直接打印：
+    - `start_gate`
+    - `prefetch`
+    - `cautious`
+  - 这让上层状态与板端 status 不再只能看到：
+    - `playback_phase`
+    - `rebuffer_cause`
+    而看不到当前实际起播门限
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.285
 - XiaoZhi playback start gate 现在不再只是调用点里的现算 helper，而是下沉成
   playback runtime 自己维护的稳定快照真相：

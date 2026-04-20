@@ -1417,6 +1417,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - frame-duration 变化
   - 这让 worker / start / status / rebuffer diagnostics 读取的是同一份
     runtime-owned gate truth，而不是各自拿原始字段重建
+- 这组 start-gate snapshot 现已继续上推到 cloud/dialog runtime 的公开真相：
+  - cloud runtime snapshot 新增：
+    - `playback_start_policy`
+    - `playback_start_frames`
+    - `playback_prefetch_frames`
+    - `playback_start_cautious_history`
+  - dialog runtime snapshot 同步新增同名字段
+  - XiaoZhi session fill path 不再重算 gate，而是直接投影 playback runtime
+    已锁存的 snapshot
+  - dialog runtime dump 现在也直接打印：
+    - `start_gate`
+    - `prefetch`
+    - `cautious`
+  - 这让上层 runtime/status 在观察：
+    - `playback_phase`
+    - `rebuffer_cause`
+    的同时，也能看到当前真正生效的起播门限链路
 
 下一步焦点：
 
@@ -1424,8 +1441,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
-- 继续评估是否要把当前 start-gate snapshot 再进一步上推成 cloud/dialog
-  可消费的显式诊断真相，避免这条门限信息只能停留在 playback runtime 内部
+- 继续把这组已上推的 start-gate 真相从“诊断可见”推进到“上层 typed 恢复语义
+  可消费”，例如评估：
+  - dialog/session 是否需要直接感知当前 gate 偏保守的原因
+  - follow-up / playback tail 策略是否要消费这条门限真相
 - 继续检查 `segment_prefetch` 是否还需要纳入更多段级真相，例如：
   - 当前 segment 的恢复历史
   - 相邻 meta 到达抖动

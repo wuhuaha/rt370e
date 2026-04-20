@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.286
+Validate that the XiaoZhi playback start-gate snapshot is now exported through
+cloud/dialog runtime snapshots without being recomputed in the session layer:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_start_policy|playback_start_frames|playback_prefetch_frames|playback_start_cautious_history' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '857,920p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '340,410p' components/river_core/river_dialog_runtime.c
+sed -n '724,768p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud runtime snapshot publicly exposes playback start-gate fields
+- XiaoZhi session fills those fields from runtime-owned snapshot storage instead
+  of recomputing a fresh gate
+- dialog runtime stores and dumps:
+  - `start_gate`
+  - `prefetch`
+  - `cautious`
+  from the cloud snapshot path
+
 ## Step 5.285
 Validate that XiaoZhi playback start gating is now stored as a runtime snapshot
 and refreshed at gate-affecting state transitions instead of being recomputed

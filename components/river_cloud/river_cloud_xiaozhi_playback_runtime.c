@@ -68,9 +68,11 @@ static const char *river_cloud_xiaozhi_playback_backend_state_name(
     }
 }
 
-static const char *river_cloud_xiaozhi_playback_start_policy_name(
-    river_cloud_xiaozhi_playback_start_policy_t policy)
+const char *river_cloud_xiaozhi_playback_start_policy_name(uint32_t policy_value)
 {
+    river_cloud_xiaozhi_playback_start_policy_t policy =
+        (river_cloud_xiaozhi_playback_start_policy_t)policy_value;
+
     switch (policy) {
     case RIVER_CLOUD_XIAOZHI_PLAYBACK_START_POLICY_REBUFFER_FAST:
         return "rebuffer_fast";
