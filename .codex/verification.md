@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.314
+Validate that `dialog_runtime` no longer depends on app-side stream-name
+registration and now classifies dialog playback directly by TTS priority:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_runtime_register_playback_stream|RIVER_APP_DIALOG_PLAYBACK_STREAM_|dialog_playback_streams|dialog_playback_stream_count' \
+  components/river_core/river_app.c \
+  components/river_core/river_dialog_runtime.c \
+  include/river/river_dialog_runtime.h
+sed -n '60,90p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog_runtime` 不再暴露 playback stream 注册 API
+- app 启动路径中不再手工注册 `xiaozhi_tts` / `iflytek_tts`
+- dialog playback ingress 直接按 `config->priority == RIVER_PLAYBACK_PRIO_TTS`
+  识别
+
 ## Step 5.313
 Validate that `dialog_runtime` now resyncs the current cloud runtime snapshot
 before absorbing a local playback-service state edge:

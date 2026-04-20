@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.314
+- `dialog_runtime` 已不再要求 app 在启动时手工注册 dialog playback stream 名称：
+  - 删除 `river_dialog_runtime_register_playback_stream(...)`
+  - 删除 `dialog_runtime` 内部的 stream 白名单表
+  - dialog playback ingress 现在直接以 `RIVER_PLAYBACK_PRIO_TTS` 识别
+    dialog output
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- app 装配层同步退场这层 playback 白名单 wiring：
+  - `river_app_boot()` 不再为 `xiaozhi_tts` / `iflytek_tts` 做额外注册
+  - [components/river_core/river_app.c](/root/ameba-river/components/river_core/river_app.c)
+- 这一步把 dialog playback 识别继续从“外部手工白名单”收回到 runtime 自身的
+  typed ownership 规则，减少了 app 对 dialog/runtime 真相源的装配负担。
+
 ## Step 5.313
 - `dialog_runtime` 的 playback listener ingress 现在会先拉取当前 cloud
   runtime snapshot，再吸收本地 playback service 边沿：

@@ -26,6 +26,11 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.314`
+  - `dialog_runtime` 已删除对 app 侧 dialog playback stream 白名单注册的依赖
+  - dialog playback ingress 现在直接按 `RIVER_PLAYBACK_PRIO_TTS` 识别
+  - `river_app_boot()` 不再装配 `xiaozhi_tts` / `iflytek_tts` 白名单
+  - 这一步继续把 dialog playback ownership truth 从 app wiring 收回 runtime
 - `Step 5.313`
   - `dialog_runtime` 的 playback listener ingress 现在会先抓取当前 cloud
     runtime snapshot，再吸收本地 playback state callback
@@ -1757,6 +1762,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
   手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
   扩展时白名单再次扩散到 app 装配层
+- 继续检查 `priority == TTS` 这层 dialog playback ingress 识别是否还需要再
+  继续下沉到 provider/runtime typed ownership helper，避免未来如果出现：
+  - 非对话类 TTS
+  - 多 provider 并行 TTS
+  时重新把判定逻辑扩散回 core/app
 - 继续把 `dialog_runtime` 里剩余“playback listener 先改本地态、再等后续
   cloud sync 修正”的路径改成同一次 reducer 内完成 truth merge，避免：
   - stale cloud snapshot

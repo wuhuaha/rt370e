@@ -15,12 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.313 resync playback ingress with cloud runtime truth`
+  - `5.314 remove app-side dialog playback stream whitelist`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 已删除 app 侧 dialog playback stream 注册依赖
+    - dialog playback ingress 现在直接按 `RIVER_PLAYBACK_PRIO_TTS` 识别
+    - `river_app_boot()` 不再装配 `xiaozhi_tts` / `iflytek_tts` 白名单
+    - 这一步继续把 dialog playback ownership truth 从 app wiring 收回 runtime
+  - previous runtime-ownership slice:
     - `dialog_runtime` 的 playback ingress 现在会先抓取当前 cloud runtime
       snapshot，再吸收本地 playback state callback
     - `managed recovery` / `interrupt latch clear` / interaction 派生现在都基于

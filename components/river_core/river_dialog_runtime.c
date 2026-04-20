@@ -10,14 +10,10 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.dialog"
 
-#define RIVER_DIALOG_RUNTIME_PLAYBACK_STREAMS_MAX 4U
-
 typedef struct {
     bool initialized;
     bool local_playback_stream_owned;
-    uint32_t dialog_playback_stream_count;
     char local_playback_stream_name[32];
-    char dialog_playback_streams[RIVER_DIALOG_RUNTIME_PLAYBACK_STREAMS_MAX][32];
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
 } river_dialog_runtime_context_t;
@@ -64,33 +60,10 @@ static void river_dialog_runtime_copy_text(char *dst, size_t dst_size, const cha
     dst[dst_size - 1U] = '\0';
 }
 
-static bool river_dialog_runtime_registered_playback_stream_locked(const char *stream_name)
-{
-    uint32_t index;
-
-    if (stream_name == NULL || stream_name[0] == '\0') {
-        return false;
-    }
-
-    if (g_river_dialog_runtime.dialog_playback_stream_count == 0U) {
-        return true;
-    }
-
-    for (index = 0U; index < g_river_dialog_runtime.dialog_playback_stream_count &&
-                      index < RIVER_DIALOG_RUNTIME_PLAYBACK_STREAMS_MAX;
-         ++index) {
-        if (strcmp(g_river_dialog_runtime.dialog_playback_streams[index], stream_name) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool river_dialog_runtime_is_dialog_playback_stream_locked(
     const river_playback_stream_config_t *config)
 {
-    return config != NULL && config->priority == RIVER_PLAYBACK_PRIO_TTS &&
-           river_dialog_runtime_registered_playback_stream_locked(config->stream_name);
+    return config != NULL && config->priority == RIVER_PLAYBACK_PRIO_TTS;
 }
 
 static bool river_dialog_runtime_matches_owned_playback_stream_locked(
@@ -566,44 +539,6 @@ river_status_t river_dialog_runtime_init(void)
                                    sizeof(g_river_dialog_runtime.snapshot.reason),
                                    "boot_begin");
     (void)river_interaction_state_set(RIVER_INTERACTION_BOOTING, "boot_begin");
-    return RIVER_OK;
-}
-
-river_status_t river_dialog_runtime_register_playback_stream(const char *stream_name)
-{
-    uint32_t index;
-
-    if (stream_name == NULL || stream_name[0] == '\0') {
-        return RIVER_ERR_ARG;
-    }
-    if (river_dialog_runtime_init() != RIVER_OK) {
-        return RIVER_ERR_NO_MEMORY;
-    }
-    if (!river_dialog_runtime_lock()) {
-        return RIVER_ERR_BUSY;
-    }
-
-    for (index = 0U; index < g_river_dialog_runtime.dialog_playback_stream_count &&
-                      index < RIVER_DIALOG_RUNTIME_PLAYBACK_STREAMS_MAX;
-         ++index) {
-        if (strcmp(g_river_dialog_runtime.dialog_playback_streams[index], stream_name) == 0) {
-            river_dialog_runtime_unlock();
-            return RIVER_OK;
-        }
-    }
-    if (g_river_dialog_runtime.dialog_playback_stream_count >=
-        RIVER_DIALOG_RUNTIME_PLAYBACK_STREAMS_MAX) {
-        river_dialog_runtime_unlock();
-        return RIVER_ERR_NO_MEMORY;
-    }
-
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime
-            .dialog_playback_streams[g_river_dialog_runtime.dialog_playback_stream_count],
-        sizeof(g_river_dialog_runtime.dialog_playback_streams[0]),
-        stream_name);
-    g_river_dialog_runtime.dialog_playback_stream_count++;
-    river_dialog_runtime_unlock();
     return RIVER_OK;
 }
 
