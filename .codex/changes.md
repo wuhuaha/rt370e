@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.322
+- playback owner 的 `phase` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
+  - 新增 `river_cloud_playback_phase_t`
+  - 新增 `river_cloud_playback_phase_name(...)`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 已改为直接维护并导出公共 `phase`：
+  - 删除私有 `river_cloud_xiaozhi_playback_phase_t`
+  - `xiaozhi_playback_phase` 内部状态改为公共 enum
+  - `playback_runtime_snapshot` 显式填充 `playback_phase_kind`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 公开 snapshot 已不再暴露字符串 `playback_phase`：
+  - 改为吸收并导出 `playback_phase_kind`
+  - `dialog_runtime_dump_status()` 也改为直接打印 typed phase
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 downlink/playback 的 phase 真相从 owner 内部私有 enum 与跨层
+  文本投影，收口到公共 owner typed truth。
+
 ## Step 5.321
 - playback owner 的 `terminal state` 已从内部字符串真相提升成公共 typed truth：
   - 新增 `river_cloud_playback_terminal_state_t`

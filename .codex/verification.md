@@ -1,5 +1,47 @@
 # Verification
 
+## Step 5.322
+Validate that playback owner now exports a public typed phase, and that
+`dialog_runtime` consumes that enum instead of exposing a string playback phase
+through its public snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_phase_kind|RIVER_CLOUD_PLAYBACK_PHASE_|river_cloud_playback_phase_name' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+rg -n 'playback_phase\\[' \
+  include/river/river_dialog_runtime.h
+sed -n '95,145p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '912,932p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '495,533p' components/river_core/river_dialog_runtime.c
+sed -n '900,907p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_cloud_runtime_snapshot_t` exposes:
+  - `playback_phase_kind`
+- public `river_dialog_runtime_snapshot_t` exposes:
+  - `playback_phase_kind`
+  and no longer exposes:
+  - `playback_phase`
+- XiaoZhi playback runtime keeps phase truth in the public enum and fills
+  `playback_phase_kind` directly from owner state
+- `dialog_runtime_dump_status()` prints phase via
+  `river_cloud_playback_phase_name(...)` instead of reading a public string
+  field
+
 ## Step 5.321
 Validate that playback owner now exports a public typed terminal state, and that
 `dialog_runtime` consumes that enum instead of exposing a string terminal state

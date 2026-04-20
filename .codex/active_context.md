@@ -15,11 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.321 export playback terminal state as public typed truth`
+  - `5.322 export playback phase as public typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback owner 的 `phase` 已从 XiaoZhi 私有 enum 提升成公共
+      typed truth：
+      - `river_cloud_playback_phase_t`
+      - `playback_phase_kind`
+    - `dialog_runtime` 的公开 snapshot 已删除字符串：
+      - `playback_phase`
+      并改为直接吸收 `playback_phase_kind`
+    - XiaoZhi downlink/playback runtime 的 `phase` 现在直接用公共 enum 维护，
+      不再保留私有 playback-phase 类型
+    - 这一步继续把 downlink/playback 的 phase 真相从私有 enum / 跨层文本字段，
+      收口到公共 owner typed truth
   - newest landed runtime-ownership slice:
     - playback owner 的 `terminal state` 已从内部字符串真相提升成公共
       typed truth：

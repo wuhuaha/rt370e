@@ -45,6 +45,24 @@ const char *river_cloud_playback_rebuffer_cause_name(
     }
 }
 
+const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase)
+{
+    switch (phase) {
+    case RIVER_CLOUD_PLAYBACK_PHASE_IDLE:
+        return "idle";
+    case RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING:
+        return "prefetching";
+    case RIVER_CLOUD_PLAYBACK_PHASE_PLAYING:
+        return "playing";
+    case RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING:
+        return "rebuffering";
+    case RIVER_CLOUD_PLAYBACK_PHASE_DRAINING:
+        return "draining";
+    default:
+        return "unknown";
+    }
+}
+
 const char *river_cloud_playback_terminal_state_name(
     river_cloud_playback_terminal_state_t state)
 {

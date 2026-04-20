@@ -60,6 +60,14 @@ typedef void (*river_cloud_state_sync_handler_t)(const char *reason,
 #define RIVER_CLOUD_RUNTIME_STATE_MAX    32U
 
 typedef enum {
+    RIVER_CLOUD_PLAYBACK_PHASE_IDLE = 0,
+    RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING,
+    RIVER_CLOUD_PLAYBACK_PHASE_PLAYING,
+    RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING,
+    RIVER_CLOUD_PLAYBACK_PHASE_DRAINING
+} river_cloud_playback_phase_t;
+
+typedef enum {
     RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE = 0,
     RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_META,
     RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN,
@@ -102,6 +110,7 @@ typedef struct {
     bool playback_backend_restart_pending;
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
+    river_cloud_playback_phase_t playback_phase_kind;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
@@ -157,6 +166,7 @@ river_status_t river_cloud_asr_stream_push_frame(const uint8_t *pcm,
 river_status_t river_cloud_asr_batch_submit_segment(const uint8_t *pcm,
                                                     size_t bytes,
                                                     const river_voice_segment_desc_t *segment);
+const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase);
 const char *river_cloud_playback_rebuffer_cause_name(
     river_cloud_playback_rebuffer_cause_t cause);
 const char *river_cloud_playback_terminal_state_name(

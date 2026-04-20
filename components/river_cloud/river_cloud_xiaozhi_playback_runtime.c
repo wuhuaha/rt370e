@@ -92,26 +92,7 @@ static bool river_cloud_xiaozhi_playback_backend_owned(
            state == RIVER_CLOUD_XIAOZHI_PLAYBACK_BACKEND_RESTART_PENDING;
 }
 
-const char *river_cloud_xiaozhi_playback_phase_name(
-    river_cloud_xiaozhi_playback_phase_t phase)
-{
-    switch (phase) {
-    case RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_IDLE:
-        return "idle";
-    case RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_PREFETCHING:
-        return "prefetching";
-    case RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_PLAYING:
-        return "playing";
-    case RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_REBUFFERING:
-        return "rebuffering";
-    case RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_DRAINING:
-        return "draining";
-    default:
-        return "unknown";
-    }
-}
-
-river_cloud_xiaozhi_playback_phase_t river_cloud_xiaozhi_playback_phase(void)
+river_cloud_playback_phase_t river_cloud_xiaozhi_playback_phase(void)
 {
     return g_river_cloud.xiaozhi_playback_phase;
 }
@@ -127,27 +108,27 @@ bool river_cloud_xiaozhi_playback_rebuffer_pending(void)
     return g_river_cloud.xiaozhi_playback_rebuffer_pending;
 }
 
-static river_cloud_xiaozhi_playback_phase_t river_cloud_xiaozhi_compute_playback_phase(void)
+static river_cloud_playback_phase_t river_cloud_xiaozhi_compute_playback_phase(void)
 {
     if (g_river_cloud.xiaozhi_tts_stop_pending) {
-        return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_DRAINING;
+        return RIVER_CLOUD_PLAYBACK_PHASE_DRAINING;
     }
     if (g_river_cloud.xiaozhi_playback_rebuffer_pending) {
-        return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_REBUFFERING;
+        return RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
     }
     if (g_river_cloud.xiaozhi_playback_active) {
-        return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_PLAYING;
+        return RIVER_CLOUD_PLAYBACK_PHASE_PLAYING;
     }
     if (river_cloud_xiaozhi_playback_queued_frames() != 0U) {
-        return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_PREFETCHING;
+        return RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING;
     }
-    return RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_IDLE;
+    return RIVER_CLOUD_PLAYBACK_PHASE_IDLE;
 }
 
 static bool river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
 {
-    river_cloud_xiaozhi_playback_phase_t old_phase = g_river_cloud.xiaozhi_playback_phase;
-    river_cloud_xiaozhi_playback_phase_t new_phase =
+    river_cloud_playback_phase_t old_phase = g_river_cloud.xiaozhi_playback_phase;
+    river_cloud_playback_phase_t new_phase =
         river_cloud_xiaozhi_compute_playback_phase();
 
     if (old_phase == new_phase) {
@@ -156,8 +137,8 @@ static bool river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
 
     g_river_cloud.xiaozhi_playback_phase = new_phase;
     RIVER_LOGI("xiaozhi playback phase: %s -> %s reason=%s queued=%lu active=%s backend=%s rebuffer=%s cause=%s stop=%s",
-               river_cloud_xiaozhi_playback_phase_name(old_phase),
-               river_cloud_xiaozhi_playback_phase_name(new_phase),
+               river_cloud_playback_phase_name(old_phase),
+               river_cloud_playback_phase_name(new_phase),
                reason != NULL && reason[0] != '\0' ? reason : "-",
                (unsigned long)river_cloud_xiaozhi_playback_queued_frames(),
                g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
@@ -279,15 +260,15 @@ uint32_t river_cloud_xiaozhi_playback_queued_frames(void)
 
 bool river_cloud_xiaozhi_playback_output_active(void)
 {
-    river_cloud_xiaozhi_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
 
-    return phase == RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_PLAYING ||
-           phase == RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_DRAINING;
+    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PLAYING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_DRAINING;
 }
 
 bool river_cloud_xiaozhi_playback_lane_engaged(void)
 {
-    return river_cloud_xiaozhi_playback_phase() != RIVER_CLOUD_XIAOZHI_PLAYBACK_PHASE_IDLE;
+    return river_cloud_xiaozhi_playback_phase() != RIVER_CLOUD_PLAYBACK_PHASE_IDLE;
 }
 
 bool river_cloud_xiaozhi_playback_has_work(void)
@@ -838,7 +819,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
                g_river_cloud.xiaozhi_playback_meta_valid ? "yes" : "no");
     RIVER_LOGI("xiaozhi playback_terminal phase=%s state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
-               river_cloud_xiaozhi_playback_phase_name(
+               river_cloud_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
                g_river_cloud.xiaozhi_playback_terminal_state_kind !=
                        RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE ?
@@ -935,6 +916,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
         backend_state == RIVER_CLOUD_XIAOZHI_PLAYBACK_BACKEND_RESTART_PENDING;
     snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
+    snapshot->playback_phase_kind = river_cloud_xiaozhi_playback_phase();
     snapshot->playback_terminal_wait_kind =
         g_river_cloud.xiaozhi_playback_terminal_wait_kind;
     snapshot->playback_terminal_state_kind =
@@ -946,7 +928,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,
                                            sizeof(snapshot->playback_phase),
-                                           river_cloud_xiaozhi_playback_phase_name(
+                                           river_cloud_playback_phase_name(
                                                river_cloud_xiaozhi_playback_phase()));
     river_cloud_xiaozhi_copy_optional_text(
         snapshot->playback_rebuffer_cause,

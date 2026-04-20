@@ -494,6 +494,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         snapshot->playback_rebuffer_pending;
     g_river_dialog_runtime.snapshot.playback_phase_known =
         snapshot->playback_phase_known;
+    g_river_dialog_runtime.snapshot.playback_phase_kind =
+        snapshot->playback_phase_kind;
     g_river_dialog_runtime.snapshot.playback_backend_owned =
         snapshot->playback_backend_owned;
     g_river_dialog_runtime.snapshot.playback_backend_restart_pending =
@@ -527,9 +529,6 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
                                    sizeof(g_river_dialog_runtime.snapshot.accept_reason),
                                    snapshot->accept_reason);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_phase,
-                                   sizeof(g_river_dialog_runtime.snapshot.playback_phase),
-                                   snapshot->playback_phase);
     river_dialog_runtime_copy_text(
         g_river_dialog_runtime.snapshot.playback_terminal_reason,
         sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
@@ -902,7 +901,7 @@ void river_dialog_runtime_dump_status(void)
                river_dialog_runtime_local_playback_state_name(playback_state),
                snapshot.playback_cloud_active ? "yes" : "no",
                snapshot.playback_phase_known ?
-                   (snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-") :
+                   river_cloud_playback_phase_name(snapshot.playback_phase_kind) :
                    "-",
                snapshot.playback_phase_known ? "yes" : "no",
                snapshot.playback_backend_owned ? "yes" : "no",

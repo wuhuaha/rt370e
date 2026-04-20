@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.322`
+  - playback owner 的 `phase` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
+    - `river_cloud_playback_phase_t`
+    - `playback_phase_kind`
+  - `dialog_runtime` 的公开 snapshot 已删除字符串：
+    - `playback_phase`
+    并改为直接吸收 `playback_phase_kind`
+  - XiaoZhi downlink/playback runtime 的 `phase` 现在直接用公共 enum 维护，
+    不再保留私有 playback-phase 类型
+  - 这一步继续把 downlink/playback 的 phase 真相从私有 enum / 跨层文本字段，
+    收口到公共 owner typed truth
 - `Step 5.321`
   - playback owner 的 `terminal state` 已从内部字符串真相提升成公共
     typed truth：
