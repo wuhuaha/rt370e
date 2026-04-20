@@ -1,5 +1,44 @@
 # Verification
 
+## Step 5.300
+Validate that `dialog runtime` now directly consumes XiaoZhi round/window truth
+from the cloud runtime snapshot instead of only inferring round liveness from
+edge lifecycle events:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'listen_stop_pending|local_close_pending|conversation_window_remaining_ms|local_close_remaining_ms' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '56,96p' include/river/river_cloud.h
+sed -n '24,72p' include/river/river_dialog_runtime.h
+sed -n '815,845p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '372,530p' components/river_core/river_dialog_runtime.c
+sed -n '769,905p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud/dialog runtime snapshots both export:
+  - `listen_stop_pending`
+  - `local_close_pending`
+  - `conversation_window_remaining_ms`
+  - `local_close_remaining_ms`
+- `river_dialog_runtime_apply_cloud_snapshot_locked()` now promotes
+  `asr_session_active` from cloud round truth when the round is still active
+- `river_dialog_runtime_wakeword_admission_block_reason()` now prefers typed
+  round causes before falling back to coarse interaction state
+- `river_dialog_runtime_dump_status()` prints
+  `stop_pending/local_close/window remaining` diagnostics directly
+
 ## Step 5.299
 Validate that XiaoZhi wake admission / follow-up reopen / open-listen round
 startup ownership has moved into `river_cloud_xiaozhi_round_runtime.c`:

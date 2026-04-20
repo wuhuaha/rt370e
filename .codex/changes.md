@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.300
+- `dialog runtime` 现在直接吸收更多 XiaoZhi round/window typed truth，而不是只靠
+  边缘 lifecycle 事件推断当前轮次：
+  - `listen_stop_pending`
+  - `local_close_pending`
+  - `conversation_window_remaining_ms`
+  - `local_close_remaining_ms`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+- `river_cloud_xiaozhi_fill_runtime_snapshot()` 现已把上述 round/window 事实直接从
+  XiaoZhi round runtime 投影到 cloud snapshot：
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- `river_dialog_runtime_apply_cloud_snapshot_locked()` 继续收口这组 round truth：
+  - cloud snapshot 中的 `listen_stop_pending/local_close_pending/window remaining`
+    现会被原子吸收到 `dialog runtime snapshot`
+  - 当 cloud round 仍处于 listening / stream / stop-pending / local-close-pending /
+    committed-input 之一时，`dialog runtime` 会维持 `asr_session_active`
+  - wakeword admission block reason 现优先暴露 typed round cause，而不是回退成
+    笼统 interaction-state
+  - status dump 现会直接打印：
+    - `stop_pending`
+    - `local_close`
+    - `local_close_remaining_ms`
+    - `conversation_window_remaining_ms`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.299
 - 继续把 XiaoZhi 的 round 启动路径从
   `river_cloud_xiaozhi_session.c` 并入

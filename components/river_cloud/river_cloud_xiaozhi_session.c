@@ -815,12 +815,21 @@ void river_cloud_xiaozhi_note_asr_result_emitted(river_cloud_asr_event_type_t ty
 
 void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot)
 {
+    uint64_t now_ms;
+
     if (snapshot == NULL) {
         return;
     }
 
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     snapshot->conversation_window_active = river_cloud_xiaozhi_conversation_window_active();
+    snapshot->conversation_window_remaining_ms =
+        (uint32_t)river_cloud_xiaozhi_conversation_window_remaining_ms(now_ms);
     snapshot->listening = river_cloud_xiaozhi_listening_active();
+    snapshot->listen_stop_pending = river_cloud_xiaozhi_listen_stop_pending();
+    snapshot->local_close_pending = river_cloud_xiaozhi_local_close_pending();
+    snapshot->local_close_remaining_ms =
+        (uint32_t)river_cloud_xiaozhi_local_close_remaining_ms(now_ms);
     river_cloud_xiaozhi_fill_playback_runtime_snapshot(snapshot);
     snapshot->turn_accepted = g_river_cloud.xiaozhi_turn_accepted;
     snapshot->barge_in_enabled_known = g_river_cloud.xiaozhi_transport_barge_in_enabled_known;

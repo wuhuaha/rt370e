@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.299 move xiaozhi round startup paths into round runtime`
+  - `5.300 let dialog runtime absorb round truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,28 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog runtime` 现在继续直接吸收 XiaoZhi round/window typed truth：
+      - `listen_stop_pending`
+      - `local_close_pending`
+      - `conversation_window_remaining_ms`
+      - `local_close_remaining_ms`
+    - cloud round 仍处于：
+      - listening
+      - stream active
+      - listen-stop pending
+      - local-close pending
+      - input committed/active
+      之一时，`dialog runtime` 会继续维持 `asr_session_active`
+    - wakeword admission block reason 已开始优先输出：
+      - `conversation_window_active`
+      - `cloud_local_close_pending`
+      - `cloud_listen_stop_pending`
+    - `dialog runtime` status dump 也直接打印 stop-pending / local-close /
+      round/window remaining truth，便于后续继续收口 coordinator bridge
+    - 下一步应继续检查：
+      - `session_coordinator` 是否还在事件桥里重建 round/ASR truth
+      - `asr_session_active` 能否进一步 reducer 化，减少 event-edge owner
+  - previous runtime-ownership slice:
     - XiaoZhi round runtime 已继续接管 round 启动入口：
       - `open_session_and_listen()`
       - `start_followup_round()`

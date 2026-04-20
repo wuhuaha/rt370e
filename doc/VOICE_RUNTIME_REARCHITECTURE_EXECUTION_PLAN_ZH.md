@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.300`
+  - `dialog runtime` 已开始直接吸收 XiaoZhi round/window typed truth：
+    - `listen_stop_pending`
+    - `local_close_pending`
+    - `conversation_window_remaining_ms`
+    - `local_close_remaining_ms`
+  - wake admission block reason 已优先暴露 typed round cause：
+    - `conversation_window_active`
+    - `cloud_local_close_pending`
+    - `cloud_listen_stop_pending`
+  - cloud round 仍处于 listening / stream / stop-pending / local-close-pending /
+    committed-input 之一时，`dialog runtime` 会继续维持 `asr_session_active`
 - `Step 5.299`
   - `open_session_and_listen() / start_followup_round() /
     maybe_start_followup_round() / begin_conversation_window()` 已并入
@@ -49,9 +61,10 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续把 round/window typed truth 更直接投影到 `dialog runtime`
-  - 让 dialog runtime 直接消费 round/window typed truth，而不是继续从
-    cloud session 层拼装派生语义
+  - 继续减少 `session_coordinator` 对 round/ASR 生命周期的事件桥接
+  - 评估把 `asr_session_active` 进一步收成 reducer/snapshot-owned truth
+  - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
+    local playback / recovering/rebuffer 的 owner 边界彻底稳定
 
 ## 2. 目标
 

@@ -372,6 +372,18 @@ static bool river_dialog_runtime_output_speaking_effective_locked(void)
     return true;
 }
 
+static bool river_dialog_runtime_cloud_round_active_locked(void)
+{
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+
+    return snapshot->cloud_listening ||
+           snapshot->cloud_stream_active ||
+           snapshot->cloud_listen_stop_pending ||
+           snapshot->cloud_local_close_pending ||
+           snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
+           snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED;
+}
+
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -434,8 +446,16 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
 
     g_river_dialog_runtime.snapshot.conversation_window_active =
         snapshot->conversation_window_active;
+    g_river_dialog_runtime.snapshot.conversation_window_remaining_ms =
+        snapshot->conversation_window_remaining_ms;
     g_river_dialog_runtime.snapshot.cloud_listening = snapshot->listening;
     g_river_dialog_runtime.snapshot.cloud_stream_active = snapshot->stream_active;
+    g_river_dialog_runtime.snapshot.cloud_listen_stop_pending =
+        snapshot->listen_stop_pending;
+    g_river_dialog_runtime.snapshot.cloud_local_close_pending =
+        snapshot->local_close_pending;
+    g_river_dialog_runtime.snapshot.local_close_remaining_ms =
+        snapshot->local_close_remaining_ms;
     g_river_dialog_runtime.snapshot.playback_cloud_active = snapshot->playback_active;
     g_river_dialog_runtime.snapshot.playback_lane_engaged = snapshot->playback_lane_engaged;
     g_river_dialog_runtime.snapshot.playback_rebuffer_pending =
@@ -497,6 +517,9 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         river_dialog_runtime_parse_input_lane(snapshot->input_state);
     g_river_dialog_runtime.snapshot.output_lane =
         river_dialog_runtime_parse_output_lane(snapshot->output_state);
+    if (river_dialog_runtime_cloud_round_active_locked()) {
+        g_river_dialog_runtime.snapshot.asr_session_active = true;
+    }
     river_dialog_runtime_refresh_playback_locked();
 }
 
@@ -769,6 +792,10 @@ const char *river_dialog_runtime_wakeword_admission_block_reason(void)
 
     if (g_river_dialog_runtime.snapshot.conversation_window_active) {
         reason = "conversation_window_active";
+    } else if (g_river_dialog_runtime.snapshot.cloud_local_close_pending) {
+        reason = "cloud_local_close_pending";
+    } else if (g_river_dialog_runtime.snapshot.cloud_listen_stop_pending) {
+        reason = "cloud_listen_stop_pending";
     } else if (g_river_dialog_runtime.snapshot.interaction_state !=
                RIVER_INTERACTION_WAKE_MONITORING) {
         reason = river_interaction_state_name(
@@ -832,7 +859,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s window=%s wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -869,7 +896,11 @@ void river_dialog_runtime_dump_status(void)
                snapshot.playback_terminal_wait_reason[0] != '\0' ?
                    snapshot.playback_terminal_wait_reason :
                    "-",
+               snapshot.cloud_listen_stop_pending ? "yes" : "no",
+               snapshot.cloud_local_close_pending ? "yes" : "no",
+               (unsigned long)snapshot.local_close_remaining_ms,
                snapshot.conversation_window_active ? "open" : "closed",
+               (unsigned long)snapshot.conversation_window_remaining_ms,
                snapshot.wake_confirmed ? "yes" : "no",
                snapshot.error_recovering ? "yes" : "no",
                snapshot.turn_id[0] != '\0' ? snapshot.turn_id : "-",

@@ -64,6 +64,8 @@ typedef struct {
     bool conversation_window_active;
     bool listening;
     bool stream_active;
+    bool listen_stop_pending;
+    bool local_close_pending;
     bool playback_active;
     bool playback_lane_engaged;
     bool playback_rebuffer_pending;
@@ -84,6 +86,8 @@ typedef struct {
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char input_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char output_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    uint32_t conversation_window_remaining_ms;
+    uint32_t local_close_remaining_ms;
     uint32_t playback_start_frames;
     uint32_t playback_prefetch_frames;
     bool playback_start_cautious_history;
