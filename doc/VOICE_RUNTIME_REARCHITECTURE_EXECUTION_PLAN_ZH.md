@@ -1351,6 +1351,22 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 对应日志语义也同步改成：
     - `rebuffer_total`
     - `streak`
+- 在此基础上，`streak` 的清零条件也已继续收紧到真正的稳定播放事实：
+  - playback segment 新增：
+    - `rebuffered`
+  - 某段一旦经历过本地 rebuffer，就不会因为“最终播完了”而立刻把
+    `streak` 清零
+  - 只有：
+    - 完整播完
+    - 且该段本身没经历 rebuffer
+    的 clean segment，才会清掉 `streak`
+  - recovered segment 现在会显式记录：
+    - `reason=segment_recovered`
+    并保留 active history
+  - clean segment 则显式记录：
+    - `reason=clean_segment`
+    并真正释放这段恢复历史
+  - 这让 `streak` 更接近“连续恢复历史尚未被稳定播放打断”的 typed truth
 - playback service 的 control wrapper 也已继续纠正一层假成功语义：
   - `stop/interrupt/flush/recover` 现在不再吞掉底层 control 的返回值后统一
     回 `RIVER_OK`

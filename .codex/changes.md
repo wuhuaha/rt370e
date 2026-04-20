@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.283
+- XiaoZhi playback segment 现在显式记录本段是否经历过 rebuffer：
+  - 新增 segment 字段：
+    - `rebuffered`
+  - 一旦某段在播放中进入 rebuffer，该段会锁存 `rebuffered=yes`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `rebuffer_streak` 的清零条件也随之收紧：
+  - 不再因为“recover 后终于把这一段播完了”就立刻清掉
+  - 现在只有：
+    - 完整播完
+    - 且该段本身没有经历 rebuffer
+    的 clean segment，才会真正把 `streak` 清零
+  - 若当前段是 recover 后才播完，runtime 会明确打印：
+    - `reason=segment_recovered`
+    并保留 `streak`
+  - 若当前段是 clean segment，则打印：
+    - `reason=clean_segment`
+    并清掉 `streak`
+  - 这让 `streak` 更接近“连续恢复历史仍未被稳定播放打断”的真实语义
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.282
 - XiaoZhi downlink/playback runtime 现在把“累计重缓冲次数”和“当前恢复门槛历史”
   拆开维护，避免历史 recover 永久放大后续 start gate：

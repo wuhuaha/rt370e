@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.283
+Validate that XiaoZhi playback now only clears the active rebuffer history
+after a fully-heard clean segment, instead of clearing it after any recovered
+segment eventually finishes:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'rebuffered|streak preserved|reason=clean_segment|reason=segment_recovered' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '772,800p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1038,1064p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- each playback segment exposes a `rebuffered` flag
+- entering rebuffer while a segment is active latches `segment->rebuffered = true`
+- `rebuffer_streak` is preserved for `reason=segment_recovered`
+- `rebuffer_streak` is only cleared for `reason=clean_segment`
+
 ## Step 5.282
 Validate that XiaoZhi playback now separates cumulative rebuffer diagnostics
 from the active restart-threshold history, and that playback-service control

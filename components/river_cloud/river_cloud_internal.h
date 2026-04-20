@@ -144,6 +144,7 @@ typedef struct {
     bool started;
     bool started_ack_reported;
     bool is_last_segment;
+    bool rebuffered;
     uint64_t started_at_ms;
     uint64_t paused_at_ms;
     uint32_t expected_duration_ms;
