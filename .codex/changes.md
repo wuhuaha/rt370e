@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.325
+- `waiting_segment` 现在被明确视为“response 尚未结束，但本地正处于段间静默空窗”：
+  - 新增 `river_cloud_xiaozhi_playback_silent_gap_allows_vad_open()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_playback_allows_vad_open()` 在
+  `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT` 时会直接返回 `true`：
+  - 不再继续要求 duplex/AEC ready
+  - 不再把段间静默误判成持续中的 playback AEC block
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_capture_held_by_playback(...)` 在 `waiting_segment` 时会：
+  - 直接返回 `false`
+  - 显式清空 `fallback_reason`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步把段间静默从“playback lane 仍 engaged，所以 capture 仍应被 AEC 阻断”
+  收口成更准确的 owner truth：
+  - response 仍在继续
+  - 但本地 capture / VAD / soft-endpoint 已可重新打开
+
 ## Step 5.324
 - playback owner 新增显式 `waiting_segment` phase：
   - `river_cloud_playback_phase_t` 增加 `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`

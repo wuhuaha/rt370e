@@ -15,11 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.324 introduce explicit waiting-segment playback phase`
+  - `5.325 let waiting_segment release silent-gap capture hold`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `waiting_segment` 不再只是一条诊断/phase 真相，也开始直接参与 duplex /
+      capture 语义
+    - XiaoZhi playback runtime 现在会把段间静默视为：
+      - response 尚在继续
+      - 但本地 VAD / capture / soft-endpoint 已可重新打开
+    - `river_cloud_xiaozhi_playback_allows_vad_open()` 在 `waiting_segment`
+      时直接返回 `true`
+    - `river_cloud_xiaozhi_capture_held_by_playback(...)` 在
+      `waiting_segment` 时直接返回 `false`，并清空 fallback reason
+    - 这一步继续把 downlink/playback 从“lane 仍 engaged 就继续 hold capture”的
+      粗粒度语义，推进到“显式区分段间静默和真正的播放/AEC 阻断”
   - newest landed runtime-ownership slice:
     - playback owner 新增了显式段间等待 phase：
       - `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`

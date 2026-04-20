@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.325`
+  - `waiting_segment` 不再只是一条显式 playback phase，也开始直接参与
+    duplex / capture 语义
+  - XiaoZhi playback runtime 在段间静默空窗时现在会：
+    - 允许 `playback_allows_vad_open()`
+    - 让 `capture_held_by_playback(...)` 直接返回 `false`
+    - 清空对应的 fallback reason
+  - 这让“response 尚未结束，但当前并无本地有声播放”的阶段，不再继续被粗暴归类为
+    `half_duplex_aec_blocked`
+  - 这一步继续把 `waiting_segment` 从“owner 诊断 truth”推进成“真正影响运行时
+    行为的 owner truth”
 - `Step 5.324`
   - playback owner 新增显式段间等待 phase：
     - `RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
@@ -299,6 +310,11 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续让 `dialog_runtime` / interaction / output lane 显式消费
+    `waiting_segment`：
+    - 区分“response 仍在继续”
+    - 与“本地仍有有声 playback 正在输出”
+    避免 silent gap 继续被上层粗粒度当成持续 speaking / capture-blocking
   - 继续压缩 `dialog_runtime` 内部 local playback shadow：
     - 只保留 stream ownership ingress 所需最小状态
     - 评估 `playback_local_active/recovering/state` 是否还能收成一个更小的
