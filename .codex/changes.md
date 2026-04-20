@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.284
+- XiaoZhi downlink/playback 的起播门限现在统一收口到显式 typed prefetch
+  policy，而不是继续把“基础门限 / starvation 预取 / 恢复历史抬高”散落在多处
+  helper 里分别推导：
+  - 新增 start policy：
+    - `baseline`
+    - `rebuffer_fast`
+    - `segment_prefetch`
+    - `starved_prefetch`
+  - 新增统一 start gate 结果：
+    - `policy`
+    - `start_frames`
+    - `prefetch_frames`
+    - `cautious_history`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `audio.out.meta` 观测到的 segment 节奏现在也能直接推动更保守的起播：
+  - 若 `last_meta_gap_ms` 已经大于基础起播预算，则即便当前不在
+    `UPSTREAM_STARVED`，runtime 也会切到 `segment_prefetch`
+  - 这让“长段 / 慢供给 / 段边界 write_failed 抖动”不再只能依赖：
+    - base start frames
+    - rebuffer streak
+    两个粗粒度信号
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- XiaoZhi playback 诊断日志也同步切到统一的 typed start-gate 语义：
+  - status / prefetch / upstream-gap rebuffer / playback start / rebuffer
+    requested 现在都会打印：
+    - `policy`
+    - `cautious`
+    - `prefetch_frames`
+  - `downlink_start_threshold_frames()` 本身也改为只返回统一
+    `compute_start_gate()` 的结果，避免后续再长出新的门限分叉
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+
 ## Step 5.283
 - XiaoZhi playback segment 现在显式记录本段是否经历过 rebuffer：
   - 新增 segment 字段：

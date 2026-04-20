@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.283 only let clean segments clear XiaoZhi rebuffer streak`
+  - `5.284 consolidate XiaoZhi downlink start gating into typed prefetch policy`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,27 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - XiaoZhi downlink start gating now comes from one explicit typed prefetch
+      policy helper instead of being split across scattered threshold
+      heuristics:
+      - `baseline`
+      - `rebuffer_fast`
+      - `segment_prefetch`
+      - `starved_prefetch`
+    - runtime now computes and reuses one typed start-gate result:
+      - `start_frames`
+      - `prefetch_frames`
+      - `cautious_history`
+    - `audio.out.meta` segment cadence can now raise the start threshold even
+      outside the active `UPSTREAM_STARVED` path, which directly targets the
+      current long-segment / slow-supply / segment-boundary playback churn
+    - board diagnostics now print the same typed gate on:
+      - status
+      - prefetch
+      - upstream-gap rebuffer
+      - playback start
+      - rebuffer requested
+  - previous runtime-ownership slice:
     - XiaoZhi playback segment truth now also records whether a segment has
       already gone through local rebuffer:
       - `rebuffered`
@@ -96,7 +117,7 @@ or top-of-tree verification target changes.
       - `reason=segment_recovered`
     - this keeps the start-threshold history aligned with actual uninterrupted
       playback stability instead of “recover 后勉强播完也算稳定”
-  - previous runtime-ownership slice:
+  - earlier runtime-ownership slice:
     - XiaoZhi playback runtime now separates:
       - cumulative rebuffer diagnostics
       - active restart-threshold history

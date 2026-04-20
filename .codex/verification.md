@@ -1,5 +1,45 @@
 # Verification
 
+## Step 5.284
+Validate that XiaoZhi downlink start gating is now derived from a single typed
+prefetch policy and that slow segment cadence can raise the start gate even
+outside the active `UPSTREAM_STARVED` path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'PLAYBACK_START_POLICY_|playback_start_gate_t|compute_start_gate|segment_prefetch_target_needed|playback_prefetch_target_frames' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'policy=%s|cautious=%s|prefetch_frames=%u' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '20,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '300,390p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '930,965p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1308,1332p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1798,1868p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2140,2162p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime exposes explicit start policy types:
+  - `baseline`
+  - `rebuffer_fast`
+  - `segment_prefetch`
+  - `starved_prefetch`
+- a single `compute_start_gate()` helper now owns:
+  - `start_frames`
+  - `prefetch_frames`
+  - `cautious_history`
+- slow `audio.out.meta` cadence can trigger `segment_prefetch` even when the
+  runtime is not currently in `UPSTREAM_STARVED`
+- status/start/rebuffer diagnostics all print the same typed policy fields
+
 ## Step 5.283
 Validate that XiaoZhi playback now only clears the active rebuffer history
 after a fully-heard clean segment, instead of clearing it after any recovered

@@ -1375,6 +1375,28 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - 还是已经掉到 `RESTART_PENDING` / `ERR_BUSY`
   - 也让 downlink runtime 里原本保留的 `recover_status` fallback 诊断终于
     成为真实可触发的观察点，而不是永远打印不到的死分支
+- 再往前一步，XiaoZhi downlink 的起播门限也已继续从分散 heuristics 收口成
+  一个 typed prefetch/start-gate policy：
+  - 新增 policy：
+    - `baseline`
+    - `rebuffer_fast`
+    - `segment_prefetch`
+    - `starved_prefetch`
+  - runtime 统一计算：
+    - `start_frames`
+    - `prefetch_frames`
+    - `cautious_history`
+    不再把这几类判断分散在多个 helper 里独立拼接
+  - `audio.out.meta` 的 segment cadence 现在也能直接触发
+    `segment_prefetch`，因此“长段/慢供给”场景不再只能靠：
+    - base start frames
+    - rebuffer streak
+    两个粗粒度信号
+  - status / prefetch / upstream-gap rebuffer / playback start / rebuffer
+    requested 现统一打印同一条 typed gate 语义：
+    - `policy`
+    - `cautious`
+    - `prefetch_frames`
 
 下一步焦点：
 
@@ -1382,10 +1404,16 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
   逐步压缩本地 flush/restart 在常态恢复路径中的占比
-- 继续评估是否要把“长段/慢供给”的 cautious start gate 从当前的 active
-  recovery history 再推进成显式 typed prefetch policy，而不是继续只靠：
-  - base start frames
-  - rebuffer streak
+- 继续把 typed prefetch/start-gate 从“内部 helper 收口”推进成更稳定的
+  runtime fact，评估是否需要把：
+  - 当前 policy
+  - 当前 start_frames
+  - 当前 prefetch_frames
+  进一步导出给更上层状态/诊断，而不是继续在 runtime 内多处现算
+- 继续检查 `segment_prefetch` 是否还需要纳入更多段级真相，例如：
+  - 当前 segment 的恢复历史
+  - 相邻 meta 到达抖动
+  - 尾段/末段的保守放宽
 - 继续把 dialog runtime 的本地 playback 入口从“app 注册白名单”推进到更少
   手工注册、更强 provider/runtime typed ownership truth，避免未来 provider
   扩展时白名单再次扩散到 app 装配层
