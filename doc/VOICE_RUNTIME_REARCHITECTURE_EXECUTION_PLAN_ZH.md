@@ -1328,6 +1328,17 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   - 使用 `snapshot.conversation_window_active` 作为对外真相
   - cloud adapter 暂时保留为 fallback，避免 runtime 未初始化时失能
   - 这让 voice/KWS 不再把“窗口是否打开”直接绑死在 cloud adapter 回调上
+- 再继续一步，XiaoZhi 自身的 round/window 辅助状态也开始从大文件拆出：
+  - 新建 `river_cloud_xiaozhi_round_runtime.c`
+  - 先承接：
+    - `listening`
+    - `conversation_window`
+    - `listen_stop`
+    - `local_close defer`
+  - `river_cloud_xiaozhi_session.c` 不再内联实现这组 helper/state machine
+  - 这一步的目的不是立刻改变行为，而是先把 owner 边界从
+    `xiaozhi_session.c` 里剥离出来，方便下一阶段继续把 round/window 真相
+    向 dialog runtime 收口
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.297
+Validate that XiaoZhi round/window/listen-stop/local-close helper ownership has
+been split out of `river_cloud_xiaozhi_session.c`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_(listening_active|conversation_window_active|conversation_window_remaining_ms|local_close_pending|local_close_remaining_ms|listen_stop_pending|apply_listen_stop_completion_round_policy|maybe_finalize_listen_stop|uplink_keepalive_needed|uplink_send_ready|should_defer_local_close|arm_local_close_defer|window_touch|window_close|window_abort_local)' \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '1,220p' components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+sed -n '1,90p' components/river_cloud/CMakeLists.txt
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the listed round/window helpers live in:
+  - `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` no longer implements
+  those helper bodies inline
+
 ## Step 5.296
 Validate that `dialog_cloud_port` now treats `dialog runtime` as the truth
 source for conversation-window visibility:

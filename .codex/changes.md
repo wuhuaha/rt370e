@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.297
+- 将 XiaoZhi 的 round/window 辅助状态从
+  `river_cloud_xiaozhi_session.c` 拆到新的
+  `river_cloud_xiaozhi_round_runtime.c`：
+  - `listening_active()`
+  - `conversation_window_active()/remaining_ms()`
+  - `local_close_pending()/remaining_ms()`
+  - `listen_stop_pending()`
+  - `apply_listen_stop_completion_round_policy()`
+  - `maybe_finalize_listen_stop()`
+  - `uplink_keepalive_needed()`
+  - `uplink_send_ready()`
+  - `should_defer_local_close()`
+  - `arm_local_close_defer()`
+  - `window_touch()/close()/abort_local()`
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+- `river_cloud_xiaozhi_session.c` 继续瘦身，只保留 transport/semantic/uplink 主流程；
+  这一步把 listen-stop、follow-up window、本地延迟关闭的 owner 从大文件中抽离。
+- `components/river_cloud/CMakeLists.txt` 已纳入新的 round runtime 源文件。
+
 ## Step 5.296
 - `river_dialog_cloud_conversation_window_active()` 现在优先读取
   `dialog runtime` 快照中的 `conversation_window_active`，而不是直接透传
