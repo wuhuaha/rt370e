@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.273
+- Removed the now-unused local-only `dialog_runtime` boot/wake/ASR entrypoints
+  after all active callers had moved to the atomic cloud-fused APIs:
+  - removed:
+    - `river_dialog_runtime_mark_boot_ready(...)`
+    - `river_dialog_runtime_note_wake_confirmed(...)`
+    - `river_dialog_runtime_note_asr_session_started(...)`
+    - `river_dialog_runtime_note_asr_session_closed(...)`
+  - kept:
+    - atomic boot/wake/ASR cloud-fused reducers
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.272
 - `dialog runtime` now owns atomic cloud-fused entrypoints for the remaining
   boot/ASR lifecycle facts:

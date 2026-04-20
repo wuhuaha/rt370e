@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.273
+Validate that the old local-only boot/wake/ASR `dialog_runtime` APIs are gone
+and only the atomic cloud-fused ingress remains:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_dialog_runtime_mark_boot_ready\\(|river_dialog_runtime_note_wake_confirmed\\(|river_dialog_runtime_note_asr_session_started\\(|river_dialog_runtime_note_asr_session_closed\\(' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+rg -n 'mark_boot_ready_with_cloud_state|note_wake_confirmed_with_cloud_state|note_asr_.*with_cloud_state|note_asr_error_with_cloud_state' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the old local-only boot/wake/ASR APIs no longer exist
+- the atomic cloud-fused boot/wake/ASR APIs remain
+
 ## Step 5.272
 Validate that boot/ASR lifecycle truth now enters dialog runtime through atomic
 cloud-fused APIs and that core-side explicit `sync_cloud_state(...)` bridges are
