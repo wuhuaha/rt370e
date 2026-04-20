@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.287
+Validate that dialog runtime boot/wake/ASR cloud-backed entrypoints now share
+one internal reducer path instead of hand-writing duplicate snapshot/apply/publish
+sequences:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'CLOUD_EVENT_|apply_cloud_event_locked|commit_cloud_event|cloud_event_default_reason' \
+  components/river_core/river_dialog_runtime.c
+sed -n '20,210p' components/river_core/river_dialog_runtime.c
+sed -n '560,600p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime defines one internal typed cloud-event reducer for:
+  - boot
+  - wake
+  - ASR started
+  - ASR closed
+  - ASR error
+- the public cloud-backed entrypoints delegate into the shared reducer instead
+  of duplicating snapshot capture / local mutation / publish sequences
+
 ## Step 5.286
 Validate that the XiaoZhi playback start-gate snapshot is now exported through
 cloud/dialog runtime snapshots without being recomputed in the session layer:

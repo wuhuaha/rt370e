@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.287
+- `dialog runtime` 内部的 boot / wake / ASR cloud-backed 入口已继续收口成
+  单一 typed reducer，而不再各自重复执行：
+  - 抓 cloud snapshot
+  - 写局部事实
+  - publish
+  这条样板流程
+  - 新增内部 typed event：
+    - `BOOT_READY`
+    - `WAKE_CONFIRMED`
+    - `ASR_SESSION_STARTED`
+    - `ASR_SESSION_CLOSED`
+    - `ASR_ERROR`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部 helper：
+  - `river_dialog_runtime_apply_cloud_event_locked(...)`
+  - `river_dialog_runtime_commit_cloud_event(...)`
+  - 统一负责：
+    - 局部事实落入 runtime snapshot
+    - 同步吸收当前 cloud snapshot
+    - 发布 reason / interaction state
+  - 这让 `dialog runtime` 更接近真正的 reducer 真相源，而不是保留多条同构
+    的手写状态拼装路径
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 对外入口保持不变，但五条 cloud-backed public API 现在全部收口到同一内部
+  reducer：
+  - `river_dialog_runtime_mark_boot_ready_with_cloud_state(...)`
+  - `river_dialog_runtime_note_wake_confirmed_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_session_started_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_session_closed_with_cloud_state(...)`
+  - `river_dialog_runtime_note_asr_error_with_cloud_state(...)`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+
 ## Step 5.286
 - XiaoZhi playback runtime 已保存的 `start gate` 真相，现已继续上推到
   cloud/dialog runtime 的公开 snapshot，而不再只能停留在 playback runtime

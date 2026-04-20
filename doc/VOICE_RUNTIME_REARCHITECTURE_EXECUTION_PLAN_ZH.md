@@ -1232,6 +1232,22 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     `river_cloud_adapter_runtime_self_sync_active()` 也随之删除
 - 进一步地，旧的 local-only boot/wake/ASR `dialog_runtime` 入口也已删除，
   避免同一类 truth 同时保留“旧直写入口 + 新融合入口”两套表面
+- 在此基础上，这几条 cloud-backed boot/wake/ASR 入口在 dialog runtime
+  内部也已进一步收口到单一 typed reducer：
+  - 新增内部 event：
+    - `BOOT_READY`
+    - `WAKE_CONFIRMED`
+    - `ASR_SESSION_STARTED`
+    - `ASR_SESSION_CLOSED`
+    - `ASR_ERROR`
+  - 新增统一 helper：
+    - `apply_cloud_event_locked(...)`
+    - `commit_cloud_event(...)`
+  - 这意味着 dialog runtime 内部不再保留五条几乎同构的：
+    - 抓 cloud snapshot
+    - 写局部事实
+    - publish
+    路径，进一步逼近真正 reducer-only 的真相源结构
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`
@@ -1455,7 +1471,8 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 继续评估 dialog runtime 是否还能把最后保留的 `playback_state` 诊断字段也
   进一步退化成 purely-diagnostic shadow，避免后续代码再次把它当回派生真相
 - 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud
-  snapshot”的重复模式，进一步收成更少的 reducer 入口
+  snapshot”的重复模式，进一步收成更少的 reducer 入口；boot/wake/ASR
+  云端融合入口已完成一轮收口，后续继续看 error/playback 相关入口
 - 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，
   让 dialog runtime 真正成为唯一显式真相源
 - 继续检查 `session_coordinator` 是否还保留其他只做“转发本地事实到

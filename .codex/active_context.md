@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.286 push XiaoZhi playback start-gate snapshot up to cloud/dialog runtime`
+  - `5.287 fold dialog runtime cloud-backed ingress into one typed reducer`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,16 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - dialog runtime boot / wake / ASR cloud-backed ingress now shares one
+      internal typed reducer instead of five handwritten
+      capture-mutate-publish paths
+    - new internal reducer helpers now own:
+      - local fact application
+      - cloud snapshot absorption
+      - publish reason selection
+    - this further reduces truth-source drift inside dialog runtime itself and
+      keeps cloud-backed ingress aligned with the long-term reducer architecture
+  - previous runtime-ownership slice:
     - XiaoZhi playback start-gate snapshot is now exported through:
       - `river_cloud_runtime_snapshot_t`
       - `river_dialog_runtime_snapshot_t`
@@ -101,7 +111,7 @@ or top-of-tree verification target changes.
       - rebuffer cause
       - current start/prefetch gate
       from one runtime chain
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - XiaoZhi playback start gate is now stored as a runtime-owned snapshot
       instead of being re-derived independently at each read site
     - runtime now splits start-gate ownership into:
@@ -117,7 +127,7 @@ or top-of-tree verification target changes.
       - downlink frame-duration update
     - this keeps worker/start/rebuffer diagnostics on the same gate truth and
       removes one more class of “同一时刻不同调用点各自现算出不同门限”的 drift
-  - older runtime-ownership slice:
+  - earlier runtime-ownership slice:
     - XiaoZhi downlink start gating now comes from one explicit typed prefetch
       policy helper instead of being split across scattered threshold
       heuristics:
