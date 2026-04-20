@@ -522,7 +522,9 @@ void river_cloud_xiaozhi_complete_active_stream_finish(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason);
 bool river_cloud_xiaozhi_should_defer_local_close(void);
+void river_cloud_xiaozhi_clear_local_close_defer(void);
 void river_cloud_xiaozhi_arm_local_close_defer(void);
+void river_cloud_xiaozhi_prepare_post_commit_wait(void);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
 void river_cloud_xiaozhi_window_close(const char *reason);
 void river_cloud_xiaozhi_window_abort_local(const char *reason);

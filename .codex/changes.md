@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.298
+- 继续把 XiaoZhi 的 round close/reset/timeout/post-commit wait 语义收口到
+  `river_cloud_xiaozhi_round_runtime.c`：
+  - `apply_open_and_listen_session_policy()`
+  - `emit_session_started()/emit_session_closed()`
+  - `clear_local_close_defer()`
+  - `prepare_post_commit_wait()`
+  - `close_local_round_for_cause()`
+  - `check_local_close_timeout()`
+  - `reset_transport_state()`
+  - `check_window_timeout()`
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+- `river_cloud_xiaozhi_session.c` 进一步退成 transport/semantic/uplink 主流程：
+  - post-commit wait 不再手工拼
+    `listen_stop_pending/local_close_pending/window_touch`
+  - follow-up reopen / wake admission / interrupt admission 继续改走 typed round
+    runtime helper
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- `river_cloud_internal.h` 新增 round runtime 显式入口：
+  - `clear_local_close_defer()`
+  - `prepare_post_commit_wait()`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+
 ## Step 5.297
 - 将 XiaoZhi 的 round/window 辅助状态从
   `river_cloud_xiaozhi_session.c` 拆到新的

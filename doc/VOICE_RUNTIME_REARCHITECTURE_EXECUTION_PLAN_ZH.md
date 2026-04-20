@@ -24,6 +24,31 @@ Branch: `agent-server-v2`
   - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
   - [doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md)
 
+### 1.1 最新进展
+
+- `Step 5.296`
+  - `river_dialog_cloud_conversation_window_active()` 已优先读取
+    `dialog runtime` snapshot，voice/KWS 侧 follow-up window 开始切向
+    `dialog runtime` 真相
+- `Step 5.297`
+  - XiaoZhi 的 `listening/window/listen_stop/local_close` 辅助状态已从
+    `river_cloud_xiaozhi_session.c` 拆到新的
+    `river_cloud_xiaozhi_round_runtime.c`
+- `Step 5.298`
+  - `round close/reset/timeout/post-commit wait` 已继续并入
+    `river_cloud_xiaozhi_round_runtime.c`
+  - `xiaozhi_session.c` 不再内联维护：
+    - `emit_session_started/closed`
+    - `local_close timeout`
+    - `transport reset`
+    - `window timeout`
+    - `post_commit_wait/local_close_defer` 拼装
+- 当前下一焦点：
+  - 继续把 wake admission / follow-up reopen / open-listen round 启停写路径
+    收口到 round runtime
+  - 让 dialog runtime 直接消费 round/window typed truth，而不是继续从
+    cloud session 层拼装派生语义
+
 ## 2. 目标
 
 - 建立以 `river_core` 为唯一编排层的运行时架构

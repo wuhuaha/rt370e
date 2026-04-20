@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.298
+Validate that XiaoZhi round close/reset/timeout/post-commit wait ownership has
+continued moving out of `river_cloud_xiaozhi_session.c` into
+`river_cloud_xiaozhi_round_runtime.c`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'river_cloud_xiaozhi_(apply_open_and_listen_session_policy|emit_session_started|emit_session_closed|clear_local_close_defer|prepare_post_commit_wait|close_local_round_for_cause|check_local_close_timeout|reset_transport_state|check_window_timeout)' \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '1,220p' components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+sed -n '1440,1605p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '2070,2235p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the listed round close/reset/timeout helpers live in:
+  - `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` no longer implements
+  those helper bodies inline
+- `river_cloud_xiaozhi_commit_active_stream_finish_for_cause(...)` now calls:
+  - `river_cloud_xiaozhi_prepare_post_commit_wait()`
+
 ## Step 5.297
 Validate that XiaoZhi round/window/listen-stop/local-close helper ownership has
 been split out of `river_cloud_xiaozhi_session.c`:

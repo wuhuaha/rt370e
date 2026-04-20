@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.297 split xiaozhi round/window runtime out of session`
+  - `5.298 move xiaozhi round close/reset/timeout into round runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,22 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - XiaoZhi round runtime 继续接管：
+      - open-and-listen session policy
+      - post-commit wait / local-close defer
+      - local round close / timeout
+      - transport reset / window timeout
+      - ASR session started / closed emit
+    - `xiaozhi_session.c` 进一步只保留：
+      - transport control
+      - semantic/turn state
+      - uplink/capture 主流程
+    - 下一步应继续把：
+      - wake admission
+      - follow-up reopen
+      - open/listen round 启停写路径
+      收成更少的 round runtime / dialog runtime typed 入口
+  - previous runtime-ownership slice:
     - `listening/window/listen_stop/local_close` 这组 XiaoZhi round 辅助状态
       已从 `river_cloud_xiaozhi_session.c` 拆到新的
       `river_cloud_xiaozhi_round_runtime.c`
