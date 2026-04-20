@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.318
+Validate that `dialog_runtime` no longer exposes local playback shadow through
+its public snapshot, while keeping those fields as internal diagnostic shadow
+only:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_local_active|playback_local_recovering|playback_state' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+sed -n '14,30p' components/river_core/river_dialog_runtime.c
+sed -n '880,930p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_dialog_runtime_snapshot_t` no longer contains:
+  - `playback_local_active`
+  - `playback_local_recovering`
+  - `playback_state`
+- `dialog_runtime` implementation still preserves those values only as internal
+  shadow for fallback/diagnostic use
+
 ## Step 5.317
 Validate that `dialog_runtime` now routes all remaining local playback shadow
 behavior through explicit `phase unknown` fallback helpers instead of mixing

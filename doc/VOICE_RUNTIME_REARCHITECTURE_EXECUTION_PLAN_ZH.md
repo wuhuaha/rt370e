@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.318`
+  - `dialog_runtime` 的公开 snapshot 已删除：
+    - `playback_state`
+    - `playback_local_active`
+    - `playback_local_recovering`
+  - 本地 playback shadow 现在只保留在 runtime 内部，服务于：
+    - stream ownership ingress
+    - phase-missing fallback
+    - diagnostics dump
+  - 这一步继续把对外 `dialog runtime` 真相面收口到 owner typed truth，而不是把
+    本地 playback listener shadow 暴露成 public truth
 - `Step 5.317`
   - `dialog_runtime` 已把剩余 local playback shadow 的：
     - active fallback
@@ -219,18 +230,16 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
+  - 继续检查 `dialog_runtime` 内部 local playback shadow 是否还能再压缩：
+    - 只保留 stream ownership ingress 所需最小状态
+    - 评估 `playback_local_active/recovering/state` 是否还能收成一个更小的
+      internal shadow 表达
   - 继续把 `dialog_runtime` 里剩余 generic terminal-wait / local playback shadow
     兼容路径压缩到 phase-missing fallback：
     - active
     - recovering
     - interrupt clear
     - speaking projection
-  - 继续检查 `dialog_runtime` 是否还能把最后保留的：
-    - `playback_state`
-    - `playback_local_active`
-    - `playback_local_recovering`
-    进一步退化成 purely-diagnostic shadow，只保留 stream-ownership ingress 所需的
-    最小本地匹配能力
   - 继续把 `playback_terminal_wait_kind` 从“已导出 typed truth”推进到更上层可消费
     语义，例如：
     - follow-up reopen

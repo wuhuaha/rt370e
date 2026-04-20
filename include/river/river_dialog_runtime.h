@@ -34,8 +34,6 @@ typedef struct {
     bool cloud_stream_active;
     bool cloud_listen_stop_pending;
     bool cloud_local_close_pending;
-    bool playback_local_active;
-    bool playback_local_recovering;
     bool playback_cloud_active;
     bool playback_lane_engaged;
     bool playback_active;
@@ -52,7 +50,6 @@ typedef struct {
     bool turn_accepted;
     bool barge_in_enabled_known;
     bool barge_in_enabled;
-    river_playback_state_t playback_state;
     river_dialog_input_lane_t input_lane;
     river_dialog_output_lane_t output_lane;
     river_interaction_state_t interaction_state;

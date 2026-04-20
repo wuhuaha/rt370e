@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.318
+- `dialog_runtime` 的公开 snapshot 已不再暴露本地 playback shadow：
+  - 删除 `playback_local_active`
+  - 删除 `playback_local_recovering`
+  - 删除 `playback_state`
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+- 上述本地 playback shadow 已下沉为 `dialog_runtime` 内部私有诊断状态：
+  - 仅在 runtime 内部用于：
+    - stream ownership ingress
+    - phase-missing fallback
+    - dump diagnostics
+  - 不再作为对外公开真相的一部分
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_dump_status()` 改为在锁内直接抓取：
+  - public snapshot
+  - internal local playback shadow
+  再统一打印，避免为了日志而把本地 shadow 继续留在公开 API 上。
+- 这一步继续把 `dialog runtime` 的对外真相面收口到：
+  - cloud/playback owner typed truth
+  - dialog lane / interaction 派生
+  而把本地 playback shadow 明确降为内部实现细节。
+
 ## Step 5.317
 - `dialog_runtime` 已把剩余 local playback shadow 的 active/recovering 参与面
   显式收口到 `phase unknown` fallback helper：

@@ -15,12 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.317 isolate local playback shadow to phase-missing helpers`
+  - `5.318 hide local playback shadow from public dialog snapshot`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 的公开 snapshot 已删除：
+      - `playback_state`
+      - `playback_local_active`
+      - `playback_local_recovering`
+    - 本地 playback shadow 现在只保留在 runtime 内部，用于：
+      - stream ownership ingress
+      - phase-missing fallback
+      - diagnostics dump
+    - 这一步继续把对外 `dialog runtime` 真相面收口到 typed owner truth，而把
+      local playback shadow 明确降为内部实现细节
+  - previous runtime-ownership slice:
     - `dialog_runtime` 已把剩余 local playback shadow 的：
       - active fallback
       - recovering fallback
@@ -32,7 +43,7 @@ or top-of-tree verification target changes.
     - 这一步继续把 local playback shadow 压回：
       - purely-diagnostic local signal
       - phase-missing fallback
-  - previous runtime-ownership slice:
+  - newest landed runtime-ownership slice:
     - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
       typed truth：
       - `playback_terminal_wait_kind`
