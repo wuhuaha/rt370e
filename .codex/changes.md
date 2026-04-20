@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.306
+- `dialog_runtime` 现在会区分“真正的 playback error”与“managed recovery 中的本地
+  playback_error”：
+  - 若 cloud playback truth 已表明当前仍处于
+    `rebuffer/recovering/cloud_active/lane_engaged`
+    之一，本地 `RIVER_PLAYBACK_ERROR` 会被吸收到
+    `playback_recovering`
+  - 不再额外把 `interaction_state` 抬成 `error_recovering`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_on_playback_state()` 不再在每次本地
+  `RIVER_PLAYBACK_ERROR` 后无条件调用 `note_error("playback_error")`：
+  - playback runtime 已能把受管控的 write_failed/rebuffer/restart 路径投影成
+    managed recovery truth
+  - `dialog_runtime` 现在优先消费这条 playback truth，而不是额外叠一层独立错误态
+
 ## Step 5.305
 - `river_cloud_xiaozhi_dump_session_status()` 现在改为先读取
   `river_cloud_runtime_snapshot_t`，再输出会话状态日志：

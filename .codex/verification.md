@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.306
+Validate that dialog runtime no longer turns managed playback recovery into a
+separate `error_recovering` path just because the local playback service emits
+`RIVER_PLAYBACK_ERROR`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_error_is_managed_recovery|playback_recovering|note_error\\(\"playback_error\"' \
+  components/river_core/river_dialog_runtime.c
+sed -n '300,340p' components/river_core/river_dialog_runtime.c
+sed -n '690,790p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime` contains a managed-recovery guard for playback error
+- when that guard matches, local `RIVER_PLAYBACK_ERROR` is published as
+  `playback_recovering`
+- `river_dialog_runtime_on_playback_state()` no longer unconditionally calls:
+  - `river_dialog_runtime_note_error("playback_error")`
+
 ## Step 5.305
 Validate that XiaoZhi session-status logging now consumes the runtime snapshot
 instead of manually reconstructing playback/turn truth from raw globals:

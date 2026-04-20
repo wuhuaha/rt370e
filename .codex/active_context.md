@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.305 route xiaozhi status dump through runtime snapshot`
+  - `5.306 fold managed playback errors into recovery truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,23 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog_runtime` 现在会把“受 cloud playback runtime 管理的本地
+      playback_error”吸收到 `playback_recovering`
+    - 若 cloud playback truth 已表明当前仍在：
+      - rebuffering
+      - playback_cloud_active
+      - playback_lane_engaged
+      之一，则不再额外把交互态抬成 `error_recovering`
+    - `river_dialog_runtime_on_playback_state()` 也不再对每次
+      `RIVER_PLAYBACK_ERROR` 无条件叠加：
+      - `note_error("playback_error")`
+    - 这一步直接针对日志里频繁出现的：
+      - `speaking -> error_recovering -> speaking`
+      状态风暴做收口
+    - 下一步应继续：
+      - 把更多 playback stop/reset/rebuffer 恢复判定继续锁进 playback truth owner
+      - 检查 dialog runtime 是否还能进一步弱化对本地 playback error 的依赖
+  - previous runtime-ownership slice:
     - `river_cloud_xiaozhi_dump_session_status()` 现在会先读取
       `river_cloud_runtime_snapshot_t`
     - session status dump 中的：
@@ -96,9 +113,7 @@ or top-of-tree verification target changes.
     - `xiaozhi_session.c` 已去掉对：
       - `g_river_cloud.xiaozhi_tts_stop_pending`
       的最后一处 session-side 直读
-    - 下一步应继续：
-      - 让更多 XiaoZhi diag/status 读取统一消费 runtime snapshot/helper
-      - 把 playback stop/reset/rebuffer 恢复路径继续从 session/adapter 收口
+    - 该步之后，XiaoZhi session 诊断面也已开始贴近 runtime snapshot 真相源
   - previous runtime-ownership slice:
     - wake admission 的 queued/coalesced/deferred/retry worker 已从
       `session_coordinator` 抽到新的 core-owned bridge：

@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.306`
+  - `dialog_runtime` 现在会把“managed playback recovery 中出现的本地
+    `RIVER_PLAYBACK_ERROR`”吸收到 `playback_recovering`
+  - 若 cloud playback truth 仍表明当前处于：
+    - rebuffering
+    - playback_cloud_active
+    - playback_lane_engaged
+    之一，则不再额外抬 `error_recovering`
+  - 这一步直接针对日志中频繁出现的
+    `speaking -> error_recovering -> speaking` 风暴做状态收口
 - `Step 5.305`
   - `river_cloud_xiaozhi_dump_session_status()` 已改为先读取
     `river_cloud_runtime_snapshot_t`
@@ -114,6 +124,8 @@ Branch: `agent-server-v2`
     - playback stop/reset
     - rebuffer/recovering
     的 owner 边界和状态投影
+  - 继续减少 `dialog_runtime` 对本地 playback service error 信号的粗粒度放大，
+    优先以 cloud playback runtime 的 managed recovery truth 驱动交互态
   - 继续让 XiaoZhi status/diag 读取优先消费 runtime snapshot / typed helper，
     减少 session/adapter 侧重新解释 playback truth
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
