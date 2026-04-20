@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.319
+- playback owner 的 `rebuffer cause` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
+  - 新增 `river_cloud_playback_rebuffer_cause_t`
+  - 新增 `river_cloud_playback_rebuffer_cause_name(...)`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 已改为直接维护并导出这条公共 typed cause：
+  - 删除私有 `river_cloud_xiaozhi_playback_rebuffer_cause_t`
+  - `playback_runtime_snapshot` 现在显式填充 `playback_rebuffer_cause_kind`
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 公开 snapshot 已不再暴露字符串 `playback_rebuffer_cause`：
+  - 改为吸收并导出 `playback_rebuffer_cause_kind`
+  - `dialog_runtime_dump_status()` 也改为直接打印 typed cause
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 downlink/playback 的恢复语义从：
+  - owner 内部私有枚举
+  - 跨层字符串原因
+  收口到公共 typed owner truth，减少 `dialog_runtime` 对文本诊断字段的依赖。
+
 ## Step 5.318
 - `dialog_runtime` 的公开 snapshot 已不再暴露本地 playback shadow：
   - 删除 `playback_local_active`

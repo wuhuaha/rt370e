@@ -45,6 +45,7 @@ typedef struct {
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
+    river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
     bool tts_stop_pending;
     bool tts_interrupt_requested;
     bool turn_accepted;
@@ -60,7 +61,6 @@ typedef struct {
     char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_phase[RIVER_CLOUD_RUNTIME_STATE_MAX];
-    char playback_rebuffer_cause[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_start_policy[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];

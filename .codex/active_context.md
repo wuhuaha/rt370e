@@ -15,12 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.318 hide local playback shadow from public dialog snapshot`
+  - `5.319 export playback rebuffer cause as public typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
+    - playback owner 的 `rebuffer cause` 已从 XiaoZhi 私有 enum 提升成公共
+      typed truth：
+      - `river_cloud_playback_rebuffer_cause_t`
+      - `playback_rebuffer_cause_kind`
+    - `dialog_runtime` 的公开 snapshot 已删除字符串：
+      - `playback_rebuffer_cause`
+      并改为直接吸收 `playback_rebuffer_cause_kind`
+    - 这一步继续把 downlink/playback 的恢复语义从私有 owner enum 和跨层文本字段
+      收口到公共 typed truth
+  - previous runtime-ownership slice:
     - `dialog_runtime` 的公开 snapshot 已删除：
       - `playback_state`
       - `playback_local_active`
@@ -43,7 +53,7 @@ or top-of-tree verification target changes.
     - 这一步继续把 local playback shadow 压回：
       - purely-diagnostic local signal
       - phase-missing fallback
-  - newest landed runtime-ownership slice:
+  - previous runtime-ownership slice:
     - cloud playback runtime 已把 terminal wait 从 generic bool/text 提升成
       typed truth：
       - `playback_terminal_wait_kind`
@@ -57,7 +67,7 @@ or top-of-tree verification target changes.
       当成真正的尾段等待；`await_last_segment_meta` 不再被误压成尾段静默
       投影
     - 这一步继续减少了 core 对 generic `terminal_waiting` 的过度二次解释
-  - newest landed runtime-ownership slice:
+  - previous runtime-ownership slice:
     - 当 `playback_phase_known` 已成立时，`dialog_runtime` 不再让
       `playback_local_active` 阻断 interrupt latch 清理
     - local playback shadow 现在进一步退回到 `phase unknown` 的兜底路径

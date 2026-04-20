@@ -30,6 +30,21 @@
 
 river_cloud_context_t g_river_cloud;
 
+const char *river_cloud_playback_rebuffer_cause_name(
+    river_cloud_playback_rebuffer_cause_t cause)
+{
+    switch (cause) {
+    case RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_NONE:
+        return "none";
+    case RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED:
+        return "upstream_starved";
+    case RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_WRITE_FAILED:
+        return "write_failed";
+    default:
+        return "unknown";
+    }
+}
+
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 static void river_cloud_xiaozhi_event_handler(const river_xiaozhi_event_t *event, void *user_data);
 #endif

@@ -1,5 +1,45 @@
 # Verification
 
+## Step 5.319
+Validate that playback owner now exports a public typed rebuffer cause, and that
+`dialog_runtime` consumes that enum instead of exposing a string rebuffer cause
+through its public snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_rebuffer_cause_kind|RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+rg -n 'playback_rebuffer_cause\\[' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '940,960p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '500,535p' components/river_core/river_dialog_runtime.c
+sed -n '918,926p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_cloud_runtime_snapshot_t` exposes:
+  - `playback_rebuffer_cause_kind`
+- public `river_dialog_runtime_snapshot_t` exposes:
+  - `playback_rebuffer_cause_kind`
+  and no longer exposes:
+  - `playback_rebuffer_cause`
+- XiaoZhi playback runtime fills `playback_rebuffer_cause_kind` directly from
+  owner state using the public enum
+
 ## Step 5.318
 Validate that `dialog_runtime` no longer exposes local playback shadow through
 its public snapshot, while keeping those fields as internal diagnostic shadow

@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.319`
+  - playback owner 的 `rebuffer cause` 已从 XiaoZhi 私有 enum 提升成公共
+    typed truth：
+    - `river_cloud_playback_rebuffer_cause_t`
+    - `playback_rebuffer_cause_kind`
+  - `dialog_runtime` 的公开 snapshot 已删除字符串：
+    - `playback_rebuffer_cause`
+    并改为直接吸收 `playback_rebuffer_cause_kind`
+  - 这一步继续把 downlink/playback 的恢复语义从私有 enum / 跨层文本原因，
+    收口到公共 owner typed truth
 - `Step 5.318`
   - `dialog_runtime` 的公开 snapshot 已删除：
     - `playback_state`
@@ -230,21 +240,19 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续检查 `dialog_runtime` 内部 local playback shadow 是否还能再压缩：
+  - 继续压缩 `dialog_runtime` 内部 local playback shadow：
     - 只保留 stream ownership ingress 所需最小状态
     - 评估 `playback_local_active/recovering/state` 是否还能收成一个更小的
-      internal shadow 表达
-  - 继续把 `dialog_runtime` 里剩余 generic terminal-wait / local playback shadow
-    兼容路径压缩到 phase-missing fallback：
-    - active
-    - recovering
-    - interrupt clear
-    - speaking projection
-  - 继续把 `playback_terminal_wait_kind` 从“已导出 typed truth”推进到更上层可消费
-    语义，例如：
-    - follow-up reopen
-    - interrupt clear hold
-    - terminal close/complete policy
+      private shadow 表达
+  - 继续把 cloud/runtime snapshot 里的 playback 文本诊断字段向 typed truth 收口：
+    - `playback_start_policy`
+    - `playback_terminal_reason`
+    - `playback_rebuffer_cause` 在 cloud public snapshot 中的剩余诊断角色
+  - 继续把 downlink/playback 的恢复流程从“write failed -> stop/start reuse”整理成
+    更稳定的 owner 状态机：
+    - rebuffer enter
+    - backend recover attempt
+    - terminal wait / completion handoff
   - 继续排查 `dialog_runtime` 对本地 playback service 边缘事件的剩余依赖，
     把它们降级成 typed local signal，而不是 coarse interaction/error 推导入口
   - 继续把 playback terminal / interrupt clear / recovery policy 往

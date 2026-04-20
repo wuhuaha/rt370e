@@ -124,12 +124,6 @@ typedef enum {
 } river_cloud_xiaozhi_playback_phase_t;
 
 typedef enum {
-    RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_NONE = 0,
-    RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED = 1,
-    RIVER_CLOUD_XIAOZHI_PLAYBACK_REBUFFER_CAUSE_WRITE_FAILED = 2
-} river_cloud_xiaozhi_playback_rebuffer_cause_t;
-
-typedef enum {
     RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED = 0,
     RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE = 1
 } river_cloud_xiaozhi_round_close_cause_t;
@@ -227,7 +221,7 @@ typedef struct {
     bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
     river_cloud_xiaozhi_playback_phase_t xiaozhi_playback_phase;
-    river_cloud_xiaozhi_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;
+    river_cloud_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;
     bool xiaozhi_playback_rebuffer_pending;
     bool xiaozhi_playback_terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t xiaozhi_playback_terminal_wait_kind;
@@ -434,11 +428,9 @@ uint32_t river_cloud_xiaozhi_playback_queued_frames(void);
 river_cloud_xiaozhi_playback_phase_t river_cloud_xiaozhi_playback_phase(void);
 const char *river_cloud_xiaozhi_playback_phase_name(
     river_cloud_xiaozhi_playback_phase_t phase);
-river_cloud_xiaozhi_playback_rebuffer_cause_t
+river_cloud_playback_rebuffer_cause_t
 river_cloud_xiaozhi_playback_rebuffer_cause(void);
 bool river_cloud_xiaozhi_playback_rebuffer_pending(void);
-const char *river_cloud_xiaozhi_playback_rebuffer_cause_name(
-    river_cloud_xiaozhi_playback_rebuffer_cause_t cause);
 const char *river_cloud_xiaozhi_playback_start_policy_name(uint32_t policy);
 bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_lane_engaged(void);
