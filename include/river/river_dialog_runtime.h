@@ -43,6 +43,7 @@ typedef struct {
     bool playback_recovering;
     bool playback_terminal_waiting;
     bool tts_stop_pending;
+    bool tts_interrupt_requested;
     bool turn_accepted;
     bool barge_in_enabled_known;
     bool barge_in_enabled;
@@ -82,6 +83,7 @@ void river_dialog_runtime_note_asr_session_closed_with_cloud_state(const char *s
 void river_dialog_runtime_note_asr_error_with_cloud_state(const char *sid, const char *reason);
 void river_dialog_runtime_on_cloud_asr_result(const river_cloud_asr_result_t *result,
                                               void *user_data);
+void river_dialog_runtime_note_tts_interrupt_requested(const char *reason);
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason);
 void river_dialog_runtime_on_playback_state(river_playback_state_t state,
                                             const river_playback_stream_config_t *config,

@@ -107,6 +107,8 @@ river_status_t river_dialog_cloud_asr_batch_submit_segment(
 
 river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason)
 {
+    river_status_t status;
+
     if (reason == NULL || reason[0] == '\0') {
         return RIVER_ERR_ARG;
     }
@@ -115,7 +117,11 @@ river_status_t river_dialog_cloud_interrupt_tts_with_reason(const char *reason)
         return RIVER_ERR_UNSUPPORTED;
     }
 
-    return g_river_dialog_cloud_port.port.interrupt_tts_with_reason(reason);
+    status = g_river_dialog_cloud_port.port.interrupt_tts_with_reason(reason);
+    if (status == RIVER_OK) {
+        river_dialog_runtime_note_tts_interrupt_requested(reason);
+    }
+    return status;
 }
 
 bool river_dialog_cloud_conversation_window_active(void)

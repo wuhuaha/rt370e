@@ -146,6 +146,7 @@ static void river_dialog_runtime_apply_cloud_event_locked(
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_BOOT_READY:
         g_river_dialog_runtime.snapshot.boot_ready = true;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_WAKE_CONFIRMED:
         g_river_dialog_runtime.snapshot.wake_confirmed = true;
@@ -154,15 +155,18 @@ static void river_dialog_runtime_apply_cloud_event_locked(
         g_river_dialog_runtime.snapshot.asr_session_active = true;
         g_river_dialog_runtime.snapshot.error_recovering = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_SESSION_CLOSED:
         g_river_dialog_runtime.snapshot.asr_session_active = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_ERROR:
         g_river_dialog_runtime.snapshot.asr_session_active = false;
         g_river_dialog_runtime.snapshot.error_recovering = true;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     default:
         break;
@@ -384,6 +388,12 @@ static bool river_dialog_runtime_cloud_round_active_locked(void)
            snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED;
 }
 
+static bool river_dialog_runtime_tts_interrupt_inflight_locked(void)
+{
+    return g_river_dialog_runtime.snapshot.tts_stop_pending ||
+           g_river_dialog_runtime.snapshot.tts_interrupt_requested;
+}
+
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -520,6 +530,13 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     if (river_dialog_runtime_cloud_round_active_locked()) {
         g_river_dialog_runtime.snapshot.asr_session_active = true;
     }
+    if (!snapshot->tts_stop_pending &&
+        !snapshot->playback_active &&
+        !snapshot->playback_lane_engaged &&
+        g_river_dialog_runtime.snapshot.output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
+        !g_river_dialog_runtime.snapshot.playback_local_active) {
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
+    }
     river_dialog_runtime_refresh_playback_locked();
 }
 
@@ -649,6 +666,23 @@ void river_dialog_runtime_on_cloud_asr_result(const river_cloud_asr_result_t *re
     }
 }
 
+void river_dialog_runtime_note_tts_interrupt_requested(const char *reason)
+{
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    if (!g_river_dialog_runtime.snapshot.tts_interrupt_requested) {
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = true;
+    }
+    if (reason != NULL && reason[0] != '\0') {
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
+                                       sizeof(g_river_dialog_runtime.snapshot.reason),
+                                       reason);
+    }
+    river_dialog_runtime_unlock();
+}
+
 void river_dialog_runtime_note_playback_state(river_playback_state_t state, const char *reason)
 {
     bool prev_playback_active;
@@ -669,6 +703,9 @@ void river_dialog_runtime_note_playback_state(river_playback_state_t state, cons
     river_dialog_runtime_refresh_playback_locked();
     if (state != RIVER_PLAYBACK_ERROR) {
         g_river_dialog_runtime.snapshot.error_recovering = false;
+    }
+    if (state == RIVER_PLAYBACK_IDLE || state == RIVER_PLAYBACK_ERROR) {
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
     next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();
     if (river_dialog_runtime_playback_phase_known_locked() &&
@@ -819,6 +856,7 @@ bool river_dialog_runtime_allows_barge_in_interrupt(void)
 
     allowed = g_river_dialog_runtime.snapshot.asr_session_active &&
               g_river_dialog_runtime.snapshot.playback_active &&
+              !river_dialog_runtime_tts_interrupt_inflight_locked() &&
               g_river_dialog_runtime.snapshot.playback_terminal_state[0] == '\0' &&
               (g_river_dialog_runtime.snapshot.interaction_state ==
                    RIVER_INTERACTION_SPEAKING ||
@@ -859,7 +897,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -896,6 +934,7 @@ void river_dialog_runtime_dump_status(void)
                snapshot.playback_terminal_wait_reason[0] != '\0' ?
                    snapshot.playback_terminal_wait_reason :
                    "-",
+               snapshot.tts_interrupt_requested ? "yes" : "no",
                snapshot.cloud_listen_stop_pending ? "yes" : "no",
                snapshot.cloud_local_close_pending ? "yes" : "no",
                (unsigned long)snapshot.local_close_remaining_ms,

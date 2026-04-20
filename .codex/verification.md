@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.301
+Validate that local interrupt-in-flight truth is now owned by `dialog runtime`
+instead of by `session_coordinator`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'tts_interrupt_requested|note_tts_interrupt_requested|interrupt_tts_with_reason\\(|barge_in_interrupt_requested|state_lock' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_core/river_dialog_cloud_port.c \
+  components/river_core/river_session_coordinator.c
+sed -n '24,92p' include/river/river_dialog_runtime.h
+sed -n '136,176p' components/river_core/river_dialog_runtime.c
+sed -n '388,430p' components/river_core/river_dialog_runtime.c
+sed -n '669,760p' components/river_core/river_dialog_runtime.c
+sed -n '96,128p' components/river_core/river_dialog_cloud_port.c
+sed -n '220,360p' components/river_core/river_session_coordinator.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog runtime` snapshot exports `tts_interrupt_requested`
+- successful `river_dialog_cloud_interrupt_tts_with_reason()` calls immediately
+  record the interrupt request in `dialog runtime`
+- `river_dialog_runtime_allows_barge_in_interrupt()` now blocks when either:
+  - `tts_stop_pending`
+  - `tts_interrupt_requested`
+  is true
+- `session_coordinator` no longer contains:
+  - `barge_in_interrupt_requested`
+  - `state_lock`
+
 ## Step 5.300
 Validate that `dialog runtime` now directly consumes XiaoZhi round/window truth
 from the cloud runtime snapshot instead of only inferring round liveness from

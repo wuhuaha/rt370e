@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.301
+- `dialog runtime` 现在直接拥有本地 `interrupt_tts` in-flight 真相：
+  - snapshot 新增 `tts_interrupt_requested`
+  - `river_dialog_runtime_allows_barge_in_interrupt()` 现同时检查：
+    - `tts_stop_pending`
+    - `tts_interrupt_requested`
+  - ASR lifecycle / playback idle-or-error / cloud playback fully disengaged 时会清掉
+    本地 interrupt 请求锁存
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `dialog_cloud_port` 在成功调用 `interrupt_tts_with_reason()` 后，会立刻把这一事实记入
+  `dialog runtime`，从而在 cloud `tts_stop_pending` 回流前就抑制重复 interrupt：
+  - [components/river_core/river_dialog_cloud_port.c](/root/ameba-river/components/river_core/river_dialog_cloud_port.c)
+- `session_coordinator` 不再维护本地 `barge_in_interrupt_requested`：
+  - ASR 文本触发的 interrupt 改走 `river_dialog_cloud_interrupt_tts_with_reason()`
+  - `state_lock` 与这条本地 latch 一并移除
+  - coordinator 继续只负责：
+    - 文本日志
+    - 最终文本路由
+    - wakeword worker / admission 调度
+  - [components/river_core/river_session_coordinator.c](/root/ameba-river/components/river_core/river_session_coordinator.c)
+
 ## Step 5.300
 - `dialog runtime` 现在直接吸收更多 XiaoZhi round/window typed truth，而不是只靠
   边缘 lifecycle 事件推断当前轮次：

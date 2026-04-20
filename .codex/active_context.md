@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.300 let dialog runtime absorb round truth`
+  - `5.301 move interrupt in-flight truth into dialog runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,24 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - `dialog runtime` 现在继续吸收本地 `interrupt_tts` in-flight 真相：
+      - snapshot 新增 `tts_interrupt_requested`
+      - `allows_barge_in_interrupt()` 现同时检查：
+        - `tts_stop_pending`
+        - `tts_interrupt_requested`
+    - `dialog_cloud_port` 在 interrupt 成功后会立刻把本地 interrupt 请求锁存进
+      `dialog runtime`，减少 cloud stop-pending 回流前的重复中断窗口
+    - `session_coordinator` 已删除：
+      - `barge_in_interrupt_requested`
+      - `state_lock`
+    - ASR 文本触发的 barge-in interrupt 改为消费 `dialog_cloud_port` +
+      `dialog runtime` policy，不再由 coordinator 自己维护本地 latch
+    - 下一步应继续检查：
+      - wakeword/open-listen admission 是否还能从 `session_coordinator`
+        继续移出 `river_cloud_adapter` 直连
+      - `dialog_cloud_port` 是否需要补齐 `begin_conversation_window`
+        之类的 core-owned entrance
+  - previous runtime-ownership slice:
     - `dialog runtime` 现在继续直接吸收 XiaoZhi round/window typed truth：
       - `listen_stop_pending`
       - `local_close_pending`
@@ -104,9 +122,6 @@ or top-of-tree verification target changes.
       - `cloud_listen_stop_pending`
     - `dialog runtime` status dump 也直接打印 stop-pending / local-close /
       round/window remaining truth，便于后续继续收口 coordinator bridge
-    - 下一步应继续检查：
-      - `session_coordinator` 是否还在事件桥里重建 round/ASR truth
-      - `asr_session_active` 能否进一步 reducer 化，减少 event-edge owner
   - previous runtime-ownership slice:
     - XiaoZhi round runtime 已继续接管 round 启动入口：
       - `open_session_and_listen()`

@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.301`
+  - `dialog runtime` 已开始直接拥有本地 interrupt in-flight 真相：
+    - `tts_interrupt_requested`
+  - `dialog_cloud_port` 会在 `interrupt_tts_with_reason()` 成功后立即把这条事实
+    写入 `dialog runtime`
+  - `session_coordinator` 已删除本地：
+    - `barge_in_interrupt_requested`
+    - `state_lock`
+  - ASR 文本触发的 barge-in interrupt 改由 `dialog runtime` policy +
+    `dialog_cloud_port` 协同完成
 - `Step 5.300`
   - `dialog runtime` 已开始直接吸收 XiaoZhi round/window typed truth：
     - `listen_stop_pending`
@@ -61,8 +71,10 @@ Branch: `agent-server-v2`
     - `window timeout`
     - `post_commit_wait/local_close_defer` 拼装
 - 当前下一焦点：
-  - 继续减少 `session_coordinator` 对 round/ASR 生命周期的事件桥接
-  - 评估把 `asr_session_active` 进一步收成 reducer/snapshot-owned truth
+  - 继续减少 `session_coordinator` 对 wake admission / open-listen 的 adapter
+    直连桥接
+  - 评估把 `begin_conversation_window` 也补进 `dialog_cloud_port`，让 wakeword
+    admission 彻底走 core-owned port/runtime 边界
   - 随后继续推进 downlink/playback runtime 重建，让 cloud playback /
     local playback / recovering/rebuffer 的 owner 边界彻底稳定
 

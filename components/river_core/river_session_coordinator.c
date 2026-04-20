@@ -6,6 +6,7 @@
 #include "os_wrapper.h"
 
 #include "river/river_cloud.h"
+#include "river/river_dialog_cloud_port.h"
 #include "river/river_dialog_runtime.h"
 #include "river/river_interaction_diag.h"
 #include "river/river_log.h"
@@ -32,27 +33,11 @@ typedef struct {
 
 typedef struct {
     bool initialized;
-    rtos_mutex_t state_lock;
     char last_partial[192];
-    bool barge_in_interrupt_requested;
     river_session_wakeword_context_t wakeword;
 } river_session_coordinator_context_t;
 
 static river_session_coordinator_context_t g_river_session_coordinator;
-
-static bool river_session_state_lock(void)
-{
-    return g_river_session_coordinator.state_lock != NULL &&
-           rtos_mutex_take(g_river_session_coordinator.state_lock,
-                           MUTEX_WAIT_TIMEOUT) == RTK_SUCCESS;
-}
-
-static void river_session_state_unlock(void)
-{
-    if (g_river_session_coordinator.state_lock != NULL) {
-        (void)rtos_mutex_give(g_river_session_coordinator.state_lock);
-    }
-}
 
 static bool river_session_wakeword_lock(void)
 {
@@ -249,18 +234,7 @@ static river_status_t river_session_schedule_wakeword(const river_voice_event_t 
 static void river_session_try_interrupt_playback_on_asr_text(
     const river_cloud_asr_result_t *result)
 {
-    bool interrupt_requested;
-
     if (result == NULL || result->text == NULL || result->text[0] == '\0') {
-        return;
-    }
-    if (!river_session_state_lock()) {
-        return;
-    }
-    interrupt_requested = g_river_session_coordinator.barge_in_interrupt_requested;
-    river_session_state_unlock();
-
-    if (interrupt_requested) {
         return;
     }
     if (!river_dialog_runtime_allows_barge_in_interrupt()) {
@@ -270,12 +244,7 @@ static void river_session_try_interrupt_playback_on_asr_text(
     RIVER_LOGI("barge-in text confirmed during playback: sid=%s text=%s -> interrupt tts",
                result->sid != NULL ? result->sid : "-",
                result->text);
-    if (river_cloud_adapter_interrupt_tts_with_reason("asr_text_confirmed") == RIVER_OK) {
-        if (river_session_state_lock()) {
-            g_river_session_coordinator.barge_in_interrupt_requested = true;
-            river_session_state_unlock();
-        }
-    }
+    (void)river_dialog_cloud_interrupt_tts_with_reason("asr_text_confirmed");
 }
 
 void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_t *result,
@@ -314,11 +283,7 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
         }
         break;
     case RIVER_CLOUD_ASR_EVENT_ERROR:
-        if (river_session_state_lock()) {
-            g_river_session_coordinator.barge_in_interrupt_requested = false;
-            g_river_session_coordinator.last_partial[0] = '\0';
-            river_session_state_unlock();
-        }
+        g_river_session_coordinator.last_partial[0] = '\0';
         RIVER_LOGE("asr provider=%s error code=%d sid=%s msg=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->code,
@@ -326,21 +291,13 @@ void river_session_coordinator_on_cloud_asr_result(const river_cloud_asr_result_
                    result->message != NULL ? result->message : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_STARTED:
-        if (river_session_state_lock()) {
-            g_river_session_coordinator.barge_in_interrupt_requested = false;
-            g_river_session_coordinator.last_partial[0] = '\0';
-            river_session_state_unlock();
-        }
+        g_river_session_coordinator.last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session started sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
         break;
     case RIVER_CLOUD_ASR_EVENT_SESSION_CLOSED:
-        if (river_session_state_lock()) {
-            g_river_session_coordinator.barge_in_interrupt_requested = false;
-            g_river_session_coordinator.last_partial[0] = '\0';
-            river_session_state_unlock();
-        }
+        g_river_session_coordinator.last_partial[0] = '\0';
         RIVER_LOGI("asr provider=%s session closed sid=%s",
                    result->provider_name != NULL ? result->provider_name : "-",
                    result->sid != NULL ? result->sid : "-");
@@ -394,12 +351,7 @@ river_status_t river_session_coordinator_init(void)
     }
 
     memset(&g_river_session_coordinator, 0, sizeof(g_river_session_coordinator));
-    if (rtos_mutex_create(&g_river_session_coordinator.state_lock) != RTK_SUCCESS) {
-        return RIVER_ERR_NO_MEMORY;
-    }
     if (river_session_wakeword_worker_init() != RIVER_OK) {
-        rtos_mutex_delete(g_river_session_coordinator.state_lock);
-        g_river_session_coordinator.state_lock = NULL;
         return RIVER_ERR_NO_MEMORY;
     }
     g_river_session_coordinator.initialized = true;
