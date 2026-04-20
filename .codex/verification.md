@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.276
+Validate that `dialog runtime` now ignores shared non-dialog playback-service
+streams and only absorbs local TTS-priority playback truth:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,70p' components/river_core/river_dialog_runtime.c
+sed -n '520,555p' components/river_core/river_dialog_runtime.c
+rg -n 'local_playback_stream_owned|is_dialog_playback_stream|RIVER_PLAYBACK_PRIO_TTS' \
+  components/river_core/river_dialog_runtime.c
+rg -n 'audio_echo|iflytek_tts|xiaozhi_tts|RIVER_PLAYBACK_PRIO_DEBUG|RIVER_PLAYBACK_PRIO_TTS' \
+  components/river_voice/river_voice_echo.c \
+  components/river_cloud/river_tts_iflytek_ws.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_on_playback_state(...)` only latches local ownership
+  for `RIVER_PLAYBACK_PRIO_TTS`
+- `local_playback_stream_owned` preserves owned-stream terminal cleanup until
+  `RIVER_PLAYBACK_IDLE`
+- `audio_echo` remains a shared `RIVER_PLAYBACK_PRIO_DEBUG` stream and is no
+  longer part of dialog-runtime local playback truth ingress
+
 ## Step 5.275
 Validate that XiaoZhi playback runtime now owns a typed backend-state truth and
 that stop/abort/rebuffer logic uses it instead of blindly treating all active

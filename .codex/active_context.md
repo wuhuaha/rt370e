@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.275 tighten xiaozhi playback backend ownership truth`
+  - `5.276 tighten dialog runtime local playback ingress ownership`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -244,6 +244,17 @@ or top-of-tree verification target changes.
     - this prevents XiaoZhi cleanup/recovery paths from treating a foreign
       active playback stream as XiaoZhi-owned, and gives logs a direct
       ownership signal for future board traces
+  - newest landed runtime-ownership slice:
+    - dialog runtime now only absorbs dialog-related local playback-service
+      streams:
+      - current rule: `RIVER_PLAYBACK_PRIO_TTS`
+      - shared `audio_echo` / debug playback no longer enters dialog truth
+    - dialog runtime also keeps the owned local playback latch through
+      cleared-config terminal transitions until `RIVER_PLAYBACK_IDLE`, so the
+      local playback ingress still closes cleanly after:
+      - `RECOVERING`
+      - `RESTART_PENDING`
+      - `IDLE`
   - previous landed runtime-ownership slice:
     - dialog runtime now directly owns the local playback-service listener
       ingress:

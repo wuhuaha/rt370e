@@ -12,6 +12,7 @@
 
 typedef struct {
     bool initialized;
+    bool local_playback_stream_owned;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
 } river_dialog_runtime_context_t;
@@ -44,6 +45,12 @@ static void river_dialog_runtime_copy_text(char *dst, size_t dst_size, const cha
 
     strncpy(dst, src, dst_size - 1U);
     dst[dst_size - 1U] = '\0';
+}
+
+static bool river_dialog_runtime_is_dialog_playback_stream(
+    const river_playback_stream_config_t *config)
+{
+    return config != NULL && config->priority == RIVER_PLAYBACK_PRIO_TTS;
 }
 
 static bool river_dialog_runtime_capture_cloud_snapshot(
@@ -515,10 +522,30 @@ void river_dialog_runtime_on_playback_state(river_playback_state_t state,
                                             const river_playback_stream_config_t *config,
                                             void *user_data)
 {
+    bool should_absorb = false;
     const char *reason;
 
-    (void)config;
     (void)user_data;
+
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    if (river_dialog_runtime_is_dialog_playback_stream(config)) {
+        g_river_dialog_runtime.local_playback_stream_owned = true;
+        should_absorb = true;
+    } else if (g_river_dialog_runtime.local_playback_stream_owned) {
+        should_absorb = true;
+    }
+
+    if (state == RIVER_PLAYBACK_IDLE) {
+        g_river_dialog_runtime.local_playback_stream_owned = false;
+    }
+    river_dialog_runtime_unlock();
+
+    if (!should_absorb) {
+        return;
+    }
 
     reason = "playback_state";
     if (state == RIVER_PLAYBACK_RECOVERING ||

@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.276
+- Tightened `dialog runtime` local playback ingress so it only absorbs
+  dialog-related playback-service streams instead of every shared local
+  playback state transition:
+  - added local ownership latch:
+    - `local_playback_stream_owned`
+  - added stream classifier:
+    - `river_dialog_runtime_is_dialog_playback_stream(...)`
+  - current dialog-stream rule:
+    - `RIVER_PLAYBACK_PRIO_TTS`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- Once `dialog runtime` has observed an owned dialog stream, it now keeps
+  absorbing its cleared-config terminal transitions until `IDLE`, so the local
+  playback truth still closes cleanly across:
+  - `RECOVERING`
+  - `RESTART_PENDING`
+  - `IDLE`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- This stops shared playback-service foreign streams such as
+  `audio_echo` (`RIVER_PLAYBACK_PRIO_DEBUG`) from polluting dialog-runtime
+  playback / interaction truth while preserving the existing TTS-driven local
+  playback ingress path
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_voice/river_voice_echo.c](/root/ameba-river/components/river_voice/river_voice_echo.c)
+
 ## Step 5.275
 - XiaoZhi playback runtime now maintains an explicit local playback-backend
   truth instead of scattering raw checks across:

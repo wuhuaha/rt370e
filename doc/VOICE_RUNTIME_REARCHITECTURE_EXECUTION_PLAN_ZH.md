@@ -1250,9 +1250,24 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - XiaoZhi-owned churn
     - foreign takeover
     - restart-pending recovery
+- dialog runtime 对共享 playback-service 的本地入口归属也已继续收紧：
+  - 新增本地 owned latch：
+    - `local_playback_stream_owned`
+  - 当前只吸收对话相关流：
+    - `RIVER_PLAYBACK_PRIO_TTS`
+  - 一旦已吸收 owned dialog stream，本地入口会继续跟踪其 cleared-config
+    终态直到：
+    - `RIVER_PLAYBACK_IDLE`
+  - 这修正了另一个上层真相泄漏点：
+    - `audio_echo` 这类共享 playback-service debug stream
+      不再污染 dialog runtime 的 playback / interaction 派生
+    - 同时不会因为终态回调里 `config == NULL` 而丢掉已拥有 TTS 流的收尾
 
 下一步焦点：
 
+- 继续把 dialog runtime 的本地 playback 入口从“按 priority 过滤”推进到
+  “按来源/ownership 分类”的更强 typed truth，避免未来其他 TTS 类共享流再次
+  混入对话真相
 - 继续检查 `dialog runtime` 内部是否还存在“先写局部事实，再补抓 cloud
   snapshot”的重复模式，进一步收成更少的 reducer 入口
 - 继续把 boot/wake/asr/playback 这几类入口统一成更少的 typed reducer，
