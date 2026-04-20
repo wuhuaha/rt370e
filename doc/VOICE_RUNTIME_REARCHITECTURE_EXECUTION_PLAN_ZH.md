@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.323`
+  - playback owner 的 `backend state` 已从“两个分裂的布尔投影”收口成公共
+    typed truth：
+    - `river_cloud_playback_backend_state_t`
+    - `playback_backend_state_kind`
+  - `dialog_runtime` 的公开 snapshot 已删除：
+    - `playback_backend_owned`
+    - `playback_backend_restart_pending`
+    并改为直接吸收 `playback_backend_state_kind`
+  - XiaoZhi downlink/playback runtime 的 backend ownership / restart-pending
+    判断现在直接复用公共 enum，不再保留私有 backend-state 类型
+  - 这一步继续把 downlink/playback backend ownership 真相从跨层布尔投影，
+    收口到公共 owner typed truth
 - `Step 5.322`
   - playback owner 的 `phase` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
     - `river_cloud_playback_phase_t`

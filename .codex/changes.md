@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.323
+- playback owner 的 `backend state` 已从“两个分裂的布尔投影”收口成公共 typed
+  truth：
+  - 新增 `river_cloud_playback_backend_state_t`
+  - 新增 `river_cloud_playback_backend_state_name(...)`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 已改为直接维护并导出公共 `backend state`：
+  - 删除私有 `river_cloud_xiaozhi_playback_backend_state_t`
+  - `playback_runtime_snapshot` 改为显式填充 `playback_backend_state_kind`
+  - owner 内部的 start/abort/rebuffer 判断统一复用公共 enum
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 公开 snapshot 已不再暴露：
+  - `playback_backend_owned`
+  - `playback_backend_restart_pending`
+  - 改为吸收并导出 `playback_backend_state_kind`
+  - `dialog_runtime_dump_status()` 也改为直接打印 typed backend state
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 downlink/playback backend ownership 真相从跨层布尔投影收口为
+  公共 owner typed truth，减少 core 对旧派生语义的重复解释。
+
 ## Step 5.322
 - playback owner 的 `phase` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
   - 新增 `river_cloud_playback_phase_t`

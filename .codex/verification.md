@@ -1,5 +1,48 @@
 # Verification
 
+## Step 5.323
+Validate that playback owner now exports a public typed backend state, and that
+`dialog_runtime` consumes that enum instead of exposing split backend booleans
+through its public snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_backend_state_kind|RIVER_CLOUD_PLAYBACK_BACKEND_|river_cloud_playback_backend_state_name' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+rg -n 'playback_backend_owned|playback_backend_restart_pending' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h
+sed -n '40,90p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '880,906p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '496,504p' components/river_core/river_dialog_runtime.c
+sed -n '894,918p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_cloud_runtime_snapshot_t` exposes:
+  - `playback_backend_state_kind`
+- public `river_dialog_runtime_snapshot_t` exposes:
+  - `playback_backend_state_kind`
+  and no longer exposes:
+  - `playback_backend_owned`
+  - `playback_backend_restart_pending`
+- XiaoZhi playback runtime keeps backend truth in the public enum and fills
+  `playback_backend_state_kind` directly from owner state
+- `dialog_runtime_dump_status()` prints backend state via
+  `river_cloud_playback_backend_state_name(...)` instead of reconstructing the
+  old boolean view
+
 ## Step 5.322
 Validate that playback owner now exports a public typed phase, and that
 `dialog_runtime` consumes that enum instead of exposing a string playback phase

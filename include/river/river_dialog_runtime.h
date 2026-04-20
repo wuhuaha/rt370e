@@ -40,11 +40,10 @@ typedef struct {
     bool playback_rebuffer_pending;
     bool playback_recovering;
     bool playback_phase_known;
-    bool playback_backend_owned;
-    bool playback_backend_restart_pending;
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
     river_cloud_playback_phase_t playback_phase_kind;
+    river_cloud_playback_backend_state_t playback_backend_state_kind;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;

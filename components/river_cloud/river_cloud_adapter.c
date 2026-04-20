@@ -63,6 +63,23 @@ const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase)
     }
 }
 
+const char *river_cloud_playback_backend_state_name(
+    river_cloud_playback_backend_state_t state)
+{
+    switch (state) {
+    case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
+        return "detached";
+    case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE:
+        return "owned_active";
+    case RIVER_CLOUD_PLAYBACK_BACKEND_FOREIGN_ACTIVE:
+        return "foreign_active";
+    case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
+        return "restart_pending";
+    default:
+        return "unknown";
+    }
+}
+
 const char *river_cloud_playback_terminal_state_name(
     river_cloud_playback_terminal_state_t state)
 {
