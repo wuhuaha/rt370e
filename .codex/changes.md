@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.321
+- playback owner 的 `terminal state` 已从内部字符串真相提升成公共 typed truth：
+  - 新增 `river_cloud_playback_terminal_state_t`
+  - 新增 `river_cloud_playback_terminal_state_name(...)`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- XiaoZhi downlink/playback runtime 已改为直接维护并导出公共 `terminal state`：
+  - 删除内部 `xiaozhi_playback_terminal_state[...]` 字符串真相
+  - 改为 `xiaozhi_playback_terminal_state_kind`
+  - terminal reset / ack 映射 / local fallback 全部直接落在公共 enum
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` 公开 snapshot 已不再暴露字符串 `playback_terminal_state`：
+  - 改为吸收并导出 `playback_terminal_state_kind`
+  - `dialog_runtime_dump_status()` 也改为直接打印 typed terminal state
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续把 downlink/playback 的 terminal 语义从 owner 内部字符串与跨层
+  文本投影，收口到公共 owner typed truth。
+
 ## Step 5.320
 - playback owner 的 `start policy` 已从 XiaoZhi 私有 enum 提升成公共 typed truth：
   - 新增 `river_cloud_playback_start_policy_t`

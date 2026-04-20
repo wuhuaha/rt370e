@@ -15,11 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.320 export playback start policy as public typed truth`
+  - `5.321 export playback terminal state as public typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback owner 的 `terminal state` 已从内部字符串真相提升成公共
+      typed truth：
+      - `river_cloud_playback_terminal_state_t`
+      - `playback_terminal_state_kind`
+    - `dialog_runtime` 的公开 snapshot 已删除字符串：
+      - `playback_terminal_state`
+      并改为直接吸收 `playback_terminal_state_kind`
+    - XiaoZhi downlink/playback runtime 的 terminal reset / ack 映射 /
+      local fallback 已全部收口到公共 enum
+    - 这一步继续把 downlink/playback 的 terminal 语义从内部字符串与跨层文本
+      投影，收口到公共 typed truth
   - newest landed runtime-ownership slice:
     - playback owner 的 `start policy` 已从 XiaoZhi 私有 enum 提升成公共
       typed truth：

@@ -1,5 +1,50 @@
 # Verification
 
+## Step 5.321
+Validate that playback owner now exports a public typed terminal state, and that
+`dialog_runtime` consumes that enum instead of exposing a string terminal state
+through its public snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_terminal_state_kind|RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_|river_cloud_playback_terminal_state_name' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+rg -n 'playback_terminal_state\\[' \
+  include/river/river_dialog_runtime.h
+sed -n '220,250p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1004,1016p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1415,1429p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1968,2057p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '505,537p' components/river_core/river_dialog_runtime.c
+sed -n '917,926p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public `river_cloud_runtime_snapshot_t` exposes:
+  - `playback_terminal_state_kind`
+- public `river_dialog_runtime_snapshot_t` exposes:
+  - `playback_terminal_state_kind`
+  and no longer exposes:
+  - `playback_terminal_state`
+- XiaoZhi playback runtime keeps terminal-state truth in
+  `xiaozhi_playback_terminal_state_kind`, and terminal reset / ack mapping /
+  local fallback all route through the public enum
+- `dialog_runtime_dump_status()` prints terminal state via
+  `river_cloud_playback_terminal_state_name(...)` instead of reading a public
+  string field
+
 ## Step 5.320
 Validate that playback owner now exports a public typed start policy, and that
 `dialog_runtime` consumes that enum instead of exposing a string start policy

@@ -67,6 +67,14 @@ typedef enum {
 } river_cloud_playback_terminal_wait_kind_t;
 
 typedef enum {
+    RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE = 0,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_COMPLETED,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_CLEARED,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+    RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_CLEARED
+} river_cloud_playback_terminal_state_t;
+
+typedef enum {
     RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_NONE = 0,
     RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED,
     RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_WRITE_FAILED
@@ -95,6 +103,7 @@ typedef struct {
     bool playback_terminal_closed;
     bool playback_terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
+    river_cloud_playback_terminal_state_t playback_terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
     river_cloud_playback_start_policy_t playback_start_policy_kind;
     bool tts_stop_pending;
@@ -150,6 +159,8 @@ river_status_t river_cloud_asr_batch_submit_segment(const uint8_t *pcm,
                                                     const river_voice_segment_desc_t *segment);
 const char *river_cloud_playback_rebuffer_cause_name(
     river_cloud_playback_rebuffer_cause_t cause);
+const char *river_cloud_playback_terminal_state_name(
+    river_cloud_playback_terminal_state_t state);
 const char *river_cloud_playback_start_policy_name(
     river_cloud_playback_start_policy_t policy);
 river_status_t river_cloud_adapter_get_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot);

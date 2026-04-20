@@ -45,6 +45,25 @@ const char *river_cloud_playback_rebuffer_cause_name(
     }
 }
 
+const char *river_cloud_playback_terminal_state_name(
+    river_cloud_playback_terminal_state_t state)
+{
+    switch (state) {
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_COMPLETED:
+        return "completed";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_CLEARED:
+        return "cleared";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED:
+        return "local_completed";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_CLEARED:
+        return "local_cleared";
+    case RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE:
+        return "none";
+    default:
+        return "unknown";
+    }
+}
+
 const char *river_cloud_playback_start_policy_name(
     river_cloud_playback_start_policy_t policy)
 {

@@ -505,6 +505,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         snapshot->playback_terminal_waiting;
     g_river_dialog_runtime.snapshot.playback_terminal_wait_kind =
         snapshot->playback_terminal_wait_kind;
+    g_river_dialog_runtime.snapshot.playback_terminal_state_kind =
+        snapshot->playback_terminal_state_kind;
     g_river_dialog_runtime.snapshot.playback_rebuffer_cause_kind =
         snapshot->playback_rebuffer_cause_kind;
     g_river_dialog_runtime.snapshot.playback_start_policy_kind =
@@ -528,9 +530,6 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_phase,
                                    sizeof(g_river_dialog_runtime.snapshot.playback_phase),
                                    snapshot->playback_phase);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.playback_terminal_state,
-                                   sizeof(g_river_dialog_runtime.snapshot.playback_terminal_state),
-                                   snapshot->playback_terminal_state);
     river_dialog_runtime_copy_text(
         g_river_dialog_runtime.snapshot.playback_terminal_reason,
         sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
@@ -918,8 +917,10 @@ void river_dialog_runtime_dump_status(void)
                    snapshot.playback_rebuffer_cause_kind),
                playback_local_recovering ? "yes" : "no",
                snapshot.playback_terminal_closed ? "yes" : "no",
-               snapshot.playback_terminal_state[0] != '\0' ?
-                   snapshot.playback_terminal_state :
+               snapshot.playback_terminal_state_kind !=
+                       RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE ?
+                   river_cloud_playback_terminal_state_name(
+                       snapshot.playback_terminal_state_kind) :
                    "-",
                snapshot.playback_terminal_reason[0] != '\0' ?
                    snapshot.playback_terminal_reason :

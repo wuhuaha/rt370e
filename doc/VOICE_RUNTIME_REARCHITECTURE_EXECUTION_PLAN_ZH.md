@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.321`
+  - playback owner 的 `terminal state` 已从内部字符串真相提升成公共
+    typed truth：
+    - `river_cloud_playback_terminal_state_t`
+    - `playback_terminal_state_kind`
+  - `dialog_runtime` 的公开 snapshot 已删除字符串：
+    - `playback_terminal_state`
+    并改为直接吸收 `playback_terminal_state_kind`
+  - XiaoZhi downlink/playback runtime 的 terminal reset / ack 映射 /
+    local fallback 已全部收口到公共 enum
+  - 这一步继续把 downlink/playback 的 terminal 语义从内部字符串 / 跨层文本字段，
+    收口到公共 owner typed truth
 - `Step 5.320`
   - playback owner 的 `start policy` 已从 XiaoZhi 私有 enum 提升成公共
     typed truth：
