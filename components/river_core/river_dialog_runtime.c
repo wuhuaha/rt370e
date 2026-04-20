@@ -264,12 +264,12 @@ const char *river_dialog_output_lane_name(river_dialog_output_lane_t state)
 
 static bool river_dialog_runtime_playback_terminal_closed_locked(void)
 {
-    return g_river_dialog_runtime.snapshot.playback_terminal_state[0] != '\0';
+    return g_river_dialog_runtime.snapshot.playback_terminal_closed;
 }
 
 static bool river_dialog_runtime_playback_phase_known_locked(void)
 {
-    return g_river_dialog_runtime.snapshot.playback_phase[0] != '\0';
+    return g_river_dialog_runtime.snapshot.playback_phase_known;
 }
 
 static bool river_dialog_runtime_playback_phase_equals_locked(const char *phase)
@@ -498,6 +498,10 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     g_river_dialog_runtime.snapshot.playback_lane_engaged = snapshot->playback_lane_engaged;
     g_river_dialog_runtime.snapshot.playback_rebuffer_pending =
         snapshot->playback_rebuffer_pending;
+    g_river_dialog_runtime.snapshot.playback_phase_known =
+        snapshot->playback_phase_known;
+    g_river_dialog_runtime.snapshot.playback_terminal_closed =
+        snapshot->playback_terminal_closed;
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
     g_river_dialog_runtime.snapshot.playback_terminal_waiting =
         snapshot->playback_terminal_waiting;
@@ -874,7 +878,7 @@ bool river_dialog_runtime_allows_barge_in_interrupt(void)
     allowed = g_river_dialog_runtime.snapshot.asr_session_active &&
               g_river_dialog_runtime.snapshot.playback_active &&
               !river_dialog_runtime_tts_interrupt_inflight_locked() &&
-              g_river_dialog_runtime.snapshot.playback_terminal_state[0] == '\0' &&
+              !g_river_dialog_runtime.snapshot.playback_terminal_closed &&
               (g_river_dialog_runtime.snapshot.interaction_state ==
                    RIVER_INTERACTION_SPEAKING ||
                g_river_dialog_runtime.snapshot.interaction_state ==
@@ -914,7 +918,7 @@ void river_dialog_runtime_dump_status(void)
         return;
     }
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s tail_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -928,7 +932,10 @@ void river_dialog_runtime_dump_status(void)
                        "restart_pending" :
                        snapshot.playback_state == RIVER_PLAYBACK_ERROR ? "error" : "unknown",
                snapshot.playback_cloud_active ? "yes" : "no",
-               snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-",
+               snapshot.playback_phase_known ?
+                   (snapshot.playback_phase[0] != '\0' ? snapshot.playback_phase : "-") :
+                   "-",
+               snapshot.playback_phase_known ? "yes" : "no",
                snapshot.playback_start_policy[0] != '\0' ?
                    snapshot.playback_start_policy :
                    "-",
@@ -941,6 +948,7 @@ void river_dialog_runtime_dump_status(void)
                    snapshot.playback_rebuffer_cause :
                    "-",
                snapshot.playback_local_recovering ? "yes" : "no",
+               snapshot.playback_terminal_closed ? "yes" : "no",
                snapshot.playback_terminal_state[0] != '\0' ?
                    snapshot.playback_terminal_state :
                    "-",

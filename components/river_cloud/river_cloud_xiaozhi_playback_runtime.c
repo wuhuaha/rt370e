@@ -924,6 +924,8 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     snapshot->playback_active = river_cloud_xiaozhi_playback_output_active();
     snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
     snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
+    snapshot->playback_phase_known = true;
+    snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
     snapshot->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,

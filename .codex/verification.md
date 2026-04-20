@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.310
+Validate that cloud playback runtime now exports typed `phase_known` /
+`terminal_closed` truth, and that `dialog_runtime` consumes those booleans
+instead of inferring both facts from string emptiness:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_phase_known|playback_terminal_closed' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '260,350p' components/river_core/river_dialog_runtime.c
+sed -n '916,940p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud/runtime snapshot structs expose:
+  - `playback_phase_known`
+  - `playback_terminal_closed`
+- `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` fills both booleans
+  from playback runtime owned truth
+- `dialog_runtime` no longer decides “phase known / terminal closed” by testing
+  whether the diagnostic strings are empty
+
 ## Step 5.309
 Validate that local playback truth now enters `dialog_runtime` only through the
 listener ingress, and that a local `RIVER_PLAYBACK_IDLE` no longer clears the

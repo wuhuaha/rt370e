@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.310
+- cloud playback runtime snapshot 新增 typed playback truth：
+  - `playback_phase_known`
+  - `playback_terminal_closed`
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `dialog_runtime` snapshot 同步吸收这两条 typed truth，并开始直接消费它们：
+  - `playback_phase_known` 不再通过 `playback_phase[0] != '\0'` 侧推
+  - `playback_terminal_closed` 不再通过 `playback_terminal_state[0] != '\0'` 侧推
+  - `allows_barge_in_interrupt()` / playback active 推导 / status dump 现在都优先走
+    typed bool
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续减少了 core 侧对 playback runtime 字符串状态的二次解释，让：
+  - phase 是否已知
+  - terminal 是否已闭合
+  直接由 playback owner 输出布尔真相。
+
 ## Step 5.309
 - `dialog_runtime` 不再暴露公开的 playback-state 侧门：
   - `river_dialog_runtime_note_playback_state(...)` 已从公开头文件删除

@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.310`
+  - cloud playback runtime snapshot 新增 typed bool：
+    - `playback_phase_known`
+    - `playback_terminal_closed`
+  - `dialog_runtime` 已开始直接吸收并消费这两条真相
+  - 这让 core 侧对：
+    - `playback_phase[0] != '\0'`
+    - `playback_terminal_state[0] != '\0'`
+    的字符串二次解释开始退出主路径
+  - `allows_barge_in_interrupt()` 与 runtime status dump 也同步开始转向
+    typed playback truth
 - `Step 5.309`
   - `dialog_runtime` 已删除公开的 playback-state 侧门：
     - `river_dialog_runtime_note_playback_state(...)`
@@ -149,6 +160,11 @@ Branch: `agent-server-v2`
     把它们降级成 typed local signal，而不是 coarse interaction/error 推导入口
   - 继续把 playback terminal / interrupt clear / recovery policy 往
     playback runtime owner 输出的 typed truth 收口，减少 core 侧再做字符串/边缘重解释
+  - 继续补齐更多 typed playback/runtime projection，逐步压缩：
+    - terminal wait
+    - rebuffer cause/history
+    - local/backend ownership
+    的 core-side 二次拼装
   - 回到 downlink/playback runtime，继续收紧：
     - `tts_stop_pending`
     - playback stop/reset

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.309 narrow playback ingress and interrupt clear policy`
+  - `5.310 export typed phase/terminal playback truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,6 +86,17 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - cloud playback runtime snapshot 新增 typed bool：
+      - `playback_phase_known`
+      - `playback_terminal_closed`
+    - `dialog_runtime` 现在直接吸收并消费这两条 playback owner truth
+    - core 侧对：
+      - `playback_phase[0] != '\0'`
+      - `playback_terminal_state[0] != '\0'`
+      这类字符串侧推已开始退场
+    - `allows_barge_in_interrupt()` 与 runtime status dump 也已开始转向 typed
+      playback truth
+  - previous runtime-ownership slice:
     - `dialog_runtime` 已删除公开的 playback-state 侧门：
       - `river_dialog_runtime_note_playback_state(...)`
     - 本地 playback 真相现在继续只经由：
