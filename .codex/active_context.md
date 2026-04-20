@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.290 replace coordinator snapshot reads with dialog-runtime policy helpers`
+  - `5.291 move playback/duplex admission helpers into playback runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
@@ -86,13 +86,22 @@ or top-of-tree verification target changes.
       transport callback shim that only forwards `river_xiaozhi_event_t`
       objects into runtime
   - newest landed runtime-ownership slice:
+    - playback-side duplex admission helpers now live in
+      `river_cloud_xiaozhi_playback_runtime.c`:
+      - `playback_allows_vad_open()`
+      - `capture_held_by_playback()`
+      - `apply_tts_start_round_policy()`
+    - `xiaozhi_session.c` no longer owns those playback/downlink rules
+    - this keeps AEC/VAD admission and `tts_start` round-close policy attached
+      to the downlink runtime truth owner
+  - previous runtime-ownership slice:
     - session_coordinator no longer reads dialog-runtime snapshots directly for:
       - wakeword admission
       - barge-in interrupt
     - those checks are now exposed as typed dialog-runtime policy helpers,
       keeping the admission rules inside the truth source itself
     - this removes another class of coordinator-side rule reconstruction
-  - previous runtime-ownership slice:
+  - older runtime-ownership slice:
     - cloud ASR lifecycle no longer needs session_coordinator as a truth bridge
     - app now fans out ASR results so:
       - dialog runtime absorbs lifecycle truth directly

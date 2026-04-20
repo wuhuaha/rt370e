@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.291
+Validate that XiaoZhi playback/duplex admission helpers are now owned by the
+playback runtime instead of `river_cloud_xiaozhi_session.c`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_allows_vad_open|capture_held_by_playback|apply_tts_start_round_policy' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '292,362p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1200,1235p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the three playback/duplex helpers live in:
+  - `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c` no longer implements
+  those helpers
+
 ## Step 5.290
 Validate that session_coordinator no longer reads dialog-runtime snapshots
 directly for wakeword admission or barge-in interrupt policy, and instead uses

@@ -1275,6 +1275,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `playback_terminal_state`
     - `asr_session_active`
   - 这继续把 admission/interrupt 规则收回 dialog runtime 这个真相源内部
+- playback/downlink 真相源也继续向前收口：
+  - 下面 3 个 helper 已从 `river_cloud_xiaozhi_session.c` 移入
+    `river_cloud_xiaozhi_playback_runtime.c`：
+    - `playback_allows_vad_open()`
+    - `capture_held_by_playback()`
+    - `apply_tts_start_round_policy()`
+  - 这意味着：
+    - 播放期间 VAD/AEC 准入规则由 playback runtime 持有
+    - `tts_start` 触发时“保留本地 round 还是回退到 half-duplex close”的判定
+      也不再散落在 session 文件中
+  - `xiaozhi_session.c` 进一步退化为 transport/session 编排层，而不是下行播放
+    判定层
 - playback runtime 内部对“本地播放后端是否仍属于 XiaoZhi”的真相也已继续收口：
   - 新增 typed backend state：
     - `detached`

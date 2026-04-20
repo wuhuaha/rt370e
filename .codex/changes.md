@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.291
+- `XiaoZhi` 的 playback/duplex admission helper 继续从
+  `river_cloud_xiaozhi_session.c` 收口到
+  `river_cloud_xiaozhi_playback_runtime.c`：
+  - `river_cloud_xiaozhi_playback_allows_vad_open()`
+  - `river_cloud_xiaozhi_capture_held_by_playback()`
+  - `river_cloud_xiaozhi_apply_tts_start_round_policy()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- 这一步把“播放期间 VAD/AEC 准入”和 “`tts_start` 是否保持本地 round 打开”
+  的判定从 session 文件剥离，转由 playback runtime 这个下行真相源持有。
+- `xiaozhi_session` 继续缩小为 transport/session 编排层，不再实现这些下行播放
+  判定规则，只消费已经公开的 playback helper。
+
 ## Step 5.290
 - `session_coordinator` 对 `dialog runtime snapshot` 的两类直接解读已继续收口成
   typed policy helper 调用：
