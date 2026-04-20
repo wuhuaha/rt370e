@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.334
+Validate that `dialog_runtime` now keeps local playback shadow as a single
+private `playback_state`, deriving active/recovering fallback on demand instead
+of caching three parallel local facts:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_local_active|playback_local_recovering|local_playback_state_active_locked|local_playback_state_recovering_locked|playback_state' \
+  components/river_core/river_dialog_runtime.c
+sed -n '12,20p' components/river_core/river_dialog_runtime.c
+sed -n '258,294p' components/river_core/river_dialog_runtime.c
+sed -n '984,992p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_context_t` no longer caches:
+  - `playback_local_active`
+  - `playback_local_recovering`
+- `dialog_runtime` now derives local fallback/diagnostic playback truth through:
+  - `river_dialog_runtime_local_playback_state_active_locked()`
+  - `river_dialog_runtime_local_playback_state_recovering_locked()`
+- phase-missing fallback and status dump still work, but local playback shadow
+  is now represented by one private `playback_state`
+
 ## Step 5.333
 Validate that playback-service `RECOVERING` is now projected as a cloud-owned
 backend truth, and that XiaoZhi downlink no longer mistakes this state for a

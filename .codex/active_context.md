@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.333 project playback recovering as owned backend truth`
+  - `5.334 collapse local playback shadow to one private state`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 内部 local playback shadow 已从：
+      - `playback_state`
+      - `playback_local_active`
+      - `playback_local_recovering`
+      收成单一 private `playback_state`
+    - phase-unknown fallback 与 diagnostics dump 现在都按需从
+      `playback_state` 派生 active/recovering
+    - 这一步继续压缩了 runtime 内部重复缓存的本地 playback 事实，减少内部阴影态
+      漂移
   - newest landed runtime-ownership slice:
     - playback runtime 现在会把本地 playback-service 的
       `RIVER_PLAYBACK_RECOVERING` 上推成 cloud-owned backend truth：

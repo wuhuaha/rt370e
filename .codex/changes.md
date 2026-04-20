@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.334
+- `dialog_runtime` 内部的 local playback shadow 已进一步从三份缓存收成单一
+  private state：
+  - 删除内部缓存：
+    - `playback_local_active`
+    - `playback_local_recovering`
+  - 保留：
+    - `playback_state`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增私有 helper，按需从 `playback_state` 派生本地诊断/兜底语义：
+  - `river_dialog_runtime_local_playback_state_active_locked()`
+  - `river_dialog_runtime_local_playback_state_recovering_locked()`
+  - phase-missing fallback 与 status dump 都改为直接消费这两条派生 helper
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这一步继续压缩了 `dialog_runtime` 内部 local playback shadow 的重复缓存：
+  - stream ownership ingress 仍保留
+  - phase-unknown fallback 仍保留
+  - diagnostics dump 仍可见
+  - 但内部不再缓存三份可能漂移的同类事实
+
 ## Step 5.333
 - playback runtime 现在把本地 playback-service 的 `RIVER_PLAYBACK_RECOVERING`
   上推成了 cloud-owned typed backend truth：

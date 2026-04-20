@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.334`
+  - `dialog_runtime` 内部 local playback shadow 已进一步从三份缓存收成单一
+    private `playback_state`
+  - phase-unknown fallback 与 diagnostics dump 现在都按需从这条 private
+    state 派生：
+    - local active
+    - local recovering
+  - 这一步继续压缩了 runtime 内部对本地 playback shadow 的重复缓存，减少内部
+    shadow 漂移，同时不改变对外 typed truth 面
 - `Step 5.333`
   - playback runtime 现在会把本地 playback-service 的
     `RIVER_PLAYBACK_RECOVERING` 上推成 cloud-owned backend truth：
@@ -1895,6 +1904,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
     - `restart_pending`
   - 这继续压缩了 core 对本地 coarse playback state 的 recovering 依赖，把
     local shadow 更明确地收敛到 phase-unknown fallback
+- `dialog_runtime` 内部 local playback shadow 也已继续收口：
+  - internal context 不再重复缓存：
+    - `playback_local_active`
+    - `playback_local_recovering`
+  - 当前只保留：
+    - `playback_state`
+    作为最小 private shadow，再由 helper 按需派生 active/recovering
+  - 这继续减少了 runtime 内部阴影态自相复制的漂移面
 - 再往前一步，XiaoZhi downlink/playback 的 rebuffer 真相也已继续拆细：
   - `xiaozhi_playback_rebuffer_count` 继续保留为累计诊断计数
   - 新增：

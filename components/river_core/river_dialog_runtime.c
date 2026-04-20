@@ -14,8 +14,6 @@ typedef struct {
     bool initialized;
     bool local_playback_stream_owned;
     char local_playback_stream_name[32];
-    bool playback_local_active;
-    bool playback_local_recovering;
     river_playback_state_t playback_state;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
@@ -260,14 +258,21 @@ static bool river_dialog_runtime_playback_waiting_segment_locked(void)
                RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
 }
 
+static bool river_dialog_runtime_local_playback_state_active_locked(void)
+{
+    return river_playback_service_state_active(g_river_dialog_runtime.playback_state);
+}
+
+static bool river_dialog_runtime_local_playback_state_recovering_locked(void)
+{
+    return g_river_dialog_runtime.playback_state == RIVER_PLAYBACK_RECOVERING ||
+           g_river_dialog_runtime.playback_state == RIVER_PLAYBACK_RESTART_PENDING;
+}
+
 static void river_dialog_runtime_apply_local_playback_state_locked(
     river_playback_state_t state)
 {
     g_river_dialog_runtime.playback_state = state;
-    g_river_dialog_runtime.playback_local_active =
-        river_playback_service_state_active(state);
-    g_river_dialog_runtime.playback_local_recovering =
-        state == RIVER_PLAYBACK_RECOVERING || state == RIVER_PLAYBACK_RESTART_PENDING;
 }
 
 static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(void)
@@ -276,7 +281,7 @@ static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(vo
         return false;
     }
 
-    return g_river_dialog_runtime.playback_local_active;
+    return river_dialog_runtime_local_playback_state_active_locked();
 }
 
 static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locked(void)
@@ -285,7 +290,7 @@ static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locke
         return false;
     }
 
-    return g_river_dialog_runtime.playback_local_recovering;
+    return river_dialog_runtime_local_playback_state_recovering_locked();
 }
 
 static bool river_dialog_runtime_compute_playback_recovering_locked(void)
@@ -979,9 +984,10 @@ void river_dialog_runtime_dump_status(void)
     }
 
     snapshot = g_river_dialog_runtime.snapshot;
-    playback_local_active = g_river_dialog_runtime.playback_local_active;
-    playback_local_recovering = g_river_dialog_runtime.playback_local_recovering;
     playback_state = g_river_dialog_runtime.playback_state;
+    playback_local_active = river_dialog_runtime_local_playback_state_active_locked();
+    playback_local_recovering =
+        river_dialog_runtime_local_playback_state_recovering_locked();
     river_dialog_runtime_unlock();
 
     RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
