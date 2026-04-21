@@ -362,20 +362,6 @@ static bool river_dialog_runtime_output_turn_quiesced_locked(void)
            !snapshot->playback_terminal_waiting;
 }
 
-static bool river_dialog_runtime_local_idle_clears_tts_interrupt_locked(void)
-{
-    if (!river_dialog_runtime_playback_phase_known_locked()) {
-        return true;
-    }
-
-    return river_dialog_runtime_output_turn_quiesced_locked();
-}
-
-static bool river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked(void)
-{
-    return river_dialog_runtime_local_playback_shadow_active_fallback_locked();
-}
-
 static bool river_dialog_runtime_terminal_wait_suppresses_speaking_locked(void)
 {
     switch (g_river_dialog_runtime.snapshot.playback_terminal_wait_kind) {
@@ -619,8 +605,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         g_river_dialog_runtime.snapshot.asr_session_active = true;
     }
     river_dialog_runtime_refresh_playback_locked();
-    if (river_dialog_runtime_output_turn_quiesced_locked() &&
-        !river_dialog_runtime_local_playback_shadow_blocks_interrupt_clear_locked()) {
+    if (river_dialog_runtime_output_turn_quiesced_locked()) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
 }
@@ -821,7 +806,7 @@ static void river_dialog_runtime_reduce_local_playback_event(
         g_river_dialog_runtime.snapshot.error_recovering = false;
     }
     if ((state == RIVER_PLAYBACK_IDLE &&
-         river_dialog_runtime_local_idle_clears_tts_interrupt_locked()) ||
+         river_dialog_runtime_output_turn_quiesced_locked()) ||
         (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }

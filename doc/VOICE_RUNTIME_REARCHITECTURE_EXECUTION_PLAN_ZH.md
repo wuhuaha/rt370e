@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.343`
+  - `dialog_runtime` 不再在 `phase unknown` 时给
+    `tts_interrupt_requested` 保留本地 playback shadow 的旁路清理逻辑
+  - cloud snapshot merge 与本地 playback idle 现在统一只依赖：
+    - `output_turn_quiesced`
+  - 这继续把 interrupt-clear policy 从 local edge signal 收口到 runtime
+    自己的统一派生真相
 - `Step 5.342`
   - XiaoZhi `backend_state` 已不再因为 phase 仍停在 `playing/draining`，
     就在 playback-service 已不活跃时继续投影 `owned_active`

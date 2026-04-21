@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.343
+- `dialog_runtime` 已删除本地 playback shadow 参与
+  `tts_interrupt_requested` 清理的两条旁路：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- cloud snapshot merge 与本地 playback idle 现在统一只看：
+  - `output_turn_quiesced_locked()`
+  不再因为 `phase unknown` 就额外走本地 shadow special-case
+- 这一步继续把 interrupt-clear policy 收口到 runtime 自己的统一派生真相，
+  减少 local playback edge signal 提前清 interrupt latch 的机会
+
 ## Step 5.342
 - XiaoZhi playback `backend_state` 已继续停止把
   `service inactive + phase=playing/draining` 投影成 `owned_active`：

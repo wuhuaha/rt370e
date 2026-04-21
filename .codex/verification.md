@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.343
+Validate that dialog runtime clears `tts_interrupt_requested` only from the
+unified output-turn quiesced truth, without phase-unknown local-shadow bypass:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'output_turn_quiesced_locked|tts_interrupt_requested = false|local_idle_clears_tts_interrupt|local_playback_shadow_blocks_interrupt_clear' \
+  components/river_core/river_dialog_runtime.c
+sed -n '350,380p' components/river_core/river_dialog_runtime.c
+sed -n '615,635p' components/river_core/river_dialog_runtime.c
+sed -n '815,835p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime.c` no longer contains:
+  - `local_idle_clears_tts_interrupt_locked`
+  - `local_playback_shadow_blocks_interrupt_clear_locked`
+- both cloud snapshot merge and local playback idle path clear
+  `tts_interrupt_requested` only when `output_turn_quiesced_locked()` is true
+
 ## Step 5.342
 Validate that XiaoZhi backend-state truth no longer projects output phase to
 attached-backend ownership when playback-service is inactive:
