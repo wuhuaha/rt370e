@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.379 tighten restart_pending start threshold`
+  - `5.380 gate restart_pending AEC block with dialog truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - voice runtime 的 `restart_pending` AEC gate 不再只看本地
+      `playback_state`
+    - `restart_pending` 是否仍应硬阻塞，现在先由 dialog runtime snapshot 判定：
+      - lane 是否仍 engaged
+      - backend 是否仍是 `restart_pending`
+      - 是否已进入 quiet recovery window
+    - `prefetching/rebuffering/waiting_segment` 这类 quiet recovery 窗口内，
+      AEC path 不再被 `restart_pending` 提前 reset
+    - 这一步继续把 duplex/AEC 恢复门控从 playback-service coarse state
+      收回到 dialog/runtime 真相源
   - newest landed runtime-ownership slice:
     - playback runtime 现在区分：
       - detached cold start
@@ -42,10 +53,10 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 `restart_pending` 是否仍在 duplex / capture / AEC gate 上被过度
-      当成“播放占用中”
-    - 如果 voice/AEC gate 仍直接按 `playback_state == RESTART_PENDING`
-      一刀切阻塞，则继续把它下沉到 dialog/runtime-owned typed playback truth
+    - 继续检查 dialog runtime 内剩余 `local playback shadow` / service-active
+      fallback 是否还能继续退化成 purely-diagnostic shadow
+    - 继续检查 session / adapter 里剩余 duplex fallback、capture reopen、
+      playback occupied 判定，是否还能进一步只消费 dialog/runtime typed truth
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

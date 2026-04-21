@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.380
+- voice runtime 的 `restart_pending` AEC gate 不再无条件依赖本地
+  `playback_state`：
+  - 改为先读取 dialog runtime snapshot，再决定是否仍需按
+    `restart_pending` 硬阻塞
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 新增两层 helper：
+  - `restart_pending_quiet_phase(...)`
+  - `restart_pending_requires_block()`
+- 当前只有在 dialog/runtime 真相同时满足以下条件时，才继续保留
+  `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING`：
+  - playback lane 仍 engaged
+  - backend truth 仍是 `RESTART_PENDING`
+  - 且不处于 `prefetching/rebuffering/waiting_segment` 这类 quiet recovery 窗口
+- 如果 dialog/runtime 已经判定：
+  - lane 不再 engaged
+  - 或已经进入 quiet recovery window
+  voice runtime 就不再提前把 AEC path 直接打成 `restart_pending` hard block，
+  而是继续下沉到后续 reference / interaction gate 判定
+- 这一步继续把 duplex/AEC 的恢复门控从底层 playback-service coarse state
+  收回到 dialog/runtime 真相源，减少恢复空窗内的 AEC reset / reopen churn
+
 ## Step 5.379
 - playback runtime 现在对 backend-aware 起播门限做了进一步拆分：
   - detached cold start

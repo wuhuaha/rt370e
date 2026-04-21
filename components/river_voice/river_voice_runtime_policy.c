@@ -6,6 +6,8 @@
 #include "os_wrapper.h"
 #include "rtk_status.h"
 
+#include "river/river_dialog_runtime.h"
+
 typedef struct {
     bool initialized;
     rtos_mutex_t lock;
@@ -48,6 +50,40 @@ static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t
     return state == RIVER_INTERACTION_SPEAKING ||
            state == RIVER_INTERACTION_BARGE_IN_LISTENING ||
            state == RIVER_INTERACTION_ASR_STREAMING;
+}
+
+static bool river_voice_runtime_restart_pending_quiet_phase(
+    river_cloud_playback_phase_t phase)
+{
+    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+}
+
+static bool river_voice_runtime_restart_pending_requires_block(void)
+{
+    river_dialog_runtime_snapshot_t snapshot;
+
+    if (river_dialog_runtime_get_snapshot(&snapshot) != RIVER_OK) {
+        return true;
+    }
+
+    if (!snapshot.playback_lane_engaged) {
+        return false;
+    }
+
+    if (snapshot.playback_backend_state_kind !=
+        RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING) {
+        return false;
+    }
+
+    if (snapshot.playback_phase_known &&
+        river_voice_runtime_restart_pending_quiet_phase(
+            snapshot.playback_phase_kind)) {
+        return false;
+    }
+
+    return true;
 }
 
 static bool river_voice_runtime_profile_supports_playback_reference(
@@ -250,7 +286,8 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
         return;
     }
 
-    if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING) {
+    if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING &&
+        river_voice_runtime_restart_pending_requires_block()) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
         return;
     }

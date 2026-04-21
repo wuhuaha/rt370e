@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.380`
+  - voice runtime 的 `restart_pending` AEC gate 不再无条件依赖本地
+    `playback_state`
+  - 新增：
+    - `restart_pending_quiet_phase(...)`
+    - `restart_pending_requires_block()`
+  - `restart_pending` 是否仍应硬阻塞，现在先看 dialog runtime snapshot：
+    - playback lane 是否仍 engaged
+    - backend truth 是否仍是 `restart_pending`
+    - 是否已进入 `prefetching/rebuffering/waiting_segment` quiet recovery window
+  - quiet recovery window 内，AEC path 不再因为本地 service 仍报
+    `RESTART_PENDING` 就被提前 reset
+  - 这一步继续把 duplex/AEC 恢复门控从 playback-service coarse state
+    收回到 dialog/runtime 真相源，降低恢复空窗里的 reset / reopen 抖动
 - `Step 5.379`
   - playback runtime 现在把 backend-aware 起播门限继续拆分成：
     - detached cold start

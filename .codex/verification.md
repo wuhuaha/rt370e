@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.380
+Validate that `restart_pending` AEC blocking is now mediated by dialog runtime
+truth, so quiet recovery windows no longer unconditionally trip the dedicated
+restart-pending hard block:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'restart_pending_requires_block|restart_pending_quiet_phase|river_dialog_runtime_get_snapshot|RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING' \
+  components/river_voice/river_voice_runtime_policy.c
+sed -n '40,88p' components/river_voice/river_voice_runtime_policy.c
+sed -n '280,296p' components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- voice runtime now consults `river_dialog_runtime_get_snapshot(...)` before
+  applying the dedicated `restart_pending` AEC hard block
+- quiet recovery windows
+  (`prefetching/rebuffering/waiting_segment`) no longer always reset the AEC
+  path just because the local playback service still reports
+  `RIVER_PLAYBACK_RESTART_PENDING`
+- the dedicated `restart_pending` gate reason is retained only for runtime
+  truths that still represent an engaged, non-quiet restart block
+
 ## Step 5.379
 Validate that `restart_pending` restart no longer waits for the detached
 cold-start threshold, and instead reuses the attached-resume watermark while
