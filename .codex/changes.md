@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.341
+- `dialog_runtime` 已开始直接消费 `playback_backend_state_kind=owned_paused`
+  作为受控 playback 过渡真相：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `playback_error_is_managed_recovery_locked()` 现在除：
+  - `rebuffer_pending`
+  - `owned_recovering`
+  - `restart_pending`
+  - `playback_cloud_active`
+  外，也会把 `owned_paused` 视为 managed playback transition
+- 这让本地 `RIVER_PLAYBACK_ERROR` 落在 XiaoZhi backend 正在
+  pause/detach 的窗口时，不再被 core 侧轻易放大成独立 `error_recovering`
+
 ## Step 5.340
 - XiaoZhi playback backend truth 新增显式 `owned_paused`：
   - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)

@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.341`
+  - `dialog_runtime` 已开始直接消费 `playback_backend_state_kind=owned_paused`
+    作为受控 playback 过渡真相
+  - 本地 `playback_error` 若发生在 XiaoZhi backend 自己的 pause/detach
+    窗口，不再轻易被 core 放大成独立 `error_recovering`
+  - 这让 `dialog runtime` 对本地 playback-service 边缘错误的解释继续收口到
+    playback runtime owner truth
 - `Step 5.340`
   - XiaoZhi playback backend truth 新增显式 `owned_paused`
   - `backend_state()` 现在不再只靠：

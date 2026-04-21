@@ -297,6 +297,8 @@ static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 {
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
+           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||

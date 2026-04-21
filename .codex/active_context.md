@@ -15,11 +15,16 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.340 split XiaoZhi owned-paused backend truth from detached/foreign`
+  - `5.341 let dialog runtime absorb owned_paused as managed playback`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 已开始把 `playback_backend_state_kind=owned_paused`
+      视为 managed playback transition
+    - 本地 `playback_error` 若落在 XiaoZhi backend 自己的 pause/detach 窗口，
+      不再轻易放大成独立 `error_recovering`
   - newest landed runtime-ownership slice:
     - XiaoZhi playback backend truth 新增 `owned_paused`
     - `backend_state()` 现在会同时吸收：
