@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.340
+- XiaoZhi playback backend truth 新增显式 `owned_paused`：
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - 用来表示：
+    - 当前 playback lane 仍属于 XiaoZhi
+    - 但本地 backend 处于 pause / detaching 过渡，而不是正在出声
+- `river_cloud_xiaozhi_playback_backend_state()` 现在改为组合：
+  - playback runtime phase
+  - playback-service 当前 stream owner
+  来区分：
+    - `owned_active`
+    - `owned_paused`
+    - `owned_recovering`
+    - `foreign_active`
+    - `detached`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- downlink worker / start path 也已开始直接消费这条新 truth：
+  - `owned_paused` 时不再误判成 foreign/detached 后立即 fresh-start
+  - 而是显式等待本地 backend 脱离 pause/detach 过渡
+- 这一步继续把 downlink/playback 的 backend ownership 真相从 coarse
+  playback-service active 状态，收口到 playback runtime 自己的 typed truth
+
 ## Step 5.339
 - `dialog_runtime` 的 `playback_active` 派生已继续从“lane occupied”收紧到
   playback runtime 的真实媒体/恢复事实：

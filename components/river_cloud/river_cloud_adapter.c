@@ -73,6 +73,8 @@ const char *river_cloud_playback_backend_state_name(
         return "detached";
     case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE:
         return "owned_active";
+    case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED:
+        return "owned_paused";
     case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING:
         return "owned_recovering";
     case RIVER_CLOUD_PLAYBACK_BACKEND_FOREIGN_ACTIVE:

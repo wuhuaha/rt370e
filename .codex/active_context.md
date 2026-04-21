@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.339 stop projecting phase-known lane occupancy to playback_active`
+  - `5.340 split XiaoZhi owned-paused backend truth from detached/foreign`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback backend truth 新增 `owned_paused`
+    - `backend_state()` 现在会同时吸收：
+      - playback runtime phase
+      - playback-service 当前 stream owner
+    - downlink/start 不再把“本地 backend 还在 pause/detach 过渡”直接当成
+      detached/foreign 去 fresh-start
   - newest landed runtime-ownership slice:
     - `dialog_runtime.snapshot.playback_active` 在 phase 已知时不再因
       `playback_lane_engaged=yes` 自动保持为 `true`

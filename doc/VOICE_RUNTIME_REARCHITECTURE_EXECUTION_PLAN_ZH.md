@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.340`
+  - XiaoZhi playback backend truth 新增显式 `owned_paused`
+  - `backend_state()` 现在不再只靠：
+    - `river_playback_service_state_active(...)`
+    - `xiaozhi_playback_active`
+    拼接 ownership
+  - 新 reducer 会同时吸收：
+    - playback runtime phase
+    - playback-service 当前 stream owner
+  - downlink worker / start path 也开始把 `owned_paused` 视为显式 wait
+    state，而不是继续误走 detached/foreign 的 fresh-start 分支
+  - 这继续把 playback backend ownership 的解释权收回 playback runtime
 - `Step 5.339`
   - `dialog_runtime.snapshot.playback_active` 已继续从“lane occupied”收紧到
     playback runtime 的真实媒体/恢复事实

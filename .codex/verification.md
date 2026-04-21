@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.340
+Validate that playback backend truth now distinguishes XiaoZhi-owned paused
+transitions from detached/foreign-active states:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'OWNED_PAUSED|capture_playback_service_view|playback_backend_state\\(|start_playback_if_needed|downlink_task' \
+  include/river/river_cloud.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '60,90p' include/river/river_cloud.h
+sed -n '40,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2320,2342p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2578,2596p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public backend enum now includes:
+  - `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED`
+- XiaoZhi backend-state reducer now combines runtime phase with current
+  playback-service stream owner, instead of only mixing coarse service active
+  state with `xiaozhi_playback_active`
+- downlink start path treats `owned_paused` as a wait state rather than
+  immediately reusing detached/foreign-active recovery logic
+
 ## Step 5.339
 Validate that dialog runtime no longer projects phase-known lane occupancy to
 `playback_active`, and no longer treats generic lane occupancy as managed

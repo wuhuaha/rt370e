@@ -24,6 +24,12 @@ typedef struct {
     bool cautious_history;
 } river_cloud_xiaozhi_playback_start_gate_t;
 
+typedef struct {
+    river_playback_state_t state;
+    bool active;
+    bool owned_stream;
+} river_cloud_xiaozhi_playback_service_view_t;
+
 static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 {
     if (value > 32767) {
@@ -37,23 +43,59 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void);
 
+static bool river_cloud_xiaozhi_playback_phase_is_output_active(
+    river_cloud_playback_phase_t phase)
+{
+    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PLAYING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_DRAINING;
+}
+
+static void river_cloud_xiaozhi_capture_playback_service_view(
+    river_cloud_xiaozhi_playback_service_view_t *view)
+{
+    river_playback_service_stats_t stats;
+
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    river_playback_service_get_stats(&stats);
+    view->state = stats.state;
+    view->active = river_playback_service_state_active(stats.state);
+    view->owned_stream =
+        view->active &&
+        strcmp(stats.stream_name, RIVER_CLOUD_XIAOZHI_TTS_STREAM_NAME) == 0;
+}
+
 static river_cloud_playback_backend_state_t
 river_cloud_xiaozhi_playback_backend_state(void)
 {
-    river_playback_state_t service_state = river_playback_service_state();
+    river_cloud_xiaozhi_playback_service_view_t service_view;
+    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
 
-    if (service_state == RIVER_PLAYBACK_RESTART_PENDING) {
+    river_cloud_xiaozhi_capture_playback_service_view(&service_view);
+
+    if (service_view.state == RIVER_PLAYBACK_RESTART_PENDING) {
         return RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING;
     }
-    if (!river_playback_service_state_active(service_state)) {
-        return RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED;
-    }
-    if (service_state == RIVER_PLAYBACK_RECOVERING &&
-        g_river_cloud.xiaozhi_playback_active) {
+    if (phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING) {
         return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING;
     }
-    if (g_river_cloud.xiaozhi_playback_active) {
-        return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
+    if (!service_view.active) {
+        if (river_cloud_xiaozhi_playback_phase_is_output_active(phase)) {
+            return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
+        }
+        return RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED;
+    }
+    if (service_view.owned_stream) {
+        if (service_view.state == RIVER_PLAYBACK_RECOVERING) {
+            return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING;
+        }
+        if (river_cloud_xiaozhi_playback_phase_is_output_active(phase)) {
+            return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
+        }
+        return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED;
     }
     return RIVER_CLOUD_PLAYBACK_BACKEND_FOREIGN_ACTIVE;
 }
@@ -69,6 +111,7 @@ static bool river_cloud_xiaozhi_playback_backend_owned(
     river_cloud_playback_backend_state_t state)
 {
     return state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE ||
+           state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
            state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            state == RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING;
 }
@@ -2278,6 +2321,9 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
     if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE) {
         return RIVER_OK;
     }
+    if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED) {
+        return RIVER_ERR_BUSY;
+    }
     if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING) {
         return RIVER_ERR_BUSY;
     }
@@ -2531,6 +2577,10 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
         backend_state = river_cloud_xiaozhi_playback_backend_state();
         playback_needs_start = river_cloud_xiaozhi_playback_backend_needs_start(
             backend_state);
+        if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED) {
+            rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
+            continue;
+        }
         if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING) {
             rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
             continue;
