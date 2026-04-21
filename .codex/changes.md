@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.350
+- XiaoZhi playback runtime 现在把 `tts_stop_pending` 后无真实输出的静默 tail-wait
+  视为可重新打开 VAD/capture 的 quiet window：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再只给
+  `waiting_segment` 开白名单；现在 `stop_pending + !playback_output_active` 也会
+  被当成静默窗口
+- 这一步继续把 capture hold 从粗粒度 `playback_lane_engaged` 收口到 runtime
+  自己的真实媒体输出真相，避免 terminal tail wait 继续伪装成“还在播”
+
 ## Step 5.349
 - XiaoZhi playback runtime 现在把 `tts_stop_pending` 之后的 detached backend
   残留音频明确收口给 runtime 自己处理：

@@ -328,10 +328,15 @@ static void river_cloud_xiaozhi_clear_followup_reopen_state(void)
     g_river_cloud.xiaozhi_no_ref_reopen_guard_deadline_ms = 0U;
 }
 
-static bool river_cloud_xiaozhi_playback_silent_gap_allows_vad_open(void)
+static bool river_cloud_xiaozhi_playback_quiet_window_allows_vad_open(void)
 {
-    return river_cloud_xiaozhi_playback_phase() ==
-           RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+    if (river_cloud_xiaozhi_playback_phase() ==
+        RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
+        return true;
+    }
+
+    return g_river_cloud.xiaozhi_tts_stop_pending &&
+           !river_cloud_xiaozhi_playback_output_active();
 }
 
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
@@ -339,7 +344,7 @@ bool river_cloud_xiaozhi_playback_allows_vad_open(void)
     river_voice_duplex_ready_eval_t eval;
     const char *fallback_reason;
 
-    if (river_cloud_xiaozhi_playback_silent_gap_allows_vad_open()) {
+    if (river_cloud_xiaozhi_playback_quiet_window_allows_vad_open()) {
         return true;
     }
 
@@ -357,7 +362,7 @@ bool river_cloud_xiaozhi_capture_held_by_playback(
 {
     const char *resolved_reason = river_cloud_xiaozhi_duplex_fallback_reason(eval);
 
-    if (river_cloud_xiaozhi_playback_silent_gap_allows_vad_open()) {
+    if (river_cloud_xiaozhi_playback_quiet_window_allows_vad_open()) {
         if (fallback_reason != NULL) {
             *fallback_reason = NULL;
         }

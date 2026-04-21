@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.350`
+  - XiaoZhi playback runtime 现在会把 `tts_stop_pending` 且本地已无真实输出的
+    terminal tail wait 视为 quiet window
+  - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 现已同步消费这条
+    truth，不再只把 `waiting_segment` 视作静默窗口
+  - 这继续把 capture/VAD 的 reopen 语义从 lane engaged 收口到 playback
+    runtime 自己的媒体输出真相
 - `Step 5.349`
   - XiaoZhi playback runtime 已把 `tts_stop_pending` 之后的 detached residual
     queue 明确收口给 runtime 自己处理

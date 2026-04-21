@@ -15,11 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.349 let playback runtime own detached pending-stop residual queue`
+  - `5.350 let playback runtime expose pending-stop quiet windows to capture/VAD`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `tts_stop_pending` 后只要本地已无真实有声输出，playback runtime 现在就会把
+      该窗口视为 quiet window
+    - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再让这种
+      terminal tail wait 继续走 generic playback-held 语义
+    - 这继续把 capture hold 从 lane occupancy 收口到真实媒体输出真相
   - newest landed runtime-ownership slice:
     - `tts_stop_pending` 建立后，detached backend 上残留的 downlink 队列
       不再由 worker 间接复活
