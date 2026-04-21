@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.355
+Validate that playback turn retention, downlink worker live-ness, and transport
+activity are now driven by separate truths:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_turn_active|playback_has_work|downlink_active|transport_active|interrupt_tts' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '321,339p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2648,2656p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '230,238p' components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now exposes two distinct truths:
+  - `playback_turn_active()` for retained playback-turn lifecycle
+  - `playback_has_work()` for actual downlink worker live-ness
+- `downlink_active()` no longer keys off coarse `playback_lane_engaged`
+- `transport_active()` no longer keeps the IO loop active merely because a
+  playback lane/meta turn still exists locally
+- interrupt/config/window-timeout/abort style call sites now keep consuming
+  the retained-turn truth instead of the worker-live truth
+
 ## Step 5.354
 Validate that rebuffer silence is now treated as a playback quiet window rather
 than a generic capture-held playback phase:

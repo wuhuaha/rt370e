@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.355
+- XiaoZhi playback runtime 现在把“回合仍保留”和“downlink worker 仍有活要干”
+  显式拆成两条真相：
+  - `playback_turn_active()`
+  - `playback_has_work()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_turn_active()` 继续表示：
+  - playback lane 尚未回到 `idle`
+  - 或仍保留有效 `audio.out.meta`
+- `playback_has_work()` 现在只表示 downlink worker 的真实运行条件：
+  - queued frames
+  - retry frame
+  - active playback
+  - pending stop
+  - pending rebuffer
+- downlink worker 的活跃判定不再依赖粗粒度 `playback_lane_engaged`：
+  - `downlink_active()` 现在直接消费新的 worker-live truth
+- transport/io 活跃判定也不再因为 playback lane 仍被占用就继续空转：
+  - `transport_active()` 已移除对 `playback_lane_engaged` 的依赖
+- 需要保留“回合还在”的路径已改为显式消费 `playback_turn_active()`：
+  - `interrupt_tts()`
+  - follow-up window timeout
+  - XiaoZhi config busy gate
+  - playback abort / terminal policy
+- 这一步继续把 dialog/runtime/downlink/transport 对 playback 的消费分层：
+  - turn lifecycle 看 `turn_active`
+  - worker live 看 `has_work`
+  - transport poll 看真实 session/listening 活跃
+
 ## Step 5.354
 - XiaoZhi playback runtime 现在会把 `rebuffering` 也视为可重新打开
   VAD/capture 的 quiet window：

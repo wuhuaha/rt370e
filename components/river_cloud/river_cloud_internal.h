@@ -422,6 +422,7 @@ river_cloud_xiaozhi_playback_rebuffer_cause(void);
 bool river_cloud_xiaozhi_playback_rebuffer_pending(void);
 bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_lane_engaged(void);
+bool river_cloud_xiaozhi_playback_turn_active(void);
 bool river_cloud_xiaozhi_playback_has_work(void);
 void river_cloud_xiaozhi_playback_note_duplex_ready(void);
 river_status_t river_cloud_xiaozhi_playback_abort_for_cause(

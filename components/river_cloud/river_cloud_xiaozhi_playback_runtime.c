@@ -323,11 +323,19 @@ bool river_cloud_xiaozhi_playback_lane_engaged(void)
     return river_cloud_xiaozhi_playback_phase() != RIVER_CLOUD_PLAYBACK_PHASE_IDLE;
 }
 
-bool river_cloud_xiaozhi_playback_has_work(void)
+bool river_cloud_xiaozhi_playback_turn_active(void)
 {
     return river_cloud_xiaozhi_playback_lane_engaged() ||
-           river_cloud_xiaozhi_playback_queued_frames() != 0U ||
            g_river_cloud.xiaozhi_playback_meta_valid;
+}
+
+bool river_cloud_xiaozhi_playback_has_work(void)
+{
+    return river_cloud_xiaozhi_playback_queued_frames() != 0U ||
+           g_river_cloud.xiaozhi_downlink_retry_valid ||
+           g_river_cloud.xiaozhi_playback_active ||
+           g_river_cloud.xiaozhi_tts_stop_pending ||
+           g_river_cloud.xiaozhi_playback_rebuffer_pending;
 }
 
 static void river_cloud_xiaozhi_clear_followup_reopen_state(void)
@@ -2334,7 +2342,7 @@ void river_cloud_xiaozhi_apply_playback_backend_refresh_policy(void)
 void river_cloud_xiaozhi_apply_terminal_playback_policy(
     river_cloud_xiaozhi_playback_abort_cause_t cause)
 {
-    if (river_cloud_xiaozhi_playback_has_work()) {
+    if (river_cloud_xiaozhi_playback_turn_active()) {
         (void)river_cloud_xiaozhi_playback_abort_for_cause(cause, NULL);
     }
 
@@ -2348,7 +2356,7 @@ river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
     river_status_t status = RIVER_OK;
     river_cloud_playback_backend_state_t backend_state =
         river_cloud_xiaozhi_playback_backend_state();
-    bool had_work = river_cloud_xiaozhi_playback_has_work();
+    bool had_work = river_cloud_xiaozhi_playback_turn_active();
     bool stream_was_attached =
         river_cloud_xiaozhi_playback_backend_attached(backend_state);
     const char *clear_reason =
@@ -2644,8 +2652,7 @@ static bool river_cloud_xiaozhi_downlink_active(void)
         return false;
     }
 
-    return river_cloud_xiaozhi_playback_queued_frames() > 0U ||
-           river_cloud_xiaozhi_playback_lane_engaged();
+    return river_cloud_xiaozhi_playback_has_work();
 }
 
 static void river_cloud_xiaozhi_downlink_task(void *arg)

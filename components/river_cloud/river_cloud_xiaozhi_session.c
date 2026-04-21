@@ -233,8 +233,7 @@ static bool river_cloud_xiaozhi_transport_active(void)
         return false;
     }
 
-    return river_xiaozhi_session_open() || river_cloud_xiaozhi_playback_lane_engaged() ||
-           river_cloud_xiaozhi_listening_active();
+    return river_xiaozhi_session_open() || river_cloud_xiaozhi_listening_active();
 }
 
 bool river_cloud_xiaozhi_uplink_active(void)
@@ -1405,14 +1404,14 @@ river_status_t river_cloud_xiaozhi_interrupt_tts(const char *reason)
 {
     river_status_t status = RIVER_ERR_UNSUPPORTED;
 
-    if (!(river_cloud_xiaozhi_playback_has_work() ||
+    if (!(river_cloud_xiaozhi_playback_turn_active() ||
           river_cloud_xiaozhi_listening_active() ||
           river_xiaozhi_session_open())) {
         return RIVER_ERR_UNSUPPORTED;
     }
 
     status = RIVER_OK;
-    if (river_cloud_xiaozhi_playback_has_work()) {
+    if (river_cloud_xiaozhi_playback_turn_active()) {
         status = river_cloud_xiaozhi_playback_abort_for_cause(
             RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_INTERRUPT,
             reason);

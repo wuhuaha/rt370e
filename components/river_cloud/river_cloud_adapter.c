@@ -755,7 +755,7 @@ river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config
     }
 
     if (g_river_cloud.audio_bridge_open || g_river_cloud.stream_active ||
-        river_cloud_xiaozhi_listening_active() || river_cloud_xiaozhi_playback_has_work() ||
+        river_cloud_xiaozhi_listening_active() || river_cloud_xiaozhi_playback_turn_active() ||
         river_xiaozhi_session_open()) {
         return RIVER_ERR_BUSY;
     }

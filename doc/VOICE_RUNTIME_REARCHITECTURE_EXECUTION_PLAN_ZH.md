@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.355`
+  - XiaoZhi playback runtime 已把“播放回合仍保留”和“downlink worker 仍需运行”
+    显式拆成两条真相：
+    - `playback_turn_active()`
+    - `playback_has_work()`
+  - `downlink_active()` 不再继续依赖粗粒度 `playback_lane_engaged`
+  - `transport_active()` 也不再因为 playback lane/meta turn 仍存在就继续让
+    IO loop 空转
+  - `interrupt_tts()`、follow-up window timeout、config busy gate、
+    playback abort/terminal policy 已改为显式消费 retained-turn truth
+  - 这一步开始把 runtime / transport / downlink 对 playback 的消费界面正式
+    分层，为后续继续把 worker/transport/runtime 真相收口到更少 helper 做准备
 - `Step 5.354`
   - XiaoZhi playback runtime 现在会把 `rebuffering` 也视为 quiet window
   - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再把

@@ -373,7 +373,7 @@ void river_cloud_xiaozhi_check_window_timeout(void)
         return;
     }
 
-    if (g_river_cloud.stream_active || river_cloud_xiaozhi_playback_has_work()) {
+    if (g_river_cloud.stream_active || river_cloud_xiaozhi_playback_turn_active()) {
         return;
     }
 

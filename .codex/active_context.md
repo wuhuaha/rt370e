@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.354 let rebuffer quiet windows release capture`
+  - `5.355 split playback turn truth from worker-live truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 已显式拆出：
+      - `playback_turn_active()`
+      - `playback_has_work()`
+    - retained playback turn 与 downlink worker live-ness 不再共用
+      `lane_engaged/meta_valid` 这套粗粒度判定
+    - downlink worker / transport poll / interrupt/config/window gate 现在各自
+      消费对应层级的 playback truth
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 现在会把 `rebuffering` 也视为 quiet window
     - 重缓冲静默期不再因为 `lane_engaged` 继续错误 hold capture/VAD
