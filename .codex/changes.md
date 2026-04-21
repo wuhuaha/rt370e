@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.356
+- XiaoZhi playback runtime 的 backend truth 不再在 `rebuffering` 期间无条件
+  伪装成 `owned_recovering`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_backend_state()` 现在会继续如实反映 backend owner/attached truth：
+  - playback service 已不活跃时返回 `detached`
+  - 只有当当前 stream 仍归 XiaoZhi 持有时，`rebuffering` 才投影成
+    `owned_recovering`
+- 这一步修正了 rebuffer resume 的结构性误判：
+  - downlink resume 路径不再因为 phase 仍是 `rebuffering`，就误以为 backend
+    还在恢复中
+  - stop-after-write-failed / starved-rebuffer 之后，runtime 现在可以重新识别
+    “backend 已 detached，需要 fresh-start”
+- 这继续把 playback runtime 的恢复语义拆成：
+  - `phase/rebuffer_pending` 表示 playback turn 正处于恢复窗口
+  - `backend_state` 只表示本地 backend 当前真实 attached/owner 状态
+
 ## Step 5.355
 - XiaoZhi playback runtime 现在把“回合仍保留”和“downlink worker 仍有活要干”
   显式拆成两条真相：

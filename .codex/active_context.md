@@ -15,11 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.355 split playback turn truth from worker-live truth`
+  - `5.356 stop faking attached backend during rebuffer`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `playback_backend_state()` 不再只因 phase 仍是 `rebuffering` 就无条件
+      投影 `owned_recovering`
+    - rebuffer phase 与 backend attached/owner truth 继续拆开
+    - stop-after-rebuffer 之后若 backend 已 detached，downlink resume 现在能
+      正确识别 fresh-start 条件
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 已显式拆出：
       - `playback_turn_active()`

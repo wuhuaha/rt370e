@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.356`
+  - `playback_backend_state()` 不再在 `rebuffering` 期间无条件投影
+    `owned_recovering`
+  - 当 playback service 已 stop/detach 时，backend truth 现在会如实返回
+    `detached`
+  - 只有 XiaoZhi stream 仍真实 attached/owned 时，rebuffer phase 才继续投影成
+    `owned_recovering`
+  - 这一步修正了 rebuffer resume 的结构性卡死风险：
+    - rebuffer phase 继续保留恢复语义
+    - 但 downlink resume 已能重新看见“backend 已 detached，需要 fresh-start”
 - `Step 5.355`
   - XiaoZhi playback runtime 已把“播放回合仍保留”和“downlink worker 仍需运行”
     显式拆成两条真相：
