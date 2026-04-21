@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.364 remove coarse playback last-segment shadow bool`
+  - `5.365 retie playback turn truth to response and terminal context`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `playback_turn_active()` 已不再直接读取 coarse
+      `xiaozhi_playback_meta_valid`
+    - retained playback turn 现在改由：
+      - playback lane engaged
+      - terminal 仍 open 且 response/playback context 有效
+      共同决定
+    - `playback_note_meta()` 现在会在写入 queue / wait / terminal context 后立即刷新
+      playback phase，缩短 meta 到 snapshot 的 stale phase 窗口
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 已移除残留的 coarse global
       `xiaozhi_playback_last_segment` shadow bool

@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.365
+- XiaoZhi playback runtime 已把 `playback_turn_active()` 的 retained-turn 判定从
+  coarse `playback_meta_valid` shadow 收口到 typed response/terminal truth：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_turn_active()` 现在只认：
+  - playback lane 当前仍 engaged
+  - 或 terminal 仍 open 且 response/playback context 有效
+- `playback_note_meta()` 现在会在写入 queue / wait / terminal context 后立即刷新
+  playback phase
+- 这一步减少了：
+  - `dialog runtime`
+  - follow-up window
+  - interrupt / abort policy
+  对 `meta_valid` 这个粗粒度 shadow 的依赖，也缩短了首条 meta 到 phase
+  snapshot 更新之间的 stale 窗口
+
 ## Step 5.364
 - XiaoZhi playback runtime 已移除残留的 coarse global
   `xiaozhi_playback_last_segment` shadow bool：

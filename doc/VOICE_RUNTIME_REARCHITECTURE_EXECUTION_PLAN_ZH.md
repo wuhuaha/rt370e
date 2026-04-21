@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.365`
+  - `playback_turn_active()` 已不再继续依赖 coarse
+    `xiaozhi_playback_meta_valid` shadow
+  - retained playback turn 现在改由：
+    - playback lane engaged
+    - terminal 仍 open 且 response/playback context 有效
+    共同决定
+  - `playback_note_meta()` 现在会在写入 queue / wait / terminal context 后立即刷新
+    playback phase
+  - 这一步继续把：
+    - follow-up window
+    - busy gate
+    - interrupt / abort policy
+    对 retained playback turn 的解释权从 coarse meta shadow 收口到
+    response/terminal typed truth，并缩短 meta 到 runtime snapshot 的 stale phase
+    窗口
 - `Step 5.364`
   - XiaoZhi playback runtime 已移除残留的 coarse global
     `xiaozhi_playback_last_segment` shadow bool

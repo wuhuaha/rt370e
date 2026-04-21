@@ -426,7 +426,8 @@ bool river_cloud_xiaozhi_playback_lane_engaged(void)
 bool river_cloud_xiaozhi_playback_turn_active(void)
 {
     return river_cloud_xiaozhi_playback_lane_engaged() ||
-           g_river_cloud.xiaozhi_playback_meta_valid;
+           (river_cloud_xiaozhi_playback_terminal_open() &&
+            river_cloud_xiaozhi_playback_response_context_valid());
 }
 
 bool river_cloud_xiaozhi_playback_has_work(void)
@@ -2087,6 +2088,7 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                    river_cloud_xiaozhi_playback_rebuffer_cause()),
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count,
                (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_streak);
+    river_cloud_xiaozhi_refresh_playback_phase("note_meta");
 }
 
 void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_event_t *event)

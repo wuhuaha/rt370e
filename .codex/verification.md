@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.365
+Validate that retained playback-turn truth now follows typed response/terminal
+context instead of the coarse `playback_meta_valid` shadow, and that
+`note_meta` refreshes phase immediately:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_turn_active|playback_response_context_valid|playback_terminal_open|refresh_playback_phase\\(\"note_meta\"\\)' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '421,432p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2070,2098p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `playback_turn_active()` no longer directly depends on
+  `xiaozhi_playback_meta_valid`
+- retained playback-turn truth now follows:
+  - lane-engaged truth
+  - response/playback context while terminal remains open
+- `playback_note_meta()` now refreshes playback phase immediately after writing
+  runtime-owned playback meta/queue truth
+
 ## Step 5.364
 Validate that the playback runtime no longer keeps a coarse global
 `last_segment` shadow bool and instead derives terminal-meta semantics from
