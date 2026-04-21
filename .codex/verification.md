@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.348
+Validate that XiaoZhi playback runtime no longer treats `playing/draining`
+phase alone as proof of audible output:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_backend_output_active|playback_output_active' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '107,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '299,311p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime contains `river_cloud_xiaozhi_playback_backend_output_active()`
+- `playback_output_active()` now requires both:
+  - output-active playback phase
+  - backend state `owned_active`
+
 ## Step 5.347
 Validate that XiaoZhi playback runtime now uses explicit backend-attached
 terminology for non-media control paths:

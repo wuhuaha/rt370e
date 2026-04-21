@@ -113,6 +113,12 @@ static bool river_cloud_xiaozhi_playback_backend_attached(
            state == RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING;
 }
 
+static bool river_cloud_xiaozhi_playback_backend_output_active(
+    river_cloud_playback_backend_state_t state)
+{
+    return state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
+}
+
 river_cloud_playback_phase_t river_cloud_xiaozhi_playback_phase(void)
 {
     return g_river_cloud.xiaozhi_playback_phase;
@@ -293,9 +299,14 @@ uint32_t river_cloud_xiaozhi_playback_queued_frames(void)
 bool river_cloud_xiaozhi_playback_output_active(void)
 {
     river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+    river_cloud_playback_backend_state_t backend_state;
 
-    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PLAYING ||
-           phase == RIVER_CLOUD_PLAYBACK_PHASE_DRAINING;
+    if (!river_cloud_xiaozhi_playback_phase_is_output_active(phase)) {
+        return false;
+    }
+
+    backend_state = river_cloud_xiaozhi_playback_backend_state();
+    return river_cloud_xiaozhi_playback_backend_output_active(backend_state);
 }
 
 bool river_cloud_xiaozhi_playback_lane_engaged(void)

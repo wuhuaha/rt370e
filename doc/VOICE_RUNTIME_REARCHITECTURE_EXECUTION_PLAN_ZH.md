@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.348`
+  - XiaoZhi playback runtime 的 `playback_output_active` 已不再只凭
+    `playing/draining` phase 就投影成“仍有真实有声输出”
+  - 现在还要求 playback backend 仍是：
+    - `owned_active`
+  - 这继续把：
+    - cloud `playback_active`
+    - dialog/duplex 上看到的“还在播”
+    - playback tail/reopen guard
+    从 phase-only 推断，收口到 playback runtime 自己的 backend owner truth
 - `Step 5.347`
   - XiaoZhi playback runtime 已把 `backend_attached` 与“媒体 active”语义
     明确拆开

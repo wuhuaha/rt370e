@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.348
+- XiaoZhi playback runtime 现在不再让 `playing/draining` phase 单独伪装成
+  “真实有声输出”：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `backend_output_active` helper，`playback_output_active()` 现在要求同时满足：
+  - playback phase 仍处于 output-active 窗口
+  - playback backend 仍是 `owned_active`
+- 这一步继续把：
+  - cloud `playback_active`
+  - duplex output speaking
+  - playback tail / reopen guard
+  从 phase-only 投影收紧到 runtime 自己的 backend owner truth，减少
+  detached/paused/restart-pending 窗口继续伪装“还在播”的机会
+
 ## Step 5.347
 - XiaoZhi playback runtime 现在把 `backend_attached` 与 “正在出声”语义显式拆开：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

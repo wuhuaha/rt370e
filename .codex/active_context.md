@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.347 clarify backend attached truth in XiaoZhi playback runtime`
+  - `5.348 tighten XiaoZhi playback audible-output truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback 的 `playback_output_active` 不再只由
+      `playing/draining` phase 直接投影
+    - 现在要求 phase 仍位于 output-active 窗口，且 backend 仍保持
+      `owned_active`
+    - 这继续把 cloud/dialog/duplex 看到的“还在播”真相从 phase-only 收口到
+      playback runtime 自己的 backend owner truth
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 已把 `backend_attached` 与“媒体 active”语义
       明确拆开
