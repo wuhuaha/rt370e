@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.363
+- XiaoZhi playback runtime 已把 downlink starvation/tail 的判定从 coarse
+  global `last_segment` shadow 中拆开，改成消费 runtime-owned typed supply
+  truth：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 typed supply helper：
+  - `river_cloud_xiaozhi_playback_supply_kind_t`
+  - `playback_supply_kind()`
+  - `playback_supply_expects_more_audio(...)`
+- `maybe_rebuffer_starved()` 现在只会在 runtime 仍明确期待更多 downlink audio 时，
+  才继续进入 starved rebuffer：
+  - `CURRENT_SEGMENT`
+  - `WAITING_NEXT_SEGMENT`
+- 当 runtime 已进入：
+  - `TERMINAL_TAIL`
+  - `SUPPLY_NONE`
+  starvation watch 会被直接清掉，不再继续被“最近一条 meta 恰好是
+  last/non-last”这个 coarse shadow 误驱动
+- 这一步继续把 downlink/playback 的 tail/starved 判断从“最近 meta 阴影”收口到
+  queue-head、waiting-context、terminal-context 这些 runtime-owned typed
+  truth
+
 ## Step 5.362
 - XiaoZhi playback runtime 已把 `WAITING_SEGMENT` 的判定从 coarse global
   meta shadow 中拆开，改成独立保存“待续段上下文”：

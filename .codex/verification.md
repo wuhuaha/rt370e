@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.363
+Validate that downlink starvation/tail decisions now follow typed supply truth
+from the playback runtime instead of the coarse global `last_segment` shadow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_supply_kind_t|playback_supply_kind\\(|playback_supply_expects_more_audio|maybe_rebuffer_starved|xiaozhi_playback_last_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '344,384p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1618,1642p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now exposes a typed downlink supply view derived from:
+  - current queue-head segment truth
+  - waiting-next-segment context
+  - terminal last-segment context
+- `maybe_rebuffer_starved()` no longer directly gates on coarse global
+  `xiaozhi_playback_last_segment`
+- terminal tail / no-supply windows now clear starvation watch instead of
+  incorrectly continuing starved-rebuffer policy
+
 ## Step 5.362
 Validate that `WAITING_SEGMENT` now follows a dedicated waiting-segment context
 instead of reconstructing the wait condition from coarse global meta shadow:

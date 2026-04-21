@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.363`
+  - XiaoZhi playback runtime 已把 downlink starvation/tail 的供给判定从
+    coarse global `last_segment` shadow 中拆开，改成显式的 typed supply
+    truth：
+    - `CURRENT_SEGMENT`
+    - `WAITING_NEXT_SEGMENT`
+    - `TERMINAL_TAIL`
+    - `NONE`
+  - `maybe_rebuffer_starved()` 现在只会在 runtime 仍明确期待更多 downlink
+    audio 时继续进入 upstream-starved rebuffer
+  - terminal tail / 无供给窗口现在会直接清掉 starvation watch，不再继续让
+    “最近 meta 的 last/non-last 阴影”主导 tail 行为
+  - 这一步继续把 downlink/playback 的 starved/tail 真相从 global meta shadow
+    收口到 queue-head、waiting-context、terminal-context 这些 runtime-owned
+    typed truth，为后续继续移除残余 coarse `last_segment` shadow 做准备
 - `Step 5.362`
   - playback runtime 已独立保存 waiting-segment context：
     - `response_id`
