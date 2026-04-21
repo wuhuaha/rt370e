@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.345`
+  - `dialog_runtime` 现在只会在拿不到 cloud runtime snapshot 时，才让
+    `playback_lane_engaged` 在 `phase unknown` 窗口继续保留 output ownership
+  - `phase unknown + lane occupied` 不再默认等价于可继续保留
+    `speaking/output_turn`
+  - 这继续把 output ownership 从 lane occupancy fallback 收口到 runtime
+    snapshot owner truth
 - `Step 5.344`
   - `dialog_runtime` 现在只会在拿不到 cloud runtime snapshot 时，才让
     本地 playback shadow 回填：

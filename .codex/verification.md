@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.345
+Validate that dialog runtime only lets `playback_lane_engaged` retain
+`output_turn` across phase-unknown windows when cloud runtime snapshot is
+unavailable:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_lane_retains_output_turn|cloud_runtime_available' \
+  components/river_core/river_dialog_runtime.c
+sed -n '390,410p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `playback_lane_retains_output_turn_locked()` no longer treats
+  `phase unknown` as sufficient by itself
+- lane-based output-turn fallback now depends on cloud runtime snapshot being
+  unavailable
+
 ## Step 5.344
 Validate that dialog runtime only lets local playback shadow backfill active /
 recovering truth when cloud runtime snapshot is unavailable:

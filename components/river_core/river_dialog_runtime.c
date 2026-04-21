@@ -387,7 +387,7 @@ static bool river_dialog_runtime_playback_lane_retains_output_turn_locked(void)
         return false;
     }
     if (!river_dialog_runtime_playback_phase_known_locked()) {
-        return true;
+        return !river_dialog_runtime_cloud_runtime_available_locked();
     }
 
     return snapshot->playback_phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;

@@ -1,5 +1,13 @@
 # Change Log
 
+## Step 5.345
+- `dialog_runtime` 的 `output_turn` 保留逻辑继续收紧：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `playback_lane_engaged=yes` 且 `phase unknown` 时，不再默认继续保留
+  output ownership；只有拿不到 cloud runtime snapshot 时才保留这条兜底
+- 这一步继续减少 core 用 lane occupancy 伪装 `speaking/output_turn` 的机会，
+  让 output ownership 更依赖 runtime snapshot 真相
+
 ## Step 5.344
 - `dialog_runtime` 的本地 playback shadow 继续收紧为“仅在拿不到
   cloud runtime snapshot 时才兜底”：
