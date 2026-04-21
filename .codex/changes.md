@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.369
+- 已把 `/root/agent-server` 2026-04-21 主线语音进展回灌到当前设备侧计划：
+  - [doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md)
+  - [doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md)
+- 主计划现已明确：
+  - 服务侧主干能力不再是端侧剩余重构的主要阻塞前提
+  - 端侧剩余优先级重排为：
+    - downlink / playback 真相链与恢复模型
+    - `dialog runtime` 唯一真相源收口
+    - runtime-ready duplex / capture / AEC gate
+    - 统一 turn timeline / 板端回归
+    - duck-first / keep-listening 行为优化
+- 全双工参考计划也已同步修正：
+  - 服务侧 `S1`~`S4` 更应视为部署确认与预算收口项，而非“骨架未完成”的阻塞项
+  - 当前设备侧排序不再以催促服务侧补主干能力为前提
+- `.codex/active_context.md` 已同步当前计划结论，便于后续切片继续围绕这组新优先级推进
+
 ## Step 5.368
 - XiaoZhi transport 侧已移除冗余的诊断 shadow `last_playback_meta_valid`：
   - [components/river_cloud/river_xiaozhi_ws.c](/root/ameba-river/components/river_cloud/river_xiaozhi_ws.c)

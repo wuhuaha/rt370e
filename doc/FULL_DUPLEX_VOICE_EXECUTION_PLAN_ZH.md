@@ -1,7 +1,7 @@
 # Full-Duplex Voice Execution Plan
 
 Status: active
-Last Updated: 2026-04-17
+Last Updated: 2026-04-21
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -23,6 +23,8 @@ Branch: `agent-server-v2`
   - `/root/agent-server/docs/architecture/full-duplex-voice-assessment-zh-2026-04-10.md`
   - `/root/agent-server/docs/architecture/local-open-source-full-duplex-roadmap-zh-2026-04-10.md`
   - `/root/agent-server/docs/architecture/voice-demo-realtime-optimization-zh-2026-04-14.md`
+  - `/root/agent-server/docs/architecture/current-mainline-voice-status-and-next-priority-zh-2026-04-21.md`
+  - `/root/agent-server/docs/architecture/architecture-and-code-health-review-zh-2026-04-17.md`
   - `/root/agent-server/docs/adr/0009-advertise-commit-driven-turn-semantics-until-server-vad-exists.md`
   - `/root/agent-server/docs/protocols/realtime-voice-client-implementation-guide-v0-zh-2026-04-16.md`
   - `/root/agent-server/docs/protocols/realtime-voice-client-collaboration-proposal-v0-zh-2026-04-16.md`
@@ -99,6 +101,20 @@ Branch: `agent-server-v2`
   - speaking 期间 input preview、barge-in 策略和 soft ducking 已进入共享 runtime
   - native realtime 主路径已支持 early audio start，而不是必须等最终完整响应闭合后再播
   - `session.update` 协议兼容扩展已经存在
+- 2026-04-21 的服务侧主线文档进一步明确：
+  - 当前服务侧已经形成“本地实时语音主线”，不再只是语音 demo
+  - 当前主优先级不再是继续补 `S1`~`S4` 主干骨架，而是：
+    - `preview_first_partial / accept / interrupt_cutoff` 回归基线
+    - 压 `accepted_turn -> first_audio`
+    - dedicated semantic judge lane
+- 这对端侧排序的直接含义是：
+  - 不再把“等待服务侧先补双轨状态机 / playback truth / early audio 主干”
+    当成剩余重构的前置阻塞
+  - 端侧应优先把：
+    - playback truth 闭环
+    - downlink/playback 恢复重建
+    - `dialog runtime` 真相源收口
+    做完，再继续放大全双工行为层改动
 - 2026-04-16 的服务侧新文档已经把端侧协同边界说清楚：
   - 端侧不是第二编排层；accepted-turn 仍以 `accept_reason` 为准
   - `input.speech.start` / `input.preview` / `input.endpoint` 都是观察事件，不是 stop/commit 指令
@@ -161,6 +177,19 @@ Branch: `agent-server-v2`
   - 部署实例是否已具备的确认项
   - 剩余协议 / 运行时收口项
 - 因此端侧后续切片不应再把“等待服务侧先补双轨状态机”视为阻塞前提
+
+2026-04-21 更新：
+
+- 基于 `/root/agent-server` 新的主线状态文档，`S1`~`S4` 应继续保留为服务侧能力分层，
+  但对设备侧规划来说已不再是“骨架未完成”的阻塞项，而更像：
+  - 本地部署 / 联调是否已开启的确认项
+  - 预算与行为收口项
+- 当前服务侧持续推进重点已经收敛为：
+  - `preview_first_partial / accept / interrupt_cutoff` 的回归与波动压缩
+  - `accepted_turn -> first_audio`
+  - dedicated semantic judge lane
+- 因此端侧的第一优先不再是催促服务侧补 `S1`~`S4`，而是补齐本地 playback truth、
+  downlink/playback 恢复模型，以及对服务侧 lane/playback truth 的稳定消费
 
 #### S1: 把 server endpoint 从实验能力升级为主路径候选
 
@@ -491,12 +520,23 @@ go test ./internal/gateway
 ## 8. 当前建议执行顺序
 
 - 第一优先：
-  - `5.170` 端侧 speaking-time uplink continuation
+  - downlink / playback 真相链与恢复模型
+  - 继续把：
+    - `audio.out.meta`
+    - `started/mark/cleared/completed`
+    - `write_failed / underrun / rebuffer`
+    收口到同一条 runtime-owned playback truth
 - 第二优先：
-  - `5.171` 端侧 duck-first interruption policy
-  - `5.172` 至少做出一个 board-profile 级 duplex-ready 声学基线
+  - `dialog runtime` 真相源收口
+  - 继续删除 local playback shadow、coordinator 薄桥接、adapter 边缘事件对常态
+    lane/playback 派生的干扰
 - 第三优先：
-  - `5.173` 默认开启条件、回退条件和回归矩阵
+  - runtime-ready duplex gate 与 AEC / reference 基线
+  - 让 `capture-held / reference-ready / quiet-window / playback-active`
+    基于 runtime truth，而不是基于静态 capability 或 lane occupancy 猜测
+- 第四优先：
+  - duck-first / keep-listening / near-end arbitration
+  - 在前面三层真相链稳定后，再扩大 speaking-time 行为优化
 - 最后收口：
   - `J2` discovery / protocol 口径升级
 
@@ -505,8 +545,10 @@ go test ./internal/gateway
 - 现阶段“能不能做全双工”的答案是：
   - 能做，但不是只改一个参数或只把 `client_commit` 改成 `server_vad`
 - 现阶段“最先该做什么”的答案是：
-  - 端侧先补状态同步与 runtime-ready gate
-  - 再补 speaking-time keep-listening / ducking / reference 基线
+  - 端侧先补 playback truth 闭环与 downlink/playback 恢复重建
+  - 再把 `dialog runtime` 收口成唯一常态真相源
+  - 然后再补 runtime-ready duplex gate 与 AEC / reference 基线
+  - 最后再进入 speaking-time keep-listening / ducking 行为优化
 - 若跳过 AEC / reference 直接做逻辑全双工，结果大概率只是：
   - 更快地回声误触发
   - 更频繁地误打断

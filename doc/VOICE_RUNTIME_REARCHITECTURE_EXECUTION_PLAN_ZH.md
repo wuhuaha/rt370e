@@ -26,6 +26,31 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.369`
+  - 已回灌 `/root/agent-server` 2026-04-21 主线语音进展到设备侧计划：
+    - `Realtime Session Core` 的
+      `input_state / output_state` 双轨状态已是服务侧主线现实
+    - `server_endpoint` 已推进为 preview-capable runtime 的默认主路径候选
+    - `internal/voice` 已真正拥有：
+      - preview
+      - endpoint
+      - interruption
+      - speech planning
+      - playback truth
+    - playback truth 主链已明确依赖：
+      - `audio.out.started`
+      - `audio.out.mark`
+      - `audio.out.cleared`
+      - `audio.out.completed`
+    - 当前服务侧持续推进重点已收敛为：
+      - `preview_first_partial / accept / interrupt_cutoff` 回归基线
+      - `accepted_turn -> first_audio`
+      - dedicated semantic judge lane
+  - 这意味着端侧后续不再把服务侧 `S1`~`S4` 当成主阻塞前提，剩余重构优先级改为：
+    - 先重建 downlink / playback 真相链与恢复模型
+    - 再继续收口 `dialog runtime` 唯一真相源
+    - 再把 duplex / capture / AEC gate 切到 runtime-ready truth
+    - 最后再做更激进的 duck-first / keep-listening 行为优化
 - `Step 5.368`
   - XiaoZhi transport 侧已移除冗余诊断 shadow
     `last_playback_meta_valid`
@@ -831,6 +856,22 @@ Branch: `agent-server-v2`
   - uplink pacing 慢于实时
   - playback write_failed / underrun 重缓冲风暴
 - 当前服务端在 accept 后响应并不慢，慢点主要在设备 uplink 和首包 audio 到达前
+- `/root/agent-server` 当前主线已经不再停留在“协议预留 / 实验骨架”阶段，而是已具备：
+  - 双轨 session core
+  - preview-first + `server_endpoint`
+  - early audio / speech planner overlap
+  - playback-truth-driven heard-text / interruption / resume
+- 服务侧当前优先级也已转为：
+  - `preview_first_partial / accept / interrupt_cutoff` 的稳定回归
+  - 压 `accepted_turn -> first_audio`
+  - dedicated semantic judge lane
+- 因此当前设备侧剩余重构排序不应再以“等待服务侧先补 S1~S4 主干能力”为前提，
+  而应围绕：
+  - playback truth 闭环
+  - downlink/playback 恢复重建
+  - `dialog runtime` 真相源收口
+  - runtime-ready duplex gate
+  重新排列
 
 ## 6. 风险与未知项
 
@@ -839,7 +880,134 @@ Branch: `agent-server-v2`
 - 若只拆文件不改所有权，复杂度不会真正下降
 - 某些播放 write error 仍可能是 SDK/驱动层行为，需要板端复现验证
 
-## 7. 执行切片
+## 7. 回灌后的端侧剩余优先级
+
+### P0: downlink / playback 真相链与恢复模型
+
+当前最优先的不是再扩更多 duplex 行为分支，而是先把端侧对“播到了哪里、
+为什么停、接下来该等还是该重启”的解释权彻底收口。
+
+原因：
+
+- 现网体感中的“卡顿 / 断续 / 播放重来”首先来自板端的
+  `underrun -> write_failed -> stop/start/rebuffer` 风暴，而不是服务侧主对话
+  本身完全起不来。
+- 服务侧 2026-04-21 主线已明确把：
+  - `audio.out.started`
+  - `audio.out.mark`
+  - `audio.out.cleared`
+  - `audio.out.completed`
+  接进 heard-text / interruption / resume 真相链；如果端侧这条链不稳定，
+  后续全双工行为都会建立在错误播放事实之上。
+
+因此当前应优先继续推进：
+
+- 让 playback runtime 成为 segment context、waiting/terminal/supply truth、
+  rebuffer cause family 的唯一 owner
+- 继续把 `write_failed` 压回“前置 starvation 没拦住时的剩余硬故障”
+- 把 `response.start -> audio.out.meta -> started/mark/cleared/completed`
+  串成同一条可验证的播放 lineage
+
+### P1: `dialog runtime` 真相源彻底收口
+
+服务侧现在已经有较清晰的 lane-state / accept / playback truth 模型；端侧若仍让
+本地 listener shadow、coordinator 薄桥接、adapter edge 事件在常态路径里改写
+交互真相，就会继续把服务侧 lane truth 稀释回本地启发式。
+
+当前第二优先级应是：
+
+- 继续删除 `dialog runtime` 常态路径里对 local playback shadow 的依赖
+- 让 session/coordinator/voice 统一消费：
+  - typed cloud runtime snapshot
+  - typed playback runtime snapshot
+- 把剩余“先写本地局部事实，再等后续 cloud sync 修正”的入口继续收成更少的
+  typed reducer
+
+目标不是“文档上只有一个 runtime”，而是让：
+
+- output turn
+- follow-up window
+- interrupt clear
+- wake/admission 协同
+
+都不再被本地边缘事件抢写偏。
+
+### P2: duplex / capture / AEC gate 切到 runtime-ready truth
+
+当前板端日志里反复出现：
+
+- `echo:0B`
+- `ref_peak=0`
+
+这说明“能不能真正边播边听”仍首先取决于声学前提和 runtime-ready gate，而不是
+是否已经把 capability 字段协商出来。
+
+因此第三优先级应是：
+
+- 明确拆开：
+  - audible playback
+  - output-turn ownership
+  - capture-held
+  - reference-ready
+  - quiet-window
+- 继续让：
+  - `prefetching`
+  - `waiting_segment`
+  - `rebuffering`
+  - terminal silent tail
+  这些阶段进入 runtime-owned quiet-window 语义，而不是重新掉回
+  `lane occupied == playback hold`
+- 最终把 duplex fallback / reopen / no-ref churn 都建立在 runtime-ready truth 上，
+  而不是 profile/capability 级静态假设上
+
+### P3: 统一 turn timeline 与板端回归基线
+
+服务侧当前 P0/P1 正在压：
+
+- `preview_first_partial / accept / interrupt_cutoff`
+- `accepted_turn -> first_audio`
+
+端侧若没有与之对齐的 timeline/lineage 观测面，就只能继续看分散日志，难以判断
+卡顿是发生在 uplink、accept、response.start、首段 meta 还是本地起播。
+
+因此第四优先级应是：
+
+- 继续把：
+  - `accept_reason`
+  - `turn_id`
+  - `response.start`
+  - `audio.out.meta`
+  - playback ACK
+  串成同一条板端可回归 timeline
+- 让 `dialog runtime` / playback runtime / transport dump 对齐同一套 turn /
+  response / playback / segment lineage
+- 为后续板端回归补齐与服务侧一致的里程碑：
+  - preview first partial
+  - accept
+  - response start
+  - first audio meta
+  - started / mark / cleared / completed
+
+### P4: 基于稳定真相链再做 duck-first / keep-listening
+
+duck-first、delayed interrupt、speaking-time keep-listening 仍然重要，但它们现在
+不应该排在 playback truth / runtime truth / runtime-ready gate 之前。
+
+原因：
+
+- 若 playback truth 还不稳，duck / interrupt 只会放大“其实没播 / 已停 /
+  已静默 gap”这些误判
+- 若 `dialog runtime` 还不是唯一真相源，near-end 行为优化会继续被本地局部
+  state 抢写打回硬打断
+- 若 AEC / reference 还未稳定，逻辑全双工只会更快放大回声误触发
+
+因此行为优化当前应建立在前面三层收口之后，再进入：
+
+- duck-first 本地仲裁
+- speaking-time keep-listening
+- 更自然的 soft interrupt / hard interrupt 分层
+
+## 8. 执行切片
 
 ### Step A: 建立 core-owned cloud port，并修正 XiaoZhi uplink 媒体语义
 
@@ -2446,7 +2614,7 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `river xiaozhi status` 能输出统一时间链路快照
 - 板端日志可直接定位慢点和卡顿来源
 
-## 编写建议
+## 9. 编写建议
 
 - 优先推进“唯一真相源”和“媒体语义收口”，不要先做纯文件拆分。
 - 每一步都要在 `.codex/changes.md`、`.codex/verification.md` 和 active context 中留下闭环记录。

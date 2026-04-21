@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.369
+Validate that the latest `/root/agent-server` mainline status has been fed
+back into the active device-side plans, and that the remaining device-side
+priorities now explicitly pivot around playback truth, dialog-runtime truth,
+runtime-ready duplex gating, and board-side timeline regression:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+rg -n 'Step 5.369|回灌后的端侧剩余优先级|preview_first_partial / accept / interrupt_cutoff|accepted_turn -> first_audio|downlink / playback 真相链与恢复模型|dialog runtime 真相源' \
+  doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md \
+  doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/changes.md
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- active plans/context now explicitly record the 2026-04-21 service-side
+  mainline status and the reprioritized device-side focus
+- both plan documents now treat service-side `S1`~`S4` as non-blocking for the
+  remaining device-side refactor ordering
+
 ## Step 5.368
 Validate that XiaoZhi transport diagnostics no longer cache a separate
 `last_playback_meta_valid` shadow and instead derive playback-meta validity

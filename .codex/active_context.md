@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.368 derive transport playback-meta validity from cached context`
+  - `5.369 feed latest service-side mainline progress back into device plans`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest planning sync:
+    - 已把 `/root/agent-server` 2026-04-21 主线语音进展回灌到设备侧计划：
+      - 服务侧不再主要阻塞于双轨 session / preview-first / playback truth 主干
+      - 当前更偏向预算收口与回归基线：
+        - `preview_first_partial / accept / interrupt_cutoff`
+        - `accepted_turn -> first_audio`
+        - dedicated semantic judge lane
+    - 设备侧剩余重构优先级现调整为：
+      - P0：downlink / playback 真相链与恢复模型
+      - P1：`dialog runtime` 唯一真相源收口
+      - P2：runtime-ready duplex / capture / AEC gate
+      - P3：统一 turn timeline 与板端回归基线
+      - P4：duck-first / keep-listening 行为优化
   - newest landed runtime-ownership slice:
     - XiaoZhi transport 侧已移除冗余诊断 shadow
       `last_playback_meta_valid`
