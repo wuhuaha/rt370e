@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.354`
+  - XiaoZhi playback runtime 现在会把 `rebuffering` 也视为 quiet window
+  - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再把
+    重缓冲静默期继续投影成 generic playback hold
+  - 这继续把“response 仍在继续，但当前无真实输出”的阶段从
+    `playback_lane_engaged` 粗粒度语义里拆出来，减少 rebuffer 风暴期间的
+    capture/VAD 误阻断
 - `Step 5.353`
   - server `output_state=speaking` 不再在 `prefetching/idle` 阶段直接投影成
     cloud duplex 的 speaking output

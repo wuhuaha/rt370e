@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.354
+Validate that rebuffer silence is now treated as a playback quiet window rather
+than a generic capture-held playback phase:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_quiet_window_allows_vad_open|RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING|capture_held_by_playback|playback_allows_vad_open' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '336,373p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback quiet-window helper now covers:
+  - `prefetching`
+  - `rebuffering`
+  - `waiting_segment`
+  - `tts_stop_pending && !playback_output_active`
+- rebuffer silence no longer stays in the generic playback-held capture path
+
 ## Step 5.353
 Validate that server `output_state=speaking` no longer makes prefetch/idle
 pretend to be an active speaking-output window:

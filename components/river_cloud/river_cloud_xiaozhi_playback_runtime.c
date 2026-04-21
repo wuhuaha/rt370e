@@ -342,6 +342,7 @@ static bool river_cloud_xiaozhi_playback_quiet_window_allows_vad_open(void)
     river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
 
     if (phase == RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
+        phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
         phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
         return true;
     }

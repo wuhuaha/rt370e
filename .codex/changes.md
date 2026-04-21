@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.354
+- XiaoZhi playback runtime 现在会把 `rebuffering` 也视为可重新打开
+  VAD/capture 的 quiet window：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_quiet_window_allows_vad_open()` 现在统一对白名单阶段开放：
+  - `prefetching`
+  - `rebuffering`
+  - `waiting_segment`
+  - `tts_stop_pending && !playback_output_active`
+- 这一步继续把重缓冲静默期从粗粒度 `playback_lane_engaged` 收口出去，避免
+  “response 仍在继续但当前无真实输出”的阶段继续错误 hold capture
+
 ## Step 5.353
 - XiaoZhi cloud duplex/soft-endpoint 不再把 server `output_state=speaking`
   在 `prefetching/idle` 阶段直接投影成“已进入 speaking output”：
