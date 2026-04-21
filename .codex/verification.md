@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.347
+Validate that XiaoZhi playback runtime now uses explicit backend-attached
+terminology for non-media control paths:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_backend_attached|stream_attached=%s|playback_backend_owned' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '100,116p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2236,2272p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime contains `river_cloud_xiaozhi_playback_backend_attached()`
+- abort log uses `stream_attached`, and `playback_backend_owned` no longer
+  exists in this file
+
 ## Step 5.346
 Validate that dialog runtime now treats cloud-runtime availability, rather than
 phase-known alone, as the gate for managed playback-error absorption and local

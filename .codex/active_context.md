@@ -15,11 +15,16 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.346 absorb managed playback edges by snapshot availability`
+  - `5.347 clarify backend attached truth in XiaoZhi playback runtime`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 已把 `backend_attached` 与“媒体 active”语义
+      明确拆开
+    - stop/abort/pause 等 control path 不再沿用模糊的 `backend_owned`
+      命名
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 的 managed playback-error 吸收与本地 no-op 吸收，
       现在都改为依赖 `cloud_runtime_available`

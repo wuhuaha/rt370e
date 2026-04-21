@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.347`
+  - XiaoZhi playback runtime 已把 `backend_attached` 与“媒体 active”语义
+    明确拆开
+  - stop/abort/pause control path 不再沿用模糊的 `backend_owned`
+    命名
+  - 这一步继续为后续 downlink/playback 行为判断打基础，减少 occupancy truth
+    与 media truth 混用
 - `Step 5.346`
   - `dialog_runtime` 的 managed playback-error 吸收与本地 playback no-op
     吸收，现在都改为依赖：

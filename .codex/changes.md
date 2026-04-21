@@ -1,5 +1,13 @@
 # Change Log
 
+## Step 5.347
+- XiaoZhi playback runtime 现在把 `backend_attached` 与 “正在出声”语义显式拆开：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 原先用于 stop/abort/pause 判定的 `backend_owned` helper 已改为
+  `backend_attached`
+- abort 日志也同步从 `stream_active` 更正为 `stream_attached`，减少后续
+  downlink/playback 路径继续混淆 occupancy 与 media activity 的风险
+
 ## Step 5.346
 - `dialog_runtime` 现在只要 cloud runtime snapshot 已可用，就会把本地
   playback edge event 继续收口给 runtime truth：
