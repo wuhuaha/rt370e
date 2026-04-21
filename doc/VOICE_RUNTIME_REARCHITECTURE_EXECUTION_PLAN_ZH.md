@@ -26,6 +26,12 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.358`
+  - `write_failed` 与 `upstream_starved` 两类 rebuffer 原因已开始走不同恢复策略
+  - 本地 `WRITE_FAILED` 现在优先 attached `service_recover`
+  - `UPSTREAM_STARVED` 仍优先 `stop_rebuffer` / fresh-start
+  - 这一步开始把“本地播放设备写抖动”和“上游供给断档”从同一套默认
+    `stop/start` 风暴里拆开
 - `Step 5.357`
   - downlink worker 现在会先经过 rebuffer resume gate，再进入 backend-state
     分支

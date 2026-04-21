@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.358
+- XiaoZhi playback runtime 现在把 `write_failed` 与 `upstream_starved` 两类
+  rebuffer 原因分开选择恢复路径：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `rebuffer_prefers_service_recover()`：
+  - 本地 `WRITE_FAILED` 优先走 attached `recover_stream`
+  - `UPSTREAM_STARVED` 继续优先走 `stop_rebuffer` / fresh-start
+- `write_failed` 分支的恢复顺序已调整为：
+  - local write failure: `service_recover -> stop_rebuffer -> fresh_start`
+  - upstream starved: `stop_rebuffer -> service_recover -> fresh_start`
+- 这一步继续把：
+  - 本地设备写链路抖动
+  - 上游供给断档
+  从同一套默认 `stop/start` 风暴里拆开，减少明明 backend 仍 attached 时的
+  无谓 stop/restart
+
 ## Step 5.357
 - XiaoZhi downlink worker 的 rebuffer resume gate 已前移到 backend 状态分支之前：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

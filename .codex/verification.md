@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.358
+Validate that local playback write failures now prefer attached service recover,
+while upstream-starved rebuffer still prefers stop/fresh-start semantics:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'rebuffer_prefers_service_recover|service_recover fallback to stop|stop rebuffer fallback to recover|recover_path = prefer_service_recover' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1588,1606p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2760,2827p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `WRITE_FAILED` rebuffer now prefers attached `recover_stream`
+- `UPSTREAM_STARVED` rebuffer still prefers `stop_rebuffer`
+- write failure no longer defaults to unconditional stop/restart when a
+  service-level recover path is still available
+
 ## Step 5.357
 Validate that the downlink worker now lets the rebuffer gate resolve attached
 resume vs detached fresh-start before backend-state branches short-circuit the

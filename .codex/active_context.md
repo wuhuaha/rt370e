@@ -15,11 +15,16 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.357 move rebuffer resume ahead of backend short-circuit`
+  - `5.358 split local write-fail recover from upstream-starved stop path`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `write_failed` rebuffer 不再默认走同一套 `stop_rebuffer`
+    - 本地写链路失败现在优先 attached `service_recover`
+    - 上游 starved 仍优先 stop/fresh-start，避免把两类问题继续折叠成同一套
+      stop/restart 风暴
   - newest landed runtime-ownership slice:
     - downlink worker 现在会先让 rebuffer gate 决定 attached resume /
       detached fresh-start
