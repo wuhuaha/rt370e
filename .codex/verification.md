@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.336
+Validate that XiaoZhi playback can now enter `prefetch_segment` from current
+segment facts alone, without requiring a previously observed large `meta_gap`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'segment_prefetch_target_needed|playback_meta_valid|playback_last_segment|playback_active|prefetch_target_ms > base_budget_ms' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '576,604p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_segment_prefetch_target_needed(...)` now returns `true`
+  either when:
+  - `last_meta_gap_ms` already exceeds the baseline budget
+  - or the current playback meta is valid, non-terminal, inactive, and
+    `prefetch_target_ms` itself already exceeds the baseline budget
+- this predictive path lets `start_gate` switch to `PREFETCH_SEGMENT` before any
+  prior rebuffer/gap history has accumulated
+
 ## Step 5.335
 Validate that all XiaoZhi downlink `write_failed` branches now prefer the same
 `stop/rebuffer` path, leaving playback-service `recover` only as a stop-failed

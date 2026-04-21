@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.336`
+  - XiaoZhi playback 的 `prefetch_segment` 起播门限现在不再只依赖
+    历史 `meta_gap`
+  - 当当前 `audio.out.meta` 已有效、当前段不是最后一段、且预测
+    `prefetch_target_ms` 已明显高于基线预算时，也会直接进入：
+    - `PREFETCH_SEGMENT`
+  - 这让首次起播和段间恢复在尚未积累历史断供前，也能直接消费当前
+    `expected_duration_ms` 建立更深的预取预算，从而继续减少
+    `underrun/write_failed/rebuffer` 风暴
 - `Step 5.335`
   - XiaoZhi downlink/playback 现在把残留的 `write_failed -> recover` 常态路径也
     收口到了统一 `stop/rebuffer`

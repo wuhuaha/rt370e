@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.335 unify write_failed onto stop/rebuffer`
+  - `5.336 predictive segment prefetch from current meta`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `prefetch_segment` 起播门限现在不再只依赖历史 `meta_gap`
+    - 当当前 `audio.out.meta` 已有效、当前段不是最后一段、且预测
+      `prefetch_target_ms` 已明显高于基线预算时，也会直接进入
+      `PREFETCH_SEGMENT`
+    - 这让首次起播和段间恢复在尚未积累历史断供前，也能直接消费当前
+      `expected_duration_ms` 建立更保守的预取预算
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink `write_failed` 现在统一先走：
       - `stop_stream_ex(...)`

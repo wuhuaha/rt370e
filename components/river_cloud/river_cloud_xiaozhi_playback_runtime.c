@@ -578,13 +578,25 @@ static bool river_cloud_xiaozhi_segment_prefetch_target_needed(uint32_t frame_ms
 {
     uint32_t base_budget_ms;
 
-    if (frame_ms == 0U || g_river_cloud.xiaozhi_playback_prefetch_target_ms == 0U ||
-        g_river_cloud.xiaozhi_playback_last_meta_gap_ms == 0U) {
+    if (frame_ms == 0U || g_river_cloud.xiaozhi_playback_prefetch_target_ms == 0U) {
         return false;
     }
 
     base_budget_ms = frame_ms * RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES;
-    return g_river_cloud.xiaozhi_playback_last_meta_gap_ms > base_budget_ms;
+    if (g_river_cloud.xiaozhi_playback_last_meta_gap_ms > base_budget_ms) {
+        return true;
+    }
+
+    /* When the current segment is not terminal, treat a clearly longer
+     * expected duration as a predictive prefetch budget even before any
+     * historical meta-gap has been observed. */
+    if (!g_river_cloud.xiaozhi_playback_meta_valid ||
+        g_river_cloud.xiaozhi_playback_last_segment ||
+        g_river_cloud.xiaozhi_playback_active) {
+        return false;
+    }
+
+    return g_river_cloud.xiaozhi_playback_prefetch_target_ms > base_budget_ms;
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_frame_duration_ms(void)

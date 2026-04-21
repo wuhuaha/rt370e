@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.336
+- XiaoZhi playback 的 `prefetch_segment` 起播门限现在不再只依赖
+  “历史 `meta_gap` 已经偏大”：
+  - 当当前 `audio.out.meta` 已有效、当前段不是最后一段、且预测
+    `prefetch_target_ms` 已明显高于基线预算时，也会直接进入
+    `PREFETCH_SEGMENT`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这意味着首次起播和段间恢复在尚未积累历史 gap 之前，也能利用服务端已经给出的
+  `expected_duration_ms` 做预测性预取：
+  - 非终段长 segment 不再默认按 `16` 帧基线过早起播
+  - 更倾向等待到 `prefetch_target_ms` 对应的预算帧数，再拉起 backend
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步继续把 downlink/playback 的起播判定从“只靠过去的断供历史”推进到：
+  - 消费当前 response/segment 已知事实
+  - 用服务端 `audio.out.meta.expected_duration_ms` 提前建立缓冲预算
+  从而减少首段和段间恢复时的 `underrun/write_failed/rebuffer` 风暴
+
 ## Step 5.335
 - XiaoZhi downlink/playback 现在把残留的 `write_failed -> recover` 常态路径也收口
   到统一的 `stop/rebuffer`：
