@@ -209,7 +209,6 @@ typedef struct {
     bool xiaozhi_playback_started_reported;
     bool xiaozhi_playback_cleared_reported;
     bool xiaozhi_playback_completed_reported;
-    bool xiaozhi_playback_last_segment;
     bool xiaozhi_playback_active;
     river_cloud_playback_phase_t xiaozhi_playback_phase;
     river_cloud_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.364
+Validate that the playback runtime no longer keeps a coarse global
+`last_segment` shadow bool and instead derives terminal-meta semantics from
+event-local fact plus stored terminal context:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_current_meta_is_last_segment|playback_last_segment_(response|playback|segment)_id|segment->is_last_segment = event->is_last_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '198,220p' components/river_cloud/river_cloud_internal.h
+sed -n '292,318p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1058,1079p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1976,2062p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_t` no longer contains `xiaozhi_playback_last_segment`
+- current-meta terminal diagnostics now derive from stored terminal context
+  instead of a separate global bool shadow
+- queued segment truth now stores `segment->is_last_segment` directly from the
+  incoming event
+
 ## Step 5.363
 Validate that downlink starvation/tail decisions now follow typed supply truth
 from the playback runtime instead of the coarse global `last_segment` shadow:

@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.363 split starvation-tail truth from coarse last-segment shadow`
+  - `5.364 remove coarse playback last-segment shadow bool`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 已移除残留的 coarse global
+      `xiaozhi_playback_last_segment` shadow bool
+    - 当前 meta 的 terminal 语义现在改由：
+      - event-local `is_last_segment`
+      - stored terminal last-segment context
+      共同提供
+    - queued segment 的 `is_last_segment` 也已直接写入 event fact，不再经过
+      额外 runtime shadow bool 中转
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 已显式抽出 typed downlink supply truth：
       - `CURRENT_SEGMENT`

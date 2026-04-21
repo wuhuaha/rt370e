@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.364
+- XiaoZhi playback runtime 已移除残留的 coarse global
+  `xiaozhi_playback_last_segment` shadow bool：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增 `playback_current_meta_is_last_segment()`：
+  - 当前 meta 是否 terminal 不再靠单独缓存一个 runtime bool
+  - 改为直接比较：
+    - 当前 meta context
+    - terminal last-segment context
+- `playback_note_meta()` 不再写入全局 `last_segment` shadow：
+  - queue 中的 `segment->is_last_segment` 直接取自当前 event
+  - dump/diagnostic 中的 `is_last_segment` 直接从 typed terminal context 推导
+- 这一步继续把 playback runtime 的 terminal 语义从“单独缓存的布尔影子位”
+  收口到：
+  - event-local segment fact
+  - runtime-owned terminal context
+
 ## Step 5.363
 - XiaoZhi playback runtime 已把 downlink starvation/tail 的判定从 coarse
   global `last_segment` shadow 中拆开，改成消费 runtime-owned typed supply

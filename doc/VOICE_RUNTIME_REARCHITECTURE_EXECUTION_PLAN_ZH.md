@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.364`
+  - XiaoZhi playback runtime 已移除残留的 coarse global
+    `xiaozhi_playback_last_segment` shadow bool
+  - 当前 meta 的 terminal 语义现在改由：
+    - event-local `is_last_segment`
+    - stored terminal last-segment context
+    共同提供
+  - `playback_note_meta()` 不再继续把 terminal 语义中转到额外的 runtime bool
+  - queued segment 的 `is_last_segment` 现在直接写入 event fact；dump 中的
+    `is_last_segment` 也改为从 typed terminal context 推导
+  - 这一步继续把 playback runtime 的 terminal 语义从“单独缓存的布尔影子位”
+    收口到 event-local fact 与 runtime-owned terminal context
 - `Step 5.363`
   - XiaoZhi playback runtime 已把 downlink starvation/tail 的供给判定从
     coarse global `last_segment` shadow 中拆开，改成显式的 typed supply
