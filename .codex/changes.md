@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.360
+- XiaoZhi playback runtime 已把 terminal/completed 对“最后一段”的判定从
+  全局当前 meta shadow 中拆开，改成显式保存独立的 terminal segment
+  context：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增 runtime-owned terminal last-segment context：
+  - `xiaozhi_playback_last_segment_response_id`
+  - `xiaozhi_playback_last_segment_playback_id`
+  - `xiaozhi_playback_last_segment_segment_id`
+  - `store_playback_last_segment_context()`
+- `playback_completed_ready()` / `playback_completed_wait_kind()` 现在只比较：
+  - `last_fully_heard_segment_id`
+  - `last_segment_segment_id`
+  不再错误依赖“最近一条 meta 当前挂着的 `segment_id`”
+- `try_queue_playback_completed_ack()` 现在也优先消费这份 terminal
+  response/playback context，再回退到当前 response context
+- 这一步继续把 playback runtime 的 terminal 真相从“全局最近 meta 阴影”收口到
+  “独立保存的终段上下文”，减少 completed/尾段等待被后续 meta shadow 干扰
+
 ## Step 5.359
 - XiaoZhi playback ACK / terminal 路径开始把 response-level 与 segment-level
   上下文显式拆开：

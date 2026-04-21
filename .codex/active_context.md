@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.359 split response-level and segment-level playback ACK truth`
+  - `5.360 split terminal last-segment truth from global meta shadow`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback runtime 已独立保存 terminal last-segment context：
+      - `response_id`
+      - `playback_id`
+      - `segment_id`
+    - `completed_ready` / terminal wait 不再把“当前最近一条 meta 的
+      segment_id”当成最后一段真相
+    - completed ACK 也会优先消费这份 terminal response/playback context，
+      进一步减少 terminal close 被全局 shadow 扰动
   - newest landed runtime-ownership slice:
     - playback ACK / terminal 路径已开始拆分：
       - response-level context

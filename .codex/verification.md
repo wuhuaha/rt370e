@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.360
+Validate that terminal/completed readiness now follows a stored terminal
+last-segment context instead of reusing the current global meta segment shadow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_last_segment_(response|playback|segment)_id|store_playback_last_segment_context|playback_completed_ready|playback_completed_wait_kind|try_queue_playback_completed_ack' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '278,311p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1794,1828p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1888,1898p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2210,2268p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- runtime state now stores a dedicated terminal last-segment context instead of
+  reusing the current global `segment_id`
+- completed readiness and terminal wait reasons now compare
+  `last_fully_heard_segment_id` against that stored terminal segment context
+- completed ACK now prefers the stored terminal response/playback context,
+  avoiding false dependence on whatever current meta shadow happens to remain
+
 ## Step 5.359
 Validate that playback ACK and terminal-close paths now distinguish
 segment-level context from response-level context instead of sharing the coarse

@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.360`
+  - playback runtime 已独立保存 terminal last-segment context：
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+  - `playback_completed_ready()` / `playback_completed_wait_kind()` 现在只认
+    这份终段上下文，不再继续拿“最近一条 meta 当前挂着的 `segment_id`”充当
+    最后一段真相
+  - completed ACK 也会优先消费这份 terminal response/playback context
+  - 这一步继续把 terminal/completed 真相从 coarse global meta shadow 收口到
+    runtime-owned typed terminal context，为后续继续拆 terminal wait / prefetch
+    shadow 做准备
 - `Step 5.359`
   - playback ACK / terminal 路径已开始把 response-level 与 segment-level
     上下文拆开
