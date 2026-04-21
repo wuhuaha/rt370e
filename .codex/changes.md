@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.375
+- playback runtime / dialog runtime 新增 typed playback hold truth：
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 `river_cloud_playback_hold_kind_t`，当前先落一类 runtime-owned hold：
+  - `RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP`
+- cloud snapshot 现在会显式导出 `playback_hold_kind`：
+  - `owned_paused + waiting_segment + !rebuffer_pending`
+    不再只能让 core 从 backend state 里猜测
+- dialog runtime 现在不再把 `OWNED_PAUSED` 一律解释成 `playback_recovering`：
+  - `segment-gap attached hold` 改由独立的 hold truth 表达
+  - playback active / output-turn continuity 继续保留，但 recovering/error 语义不再被
+    正常段间 hold 污染
+- cloud / dialog dump 也新增 `hold=` 观测面，便于板端确认当前 paused backend
+  究竟是：
+  - 正常 segment-gap hold
+  - 还是其他恢复路径
+
 ## Step 5.374
 - `segment_gap_pause` 现在优先走 attached flush-hold，而不是默认 detached stop：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

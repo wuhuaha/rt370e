@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.375`
+  - playback runtime / dialog runtime 新增 typed playback hold truth：
+    - `RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP`
+  - cloud snapshot 现在会显式导出 `playback_hold_kind`
+  - `owned_paused + waiting_segment + !rebuffer_pending` 不再继续隐式复用
+    `recovering` 语义，而是被单独标成正常段间 hold
+  - dialog runtime 现在不再把 `OWNED_PAUSED` 一律解释成
+    `playback_recovering`
+  - output continuity 继续保留，但恢复/错误语义不再被正常 segment-gap hold
+    污染
+  - 这一步开始把“attached hold 的含义”从 backend state 猜测，推进成
+    dialog/runtime 可消费的 typed truth，为后续继续拆 residual
+    stop/start 恢复分叉做准备
 - `Step 5.374`
   - `segment_gap_pause` 现在优先走 attached flush-hold，而不是默认 detached
     stop

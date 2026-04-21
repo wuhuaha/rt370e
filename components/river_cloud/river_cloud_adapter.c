@@ -86,6 +86,19 @@ const char *river_cloud_playback_backend_state_name(
     }
 }
 
+const char *river_cloud_playback_hold_kind_name(
+    river_cloud_playback_hold_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_CLOUD_PLAYBACK_HOLD_NONE:
+        return "none";
+    case RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP:
+        return "segment_gap";
+    default:
+        return "unknown";
+    }
+}
+
 const char *river_cloud_playback_terminal_state_name(
     river_cloud_playback_terminal_state_t state)
 {

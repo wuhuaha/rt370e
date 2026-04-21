@@ -127,6 +127,22 @@ static bool river_cloud_xiaozhi_playback_backend_output_active(
     return state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
 }
 
+static river_cloud_playback_hold_kind_t
+river_cloud_xiaozhi_playback_hold_kind(void)
+{
+    river_cloud_playback_backend_state_t backend_state =
+        river_cloud_xiaozhi_playback_backend_state();
+    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+
+    if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED &&
+        !g_river_cloud.xiaozhi_playback_rebuffer_pending &&
+        phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
+        return RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP;
+    }
+
+    return RIVER_CLOUD_PLAYBACK_HOLD_NONE;
+}
+
 river_cloud_playback_phase_t river_cloud_xiaozhi_playback_phase(void)
 {
     return g_river_cloud.xiaozhi_playback_phase;
@@ -1109,9 +1125,11 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                g_river_cloud.xiaozhi_playback_started_reported ? "yes" : "no",
                g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
                river_cloud_xiaozhi_playback_segment_context_valid() ? "yes" : "no");
-    RIVER_LOGI("xiaozhi playback_terminal phase=%s state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
+    RIVER_LOGI("xiaozhi playback_terminal phase=%s hold=%s state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
                river_cloud_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
+               river_cloud_playback_hold_kind_name(
+                   river_cloud_xiaozhi_playback_hold_kind()),
                g_river_cloud.xiaozhi_playback_terminal_state_kind !=
                        RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE ?
                    river_cloud_playback_terminal_state_name(
@@ -1226,6 +1244,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
     snapshot->playback_phase_known = true;
     snapshot->playback_backend_state_kind = backend_state;
+    snapshot->playback_hold_kind = river_cloud_xiaozhi_playback_hold_kind();
     snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
     snapshot->playback_phase_kind = river_cloud_xiaozhi_playback_phase();

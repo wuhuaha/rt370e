@@ -259,6 +259,12 @@ static bool river_dialog_runtime_playback_waiting_segment_locked(void)
                RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
 }
 
+static bool river_dialog_runtime_playback_segment_gap_hold_locked(void)
+{
+    return g_river_dialog_runtime.snapshot.playback_hold_kind ==
+           RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP;
+}
+
 static bool river_dialog_runtime_cloud_runtime_available_locked(void)
 {
     return g_river_dialog_runtime.cloud_runtime_available;
@@ -303,8 +309,6 @@ static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 {
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
@@ -318,8 +322,6 @@ static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
     }
 
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
@@ -338,7 +340,8 @@ static bool river_dialog_runtime_compute_playback_active_locked(void)
         return false;
     }
 
-    if (cloud_playback_active || recovering) {
+    if (cloud_playback_active || recovering ||
+        river_dialog_runtime_playback_segment_gap_hold_locked()) {
         return true;
     }
 
@@ -564,6 +567,8 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         snapshot->playback_phase_kind;
     g_river_dialog_runtime.snapshot.playback_backend_state_kind =
         snapshot->playback_backend_state_kind;
+    g_river_dialog_runtime.snapshot.playback_hold_kind =
+        snapshot->playback_hold_kind;
     g_river_dialog_runtime.snapshot.playback_terminal_closed =
         snapshot->playback_terminal_closed;
     g_river_dialog_runtime.snapshot.tts_stop_pending = snapshot->tts_stop_pending;
@@ -1001,7 +1006,7 @@ void river_dialog_runtime_dump_status(void)
         river_dialog_runtime_local_playback_state_recovering_locked();
     river_dialog_runtime_unlock();
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -1017,6 +1022,7 @@ void river_dialog_runtime_dump_status(void)
                snapshot.playback_phase_known ? "yes" : "no",
                river_cloud_playback_backend_state_name(
                    snapshot.playback_backend_state_kind),
+               river_cloud_playback_hold_kind_name(snapshot.playback_hold_kind),
                river_cloud_playback_start_policy_name(snapshot.playback_start_policy_kind),
                (unsigned long)snapshot.playback_start_frames,
                (unsigned long)snapshot.playback_prefetch_frames,
