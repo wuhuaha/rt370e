@@ -205,7 +205,6 @@ typedef struct {
     bool xiaozhi_turn_accepted;
     bool xiaozhi_transport_barge_in_enabled_known;
     bool xiaozhi_transport_barge_in_enabled;
-    bool xiaozhi_playback_meta_valid;
     bool xiaozhi_playback_started_reported;
     bool xiaozhi_playback_cleared_reported;
     bool xiaozhi_playback_completed_reported;

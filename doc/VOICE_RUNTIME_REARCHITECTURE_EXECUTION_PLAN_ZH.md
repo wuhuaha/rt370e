@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.367`
+  - XiaoZhi playback runtime 已移除残留的 coarse
+    `xiaozhi_playback_meta_valid` shadow
+  - 当前 playback meta 是否有效，现只由 typed segment context 提供：
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+  - `playback_current_meta_is_last_segment()` 与 playback dump 的 `valid=`
+    都不再继续先读一个 coarse runtime bool
+  - 这一步继续把 playback runtime 对“当前 meta 是否有效”的解释权，从 shadow
+    bool 收口到 runtime-owned response/playback/segment context
 - `Step 5.366`
   - cloud/dialog runtime snapshot 现在正式导出 `playback_turn_active`
   - `dialog_runtime` 新增 `playback_turn_retains_output_turn_locked()`：

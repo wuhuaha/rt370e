@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.366 project retained playback-turn truth into dialog runtime snapshot`
+  - `5.367 remove playback meta-valid shadow from runtime truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 已移除残留的
+      `xiaozhi_playback_meta_valid` shadow
+    - 当前 playback meta 是否有效，现只由 typed segment context 提供：
+      - `response_id`
+      - `playback_id`
+      - `segment_id`
+    - `current_meta_is_last_segment` 与 playback dump 的 `valid=` 都不再经过
+      额外的 coarse bool 中转
   - newest landed runtime-ownership slice:
     - cloud/dialog runtime snapshot 已正式导出 `playback_turn_active`
     - `dialog_runtime` 的 retained output-turn fallback 不再只看

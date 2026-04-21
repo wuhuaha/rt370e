@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.367
+- XiaoZhi playback runtime 已移除残留的 coarse
+  `xiaozhi_playback_meta_valid` shadow：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- “当前 playback meta 是否有效” 现在直接由 typed segment context 提供：
+  - `response_id`
+  - `playback_id`
+  - `segment_id`
+- `playback_current_meta_is_last_segment()` 不再先看 `meta_valid` shadow：
+  - 改为直接消费 `playback_segment_context_valid()`
+  - 再与 stored terminal last-segment context 比较
+- playback dump 中的 `valid=` 也不再读 shadow bool，而是实时打印 typed
+  segment context 是否完整
+- 这一步继续把 playback runtime 对“当前 meta 有效性”的解释权，从粗粒度
+  shadow bool 收口到 runtime-owned response/playback/segment context
+
 ## Step 5.366
 - cloud/dialog runtime snapshot 现在正式导出 `playback_turn_active`：
   - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)

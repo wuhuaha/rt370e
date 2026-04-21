@@ -302,7 +302,7 @@ static bool river_cloud_xiaozhi_playback_segment_context_valid(void)
 
 static bool river_cloud_xiaozhi_playback_current_meta_is_last_segment(void)
 {
-    if (!g_river_cloud.xiaozhi_playback_meta_valid ||
+    if (!river_cloud_xiaozhi_playback_segment_context_valid() ||
         !river_cloud_xiaozhi_playback_last_segment_observed()) {
         return false;
     }
@@ -1092,7 +1092,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                river_cloud_xiaozhi_playback_current_meta_is_last_segment() ? "yes" : "no",
                g_river_cloud.xiaozhi_playback_started_reported ? "yes" : "no",
                g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
-               g_river_cloud.xiaozhi_playback_meta_valid ? "yes" : "no");
+               river_cloud_xiaozhi_playback_segment_context_valid() ? "yes" : "no");
     RIVER_LOGI("xiaozhi playback_terminal phase=%s state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
                river_cloud_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
@@ -1240,7 +1240,6 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
 
 void river_cloud_xiaozhi_clear_playback_meta_state(void)
 {
-    g_river_cloud.xiaozhi_playback_meta_valid = false;
     g_river_cloud.xiaozhi_playback_started_reported = false;
     g_river_cloud.xiaozhi_playback_cleared_reported = false;
     g_river_cloud.xiaozhi_playback_completed_reported = false;
@@ -1995,9 +1994,7 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
     g_river_cloud.xiaozhi_playback_prefetch_target_ms = prefetch_target_ms;
     g_river_cloud.xiaozhi_playback_last_meta_ms = now_ms;
-    g_river_cloud.xiaozhi_playback_meta_valid =
-        river_cloud_xiaozhi_playback_segment_context_valid();
-    if (g_river_cloud.xiaozhi_playback_meta_valid) {
+    if (river_cloud_xiaozhi_playback_segment_context_valid()) {
         if (event->is_last_segment) {
             river_cloud_xiaozhi_clear_playback_wait_context();
             river_cloud_xiaozhi_store_playback_last_segment_context();

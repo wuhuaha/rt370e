@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.367
+Validate that the playback runtime no longer keeps a coarse
+`xiaozhi_playback_meta_valid` shadow, and that current-meta validity now comes
+directly from typed response/playback/segment context:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_segment_context_valid|playback_current_meta_is_last_segment|valid=%s' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+rg -n 'xiaozhi_playback_meta_valid' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '296,316p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1988,2008p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `rg -n 'xiaozhi_playback_meta_valid' ...` returns no matches
+- current playback-meta validity is now derived directly from typed
+  response/playback/segment context
+- `playback_current_meta_is_last_segment()` no longer depends on a coarse
+  runtime `meta_valid` shadow
+
 ## Step 5.366
 Validate that cloud/dialog runtime snapshots now carry explicit retained
 playback-turn truth, and that dialog-runtime output-turn fallback only consumes
