@@ -1183,6 +1183,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     backend_state = river_cloud_xiaozhi_playback_backend_state();
     snapshot->playback_active = river_cloud_xiaozhi_playback_output_active();
     snapshot->playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
+    snapshot->playback_turn_active = river_cloud_xiaozhi_playback_turn_active();
     snapshot->playback_rebuffer_pending = g_river_cloud.xiaozhi_playback_rebuffer_pending;
     snapshot->playback_phase_known = true;
     snapshot->playback_backend_state_kind = backend_state;

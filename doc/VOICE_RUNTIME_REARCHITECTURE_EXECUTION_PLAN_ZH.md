@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.366`
+  - cloud/dialog runtime snapshot 现在正式导出 `playback_turn_active`
+  - `dialog_runtime` 新增 `playback_turn_retains_output_turn_locked()`：
+    - lane 仍 occupied 时，继续只让 `rebuffering` 保留 output-turn ownership
+    - lane 已释放但 runtime 仍声明 `playback_turn_active=yes` 时，只有
+      `output_lane=speaking` 且未进入 suppress-speaking 的 terminal wait，
+      才继续保留 speaking/output-turn
+  - `output_turn_quiesced_locked()` 现在也显式要求
+    `playback_turn_active=no`
+  - 这一步继续把 core 对 output-turn 生命周期的解释权，从 coarse lane
+    occupancy 收口到 runtime-owned retained-turn truth，减少 lane 已空但
+    turn 尚未真正结束时的误判窗口
 - `Step 5.365`
   - `playback_turn_active()` 已不再继续依赖 coarse
     `xiaozhi_playback_meta_valid` shadow

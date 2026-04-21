@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.366
+Validate that cloud/dialog runtime snapshots now carry explicit retained
+playback-turn truth, and that dialog-runtime output-turn fallback only consumes
+that truth where the semantics are really about turn ownership rather than
+generic lane occupancy:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_turn_active|playback_turn_retains_output_turn_locked|output_turn_quiesced_locked' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c
+sed -n '362,429p' components/river_core/river_dialog_runtime.c
+sed -n '1179,1188p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud/dialog runtime snapshots now both expose `playback_turn_active`
+- `output_turn_quiesced_locked()` no longer declares quiesce while retained
+  playback-turn truth is still active
+- `dialog_runtime` no longer treats generic `playback_lane_engaged` as the only
+  source of retained output-turn ownership
+
 ## Step 5.365
 Validate that retained playback-turn truth now follows typed response/terminal
 context instead of the coarse `playback_meta_valid` shadow, and that

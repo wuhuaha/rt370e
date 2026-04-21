@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.365 retie playback turn truth to response and terminal context`
+  - `5.366 project retained playback-turn truth into dialog runtime snapshot`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - cloud/dialog runtime snapshot 已正式导出 `playback_turn_active`
+    - `dialog_runtime` 的 retained output-turn fallback 不再只看
+      `playback_lane_engaged`
+    - lane 已释放但 turn 仍 active 时，只有：
+      - `output_lane=speaking`
+      - 且未进入 suppress-speaking 的 terminal wait
+      才继续保留 speaking/output-turn
+    - `output_turn_quiesced` 也已显式要求
+      `playback_turn_active=no`
   - newest landed runtime-ownership slice:
     - `playback_turn_active()` 已不再直接读取 coarse
       `xiaozhi_playback_meta_valid`

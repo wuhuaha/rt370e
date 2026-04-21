@@ -114,6 +114,7 @@ typedef struct {
     bool local_close_pending;
     bool playback_active;
     bool playback_lane_engaged;
+    bool playback_turn_active;
     bool playback_rebuffer_pending;
     bool playback_phase_known;
     bool playback_terminal_closed;

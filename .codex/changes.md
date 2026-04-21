@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.366
+- cloud/dialog runtime snapshot 现在正式导出 `playback_turn_active`：
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `dialog_runtime` 不再只拿 `playback_lane_engaged` 去猜 retained output-turn：
+  - 新增 `playback_turn_retains_output_turn_locked()`
+  - lane 仍 occupied 时，继续只让 `rebuffering` 保留 output ownership
+  - lane 已释放但 runtime 仍声明 `playback_turn_active=yes` 时，只有
+    `output_lane=speaking` 且没有进入 suppress-speaking 的 terminal wait，
+    才继续保留 speaking/output-turn
+- `output_turn_quiesced_locked()` 现在也显式要求
+  `playback_turn_active=no`，避免 terminal 仍 open 的 retained-turn 窗口被过早
+  视为真正 quiesced
+- `dialog_runtime` 日志现在会同时打印：
+  - `lane`
+  - `turn`
+- 这一步继续把 core 对 output-turn 生命周期的解释权，从 coarse lane occupancy
+  收口到 runtime-owned typed playback-turn truth，减少 lane 已空但 turn 尚未真正
+  结束时的误判窗口
+
 ## Step 5.365
 - XiaoZhi playback runtime 已把 `playback_turn_active()` 的 retained-turn 判定从
   coarse `playback_meta_valid` shadow 收口到 typed response/terminal truth：

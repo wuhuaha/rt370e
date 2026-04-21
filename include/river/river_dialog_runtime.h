@@ -37,6 +37,7 @@ typedef struct {
     bool cloud_local_close_pending;
     bool playback_cloud_active;
     bool playback_lane_engaged;
+    bool playback_turn_active;
     bool playback_active;
     bool playback_rebuffer_pending;
     bool playback_recovering;
