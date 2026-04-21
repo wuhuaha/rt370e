@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.377
+Validate that attached playback resume now uses a runtime-owned resume
+threshold instead of always reusing cold-start `start_frames`, and that the
+actual playback-service buffer budget is captured into runtime truth:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_buffer_frames|playback_buffer_frame_budget|attached_resume_threshold_frames|paused backend resumed|resume=%u buffer=%u|start=%u resume=%u buffer=%u' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1210,1238p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1574,1602p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1928,1978p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2846,2866p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- runtime context now stores the actual playback-service `buffer_frames`
+- attached resume paths no longer blindly wait for cold-start `start_frames`
+- the effective attached resume gate is now `min(start_frames, buffer_frames)`
+- status / resume logs expose `start`, `resume`, and `buffer` together
+
 ## Step 5.376
 Validate that residual rebuffer recovery now prefers attached `service_recover`
 for all upstream-starved windows that still expect more audio, and that timer

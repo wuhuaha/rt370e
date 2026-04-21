@@ -42,6 +42,8 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void);
+static uint32_t river_cloud_xiaozhi_playback_buffer_frame_budget(void);
+static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(void);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
 
 static bool river_cloud_xiaozhi_playback_phase_is_output_active(
@@ -1216,7 +1218,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES,
                (unsigned long)reopen_guard_left_ms,
                (unsigned int)river_cloud_xiaozhi_open_hold_frames_required());
-    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums start=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu backend=%s rebuffer=%s/%s rebuffer_total=%lu streak=%lu",
+    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums start=%u resume=%u buffer=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu backend=%s rebuffer=%s/%s rebuffer_total=%lu streak=%lu",
                (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_downlink_ring),
                (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES,
                (unsigned long)g_river_cloud.xiaozhi_downlink_ring_dropped,
@@ -1224,6 +1226,8 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned long)g_river_cloud.xiaozhi_downlink_sample_rate,
                (unsigned long)g_river_cloud.xiaozhi_downlink_frame_duration_ms,
                (unsigned int)start_gate.start_frames,
+               (unsigned int)river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(),
+               (unsigned int)river_cloud_xiaozhi_playback_buffer_frame_budget(),
                river_cloud_playback_start_policy_name(start_gate.policy),
                start_gate.cautious_history ? "yes" : "no",
                (unsigned long)g_river_cloud.xiaozhi_playback_prefetch_target_ms,
@@ -1320,6 +1324,7 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_expected_duration_ms = 0U;
     g_river_cloud.xiaozhi_playback_last_meta_gap_ms = 0U;
     g_river_cloud.xiaozhi_playback_prefetch_target_ms = 0U;
+    g_river_cloud.xiaozhi_playback_buffer_frames = 0U;
     g_river_cloud.xiaozhi_playback_last_meta_ms = 0U;
     g_river_cloud.xiaozhi_playback_duplex_ready_seen = false;
     g_river_cloud.xiaozhi_playback_response_id[0] = '\0';
@@ -1448,6 +1453,7 @@ void river_cloud_xiaozhi_reset_playback_state(void)
     bool duplex_ready_seen = g_river_cloud.xiaozhi_playback_duplex_ready_seen;
 
     g_river_cloud.xiaozhi_playback_active = false;
+    g_river_cloud.xiaozhi_playback_buffer_frames = 0U;
     river_cloud_xiaozhi_cancel_playback_stop();
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
     river_cloud_xiaozhi_clear_playback_terminal_wait();
@@ -1570,6 +1576,29 @@ static void river_cloud_xiaozhi_drop_detached_pending_stop_audio(
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void)
 {
     return river_cloud_xiaozhi_current_start_gate().start_frames;
+}
+
+static uint32_t river_cloud_xiaozhi_playback_buffer_frame_budget(void)
+{
+    if (g_river_cloud.xiaozhi_playback_buffer_frames != 0U) {
+        return g_river_cloud.xiaozhi_playback_buffer_frames;
+    }
+
+    return RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES;
+}
+
+static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(void)
+{
+    uint32_t start_frames = river_cloud_xiaozhi_downlink_start_threshold_frames();
+    uint32_t buffer_frames = river_cloud_xiaozhi_playback_buffer_frame_budget();
+
+    if (start_frames == 0U) {
+        return buffer_frames;
+    }
+    if (buffer_frames == 0U) {
+        return start_frames;
+    }
+    return buffer_frames < start_frames ? buffer_frames : start_frames;
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_starved_rebuffer_ms(void)
@@ -1899,14 +1928,14 @@ static bool river_cloud_xiaozhi_rebuffer_resume_ready(uint32_t queued_frames,
                                                       river_cloud_playback_backend_state_t
                                                           backend_state)
 {
-    uint32_t start_frames;
+    uint32_t resume_frames;
 
     if (!g_river_cloud.xiaozhi_playback_rebuffer_pending || g_river_cloud.xiaozhi_tts_stop_pending) {
         return true;
     }
 
-    start_frames = river_cloud_xiaozhi_downlink_start_threshold_frames();
-    if (queued_frames < start_frames) {
+    resume_frames = river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
+    if (queued_frames < resume_frames) {
         return false;
     }
 
@@ -1920,6 +1949,7 @@ static bool river_cloud_xiaozhi_rebuffer_resume_ready(uint32_t queued_frames,
 static bool river_cloud_xiaozhi_maybe_resume_paused_playback(uint32_t queued_frames)
 {
     uint32_t start_frames;
+    uint32_t resume_frames;
 
     if (g_river_cloud.xiaozhi_tts_stop_pending ||
         !river_cloud_xiaozhi_playback_terminal_open() ||
@@ -1929,15 +1959,18 @@ static bool river_cloud_xiaozhi_maybe_resume_paused_playback(uint32_t queued_fra
     }
 
     start_frames = river_cloud_xiaozhi_downlink_start_threshold_frames();
-    if (queued_frames < start_frames) {
+    resume_frames = river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
+    if (queued_frames < resume_frames) {
         return false;
     }
 
     river_cloud_xiaozhi_mark_playback_started();
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
-    RIVER_LOGI("xiaozhi playback paused backend resumed: queued=%lu start=%u phase=%s backend=%s",
+    RIVER_LOGI("xiaozhi playback paused backend resumed: queued=%lu resume=%u start=%u buffer=%u phase=%s backend=%s",
                (unsigned long)queued_frames,
+               (unsigned int)resume_frames,
                (unsigned int)start_frames,
+               (unsigned int)river_cloud_xiaozhi_playback_buffer_frame_budget(),
                river_cloud_playback_phase_name(
                    river_cloud_xiaozhi_playback_phase()),
                river_cloud_playback_backend_state_name(
@@ -2819,6 +2852,7 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
         }
     }
 
+    g_river_cloud.xiaozhi_playback_buffer_frames = buffer_frames;
     RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu start=%u policy=%s cautious=%s target_ms=%u prefetch_frames=%u mode=%s buffer=%u gain=%d/%d from_backend=%s rebuffer=%s/%s",
                (unsigned long)sample_rate,
                (unsigned long)frame_duration_ms,

@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.377`
+  - downlink/playback runtime 现在显式拆分：
+    - cold start threshold
+    - attached resume threshold
+    - actual playback buffer budget
+  - playback start 时会锁存本次真正下发给 playback service 的
+    `buffer_frames`
+  - attached hold / rebuffer resume 不再一律等待 cold-start `start_frames`
+  - 当前 attached resume 门限统一变成：
+    - `min(start_frames, buffer_frames)`
+  - playback dump / paused-resume 日志现在会直接暴露：
+    - `start`
+    - `resume`
+    - `buffer`
+  - 这一步继续把 downlink/playback 恢复语义从“冷启动保守门限”拆成
+    runtime-owned attached resume truth，减少 attach 后恢复时不必要的排队等待
 - `Step 5.376`
   - playback rebuffer 恢复决策现在统一收口到
     `request_playback_rebuffer_recovery(...)`
@@ -2672,6 +2688,10 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
   让它们也与 session/runtime helper 采用同一 ownership 模式
 - 让 `dialog runtime` / `session coordinator` / cloud bridge 最终都只消费
   一条统一的 playback-runtime 真相，而不是再从局部 active/idle 信号二次猜测
+- 当前下一步继续聚焦：
+  - 审视 `pending_stop / restart_pending / abort-reset` 边界
+  - 把仍会把 attached recover 打回 detached stop/start 的残余路径继续削减
+  - 目标是把 restart churn 收口到真正的硬故障，而不是常态恢复
 
 ### Step E: 统一 turn timeline 与板端验证
 

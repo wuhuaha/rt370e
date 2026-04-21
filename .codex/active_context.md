@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.376 shrink residual rebuffer stop/start with attached recover-first`
+  - `5.377 split cold-start threshold from attached resume threshold`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - downlink/playback runtime 现在显式拆分：
+      - cold start threshold
+      - attached resume threshold
+      - actual playback buffer budget
+    - playback start 时会锁存本次真正下发给 playback service 的
+      `buffer_frames`
+    - attached hold / rebuffer resume 不再一律等待 cold-start `start_frames`
+    - 当前 attached resume 门限统一变成：
+      - `min(start_frames, buffer_frames)`
+    - playback status / resume 日志现在会直接暴露：
+      - `start`
+      - `resume`
+      - `buffer`
+  - current next runtime slice:
+    - 检查 `pending_stop / restart_pending / abort-reset` 边界
+    - 继续找出仍会把 attached recover 打回 detached stop/start 的残余路径
+    - 目标是把 restart churn 进一步收口到真正的硬故障场景
   - newest landed runtime-ownership slice:
     - playback rebuffer 恢复决策现在收口到统一 helper
     - `UPSTREAM_STARVED + CURRENT_SEGMENT` 也开始优先 attached

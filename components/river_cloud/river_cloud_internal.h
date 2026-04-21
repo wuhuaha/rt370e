@@ -263,6 +263,7 @@ typedef struct {
     river_cloud_playback_start_policy_t xiaozhi_playback_start_policy;
     uint32_t xiaozhi_playback_start_frames;
     uint32_t xiaozhi_playback_prefetch_frames;
+    uint32_t xiaozhi_playback_buffer_frames;
     bool xiaozhi_playback_start_cautious_history;
     uint32_t xiaozhi_playback_segment_head;
     uint32_t xiaozhi_playback_segment_count;

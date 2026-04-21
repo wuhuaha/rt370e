@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.377
+- downlink/playback runtime 现在显式区分：
+  - cold start threshold
+  - attached resume threshold
+  - actual playback buffer budget
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- playback runtime 新增 runtime-owned `xiaozhi_playback_buffer_frames`：
+  - start 时锁存本次真正下发给 playback service 的 `buffer_frames`
+  - reset / meta clear 时同步清零
+- 新增：
+  - `playback_buffer_frame_budget()`
+  - `downlink_attached_resume_threshold_frames()`
+- attached hold / rebuffer resume 不再一律复用 cold start 的
+  `start_frames`：
+  - `rebuffer_resume_ready()`
+  - `maybe_resume_paused_playback()`
+  现在统一使用 `min(start_frames, buffer_frames)`
+- status / resume 日志现在会直接暴露：
+  - `start`
+  - `resume`
+  - `buffer`
+- 这一步继续把 downlink/playback 恢复语义从“保守冷启动”拆成“runtime-owned
+  attached resume 真相”，降低 attached hold/recover 恢复时不必要的排队等待
+
 ## Step 5.376
 - playback rebuffer 恢复决策现在统一收口到：
   - `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)`
