@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.370
+Validate that the playback runtime now derives `audio.out.cleared` from the
+fully-heard segment lineage rather than from the current playback-meta context:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'last_fully_heard_(response|playback|segment)_id|playback_last_fully_heard_context_valid|playback ack cleared queued|playback_heard_context' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1856,1930p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2198,2248p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1106,1132p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now stores fully-heard response/playback/segment context
+- `audio.out.cleared` no longer depends on the current playback-meta
+  `response_id / playback_id`
+- playback diagnostics now expose the heard-context lineage used by the cleared
+  terminal fact
+
 ## Step 5.369
 Validate that the latest `/root/agent-server` mainline status has been fed
 back into the active device-side plans, and that the remaining device-side

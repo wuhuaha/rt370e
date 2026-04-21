@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.370
+- XiaoZhi playback runtime 现在会把最后一个 fully-heard segment 的 response /
+  playback / segment 上下文一起保存成 typed heard context：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_mark_segment_fully_heard(...)` 不再只保存
+  `last_fully_heard_segment_id`：
+  - 现在也同步保存：
+    - `last_fully_heard_response_id`
+    - `last_fully_heard_playback_id`
+- `audio.out.cleared` ACK 不再继续拿当前 playback meta 的
+  `response_id / playback_id` 去拼终态：
+  - `river_cloud_xiaozhi_try_queue_playback_cleared_ack(...)` 现在直接消费
+    fully-heard segment 自带的 typed context
+- playback dump 新增 heard-context 观测日志，便于板端确认当前 clear / truncate
+  将回报给服务侧的是哪条 playback lineage
+- 这一步继续把 playback truth 链上的 cleared 终态从 current-meta shadow 收口到
+  runtime-owned heard-segment truth，减少新 response / 新 meta 覆盖旧 context
+  时的错 ACK 风险
+
 ## Step 5.369
 - 已把 `/root/agent-server` 2026-04-21 主线语音进展回灌到当前设备侧计划：
   - [doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md)

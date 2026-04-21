@@ -323,6 +323,8 @@ typedef struct {
     char xiaozhi_playback_last_segment_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char xiaozhi_playback_last_segment_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_last_segment_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char xiaozhi_playback_last_fully_heard_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
+    char xiaozhi_playback_last_fully_heard_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_last_started_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_last_fully_heard_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_terminal_ack[RIVER_CLOUD_XIAOZHI_TERMINAL_ACK_MAX];

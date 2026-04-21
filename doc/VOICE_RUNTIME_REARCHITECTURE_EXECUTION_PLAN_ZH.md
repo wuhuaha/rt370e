@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.370`
+  - XiaoZhi playback runtime 现在会把最后一个 fully-heard segment 的
+    `response_id / playback_id / segment_id` 一起保存成 typed heard context
+  - `audio.out.cleared` ACK 不再继续拿“当前 playback meta 的 response/playback
+    上下文”去拼 cleared 事实，而是直接消费这份 fully-heard segment context
+  - playback dump 也新增了 heard-context 观测面，便于板端确认：
+    - 当前清理/截断要回报给服务侧的究竟是哪一条 playback lineage
+  - 这一步继续把 playback truth 链上的 cleared 终态从 current-meta shadow
+    收口到 runtime-owned heard-segment truth，减少新 response / 新 meta 覆盖旧
+    context 时的错 ACK 风险
 - `Step 5.369`
   - 已回灌 `/root/agent-server` 2026-04-21 主线语音进展到设备侧计划：
     - `Realtime Session Core` 的

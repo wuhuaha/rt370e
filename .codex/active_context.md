@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.369 feed latest service-side mainline progress back into device plans`
+  - `5.370 derive cleared ACK context from fully-heard playback truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 已把 fully-heard segment 的：
+      - `response_id`
+      - `playback_id`
+      - `segment_id`
+      一起保存成 heard context
+    - `audio.out.cleared` ACK 不再拿“当前 playback meta 的 response/playback
+      上下文”去发送
+    - cleared 终态现在直接消费 runtime-owned fully-heard segment truth，
+      继续减少新 response / 新 meta 覆盖旧 playback context 时的错 ACK 风险
   - newest planning sync:
     - 已把 `/root/agent-server` 2026-04-21 主线语音进展回灌到设备侧计划：
       - 服务侧不再主要阻塞于双轨 session / preview-first / playback truth 主干
