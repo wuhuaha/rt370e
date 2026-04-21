@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.381 scope restart_pending backend truth to owned stream`
+  - `5.382 gate generic playback AEC truth with dialog lane`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - voice runtime 的 generic playback AEC gate 现在也消费 dialog runtime
+      的 playback-lane truth
+    - 本地 playback-service 短暂 inactive 时，只要 dialog runtime 仍认定：
+      - lane engaged
+      - recovering
+      - turn active
+      AEC path 就不再立刻退回 `block_playback`
+    - `restart_pending` 与 generic playback gate 现在共用同一份
+      dialog snapshot
+    - 这一步继续把 duplex/AEC 的播放占用判定收口到 dialog runtime 真相源
   - newest landed runtime-ownership slice:
     - XiaoZhi playback backend truth 现在只对 owned stream 承认
       `backend_restart_pending`
@@ -62,8 +73,8 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续检查 dialog runtime 内剩余 `local playback shadow` / service-active
       fallback 是否还能继续退化成 purely-diagnostic shadow
-    - 继续检查 playback runtime 内剩余直接读取 raw playback-service state 的
-      路径，是否还能继续收口到 owned backend truth helper
+    - 继续检查 voice/playback runtime 内剩余 raw playback-service state 读取，
+      是否还能进一步统一到 dialog/runtime owned truth
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

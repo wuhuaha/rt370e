@@ -60,26 +60,39 @@ static bool river_voice_runtime_restart_pending_quiet_phase(
            phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
 }
 
-static bool river_voice_runtime_restart_pending_requires_block(void)
+static bool river_voice_runtime_dialog_snapshot_capture(
+    river_dialog_runtime_snapshot_t *snapshot)
 {
-    river_dialog_runtime_snapshot_t snapshot;
+    return snapshot != NULL && river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
+}
 
-    if (river_dialog_runtime_get_snapshot(&snapshot) != RIVER_OK) {
+static bool river_voice_runtime_dialog_playback_lane_engaged(
+    const river_dialog_runtime_snapshot_t *snapshot)
+{
+    return snapshot != NULL &&
+           (snapshot->playback_lane_engaged || snapshot->playback_recovering ||
+            snapshot->playback_turn_active);
+}
+
+static bool river_voice_runtime_restart_pending_requires_block(
+    const river_dialog_runtime_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
         return true;
     }
 
-    if (!snapshot.playback_lane_engaged) {
+    if (!river_voice_runtime_dialog_playback_lane_engaged(snapshot)) {
         return false;
     }
 
-    if (snapshot.playback_backend_state_kind !=
+    if (snapshot->playback_backend_state_kind !=
         RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING) {
         return false;
     }
 
-    if (snapshot.playback_phase_known &&
+    if (snapshot->playback_phase_known &&
         river_voice_runtime_restart_pending_quiet_phase(
-            snapshot.playback_phase_kind)) {
+            snapshot->playback_phase_kind)) {
         return false;
     }
 
@@ -266,6 +279,9 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
                                             river_voice_aec_gate_eval_t *eval)
 {
     const river_voice_profile_config_t *profile_config;
+    river_dialog_runtime_snapshot_t dialog_snapshot;
+    const river_dialog_runtime_snapshot_t *dialog_snapshot_ptr = NULL;
+    bool playback_active;
 
     if (eval == 0) {
         return;
@@ -281,18 +297,28 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
     eval->system_ready = false;
     eval->active = false;
 
+    if (river_voice_runtime_dialog_snapshot_capture(&dialog_snapshot)) {
+        dialog_snapshot_ptr = &dialog_snapshot;
+    }
+
     if (!profile_config->experimental) {
         eval->reason = RIVER_VOICE_AEC_GATE_DISABLED;
         return;
     }
 
     if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING &&
-        river_voice_runtime_restart_pending_requires_block()) {
+        river_voice_runtime_restart_pending_requires_block(dialog_snapshot_ptr)) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
         return;
     }
 
-    if (!river_playback_service_state_active(eval->playback_state)) {
+    playback_active = river_playback_service_state_active(eval->playback_state);
+    if (!playback_active &&
+        river_voice_runtime_dialog_playback_lane_engaged(dialog_snapshot_ptr)) {
+        playback_active = true;
+    }
+
+    if (!playback_active) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK;
         return;
     }

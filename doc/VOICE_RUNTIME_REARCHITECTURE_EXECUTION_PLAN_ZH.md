@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.382`
+  - voice runtime 的 generic playback AEC gate 现在也消费 dialog runtime
+    的 playback-lane truth，而不再只看本地 playback-service `active`
+  - 新增：
+    - `dialog_snapshot_capture(...)`
+    - `dialog_playback_lane_engaged(...)`
+  - 当本地 playback-service 短暂 inactive，但 dialog runtime 仍认定：
+    - playback lane engaged
+    - 或 playback recovering
+    - 或 playback turn active
+    时，AEC path 不再立刻退回 `block_playback`
+  - `restart_pending` 与 generic playback gate 现在共用同一份
+    dialog snapshot
+  - 这一步继续把 duplex/AEC 的播放占用判定收口到 dialog runtime 真相源
 - `Step 5.381`
   - XiaoZhi playback backend truth 现在只对 owned stream 承认
     `backend_restart_pending`

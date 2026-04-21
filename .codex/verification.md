@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.382
+Validate that the generic playback AEC gate now also uses dialog runtime
+playback-lane truth, so local playback-service inactive gaps do not
+immediately collapse into `BLOCKED_PLAYBACK` while dialog runtime still says
+the playback lane is engaged:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'dialog_snapshot_capture|dialog_playback_lane_engaged|RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK|restart_pending_requires_block' \
+  components/river_voice/river_voice_runtime_policy.c
+sed -n '55,86p' components/river_voice/river_voice_runtime_policy.c
+sed -n '279,322p' components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- generic playback blocking no longer depends solely on
+  `river_playback_service_state_active(...)`
+- dialog runtime `playback_lane_engaged` / `playback_recovering` /
+  `playback_turn_active` can now keep the AEC gate in the playback-engaged
+  path during local inactive gaps
+- `restart_pending` and generic playback gating now consume the same dialog
+  snapshot source instead of separate local/coarse checks
+
 ## Step 5.381
 Validate that XiaoZhi backend truth only recognizes `restart_pending` for the
 owned playback stream, instead of unconditionally trusting the raw playback

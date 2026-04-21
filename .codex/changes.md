@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.382
+- voice runtime 的 generic playback AEC gate 现在也会消费 dialog runtime
+  的 playback-lane truth，而不再只看本地 playback-service `active` 状态：
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 新增：
+  - `dialog_snapshot_capture(...)`
+  - `dialog_playback_lane_engaged(...)`
+- 当本地 playback-service 暂时掉到 inactive，但 dialog runtime 仍明确给出：
+  - `playback_lane_engaged`
+  - 或 `playback_recovering`
+  - 或 `playback_turn_active`
+  时，voice runtime 不再立刻落回 `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK`
+- `restart_pending` 的专用 gate 也同步复用同一份 dialog snapshot，而不是再次
+  单独抓取一份局部状态
+- 这一步继续把 duplex/AEC 的“播放是否仍占用中”收口到 dialog runtime 真相源，
+  降低 local playback-service 短暂 inactive 对 AEC path 的误 reset / reopen
+
 ## Step 5.381
 - XiaoZhi playback backend truth 现在进一步受 stream ownership 约束：
   - 只有 owned stream 的 `RIVER_PLAYBACK_RESTART_PENDING` 才会被映射成
