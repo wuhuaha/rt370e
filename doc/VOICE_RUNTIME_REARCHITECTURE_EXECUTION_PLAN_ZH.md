@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.379`
+  - playback runtime 现在把 backend-aware 起播门限继续拆分成：
+    - detached cold start
+    - restart-pending restart
+  - 新增 `downlink_start_threshold_for_backend(...)`
+  - `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` 重新起播时不再一律等待
+    cold-start `start_frames`
+  - restart-after-recover 现在复用 attached-resume 门限：
+    - `min(start_frames, buffer_frames)`
+  - 这一步继续把 playback start policy 从 coarse backend state 中解耦，
+    避免 recover/restart 后再次回退成保守的冷启动排队
 - `Step 5.378`
   - playback runtime 现在显式区分：
     - backend 仍保有 turn / restart 语义

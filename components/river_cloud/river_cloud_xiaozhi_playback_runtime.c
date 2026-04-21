@@ -44,6 +44,8 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void);
 static uint32_t river_cloud_xiaozhi_playback_buffer_frame_budget(void);
 static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(void);
+static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
+    river_cloud_playback_backend_state_t backend_state);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
 
 static bool river_cloud_xiaozhi_playback_phase_is_output_active(
@@ -1600,6 +1602,16 @@ static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(vo
     return buffer_frames < start_frames ? buffer_frames : start_frames;
 }
 
+static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
+    river_cloud_playback_backend_state_t backend_state)
+{
+    if (backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING) {
+        return river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
+    }
+
+    return river_cloud_xiaozhi_downlink_start_threshold_frames();
+}
+
 static uint32_t river_cloud_xiaozhi_downlink_starved_rebuffer_ms(void)
 {
     uint32_t frame_ms = river_cloud_xiaozhi_downlink_frame_duration_ms();
@@ -3091,10 +3103,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
         }
         if (backend_state != RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE ||
             playback_needs_start) {
-            river_cloud_xiaozhi_playback_start_gate_t start_gate =
-                river_cloud_xiaozhi_current_start_gate();
-
-            start_frames = start_gate.start_frames;
+            start_frames = river_cloud_xiaozhi_downlink_start_threshold_for_backend(
+                backend_state);
             if (!g_river_cloud.xiaozhi_tts_stop_pending && queued_frames < start_frames) {
                 rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
                 continue;

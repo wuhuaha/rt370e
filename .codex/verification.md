@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.379
+Validate that `restart_pending` restart no longer waits for the detached
+cold-start threshold, and instead reuses the attached-resume watermark while
+true detached starts still use the cold-start gate:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'downlink_start_threshold_for_backend|RESTART_PENDING|downlink_attached_resume_threshold_frames|downlink_start_threshold_frames' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '42,52p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1591,1615p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3098,3112p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- true detached start paths still use `downlink_start_threshold_frames()`
+- `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` now uses
+  `downlink_attached_resume_threshold_frames()`
+- downlink worker no longer forces restart-after-recover flows to wait for the
+  full cold-start watermark before reattaching playback
+
 ## Step 5.378
 Validate that `restart_pending` is no longer treated as a truly attached
 stream in playback-runtime stop/flush/abort boundaries, while still remaining

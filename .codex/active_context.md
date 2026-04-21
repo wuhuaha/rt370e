@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.378 split restart_pending ownership from true stream attachment`
+  - `5.379 tighten restart_pending start threshold`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback runtime 现在区分：
+      - detached cold start
+      - restart-pending restart
+    - `RESTART_PENDING` 重新起播不再一律等待 cold-start `start_frames`
+    - 新增 backend-aware start threshold helper：
+      - `downlink_start_threshold_for_backend(...)`
+    - `restart_pending` restart 现在复用 attached-resume 门限：
+      - `min(start_frames, buffer_frames)`
+    - 这一步继续把 playback start policy 从粗粒度 backend state 中拆开，
+      降低 recover/restart 后再次“冷启动式”排队
   - newest landed runtime-ownership slice:
     - playback runtime 现在显式区分：
       - backend 仍保有 turn / restart 语义
@@ -33,8 +44,8 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续检查 `restart_pending` 是否仍在 duplex / capture / AEC gate 上被过度
       当成“播放占用中”
-    - 继续评估 detached fresh-start 与 attached resume 门限是否还需进一步统一
-      到更精确的 typed start policy
+    - 如果 voice/AEC gate 仍直接按 `playback_state == RESTART_PENDING`
+      一刀切阻塞，则继续把它下沉到 dialog/runtime-owned typed playback truth
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

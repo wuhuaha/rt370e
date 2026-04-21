@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.379
+- playback runtime 现在对 backend-aware 起播门限做了进一步拆分：
+  - detached cold start
+  - restart-pending restart
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_downlink_start_threshold_for_backend(...)`
+- `downlink_task()` 在以下场景不再一律复用 cold-start `start_frames`：
+  - backend 真正 detached 的 fresh start
+  - backend=`RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` 的 restart
+- `restart_pending` 重新起播现在直接复用 attached-resume 门限：
+  - `min(start_frames, buffer_frames)`
+  - 不再在已经保有 turn / queued audio 语义时退回到更保守的 cold start 等待
+- 这一步继续把 playback runtime 的启动决策从 coarse backend state 拆成
+  runtime-owned typed start policy，减少 recover/restart 后再次冷启动式排队
+
 ## Step 5.378
 - playback runtime 现在显式区分：
   - backend 仍保有 turn / restart 语义
