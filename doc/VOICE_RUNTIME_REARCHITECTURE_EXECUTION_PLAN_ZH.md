@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.368`
+  - XiaoZhi transport 侧已移除冗余诊断 shadow
+    `last_playback_meta_valid`
+  - transport playback-meta 的 `valid=` 现在直接由 cached meta context
+    推导：
+    - `last_response_id`
+    - `last_playback_id`
+    - `last_segment_id`
+  - `last_playback_is_last_segment` 继续只表示最近一条 `audio.out.meta` 的
+    event-local fact，不再继续和 validity shadow 混用
+  - 这一步继续把 transport 诊断层的 playback-meta validity 真相收口到已有
+    的 typed meta context
 - `Step 5.367`
   - XiaoZhi playback runtime 已移除残留的 coarse
     `xiaozhi_playback_meta_valid` shadow

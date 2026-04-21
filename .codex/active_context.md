@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.367 remove playback meta-valid shadow from runtime truth`
+  - `5.368 derive transport playback-meta validity from cached context`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi transport 侧已移除冗余诊断 shadow
+      `last_playback_meta_valid`
+    - transport playback-meta 的 `valid=` 现在直接由 cached meta context
+      推导：
+      - `last_response_id`
+      - `last_playback_id`
+      - `last_segment_id`
+    - `last_playback_is_last_segment` 继续只表示最近一条 meta 的 event-local
+      fact，不再兼任 validity 总开关
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 已移除残留的
       `xiaozhi_playback_meta_valid` shadow

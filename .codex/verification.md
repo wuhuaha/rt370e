@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.368
+Validate that XiaoZhi transport diagnostics no longer cache a separate
+`last_playback_meta_valid` shadow and instead derive playback-meta validity
+from the cached response/playback/segment context:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'last_playback_meta_valid|last_playback_is_last_segment|last_response_id|last_playback_id|last_segment_id' \
+  components/river_cloud/river_xiaozhi_ws.c
+sed -n '688,705p' components/river_cloud/river_xiaozhi_ws.c
+sed -n '3134,3145p' components/river_cloud/river_xiaozhi_ws.c
+sed -n '4854,4864p' components/river_cloud/river_xiaozhi_ws.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `rg -n 'last_playback_meta_valid' ...` returns only the helper name or no
+  struct field / cached bool state
+- transport playback-meta `valid=` is now derived directly from cached meta
+  context instead of a separate shadow flag
+
 ## Step 5.367
 Validate that the playback runtime no longer keeps a coarse
 `xiaozhi_playback_meta_valid` shadow, and that current-meta validity now comes
