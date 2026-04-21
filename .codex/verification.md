@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.349
+Validate that pending-stop terminal close now owns detached residual queue
+instead of letting downlink revive non-active backends:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'drop_detached_pending_stop_audio|tts_stop_pending &&|pending stop drops detached queued audio' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1235,1265p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2195,2212p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2596,2628p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- detached residual audio under `tts_stop_pending` is explicitly dropped by
+  playback runtime before completed terminal handling
+- downlink worker does not fresh-start non-`owned_active` backend while
+  `tts_stop_pending` is true
+
 ## Step 5.348
 Validate that XiaoZhi playback runtime no longer treats `playing/draining`
 phase alone as proof of audible output:

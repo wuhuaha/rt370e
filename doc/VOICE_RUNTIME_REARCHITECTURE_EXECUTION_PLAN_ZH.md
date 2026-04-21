@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.349`
+  - XiaoZhi playback runtime 已把 `tts_stop_pending` 之后的 detached residual
+    queue 明确收口给 runtime 自己处理
+  - pending-stop terminal close 现在会：
+    - 主动丢弃 detached backend 上残留的 queued audio
+    - 阻止 downlink worker 在 stop_pending 期间 fresh-start 非
+      `owned_active` backend
+  - 这继续把 terminal-stop 的解释权从 worker 循环里的偶然 restart 行为，
+    收口到 playback runtime 自己的 terminal truth
 - `Step 5.348`
   - XiaoZhi playback runtime 的 `playback_output_active` 已不再只凭
     `playing/draining` phase 就投影成“仍有真实有声输出”

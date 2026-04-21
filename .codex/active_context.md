@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.348 tighten XiaoZhi playback audible-output truth`
+  - `5.349 let playback runtime own detached pending-stop residual queue`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `tts_stop_pending` 建立后，detached backend 上残留的 downlink 队列
+      不再由 worker 间接复活
+    - playback runtime 现在会主动丢弃这部分 detached residual audio，并继续走
+      terminal completed 收口
+    - downlink worker 也不再在 stop_pending 期间 fresh-start 非
+      `owned_active` backend
   - newest landed runtime-ownership slice:
     - XiaoZhi playback 的 `playback_output_active` 不再只由
       `playing/draining` phase 直接投影

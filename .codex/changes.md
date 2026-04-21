@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.349
+- XiaoZhi playback runtime 现在把 `tts_stop_pending` 之后的 detached backend
+  残留音频明确收口给 runtime 自己处理：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_check_pending_stop()` 在 backend 已 detached/foreign/restart-pending
+  时，不再因为队列里还有残留帧就继续挂起；现在会主动丢弃 detached residual
+  queue，再进入 completed terminal 收口
+- downlink worker 在 `tts_stop_pending` 期间也不再 fresh-start 非
+  `owned_active` backend，避免 terminal-stop 与 residual queue 互相复活
+
 ## Step 5.348
 - XiaoZhi playback runtime 现在不再让 `playing/draining` phase 单独伪装成
   “真实有声输出”：
