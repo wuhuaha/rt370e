@@ -393,6 +393,20 @@ static bool river_dialog_runtime_terminal_wait_suppresses_speaking_locked(void)
     }
 }
 
+static bool river_dialog_runtime_playback_lane_retains_output_turn_locked(void)
+{
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+
+    if (!snapshot->playback_lane_engaged) {
+        return false;
+    }
+    if (!river_dialog_runtime_playback_phase_known_locked()) {
+        return true;
+    }
+
+    return snapshot->playback_phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
+}
+
 static bool river_dialog_runtime_output_speaking_effective_locked(void)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
@@ -414,6 +428,11 @@ static bool river_dialog_runtime_output_speaking_effective_locked(void)
         !snapshot->playback_recovering) {
         return false;
     }
+    if (!snapshot->playback_active &&
+        !snapshot->playback_recovering &&
+        !river_dialog_runtime_playback_lane_retains_output_turn_locked()) {
+        return false;
+    }
 
     return true;
 }
@@ -427,7 +446,7 @@ static bool river_dialog_runtime_output_turn_engaged_locked(void)
     }
 
     return snapshot->playback_active ||
-           snapshot->playback_lane_engaged ||
+           river_dialog_runtime_playback_lane_retains_output_turn_locked() ||
            river_dialog_runtime_output_speaking_effective_locked();
 }
 

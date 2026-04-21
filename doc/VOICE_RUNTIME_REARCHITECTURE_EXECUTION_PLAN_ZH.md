@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.338`
+  - `dialog_runtime` 的 output-turn 派生已继续从粗粒度
+    `playback_lane_engaged` 收紧到“有媒体 backing 的 lane truth”
+  - phase 已知时，当前只让 `rebuffering` 继续保留 output-turn ownership；
+    `prefetching` / `waiting_segment` 不再仅因 lane occupied 就自动投影成
+    `speaking`
+  - 这继续减少了 dialog/core 对“lane 仍占用但实际上还没出声”状态的误判，
+    让 `speaking` / `barge_in_listening` 更接近真实媒体输出
 - `Step 5.337`
   - `dialog_runtime` 的本地 playback listener 入口已从双阶段收口成单次
     reducer

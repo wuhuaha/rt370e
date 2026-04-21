@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.337 reduce dialog playback ingress in one reducer`
+  - `5.338 tighten output-turn truth to media-backed playback`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 的 output turn 不再因
+      `playback_lane_engaged=yes` 就自动视为还在“说话”
+    - phase 已知时，当前只让：
+      - `playback_active`
+      - `playback_recovering`
+      - `rebuffering`
+      继续保留 output-turn ownership
+    - `prefetching` / `waiting_segment` 这类无媒体 backing 的 lane 占用不再
+      直接投影成 `speaking` / `barge_in_listening`
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 的本地 playback 入口不再分成：
       - 一次只更新 `local_playback_stream_owned`

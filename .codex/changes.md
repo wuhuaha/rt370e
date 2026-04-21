@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.338
+- `dialog_runtime` 的 output-turn 派生继续从粗粒度 `playback_lane_engaged`
+  收紧到“有媒体支撑的 lane truth”：
+  - `prefetching`
+  - `waiting_segment`
+  不再仅因 lane 被占就自动把 output turn 视为 engaged
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 `playback_lane_retains_output_turn_locked()`：
+  - 当 playback phase 已知时，当前只让 `rebuffering` 继续保留 output-turn
+    ownership
+  - phase unknown 时仍保留旧的退化兜底
+- `output_speaking_effective_locked()` 现在也要求 output lane 至少有一条“媒体
+  backing”：
+  - `playback_active`
+  - `playback_recovering`
+  - 或 `rebuffering` lane retention
+- 这一步继续把 `dialog runtime` 的 `speaking` / `barge_in_listening` 从
+  “lane 还没清空”推进到“确实还处于有声播放或受控恢复中”的 typed truth
+
 ## Step 5.337
 - `dialog_runtime` 的本地 playback listener 入口已从“两段式”收口成单次 reducer：
   - 同一个 reducer 里连续完成：

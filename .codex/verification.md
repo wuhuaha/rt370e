@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.338
+Validate that dialog runtime no longer treats `prefetching` or
+`waiting_segment` lane occupancy as automatic speaking/output-turn truth:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_lane_retains_output_turn_locked|output_speaking_effective_locked|output_turn_engaged_locked' \
+  components/river_core/river_dialog_runtime.c
+sed -n '384,446p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `output_turn_engaged_locked()` no longer directly returns `playback_lane_engaged`
+- `output_speaking_effective_locked()` now requires media-backed playback truth
+  instead of treating any occupied lane as speaking
+- phase-known `prefetching` / `waiting_segment` no longer automatically project
+  to `speaking` or `barge_in_listening`
+
 ## Step 5.337
 Validate that dialog runtime now reduces local playback ingress in one pass,
 instead of split ownership-mark and later state-merge passes:
