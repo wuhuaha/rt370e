@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.351`
+  - XiaoZhi playback runtime 现在会把 `prefetching` 也视为 quiet window
+  - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再把
+    prefetch-only lane occupancy 继续投影成 generic playback hold
+  - 这继续把“尚未真正出声、只是 runtime 正在预取”的阶段，从
+    `playback_lane_engaged` 粗粒度语义里拆出来，避免 pre-start 窗口继续错误
+    阻断 capture/VAD
 - `Step 5.350`
   - XiaoZhi playback runtime 现在会把 `tts_stop_pending` 且本地已无真实输出的
     terminal tail wait 视为 quiet window

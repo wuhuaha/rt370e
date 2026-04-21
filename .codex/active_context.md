@@ -15,11 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.350 let playback runtime expose pending-stop quiet windows to capture/VAD`
+  - `5.351 let playback runtime expose prefetch quiet windows to capture/VAD`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 现在会把 `prefetching` 也视为 quiet window
+    - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再把
+      prefetch-only lane occupancy 当成 generic playback hold
+    - 这继续把 pre-start 窗口从粗粒度 `lane_engaged` 语义里拆出来，避免尚未
+      出声就继续卡住 capture/VAD
   - newest landed runtime-ownership slice:
     - `tts_stop_pending` 后只要本地已无真实有声输出，playback runtime 现在就会把
       该窗口视为 quiet window

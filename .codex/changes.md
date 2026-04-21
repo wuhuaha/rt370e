@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.351
+- XiaoZhi playback runtime 现在会把 `prefetching` 也视为可重新打开
+  VAD/capture 的 quiet window：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_quiet_window_allows_vad_open()` 不再只给：
+  - `waiting_segment`
+  - `tts_stop_pending && !playback_output_active`
+  开白名单；现在 `prefetching` 也会直接释放 capture hold
+- 这一步继续把“尚未真正出声、只是 runtime 正在预取”的阶段，从粗粒度
+  `playback_lane_engaged` 里拆出来，避免 pre-start 窗口继续伪装成播放阻断
+
 ## Step 5.350
 - XiaoZhi playback runtime 现在把 `tts_stop_pending` 后无真实输出的静默 tail-wait
   视为可重新打开 VAD/capture 的 quiet window：

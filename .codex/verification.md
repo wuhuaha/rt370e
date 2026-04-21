@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.351
+Validate that playback prefetch is now treated as a quiet window instead of a
+generic capture-held playback phase:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_quiet_window_allows_vad_open|RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING|capture_held_by_playback|playback_allows_vad_open' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '331,372p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback quiet-window helper now covers:
+  - `prefetching`
+  - `waiting_segment`
+  - `tts_stop_pending && !playback_output_active`
+- capture/VAD gate no longer treats prefetch-only lane occupancy as a reason to
+  keep capture held
+
 ## Step 5.350
 Validate that pending-stop silent tail-wait now reuses the playback quiet-window
 truth and no longer keeps capture held after audible output is gone:

@@ -330,8 +330,10 @@ static void river_cloud_xiaozhi_clear_followup_reopen_state(void)
 
 static bool river_cloud_xiaozhi_playback_quiet_window_allows_vad_open(void)
 {
-    if (river_cloud_xiaozhi_playback_phase() ==
-        RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
+    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+
+    if (phase == RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
+        phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
         return true;
     }
 
