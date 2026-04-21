@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.359
+- XiaoZhi playback ACK / terminal 路径开始把 response-level 与 segment-level
+  上下文显式拆开：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `playback_response_context_valid()`
+  - `playback_segment_context_valid()`
+- `started/mark` ACK 现在直接消费当前 segment 自带的
+  `response_id/playback_id/segment_id`，不再被全局 `meta_valid` 一起卡住
+- `cleared/completed` terminal ACK 现在只要求 response-level 上下文存在：
+  - `response_id`
+  - `playback_id`
+  不再错误依赖当前 `segment_id` 仍然挂在全局 meta 上
+- `update_playback_ack_progress()` 与 `playback_finalize_cleared()` 也不再被
+  `meta_valid` 这个 coarse 布尔位提前短路
+- 这一步继续把 playback runtime 从“单个 `meta_valid` 阴影布尔位”收口到更细的
+  typed ACK 上下文真相
+
 ## Step 5.358
 - XiaoZhi playback runtime 现在把 `write_failed` 与 `upstream_starved` 两类
   rebuffer 原因分开选择恢复路径：

@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.359`
+  - playback ACK / terminal 路径已开始把 response-level 与 segment-level
+    上下文拆开
+  - `started/mark` ACK 现在直接消费当前 segment 上下文
+  - `cleared/completed` terminal ACK 现在只要求 response-level 上下文，不再
+    继续被全局 `segment_id/meta_valid` 绑死
+  - 这一步继续把 playback runtime 的 ACK 真相从单个 shadow bool 收口到更细的
+    typed context
 - `Step 5.358`
   - `write_failed` 与 `upstream_starved` 两类 rebuffer 原因已开始走不同恢复策略
   - 本地 `WRITE_FAILED` 现在优先 attached `service_recover`

@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.359
+Validate that playback ACK and terminal-close paths now distinguish
+segment-level context from response-level context instead of sharing the coarse
+`meta_valid` gate:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_response_context_valid|playback_segment_context_valid|try_queue_playback_started_ack|try_queue_playback_completed_ack|playback_finalize_cleared' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '275,297p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1988,2268p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `started/mark` ACK now gate on current segment context, not the coarse global
+  `meta_valid`
+- `cleared/completed` terminal ACK now gate on response-level context and
+  terminal state, not on whether a current `segment_id` still exists globally
+- `playback_finalize_cleared()` and ACK progress no longer get prematurely
+  skipped merely because `meta_valid` fell false
+
 ## Step 5.358
 Validate that local playback write failures now prefer attached service recover,
 while upstream-starved rebuffer still prefers stop/fresh-start semantics:

@@ -15,11 +15,17 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.358 split local write-fail recover from upstream-starved stop path`
+  - `5.359 split response-level and segment-level playback ACK truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback ACK / terminal 路径已开始拆分：
+      - response-level context
+      - segment-level context
+    - `started/mark` 不再被全局 `meta_valid` 粗短路
+    - `cleared/completed` 也不再错误依赖当前 `segment_id` 仍然挂在全局 meta 上
   - newest landed runtime-ownership slice:
     - `write_failed` rebuffer 不再默认走同一套 `stop_rebuffer`
     - 本地写链路失败现在优先 attached `service_recover`
