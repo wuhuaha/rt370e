@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.373 skip early starved rebuffer in waiting-next-segment window`
+  - `5.374 shift segment-gap into attached hold/resume path`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `segment_gap_pause` 现在优先走 attached `flush` hold，失败才回退到
+      detached stop
+    - downlink worker 现在会在 backend=`owned_paused` 且 refill 达标时显式
+      resume playback runtime
+    - transport reset / session start 也会先 stop 已 attach 的 owned backend，
+      避免 segment-gap attached pause 遗留悬挂 backend
   - newest landed runtime-ownership slice:
     - `maybe_rebuffer_starved()` 不再在 `waiting_next_segment` 窗口里提前触发
       upstream-starved rebuffer

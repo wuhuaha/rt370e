@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.374
+- `segment_gap_pause` 现在优先走 attached flush-hold，而不是默认 detached stop：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)`
+  - `river_cloud_xiaozhi_maybe_resume_paused_playback(...)`
+- 当前进入 `waiting_next_segment` 且 queue 见底时：
+  - 先尝试 `flush_stream_ex("xiaozhi_segment_gap_pause")`
+  - flush 失败才回退到 detached stop
+- downlink worker 现在会在：
+  - backend=`owned_paused`
+  - refill `>= start_frames`
+  时显式 resume 本地 playback runtime，而不是一直空等
+- transport reset / session start 也会先 stop 已 attach 的 owned backend，
+  避免 segment-gap attached pause 在 reset 边界遗留悬挂 backend
+- 这一步开始把 segment-gap 从 detached stop/start 模型推进到 attached
+  hold/resume 模型，继续削减段间晚到导致的 backend restart 抖动
+
 ## Step 5.373
 - `maybe_rebuffer_starved()` 不再在 `WAITING_NEXT_SEGMENT` 窗口里提前触发
   starved rebuffer：

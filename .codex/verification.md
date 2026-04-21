@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.374
+Validate that segment-gap handling now prefers attached flush-hold and that the
+downlink worker can resume an `owned_paused` backend once refill reaches the
+current start threshold:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'hold_playback_for_segment_gap|paused backend resumed|segment gap hold|owned_paused|transport_reset|session_start' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1440,1608p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1790,1855p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2890,2955p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- segment-gap handling now prefers `flush_stream_ex(...)` before falling back to
+  detached stop
+- downlink worker can now resume `owned_paused` once queued frames refill above
+  the start threshold
+- transport/session reset paths stop any still-attached owned backend before
+  clearing local playback runtime state
+
 ## Step 5.373
 Validate that `maybe_rebuffer_starved()` no longer upgrades the
 `WAITING_NEXT_SEGMENT` window into an early upstream-starved rebuffer:
