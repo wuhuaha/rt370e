@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.353`
+  - server `output_state=speaking` 不再在 `prefetching/idle` 阶段直接投影成
+    cloud duplex 的 speaking output
+  - `output_speaking_active()` 现在只会在 runtime phase 仍保留 output turn 时，
+    才接受 transport-side speaking state
+  - 这继续把 cloud duplex 的 speaking truth 从 transport-side 字符串收口到
+    playback runtime 自己的 phase/media truth，减少首段预取窗口里
+    soft-endpoint / uplink continuation 抢跑
 - `Step 5.352`
   - `tts_start` 不再只凭 raw duplex/AEC fallback 就立即关闭本地 round
   - `apply_tts_start_round_policy()` 现在会先看 playback runtime 当前是否真的

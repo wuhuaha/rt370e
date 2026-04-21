@@ -50,6 +50,15 @@ static bool river_cloud_xiaozhi_playback_phase_is_output_active(
            phase == RIVER_CLOUD_PLAYBACK_PHASE_DRAINING;
 }
 
+static bool river_cloud_xiaozhi_playback_phase_retains_output_turn(
+    river_cloud_playback_phase_t phase)
+{
+    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PLAYING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_DRAINING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
+           phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+}
+
 static void river_cloud_xiaozhi_capture_playback_service_view(
     river_cloud_xiaozhi_playback_service_view_t *view)
 {
@@ -472,8 +481,17 @@ static void river_cloud_xiaozhi_apply_playback_started_round_policy(void)
 
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
-    return river_cloud_xiaozhi_playback_output_active() ||
-           (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") == 0);
+    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+
+    if (river_cloud_xiaozhi_playback_output_active()) {
+        return true;
+    }
+
+    if (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") != 0) {
+        return false;
+    }
+
+    return river_cloud_xiaozhi_playback_phase_retains_output_turn(phase);
 }
 
 bool river_cloud_xiaozhi_duplex_soft_endpoint_enabled(void)

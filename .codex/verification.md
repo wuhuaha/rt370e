@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.353
+Validate that server `output_state=speaking` no longer makes prefetch/idle
+pretend to be an active speaking-output window:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_phase_retains_output_turn|output_speaking_active|RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT|RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '36,58p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '482,500p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `output_speaking_active()` 只会在 runtime phase 仍保留 output-turn 时，才接受
+  server `output_state=speaking`
+- `prefetching` / `idle` 不再单凭 transport-side speaking state 抢跑
+  soft-endpoint / uplink continuation
+
 ## Step 5.352
 Validate that `tts_start` no longer closes the local round before playback
 actually holds capture, and that the fallback is deferred to playback start:

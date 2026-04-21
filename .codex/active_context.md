@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.352 defer half-duplex round close until playback truly holds capture`
+  - `5.353 keep transport speaking state from racing ahead of runtime playback truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - server `output_state=speaking` 不再在 `prefetching/idle` 阶段直接投影成
+      cloud duplex 的 speaking output
+    - `output_speaking_active()` 现在只会在 runtime phase 仍保留 output turn 时，
+      才接受 transport-side speaking state
+    - 这继续减少了首段预取窗口里 soft-endpoint / uplink continuation 被
+      transport 语义抢跑的问题
   - newest landed runtime-ownership slice:
     - `tts_start` 不再只凭预判的 duplex/AEC fallback 就立即关闭本地 round
     - 现在只有当 playback runtime 当前确实 `capture_held=yes` 时，才会执行

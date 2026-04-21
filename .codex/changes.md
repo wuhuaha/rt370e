@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.353
+- XiaoZhi cloud duplex/soft-endpoint 不再把 server `output_state=speaking`
+  在 `prefetching/idle` 阶段直接投影成“已进入 speaking output”：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `playback_phase_retains_output_turn()`，只让这些 phase 继续保留
+  `output_state=speaking` 的 output-turn 语义：
+  - `playing`
+  - `draining`
+  - `rebuffering`
+  - `waiting_segment`
+- `output_speaking_active()` 现在不再让首段 `prefetch` / 无媒体 `idle` 窗口
+  抢跑 soft-endpoint / uplink continuation
+- 这一步继续把 cloud duplex 的 speaking truth 从 transport-side
+  `output_state` 字符串，收口到 playback runtime 自己的 phase/media truth
+
 ## Step 5.352
 - XiaoZhi playback runtime 不再在 `tts_start` 时，仅凭预判的 duplex/AEC
   fallback 就立即关闭本地 round：
