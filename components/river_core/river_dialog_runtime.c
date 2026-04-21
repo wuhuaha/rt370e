@@ -748,11 +748,14 @@ void river_dialog_runtime_note_tts_interrupt_requested(const char *reason)
     river_dialog_runtime_unlock();
 }
 
-static void river_dialog_runtime_note_playback_state(river_playback_state_t state,
-                                                     const char *reason)
+static void river_dialog_runtime_reduce_local_playback_event(
+    river_playback_state_t state,
+    const river_playback_stream_config_t *config,
+    const char *reason)
 {
     river_cloud_runtime_snapshot_t cloud_snapshot;
     bool have_cloud_snapshot = river_dialog_runtime_capture_cloud_snapshot(&cloud_snapshot);
+    bool should_absorb = false;
     bool prev_playback_active;
     bool prev_playback_recovering;
     bool prev_error_recovering;
@@ -762,6 +765,25 @@ static void river_dialog_runtime_note_playback_state(river_playback_state_t stat
     const char *effective_reason = reason;
 
     if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    if (river_dialog_runtime_is_dialog_playback_stream_locked(config)) {
+        g_river_dialog_runtime.local_playback_stream_owned = true;
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.local_playback_stream_name,
+                                       sizeof(g_river_dialog_runtime.local_playback_stream_name),
+                                       config->stream_name);
+        should_absorb = true;
+    } else if (river_dialog_runtime_matches_owned_playback_stream_locked(config)) {
+        should_absorb = true;
+    }
+
+    if (state == RIVER_PLAYBACK_IDLE) {
+        g_river_dialog_runtime.local_playback_stream_owned = false;
+        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
+    }
+    if (!should_absorb) {
+        river_dialog_runtime_unlock();
         return;
     }
 
@@ -813,34 +835,9 @@ void river_dialog_runtime_on_playback_state(river_playback_state_t state,
                                             const river_playback_stream_config_t *config,
                                             void *user_data)
 {
-    bool should_absorb = false;
     const char *reason;
 
     (void)user_data;
-
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    if (river_dialog_runtime_is_dialog_playback_stream_locked(config)) {
-        g_river_dialog_runtime.local_playback_stream_owned = true;
-        river_dialog_runtime_copy_text(g_river_dialog_runtime.local_playback_stream_name,
-                                       sizeof(g_river_dialog_runtime.local_playback_stream_name),
-                                       config->stream_name);
-        should_absorb = true;
-    } else if (river_dialog_runtime_matches_owned_playback_stream_locked(config)) {
-        should_absorb = true;
-    }
-
-    if (state == RIVER_PLAYBACK_IDLE) {
-        g_river_dialog_runtime.local_playback_stream_owned = false;
-        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
-    }
-    river_dialog_runtime_unlock();
-
-    if (!should_absorb) {
-        return;
-    }
 
     reason = "playback_state";
     if (state == RIVER_PLAYBACK_RECOVERING ||
@@ -850,7 +847,7 @@ void river_dialog_runtime_on_playback_state(river_playback_state_t state,
         reason = "playback_error";
     }
 
-    river_dialog_runtime_note_playback_state(state, reason);
+    river_dialog_runtime_reduce_local_playback_event(state, config, reason);
 }
 
 void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_data)

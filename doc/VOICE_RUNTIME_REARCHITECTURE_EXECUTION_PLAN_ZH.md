@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.337`
+  - `dialog_runtime` 的本地 playback listener 入口已从双阶段收口成单次
+    reducer
+  - 同一次 reducer 内会连续完成：
+    - dialog playback ownership 识别
+    - cloud runtime snapshot merge
+    - local playback shadow 更新
+    - aggregate playback / interaction 派生
+  - 这继续消除了“先写局部 ownership，再等后续 cloud snapshot / publish
+    修正”的入口竞态，让 `dialog runtime` 更接近真正单点 reducer 真相源
 - `Step 5.336`
   - XiaoZhi playback 的 `prefetch_segment` 起播门限现在不再只依赖
     历史 `meta_gap`

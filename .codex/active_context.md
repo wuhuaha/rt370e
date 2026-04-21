@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.336 predictive segment prefetch from current meta`
+  - `5.337 reduce dialog playback ingress in one reducer`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 的本地 playback 入口不再分成：
+      - 一次只更新 `local_playback_stream_owned`
+      - 再单独一次吸收 cloud snapshot + local playback state
+    - 本地 playback listener 现在在同一 reducer 内完成：
+      - ownership 识别
+      - cloud snapshot merge
+      - local playback shadow 更新
+      - aggregate interaction 派生
+    - 这继续减少了 `dialog runtime` 里“局部状态先抢跑，再等后续
+      cloud sync 修正”的窗口
   - newest landed runtime-ownership slice:
     - `prefetch_segment` 起播门限现在不再只依赖历史 `meta_gap`
     - 当当前 `audio.out.meta` 已有效、当前段不是最后一段、且预测

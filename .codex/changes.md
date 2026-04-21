@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.337
+- `dialog_runtime` 的本地 playback listener 入口已从“两段式”收口成单次 reducer：
+  - 同一个 reducer 里连续完成：
+    - dialog playback ownership 识别
+    - cloud runtime snapshot 合并
+    - local playback shadow 更新
+    - aggregate playback / interaction 派生
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 这消除了原先 `on_playback_state(...)` 的双锁 / 双阶段路径：
+  - 先改 `local_playback_stream_owned`
+  - 再另起一次 `note_playback_state(...)`
+  之间的局部抢跑窗口
+- 这一步继续把 `dialog runtime` 推向真正 reducer-only 的真相源：
+  - 本地 playback ingress 不再先写局部事实、再等后续 sync 覆盖
+  - ownership / cloud fact / local fallback 现在在同一轮派生里完成合并
+
 ## Step 5.336
 - XiaoZhi playback 的 `prefetch_segment` 起播门限现在不再只依赖
   “历史 `meta_gap` 已经偏大”：

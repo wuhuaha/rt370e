@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.337
+Validate that dialog runtime now reduces local playback ingress in one pass,
+instead of split ownership-mark and later state-merge passes:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'reduce_local_playback_event|local_playback_stream_owned|matches_owned|capture_cloud_snapshot' \
+  components/river_core/river_dialog_runtime.c
+sed -n '748,852p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_on_playback_state(...)` no longer performs:
+  - one lock/unlock pass only to mark local ownership
+  - followed by a second playback-state merge call
+- `river_dialog_runtime_reduce_local_playback_event(...)` performs ownership
+  recognition, cloud snapshot merge, local playback shadow update, and aggregate
+  publish in the same reducer path
+
 ## Step 5.336
 Validate that XiaoZhi playback can now enter `prefetch_segment` from current
 segment facts alone, without requiring a previously observed large `meta_gap`:
