@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.335`
+  - XiaoZhi downlink/playback 现在把残留的 `write_failed -> recover` 常态路径也
+    收口到了统一 `stop/rebuffer`
+  - downlink worker 在任意 `write_failed` 下都会先执行：
+    - `stop_stream_ex(...)`
+    - runtime-owned `rebuffer_pause`
+  - 只有 stop 自身失败时，才会打印：
+    - `xiaozhi playback stop rebuffer fallback to recover`
+    并回退到 `river_playback_service_recover_stream_ex(...)`
+  - 这一步继续把 playback backend 真相收回到 runtime 自己手里，让
+    `RECOVERING` 进一步退成硬 stop 失败时的兜底语义
 - `Step 5.334`
   - `dialog_runtime` 内部 local playback shadow 已进一步从三份缓存收成单一
     private `playback_state`

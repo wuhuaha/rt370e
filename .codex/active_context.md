@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.334 collapse local playback shadow to one private state`
+  - `5.335 unify write_failed onto stop/rebuffer`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink `write_failed` 现在统一先走：
+      - `stop_stream_ex(...)`
+      - runtime-owned `rebuffer_pause`
+    - 不再按 `recover_cause` 把普通 `write_failed` 默认分流回
+      playback-service `recover`
+    - `recover_stream_ex(...)` 现只保留为 stop 失败时的兜底语义
+    - 这一步继续把 playback backend 的恢复入口收口到单一 `stop/rebuffer`
+      真相链
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 内部 local playback shadow 已从：
       - `playback_state`

@@ -2584,7 +2584,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                 river_cloud_xiaozhi_downlink_starved_low_water_frames();
             river_status_t recover_status;
             const char *recover_reason = "xiaozhi_playback_write_failed";
-            const char *recover_path = "recover";
+            const char *recover_path = "stop_rebuffer";
 
             now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
             if (river_cloud_xiaozhi_write_failed_prefers_starved_rebuffer(queued_frames,
@@ -2592,7 +2592,6 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                                                           &supply_gap_ms)) {
                 recover_cause = RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED;
                 recover_reason = "xiaozhi_playback_starved_write";
-                recover_path = "stop_rebuffer";
             }
             river_cloud_xiaozhi_note_playback_rebuffer(
                 now_ms,
@@ -2622,17 +2621,12 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_count,
                        (unsigned long)g_river_cloud.xiaozhi_playback_rebuffer_streak,
                        recover_path);
-            if (recover_cause == RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED) {
-                recover_status =
-                    river_cloud_xiaozhi_stop_playback_for_rebuffer(recover_reason);
-                if (recover_status != RIVER_OK) {
-                    RIVER_LOGW("xiaozhi playback stop rebuffer fallback to recover: cause=%s status=%d",
-                               river_cloud_playback_rebuffer_cause_name(recover_cause),
-                               (int)recover_status);
-                    recover_status =
-                        river_playback_service_recover_stream_ex(recover_reason);
-                }
-            } else {
+            recover_status =
+                river_cloud_xiaozhi_stop_playback_for_rebuffer(recover_reason);
+            if (recover_status != RIVER_OK) {
+                RIVER_LOGW("xiaozhi playback stop rebuffer fallback to recover: cause=%s status=%d",
+                           river_cloud_playback_rebuffer_cause_name(recover_cause),
+                           (int)recover_status);
                 recover_status = river_playback_service_recover_stream_ex(recover_reason);
             }
             if (recover_status != RIVER_OK) {

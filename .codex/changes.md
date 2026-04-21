@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.335
+- XiaoZhi downlink/playback 现在把残留的 `write_failed -> recover` 常态路径也收口
+  到统一的 `stop/rebuffer`：
+  - `write_failed` 不再区分：
+    - `upstream_starved -> stop/rebuffer`
+    - `write_failed -> recover`
+  - 而是统一先执行：
+    - `river_cloud_xiaozhi_stop_playback_for_rebuffer(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `recover` 现在只保留为 stop 失败时的 backend 兜底，而不再是 write-fail 的默认
+  恢复通道：
+  - `recovery=stop_rebuffer` 成为所有 downlink `write_failed` 的主日志语义
+  - 只有 `stop_stream_ex(...)` 自身失败时，才会打印：
+    - `xiaozhi playback stop rebuffer fallback to recover`
+    并回退到 `river_playback_service_recover_stream_ex(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步继续压缩 playback backend 的恢复语义分叉：
+  - runtime 继续把重缓冲真相收口在自己手里
+  - playback-service `RECOVERING` 进一步退成硬 stop 失败时的兜底语义
+  - 更贴近板端日志里反复出现的：
+    - `write failed`
+    - `playback stop`
+    - `rebuffer start/restart`
+    这一条真实故障链
+
 ## Step 5.334
 - `dialog_runtime` 内部的 local playback shadow 已进一步从三份缓存收成单一
   private state：

@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.335
+Validate that all XiaoZhi downlink `write_failed` branches now prefer the same
+`stop/rebuffer` path, leaving playback-service `recover` only as a stop-failed
+fallback:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'recovery=stop_rebuffer|stop rebuffer fallback to recover|recover_stream_ex|stop_playback_for_rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2568,2645p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `xiaozhi playback write failed` and `xiaozhi playback rebuffer requested` now
+  report:
+  - `recovery=stop_rebuffer`
+  for both:
+  - plain `write_failed`
+  - `upstream_starved`-reclassified write failures
+- the branch no longer directly chooses `recover_stream_ex(...)` based only on
+  `recover_cause`
+- `river_playback_service_recover_stream_ex(...)` remains only behind:
+  - `xiaozhi playback stop rebuffer fallback to recover`
+
 ## Step 5.334
 Validate that `dialog_runtime` now keeps local playback shadow as a single
 private `playback_state`, deriving active/recovering fallback on demand instead
