@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.339
+- `dialog_runtime` 的 `playback_active` 派生已继续从“lane occupied”收紧到
+  playback runtime 的真实媒体/恢复事实：
+  - phase 已知时，不再因 `playback_lane_engaged=yes` 就把
+    `playback_active` 维持为 `true`
+  - `prefetching` / `waiting_segment` 这种尚未真正出声的阶段不再被 core
+    投影成 active
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `playback_error_is_managed_recovery_locked()` 也同步缩窄：
+  - 不再把 generic `playback_lane_engaged` 当成 managed recovery 的证据
+  - 现在只接受：
+    - `playback_rebuffer_pending`
+    - backend `owned_recovering` / `restart_pending`
+    - `playback_cloud_active`
+- 这一步继续把 `dialog runtime` 的 playback 真相面收回到 runtime owner：
+  - “占着 lane 但还没真正出声”不再伪装成 active / recovering
+  - `playback_error` 也更少被 prefetch/gap 这类非媒体阶段误吸收到 managed
+    recovery
+
 ## Step 5.338
 - `dialog_runtime` 的 output-turn 派生继续从粗粒度 `playback_lane_engaged`
   收紧到“有媒体支撑的 lane truth”：

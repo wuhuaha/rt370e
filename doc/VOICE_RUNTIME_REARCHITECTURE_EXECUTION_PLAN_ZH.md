@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.339`
+  - `dialog_runtime.snapshot.playback_active` 已继续从“lane occupied”收紧到
+    playback runtime 的真实媒体/恢复事实
+  - phase 已知时，`prefetching` / `waiting_segment` 不再因 lane 仍被占用
+    就投影成 core 侧 `playback_active`
+  - `playback_error -> managed recovery` 的吸收条件也同步缩窄，不再把
+    generic lane occupancy 当作证据
+  - 这继续减少了 core 对“媒体还没开始 / 已经进入静默 gap”状态的 active
+    误判
 - `Step 5.338`
   - `dialog_runtime` 的 output-turn 派生已继续从粗粒度
     `playback_lane_engaged` 收紧到“有媒体 backing 的 lane truth”

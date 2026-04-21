@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.339
+Validate that dialog runtime no longer projects phase-known lane occupancy to
+`playback_active`, and no longer treats generic lane occupancy as managed
+recovery:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_error_is_managed_recovery_locked|compute_playback_active_locked|playback_lane_engaged' \
+  components/river_core/river_dialog_runtime.c
+sed -n '300,355p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `compute_playback_active_locked()` no longer elevates phase-known
+  `playback_lane_engaged` to `playback_active`
+- `playback_error_is_managed_recovery_locked()` no longer accepts generic lane
+  occupancy as managed recovery evidence
+- phase-known `prefetching` / `waiting_segment` no longer project to
+  `dialog_runtime.snapshot.playback_active`
+
 ## Step 5.338
 Validate that dialog runtime no longer treats `prefetching` or
 `waiting_segment` lane occupancy as automatic speaking/output-turn truth:

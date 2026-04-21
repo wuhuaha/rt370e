@@ -314,16 +314,13 @@ static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
-           g_river_dialog_runtime.snapshot.playback_cloud_active ||
-           g_river_dialog_runtime.snapshot.playback_lane_engaged;
+           g_river_dialog_runtime.snapshot.playback_cloud_active;
 }
 
 static bool river_dialog_runtime_compute_playback_active_locked(void)
 {
     bool cloud_playback_active = g_river_dialog_runtime.snapshot.playback_cloud_active;
-    bool lane_engaged = g_river_dialog_runtime.snapshot.playback_lane_engaged;
     bool recovering = g_river_dialog_runtime.snapshot.playback_recovering;
-    bool waiting_segment = river_dialog_runtime_playback_waiting_segment_locked();
     bool local_shadow_active =
         river_dialog_runtime_local_playback_shadow_active_fallback_locked();
 
@@ -335,12 +332,7 @@ static bool river_dialog_runtime_compute_playback_active_locked(void)
         return true;
     }
 
-    if (lane_engaged && !waiting_segment) {
-        return true;
-    }
-
-    if (!local_shadow_active && !cloud_playback_active &&
-        (!lane_engaged || waiting_segment) && !recovering &&
+    if (!local_shadow_active && !cloud_playback_active && !recovering &&
         g_river_dialog_runtime.snapshot.playback_terminal_waiting) {
         return false;
     }

@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.338 tighten output-turn truth to media-backed playback`
+  - `5.339 stop projecting phase-known lane occupancy to playback_active`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime.snapshot.playback_active` 在 phase 已知时不再因
+      `playback_lane_engaged=yes` 自动保持为 `true`
+    - `prefetching` / `waiting_segment` 这类无真实媒体输出的阶段不再投影成
+      core 侧 playback-active
+    - `playback_error` 的 managed-recovery 判定也不再把 generic lane
+      occupancy 当成证据
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 的 output turn 不再因
       `playback_lane_engaged=yes` 就自动视为还在“说话”
