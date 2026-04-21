@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.352
+Validate that `tts_start` no longer closes the local round before playback
+actually holds capture, and that the fallback is deferred to playback start:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'tts_start keeps local round open: capture_held=no|playback_started falls back to round close|capture_held_by_playback\\(|playback_started' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '381,470p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1144,1156p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `tts_start` 路径不再只凭 raw duplex fallback 就立即关本地 round
+- `mark_playback_started()` 会触发新的 `playback_started` round policy
+- 只有当 playback runtime 当前确实 `capture_held=yes` 时，server-response
+  close 才会发生
+
 ## Step 5.351
 Validate that playback prefetch is now treated as a quiet window instead of a
 generic capture-held playback phase:

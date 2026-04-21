@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.352`
+  - `tts_start` 不再只凭 raw duplex/AEC fallback 就立即关闭本地 round
+  - `apply_tts_start_round_policy()` 现在会先看 playback runtime 当前是否真的
+    `capture_held`
+  - 新增 `playback_started` round policy，把 half-duplex 关轮延后到 playback
+    真正起播并开始 hold capture 的时刻
+  - 这继续把 half-duplex 关轮从“预判将来会播”收口到“当前已经真实占用媒体/
+    capture”的 runtime 真相，减少首段预取窗口提前断开 uplink
 - `Step 5.351`
   - XiaoZhi playback runtime 现在会把 `prefetching` 也视为 quiet window
   - `playback_allows_vad_open()` 与 `capture_held_by_playback()` 不再把

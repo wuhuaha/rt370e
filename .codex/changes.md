@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.352
+- XiaoZhi playback runtime 不再在 `tts_start` 时，仅凭预判的 duplex/AEC
+  fallback 就立即关闭本地 round：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `apply_tts_start_round_policy()` 现在改为先看
+  `capture_held_by_playback()` 的 runtime 真相：
+  - 如果 playback 还没有真正 hold capture，就只记录
+    `capture_held=no` 并继续保持本地 round 打开
+  - 只有当 playback 当前确实会阻断 capture 时，才执行 server-response
+    close
+- 新增 `playback_started` round policy：
+  - 本地 round 关闭被延后到 playback 真正起播并开始 hold capture 的时刻
+- 这一步继续把 half-duplex 关轮从“预判将来会播”收口到“当前已经真实占用媒体/
+  capture”的 runtime 真相，减少首段预取窗口提前断开 uplink
+
 ## Step 5.351
 - XiaoZhi playback runtime 现在会把 `prefetching` 也视为可重新打开
   VAD/capture 的 quiet window：

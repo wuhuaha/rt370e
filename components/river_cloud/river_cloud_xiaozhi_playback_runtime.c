@@ -382,18 +382,29 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
 {
     river_voice_duplex_ready_eval_t duplex_eval;
     const char *fallback_reason;
+    bool capture_held;
+    river_cloud_playback_phase_t phase;
+    river_cloud_playback_backend_state_t backend_state;
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
-    fallback_reason = river_cloud_xiaozhi_duplex_fallback_reason(&duplex_eval);
+    capture_held = river_cloud_xiaozhi_capture_held_by_playback(&duplex_eval,
+                                                                &fallback_reason);
+    phase = river_cloud_xiaozhi_playback_phase();
+    backend_state = river_cloud_xiaozhi_playback_backend_state();
 
-    if (fallback_reason == NULL) {
-        RIVER_LOGI("xiaozhi tts_start keeps local round open: duplex_default_on=yes duplex_ready=yes reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u stream=%s stop_pending=%s close_pending=%s",
+    if (!capture_held) {
+        RIVER_LOGI("xiaozhi tts_start keeps local round open: capture_held=no fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u phase=%s backend=%s stream=%s stop_pending=%s close_pending=%s",
+                   fallback_reason != NULL ? fallback_reason : "-",
+                   river_xiaozhi_duplex_default_on_allowed() ? "yes" : "no",
+                   duplex_eval.ready ? "yes" : "no",
                    river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                    river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                    river_reference_service_state_name(duplex_eval.reference_state),
                    river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                    (unsigned int)duplex_eval.native_reference_peak,
                    (unsigned int)duplex_eval.native_reference_ratio_q15,
+                   river_cloud_playback_phase_name(phase),
+                   river_cloud_playback_backend_state_name(backend_state),
                    g_river_cloud.stream_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
                    g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no");
@@ -401,7 +412,7 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
     }
 
     river_cloud_xiaozhi_note_semantic_fallback(fallback_reason);
-    RIVER_LOGI("xiaozhi tts_start falls back to round close: fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu",
+    RIVER_LOGI("xiaozhi tts_start falls back to round close: capture_held=yes fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu phase=%s backend=%s",
                fallback_reason,
                river_xiaozhi_duplex_default_on_allowed() ? "yes" : "no",
                duplex_eval.ready ? "yes" : "no",
@@ -413,10 +424,50 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
                (unsigned int)duplex_eval.native_reference_ratio_q15,
                (unsigned long)duplex_eval.reference_queue_frames,
                (unsigned long)duplex_eval.reference_queue_peak_frames,
-               (unsigned long)duplex_eval.reference_last_write_age_ms);
+               (unsigned long)duplex_eval.reference_last_write_age_ms,
+               river_cloud_playback_phase_name(phase),
+               river_cloud_playback_backend_state_name(backend_state));
     river_cloud_xiaozhi_close_local_round_for_cause(
         RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
         "tts_start");
+}
+
+static void river_cloud_xiaozhi_apply_playback_started_round_policy(void)
+{
+    river_voice_duplex_ready_eval_t duplex_eval;
+    const char *fallback_reason;
+
+    if (!g_river_cloud.stream_active && !g_river_cloud.xiaozhi_listen_stop_pending &&
+        !g_river_cloud.xiaozhi_local_close_pending) {
+        return;
+    }
+
+    river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
+    if (!river_cloud_xiaozhi_capture_held_by_playback(&duplex_eval,
+                                                      &fallback_reason)) {
+        return;
+    }
+
+    river_cloud_xiaozhi_note_semantic_fallback(fallback_reason);
+    RIVER_LOGI("xiaozhi playback_started falls back to round close: capture_held=yes fallback=%s duplex_default_on=%s duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u phase=%s backend=%s stream=%s stop_pending=%s close_pending=%s",
+               fallback_reason,
+               river_xiaozhi_duplex_default_on_allowed() ? "yes" : "no",
+               duplex_eval.ready ? "yes" : "no",
+               river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
+               river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
+               river_reference_service_state_name(duplex_eval.reference_state),
+               river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
+               (unsigned int)duplex_eval.native_reference_peak,
+               (unsigned int)duplex_eval.native_reference_ratio_q15,
+               river_cloud_playback_phase_name(river_cloud_xiaozhi_playback_phase()),
+               river_cloud_playback_backend_state_name(
+                   river_cloud_xiaozhi_playback_backend_state()),
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
+               g_river_cloud.xiaozhi_local_close_pending ? "yes" : "no");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
+        "playback_started");
 }
 
 static bool river_cloud_xiaozhi_output_speaking_active(void)
@@ -1151,6 +1202,7 @@ void river_cloud_xiaozhi_mark_playback_started(void)
     river_cloud_xiaozhi_cancel_playback_stop();
     river_cloud_xiaozhi_clear_followup_reopen_state();
     river_cloud_xiaozhi_refresh_playback_phase("playback_started");
+    river_cloud_xiaozhi_apply_playback_started_round_policy();
 }
 
 void river_cloud_xiaozhi_arm_playback_stop(uint32_t drain_ms)
