@@ -319,6 +319,9 @@ typedef struct {
     char xiaozhi_playback_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char xiaozhi_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
+    char xiaozhi_playback_wait_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
+    char xiaozhi_playback_wait_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
+    char xiaozhi_playback_wait_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
     char xiaozhi_playback_last_segment_response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char xiaozhi_playback_last_segment_playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char xiaozhi_playback_last_segment_segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];

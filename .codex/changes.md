@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.362
+- XiaoZhi playback runtime 已把 `WAITING_SEGMENT` 的判定从 coarse global
+  meta shadow 中拆开，改成独立保存“待续段上下文”：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增 runtime-owned waiting-segment context：
+  - `xiaozhi_playback_wait_response_id`
+  - `xiaozhi_playback_wait_playback_id`
+  - `xiaozhi_playback_wait_segment_id`
+  - `playback_wait_context_valid()`
+  - `store_playback_wait_context()`
+  - `clear_playback_wait_context()`
+- `playback_waiting_next_segment()` 现在只认：
+  - 已存在有效待续段上下文
+  - 当前 segment queue 已空
+  不再继续从：
+  - `xiaozhi_playback_meta_valid`
+  - `xiaozhi_playback_last_segment`
+  这组 global shadow 重建 waiting 语义
+- `playback_note_meta()` 现在会：
+  - 在 non-terminal meta 上保存待续段上下文
+  - 在 terminal meta 或无效 meta 上清掉待续段上下文
+- 这一步继续把 playback phase/wait 的语义从“最近 meta 阴影”收口到
+  runtime-owned typed waiting truth
+
 ## Step 5.361
 - XiaoZhi playback start-gate 的 predictive segment-prefetch 判定已开始直接
   消费 queue 头段/当前待播 segment 真相：

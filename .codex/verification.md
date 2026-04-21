@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.362
+Validate that `WAITING_SEGMENT` now follows a dedicated waiting-segment context
+instead of reconstructing the wait condition from coarse global meta shadow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_wait_context_valid|store_playback_wait_context|clear_playback_wait_context|playback_wait_(response|playback|segment)_id|playback_waiting_next_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_internal.h
+sed -n '145,175p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '303,333p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1952,1964p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now stores a dedicated waiting-segment context instead of
+  inferring the wait from `meta_valid + !last_segment`
+- non-terminal meta stores waiting context, while terminal/invalid meta clears
+  it
+- `playback_waiting_next_segment()` now only depends on:
+  - waiting context validity
+  - empty segment queue
+
 ## Step 5.361
 Validate that predictive segment-prefetch now follows the queue-head/current
 segment truth instead of rebuilding "current segment" from coarse global meta

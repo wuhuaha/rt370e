@@ -142,10 +142,16 @@ bool river_cloud_xiaozhi_playback_rebuffer_pending(void)
     return g_river_cloud.xiaozhi_playback_rebuffer_pending;
 }
 
+static bool river_cloud_xiaozhi_playback_wait_context_valid(void)
+{
+    return g_river_cloud.xiaozhi_playback_wait_response_id[0] != '\0' &&
+           g_river_cloud.xiaozhi_playback_wait_playback_id[0] != '\0' &&
+           g_river_cloud.xiaozhi_playback_wait_segment_id[0] != '\0';
+}
+
 static bool river_cloud_xiaozhi_playback_waiting_next_segment(void)
 {
-    return g_river_cloud.xiaozhi_playback_meta_valid &&
-           !g_river_cloud.xiaozhi_playback_last_segment &&
+    return river_cloud_xiaozhi_playback_wait_context_valid() &&
            g_river_cloud.xiaozhi_playback_segment_count == 0U;
 }
 
@@ -292,6 +298,29 @@ static bool river_cloud_xiaozhi_playback_segment_context_valid(void)
 {
     return river_cloud_xiaozhi_playback_response_context_valid() &&
            g_river_cloud.xiaozhi_playback_segment_id[0] != '\0';
+}
+
+static void river_cloud_xiaozhi_clear_playback_wait_context(void)
+{
+    g_river_cloud.xiaozhi_playback_wait_response_id[0] = '\0';
+    g_river_cloud.xiaozhi_playback_wait_playback_id[0] = '\0';
+    g_river_cloud.xiaozhi_playback_wait_segment_id[0] = '\0';
+}
+
+static void river_cloud_xiaozhi_store_playback_wait_context(void)
+{
+    river_cloud_xiaozhi_copy_optional_text(
+        g_river_cloud.xiaozhi_playback_wait_response_id,
+        sizeof(g_river_cloud.xiaozhi_playback_wait_response_id),
+        g_river_cloud.xiaozhi_playback_response_id);
+    river_cloud_xiaozhi_copy_optional_text(
+        g_river_cloud.xiaozhi_playback_wait_playback_id,
+        sizeof(g_river_cloud.xiaozhi_playback_wait_playback_id),
+        g_river_cloud.xiaozhi_playback_id);
+    river_cloud_xiaozhi_copy_optional_text(
+        g_river_cloud.xiaozhi_playback_wait_segment_id,
+        sizeof(g_river_cloud.xiaozhi_playback_wait_segment_id),
+        g_river_cloud.xiaozhi_playback_segment_id);
 }
 
 static void river_cloud_xiaozhi_store_playback_last_segment_context(void)
@@ -1185,6 +1214,7 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_response_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_segment_id[0] = '\0';
+    river_cloud_xiaozhi_clear_playback_wait_context();
     g_river_cloud.xiaozhi_playback_last_segment_response_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_last_segment_playback_id[0] = '\0';
     g_river_cloud.xiaozhi_playback_last_segment_segment_id[0] = '\0';
@@ -1922,8 +1952,15 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     g_river_cloud.xiaozhi_playback_last_segment = event->is_last_segment;
     g_river_cloud.xiaozhi_playback_meta_valid =
         river_cloud_xiaozhi_playback_segment_context_valid();
-    if (event->is_last_segment && g_river_cloud.xiaozhi_playback_meta_valid) {
-        river_cloud_xiaozhi_store_playback_last_segment_context();
+    if (g_river_cloud.xiaozhi_playback_meta_valid) {
+        if (event->is_last_segment) {
+            river_cloud_xiaozhi_clear_playback_wait_context();
+            river_cloud_xiaozhi_store_playback_last_segment_context();
+        } else {
+            river_cloud_xiaozhi_store_playback_wait_context();
+        }
+    } else {
+        river_cloud_xiaozhi_clear_playback_wait_context();
     }
     g_river_cloud.xiaozhi_playback_started_reported =
         g_river_cloud.xiaozhi_playback_last_started_segment_id[0] != '\0' &&

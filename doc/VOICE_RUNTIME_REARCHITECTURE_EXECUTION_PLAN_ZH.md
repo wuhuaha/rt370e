@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.362`
+  - playback runtime 已独立保存 waiting-segment context：
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+  - `WAITING_SEGMENT` 不再继续从：
+    - `meta_valid`
+    - `last_segment`
+    这组 coarse global meta shadow 推导
+  - non-terminal meta 会写入待续段上下文，terminal/invalid meta 会清掉它
+  - 这一步继续把 playback phase/wait 真相从“最近 meta 阴影”收口到
+    runtime-owned typed waiting context，为后续继续拆 queue-tail / starvation
+    shadow 做准备
 - `Step 5.361`
   - playback start-gate 的 predictive segment-prefetch 已直接读取
     queue 头段/当前待播 segment
