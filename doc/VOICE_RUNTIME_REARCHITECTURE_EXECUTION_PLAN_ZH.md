@@ -26,6 +26,12 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.342`
+  - XiaoZhi `backend_state` 已不再因为 phase 仍停在 `playing/draining`，
+    就在 playback-service 已不活跃时继续投影 `owned_active`
+  - `backend occupancy` 与 `media/output phase` 继续拆开，各自保持独立真相
+  - 这继续减少了 downlink/playback 对 phase 反推本地 backend 仍 attached 的
+    假设
 - `Step 5.341`
   - `dialog_runtime` 已开始直接消费 `playback_backend_state_kind=owned_paused`
     作为受控 playback 过渡真相

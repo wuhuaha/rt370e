@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.342
+- XiaoZhi playback `backend_state` 已继续停止把
+  `service inactive + phase=playing/draining` 投影成 `owned_active`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 现在 `backend_state` 对“是否 attached backend”更严格：
+  - 本地 playback-service 不活跃时直接视为 `detached`
+  - `playing/draining` 仍由独立的 playback phase / playback_active truth 表示
+- 这一步继续把：
+  - backend occupancy
+  - media/output phase
+  两类真相拆开，避免用 phase 去伪造“本地 backend 还挂着”
+
 ## Step 5.341
 - `dialog_runtime` 已开始直接消费 `playback_backend_state_kind=owned_paused`
   作为受控 playback 过渡真相：

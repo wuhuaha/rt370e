@@ -1,5 +1,27 @@
 # Verification
 
+## Step 5.342
+Validate that XiaoZhi backend-state truth no longer projects output phase to
+attached-backend ownership when playback-service is inactive:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '72,92p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_backend_state()` no longer keeps
+  `OWNED_ACTIVE` only because phase is `playing/draining` when playback-service
+  is already inactive
+- backend occupancy truth is now stricter than output/media phase truth
+
 ## Step 5.341
 Validate that dialog runtime now treats `owned_paused` as managed playback
 transition truth when absorbing local playback errors:

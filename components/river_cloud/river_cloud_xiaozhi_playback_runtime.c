@@ -83,9 +83,6 @@ river_cloud_xiaozhi_playback_backend_state(void)
         return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING;
     }
     if (!service_view.active) {
-        if (river_cloud_xiaozhi_playback_phase_is_output_active(phase)) {
-            return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE;
-        }
         return RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED;
     }
     if (service_view.owned_stream) {
