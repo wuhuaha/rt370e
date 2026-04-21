@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.381`
+  - XiaoZhi playback backend truth 现在只对 owned stream 承认
+    `backend_restart_pending`
+  - `playback_backend_state()` 不再在 ownership 判定之前就无条件把 raw
+    `RESTART_PENDING` 直接映射成本流 backend truth
+  - foreign stream 的 restart/recover 不再污染 XiaoZhi 本流的 backend 判定
+  - 这一步继续把 downlink/playback runtime 的 backend 真相收回到
+    owned-stream scoped typed truth
 - `Step 5.380`
   - voice runtime 的 `restart_pending` AEC gate 不再无条件依赖本地
     `playback_state`

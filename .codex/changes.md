@@ -1,5 +1,18 @@
 # Change Log
 
+## Step 5.381
+- XiaoZhi playback backend truth 现在进一步受 stream ownership 约束：
+  - 只有 owned stream 的 `RIVER_PLAYBACK_RESTART_PENDING` 才会被映射成
+    `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `playback_backend_state()` 不再在 ownership 判定之前就无条件吞掉
+  `RESTART_PENDING`
+- 这意味着：
+  - foreign stream 的 restart/recover 不会再污染 XiaoZhi 自己的 backend truth
+  - backend=`restart_pending` 继续只表示“本流仍保有 restart 语义”
+- 这一步继续把 downlink/playback runtime 的 backend 真相从底层
+  playback-service coarse state 收回到“owned stream + typed backend”语义
+
 ## Step 5.380
 - voice runtime 的 `restart_pending` AEC gate 不再无条件依赖本地
   `playback_state`：

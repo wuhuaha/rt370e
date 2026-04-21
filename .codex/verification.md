@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.381
+Validate that XiaoZhi backend truth only recognizes `restart_pending` for the
+owned playback stream, instead of unconditionally trusting the raw playback
+service state before ownership classification:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_backend_state|owned_stream|RIVER_PLAYBACK_RESTART_PENDING|RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '84,108p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` is now produced only inside
+  the owned-stream branch
+- foreign playback streams no longer pollute XiaoZhi backend truth simply
+  because the raw playback service is in `RIVER_PLAYBACK_RESTART_PENDING`
+
 ## Step 5.380
 Validate that `restart_pending` AEC blocking is now mediated by dialog runtime
 truth, so quiet recovery windows no longer unconditionally trip the dedicated

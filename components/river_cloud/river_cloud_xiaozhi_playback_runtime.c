@@ -90,13 +90,13 @@ river_cloud_xiaozhi_playback_backend_state(void)
 
     river_cloud_xiaozhi_capture_playback_service_view(&service_view);
 
-    if (service_view.state == RIVER_PLAYBACK_RESTART_PENDING) {
-        return RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING;
-    }
     if (!service_view.active) {
         return RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED;
     }
     if (service_view.owned_stream) {
+        if (service_view.state == RIVER_PLAYBACK_RESTART_PENDING) {
+            return RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING;
+        }
         if (service_view.state == RIVER_PLAYBACK_RECOVERING ||
             phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING) {
             return RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING;

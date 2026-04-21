@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.380 gate restart_pending AEC block with dialog truth`
+  - `5.381 scope restart_pending backend truth to owned stream`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback backend truth 现在只对 owned stream 承认
+      `backend_restart_pending`
+    - `playback_backend_state()` 不再在 ownership 判定之前就无条件吞掉
+      raw `RESTART_PENDING`
+    - foreign stream 的 restart/recover 不再污染 XiaoZhi 本流的 backend truth
+    - 这一步继续把 playback backend 语义收回到“owned stream + typed truth”
   - newest landed runtime-ownership slice:
     - voice runtime 的 `restart_pending` AEC gate 不再只看本地
       `playback_state`
@@ -55,8 +62,8 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续检查 dialog runtime 内剩余 `local playback shadow` / service-active
       fallback 是否还能继续退化成 purely-diagnostic shadow
-    - 继续检查 session / adapter 里剩余 duplex fallback、capture reopen、
-      playback occupied 判定，是否还能进一步只消费 dialog/runtime typed truth
+    - 继续检查 playback runtime 内剩余直接读取 raw playback-service state 的
+      路径，是否还能继续收口到 owned backend truth helper
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
