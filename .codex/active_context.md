@@ -15,11 +15,15 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.343 collapse tts interrupt clear to unified output-turn quiesced truth`
+  - `5.344 shrink local playback shadow to snapshot-unavailable fallback`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 现在只会在拿不到 cloud runtime snapshot 时，才让
+      本地 playback shadow 回填 `playback_active/recovering`
+    - `phase unknown` 本身不再构成 local shadow 介入常态派生的理由
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 不再在 `phase unknown` 下让本地 playback shadow
       旁路清理 `tts_interrupt_requested`

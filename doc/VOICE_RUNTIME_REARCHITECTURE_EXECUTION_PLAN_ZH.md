@@ -26,6 +26,14 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.344`
+  - `dialog_runtime` 现在只会在拿不到 cloud runtime snapshot 时，才让
+    本地 playback shadow 回填：
+    - `playback_active`
+    - `playback_recovering`
+  - `phase unknown` 本身不再构成 local shadow 介入常态派生的理由
+  - 这继续把 core 侧 playback 派生从本地 listener shadow 收口到 runtime
+    snapshot owner truth
 - `Step 5.343`
   - `dialog_runtime` 不再在 `phase unknown` 时给
     `tts_interrupt_requested` 保留本地 playback shadow 的旁路清理逻辑

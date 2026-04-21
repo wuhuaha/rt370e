@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.344
+Validate that dialog runtime only lets local playback shadow backfill active /
+recovering truth when cloud runtime snapshot is unavailable:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'cloud_runtime_available|local_playback_shadow_active_fallback|local_playback_shadow_recovering_fallback' \
+  components/river_core/river_dialog_runtime.c
+sed -n '10,35p' components/river_core/river_dialog_runtime.c
+sed -n '250,305p' components/river_core/river_dialog_runtime.c
+sed -n '520,545p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime` now tracks a private `cloud_runtime_available` truth
+- `local_playback_shadow_active_fallback_locked()` and
+  `local_playback_shadow_recovering_fallback_locked()` only engage when that
+  truth is `false`
+
 ## Step 5.343
 Validate that dialog runtime clears `tts_interrupt_requested` only from the
 unified output-turn quiesced truth, without phase-unknown local-shadow bypass:

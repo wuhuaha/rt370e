@@ -12,6 +12,7 @@
 
 typedef struct {
     bool initialized;
+    bool cloud_runtime_available;
     bool local_playback_stream_owned;
     char local_playback_stream_name[32];
     river_playback_state_t playback_state;
@@ -258,6 +259,11 @@ static bool river_dialog_runtime_playback_waiting_segment_locked(void)
                RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
 }
 
+static bool river_dialog_runtime_cloud_runtime_available_locked(void)
+{
+    return g_river_dialog_runtime.cloud_runtime_available;
+}
+
 static bool river_dialog_runtime_local_playback_state_active_locked(void)
 {
     return river_playback_service_state_active(g_river_dialog_runtime.playback_state);
@@ -277,7 +283,7 @@ static void river_dialog_runtime_apply_local_playback_state_locked(
 
 static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(void)
 {
-    if (river_dialog_runtime_playback_phase_known_locked()) {
+    if (river_dialog_runtime_cloud_runtime_available_locked()) {
         return false;
     }
 
@@ -286,7 +292,7 @@ static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(vo
 
 static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locked(void)
 {
-    if (river_dialog_runtime_playback_phase_known_locked()) {
+    if (river_dialog_runtime_cloud_runtime_available_locked()) {
         return false;
     }
 
@@ -526,6 +532,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         return;
     }
 
+    g_river_dialog_runtime.cloud_runtime_available = snapshot->available;
     g_river_dialog_runtime.snapshot.conversation_window_active =
         snapshot->conversation_window_active;
     g_river_dialog_runtime.snapshot.conversation_window_remaining_ms =

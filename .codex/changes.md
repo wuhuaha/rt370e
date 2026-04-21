@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.344
+- `dialog_runtime` 的本地 playback shadow 继续收紧为“仅在拿不到
+  cloud runtime snapshot 时才兜底”：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `local_playback_shadow_active/recovering` 不再把
+  `phase unknown` 当成可介入常态派生的充分条件
+- 这一步继续把：
+  - `playback_active`
+  - `playback_recovering`
+  的解释权收回到 runtime snapshot；本地 playback listener 只在 cloud truth
+  尚不可得时保留兜底语义
+
 ## Step 5.343
 - `dialog_runtime` 已删除本地 playback shadow 参与
   `tts_interrupt_requested` 清理的两条旁路：
