@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.372
+- `write_failed` 路径现在会把 runtime-owned supply truth 一起带入恢复决策：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 当一次 `write_failed` 被归类为 `UPSTREAM_STARVED`，但当前 supply 已明确是
+  `WAITING_NEXT_SEGMENT` 时：
+  - 不再默认走 detached `stop_rebuffer`
+  - 改为优先 attached `service_recover`
+- 新增 `playback_supply_kind_name()`，日志现在会直接打印这次 `write_failed`
+  所处的 supply kind，便于把：
+  - 当前段内断流
+  - 段间晚到
+  - terminal tail
+  区分开
+- 这一步继续把 `underrun/write_failed -> stop/start` 风暴里的“段间晚到”从
+  统一 stop/restart 模型中拆出去，优先尝试 attached recovery，减少 backend
+  detach/restart 抖动
+
 ## Step 5.371
 - `audio.out.completed` ACK 现在彻底绑定到 terminal last-segment lineage：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

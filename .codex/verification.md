@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.372
+Validate that `write_failed` recovery now consumes runtime-owned supply truth,
+and that `UPSTREAM_STARVED` in the `WAITING_NEXT_SEGMENT` window prefers
+attached `service_recover` rather than detached `stop_rebuffer`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_supply_kind_name|rebuffer_prefers_service_recover|write failed: cause=|WAITING_NEXT_SEGMENT' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '368,420p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1750,1775p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2940,2998p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `write_failed` recovery logs now expose the runtime-owned supply kind
+- `UPSTREAM_STARVED + WAITING_NEXT_SEGMENT` no longer defaults to detached
+  `stop_rebuffer`
+- segment-gap late arrival can now stay on an attached recovery-first path
+
 ## Step 5.371
 Validate that the playback runtime now derives `audio.out.completed` strictly
 from terminal last-segment lineage rather than falling back to the current

@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.371 derive completed ACK context from terminal last-segment truth`
+  - `5.372 prefer attached recovery for waiting-segment starved write failures`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `write_failed` 恢复链现在也显式消费 runtime-owned supply truth
+    - 当 rebuffer cause 被判定为 `upstream_starved`，且当前 supply 已明确是
+      `waiting_next_segment` 时：
+      - 不再默认 detached `stop_rebuffer`
+      - 改为优先 attached `service_recover`
+    - `write_failed` 日志也会直接打印当前 supply kind，便于板端确认当前是在：
+      - 当前段内断流
+      - 段间晚到
+      - 还是 terminal tail
   - newest landed runtime-ownership slice:
     - `audio.out.completed` ACK 已不再回退到“当前 playback meta 的
       response/playback 上下文”
