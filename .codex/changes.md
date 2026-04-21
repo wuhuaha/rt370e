@@ -1,5 +1,15 @@
 # Change Log
 
+## Step 5.346
+- `dialog_runtime` 现在只要 cloud runtime snapshot 已可用，就会把本地
+  playback edge event 继续收口给 runtime truth：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `playback_error_is_managed_recovery_locked()` 不再依赖 `phase_known`，
+  而是依赖 `cloud_runtime_available`，并把 `owned_paused` 纳入 managed
+  recovery owner truth
+- 本地 playback reducer 的“无变化直接吸收”条件也从 `phase_known` 收口到了
+  `cloud_runtime_available`
+
 ## Step 5.345
 - `dialog_runtime` 的 `output_turn` 保留逻辑继续收紧：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

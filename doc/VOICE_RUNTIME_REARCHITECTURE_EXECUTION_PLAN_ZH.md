@@ -26,6 +26,13 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.346`
+  - `dialog_runtime` 的 managed playback-error 吸收与本地 playback no-op
+    吸收，现在都改为依赖：
+    - `cloud_runtime_available`
+  - `owned_paused` 也被纳入受控 playback owner 过渡真相
+  - 这继续把 core 对本地 playback 边缘事件的解释权，从 `phase_known`
+    退化分支收口到 runtime snapshot owner truth
 - `Step 5.345`
   - `dialog_runtime` 现在只会在拿不到 cloud runtime snapshot 时，才让
     `playback_lane_engaged` 在 `phase unknown` 窗口继续保留 output ownership

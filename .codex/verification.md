@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.346
+Validate that dialog runtime now treats cloud-runtime availability, rather than
+phase-known alone, as the gate for managed playback-error absorption and local
+playback no-op absorption:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_error_is_managed_recovery_locked|OWNED_PAUSED|cloud_runtime_available_locked\\(\\)' \
+  components/river_core/river_dialog_runtime.c
+sed -n '312,326p' components/river_core/river_dialog_runtime.c
+sed -n '820,838p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `playback_error_is_managed_recovery_locked()` gates on
+  `cloud_runtime_available`
+- `RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED` is included in managed recovery
+- local playback reducer's no-op short-circuit also gates on
+  `cloud_runtime_available`
+
 ## Step 5.345
 Validate that dialog runtime only lets `playback_lane_engaged` retain
 `output_turn` across phase-unknown windows when cloud runtime snapshot is

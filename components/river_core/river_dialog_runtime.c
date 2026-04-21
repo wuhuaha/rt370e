@@ -313,11 +313,13 @@ static bool river_dialog_runtime_compute_playback_recovering_locked(void)
 
 static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
 {
-    if (!river_dialog_runtime_playback_phase_known_locked()) {
+    if (!river_dialog_runtime_cloud_runtime_available_locked()) {
         return false;
     }
 
     return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
+           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
            g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
@@ -818,7 +820,7 @@ static void river_dialog_runtime_reduce_local_playback_event(
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
     next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();
-    if (river_dialog_runtime_playback_phase_known_locked() &&
+    if (river_dialog_runtime_cloud_runtime_available_locked() &&
         prev_playback_active == g_river_dialog_runtime.snapshot.playback_active &&
         prev_playback_recovering == g_river_dialog_runtime.snapshot.playback_recovering &&
         prev_error_recovering == g_river_dialog_runtime.snapshot.error_recovering &&

@@ -15,11 +15,15 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.345 shrink output-turn lane fallback to snapshot-unavailable only`
+  - `5.346 absorb managed playback edges by snapshot availability`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog_runtime` 的 managed playback-error 吸收与本地 no-op 吸收，
+      现在都改为依赖 `cloud_runtime_available`
+    - `owned_paused` 也被视为受控 playback owner 过渡真相
   - newest landed runtime-ownership slice:
     - `dialog_runtime` 的 `playback_lane_engaged` 不再只因
       `phase unknown` 就默认保留 output ownership
