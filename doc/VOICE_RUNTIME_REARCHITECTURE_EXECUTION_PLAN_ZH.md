@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.361`
+  - playback start-gate 的 predictive segment-prefetch 已直接读取
+    queue 头段/当前待播 segment
+  - `segment_prefetch_target_needed()` 不再继续从：
+    - `meta_valid`
+    - `last_segment`
+    这组 coarse global meta shadow 重建“当前待播段”的 terminal 语义
+  - 这一步继续把起播门限的判断依据收口到 runtime-owned segment queue truth，
+    为后续继续拆 waiting-segment / prefetch shadow 做准备
 - `Step 5.360`
   - playback runtime 已独立保存 terminal last-segment context：
     - `response_id`

@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.361
+Validate that predictive segment-prefetch now follows the queue-head/current
+segment truth instead of rebuilding "current segment" from coarse global meta
+shadow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'playback_prefetch_target_segment|segment_prefetch_target_needed|playback_meta_valid|playback_last_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '731,776p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `segment_prefetch_target_needed()` now reads the queue-head/current playback
+  segment instead of reconstructing segment truth from global `meta_valid` and
+  `last_segment`
+- predictive prefetch only stays on when the next segment to start is a
+  non-terminal segment
+
 ## Step 5.360
 Validate that terminal/completed readiness now follows a stored terminal
 last-segment context instead of reusing the current global meta segment shadow:

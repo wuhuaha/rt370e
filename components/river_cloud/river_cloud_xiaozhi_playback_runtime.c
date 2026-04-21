@@ -737,8 +737,22 @@ static uint32_t river_cloud_xiaozhi_playback_prefetch_target_frames(uint32_t fra
     return (g_river_cloud.xiaozhi_playback_prefetch_target_ms + frame_ms - 1U) / frame_ms;
 }
 
+static const river_cloud_xiaozhi_playback_segment_t *
+river_cloud_xiaozhi_playback_prefetch_target_segment(void)
+{
+    river_cloud_xiaozhi_playback_segment_t *segment =
+        river_cloud_xiaozhi_current_playback_segment();
+
+    if (segment == NULL || !segment->valid || segment->segment_id[0] == '\0') {
+        return NULL;
+    }
+
+    return segment;
+}
+
 static bool river_cloud_xiaozhi_segment_prefetch_target_needed(uint32_t frame_ms)
 {
+    const river_cloud_xiaozhi_playback_segment_t *segment;
     uint32_t base_budget_ms;
 
     if (frame_ms == 0U || g_river_cloud.xiaozhi_playback_prefetch_target_ms == 0U) {
@@ -750,12 +764,15 @@ static bool river_cloud_xiaozhi_segment_prefetch_target_needed(uint32_t frame_ms
         return true;
     }
 
-    /* When the current segment is not terminal, treat a clearly longer
-     * expected duration as a predictive prefetch budget even before any
+    if (g_river_cloud.xiaozhi_playback_active) {
+        return false;
+    }
+
+    /* When the segment that would start next is not terminal, treat a clearly
+     * longer expected duration as a predictive prefetch budget even before any
      * historical meta-gap has been observed. */
-    if (!g_river_cloud.xiaozhi_playback_meta_valid ||
-        g_river_cloud.xiaozhi_playback_last_segment ||
-        g_river_cloud.xiaozhi_playback_active) {
+    segment = river_cloud_xiaozhi_playback_prefetch_target_segment();
+    if (segment == NULL || segment->is_last_segment) {
         return false;
     }
 

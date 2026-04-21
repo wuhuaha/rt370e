@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.361
+- XiaoZhi playback start-gate 的 predictive segment-prefetch 判定已开始直接
+  消费 queue 头段/当前待播 segment 真相：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `playback_prefetch_target_segment()`
+- `segment_prefetch_target_needed()` 不再继续读取 coarse global shadow：
+  - `xiaozhi_playback_meta_valid`
+  - `xiaozhi_playback_last_segment`
+- predictive prefetch 现在只在这些条件下成立：
+  - 当前并未真实 active playback
+  - queue 头段/当前待播 segment 存在且有效
+  - 该 segment 不是 terminal last-segment
+  - 预取目标仍高于 baseline start budget
+- 这一步继续把 start-gate 从“最近一条 meta 阴影”收口到 runtime-owned
+  segment queue truth，减少 terminal meta 或 stale global shadow 对起播门限的
+  干扰
+
 ## Step 5.360
 - XiaoZhi playback runtime 已把 terminal/completed 对“最后一段”的判定从
   全局当前 meta shadow 中拆开，改成显式保存独立的 terminal segment

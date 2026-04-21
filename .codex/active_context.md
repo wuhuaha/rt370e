@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.360 split terminal last-segment truth from global meta shadow`
+  - `5.361 move segment-prefetch truth onto queued playback segment`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback start-gate 的 predictive segment-prefetch 已直接读取
+      queue 头段/当前待播 segment
+    - `segment_prefetch_target_needed()` 不再继续把
+      `meta_valid/last_segment` 当成“当前待播段”真相
+    - 这继续把起播门限策略从 coarse global meta shadow 收口到
+      runtime-owned segment queue truth
   - newest landed runtime-ownership slice:
     - playback runtime 已独立保存 terminal last-segment context：
       - `response_id`
