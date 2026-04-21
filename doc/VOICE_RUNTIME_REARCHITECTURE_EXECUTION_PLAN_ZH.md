@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.357`
+  - downlink worker 现在会先经过 rebuffer resume gate，再进入 backend-state
+    分支
+  - `rebuffer_resume_ready()` 已统一吸收两类恢复语义：
+    - attached `owned_recovering` 直接 finish rebuffer
+    - detached backend 保持 pending，后续走 fresh-start
+  - loop 也会在 gate 之后重新抓取 backend truth，再决定 wait/start
+  - 这一步修正了 attached recovering backend 在真正 resume 前就被短路卡住的
+    结构问题
 - `Step 5.356`
   - `playback_backend_state()` 不再在 `rebuffering` 期间无条件投影
     `owned_recovering`

@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.357
+- XiaoZhi downlink worker 的 rebuffer resume gate 已前移到 backend 状态分支之前：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `rebuffer_resume_ready()` 现在会统一处理两类恢复路径：
+  - backend 仍 attached 且 `owned_recovering` 时，直接 `finish_playback_rebuffer()`
+  - backend 已 detached 时，保留 rebuffer pending，交给后续 fresh-start
+- downlink loop 现在会在 rebuffer gate 之后重新抓取一次 backend truth，再决定：
+  - pending-stop
+  - paused/recovering wait
+  - start/restart
+- 这一步修正了一个结构性短路：
+  - 以前 attached recovering backend 会在真正 finish rebuffer 前先被
+    `OWNED_RECOVERING` 分支拦住
+  - 现在 rebuffer gate 本身负责判定“继续等 / attached resume / detached
+    fresh-start”
+
 ## Step 5.356
 - XiaoZhi playback runtime 的 backend truth 不再在 `rebuffering` 期间无条件
   伪装成 `owned_recovering`：

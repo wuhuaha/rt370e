@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.357
+Validate that the downlink worker now lets the rebuffer gate resolve attached
+resume vs detached fresh-start before backend-state branches short-circuit the
+loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'rebuffer_resume_ready|OWNED_RECOVERING|finish_playback_rebuffer|playback_backend_needs_start' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1606,1628p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2689,2724p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- attached recovering backends are now allowed to finish rebuffer in the resume
+  gate itself
+- detached backends still keep rebuffer pending and then fall through to the
+  fresh-start path
+- the downlink loop now refreshes backend truth after the rebuffer gate before
+  deciding whether to wait, stop, or start
+
 ## Step 5.356
 Validate that rebuffer phase no longer fakes an attached XiaoZhi backend when
 the playback service has already detached, so resume paths can fresh-start:
