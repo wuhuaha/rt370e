@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.371
+- `audio.out.completed` ACK 现在彻底绑定到 terminal last-segment lineage：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_try_queue_playback_completed_ack()` 不再继续保留回退到
+  “当前 playback meta 的 `response_id / playback_id`” 这条旧路径：
+  - terminal/completed 现在只消费 runtime-owned 的
+    `last_segment_response_id / last_segment_playback_id`
+- playback dump 新增 terminal-context 观测日志：
+  - 现在可以直接看到 completed 准备消费的：
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+- 这一步继续把 completed 终态从 current-meta shadow 收口到 terminal
+  last-segment truth，减少 response/playback rollover 时 completed ACK 错绑到
+  新上下文的风险
+
 ## Step 5.370
 - XiaoZhi playback runtime 现在会把最后一个 fully-heard segment 的 response /
   playback / segment 上下文一起保存成 typed heard context：

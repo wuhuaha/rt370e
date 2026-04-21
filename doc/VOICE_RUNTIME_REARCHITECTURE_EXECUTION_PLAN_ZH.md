@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.371`
+  - `audio.out.completed` ACK 已不再保留回退到“当前 playback meta 的
+    response/playback 上下文”这条旧路径
+  - completed 终态现在只消费 terminal last-segment lineage：
+    - `response_id`
+    - `playback_id`
+    - `segment_id`
+  - playback dump 也新增了 terminal-context 观测面，便于板端确认 completed
+    当前究竟会回报哪一条 playback lineage
+  - 这一步继续把 playback truth 链上的 completed 终态从 current-meta shadow
+    收口到 runtime-owned terminal truth，减少 response/playback rollover 时的
+    错 ACK 风险
 - `Step 5.370`
   - XiaoZhi playback runtime 现在会把最后一个 fully-heard segment 的
     `response_id / playback_id / segment_id` 一起保存成 typed heard context

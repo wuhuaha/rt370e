@@ -1131,6 +1131,17 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                    "-",
                river_cloud_xiaozhi_playback_last_fully_heard_context_valid() ? "yes" :
                                                                                 "no");
+    RIVER_LOGI("xiaozhi playback_terminal_context response_id=%s playback_id=%s segment_id=%s valid=%s",
+               g_river_cloud.xiaozhi_playback_last_segment_response_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_playback_last_segment_response_id :
+                   "-",
+               g_river_cloud.xiaozhi_playback_last_segment_playback_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_playback_last_segment_playback_id :
+                   "-",
+               g_river_cloud.xiaozhi_playback_last_segment_segment_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_playback_last_segment_segment_id :
+                   "-",
+               river_cloud_xiaozhi_playback_last_segment_observed() ? "yes" : "no");
     RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu playback_active=%s backend=%s duplex_seen=%s",
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
@@ -2369,12 +2380,14 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
             NULL);
         return true;
     }
+    if (!river_cloud_xiaozhi_playback_last_segment_observed()) {
+        river_cloud_xiaozhi_set_playback_terminal_state(
+            RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+            NULL);
+        return true;
+    }
     response_id = g_river_cloud.xiaozhi_playback_last_segment_response_id;
     playback_id = g_river_cloud.xiaozhi_playback_last_segment_playback_id;
-    if (response_id[0] == '\0' || playback_id[0] == '\0') {
-        response_id = g_river_cloud.xiaozhi_playback_response_id;
-        playback_id = g_river_cloud.xiaozhi_playback_id;
-    }
     if (response_id[0] == '\0' || playback_id[0] == '\0') {
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
