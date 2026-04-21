@@ -1687,6 +1687,10 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
         river_cloud_xiaozhi_clear_downlink_starvation_watch();
         return false;
     }
+    if (supply_kind == RIVER_CLOUD_XIAOZHI_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT) {
+        river_cloud_xiaozhi_clear_downlink_starvation_watch();
+        return false;
+    }
 
     low_water_frames = river_cloud_xiaozhi_downlink_starved_low_water_frames();
     if (queued_frames > low_water_frames) {

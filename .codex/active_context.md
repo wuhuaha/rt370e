@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.372 prefer attached recovery for waiting-segment starved write failures`
+  - `5.373 skip early starved rebuffer in waiting-next-segment window`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `maybe_rebuffer_starved()` 不再在 `waiting_next_segment` 窗口里提前触发
+      upstream-starved rebuffer
+    - 当 supply truth 已明确进入：
+      - `waiting_next_segment`
+      starvation watch 会被直接清掉，继续让 segment-gap 路径接手
+    - 这继续把“段间晚到”从 generic low-water stop/rebuffer 模型中拆出去
   - newest landed runtime-ownership slice:
     - `write_failed` 恢复链现在也显式消费 runtime-owned supply truth
     - 当 rebuffer cause 被判定为 `upstream_starved`，且当前 supply 已明确是

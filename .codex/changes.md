@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.373
+- `maybe_rebuffer_starved()` 不再在 `WAITING_NEXT_SEGMENT` 窗口里提前触发
+  starved rebuffer：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 当 runtime-owned supply truth 已明确是 `waiting_next_segment` 时：
+  - 不再因为 low-water / wait-ms 达标就提前走
+    `xiaozhi_playback_starved -> stop/rebuffer`
+  - 改为清掉 starvation watch，继续等 segment-gap 路径接手
+- 这一步继续把“段间晚到”从 generic upstream-starved rebuffer 中拆出去，
+  减少当前段尾部低水位时被提前升级成 stop/start 风暴
+
 ## Step 5.372
 - `write_failed` 路径现在会把 runtime-owned supply truth 一起带入恢复决策：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

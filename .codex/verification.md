@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.373
+Validate that `maybe_rebuffer_starved()` no longer upgrades the
+`WAITING_NEXT_SEGMENT` window into an early upstream-starved rebuffer:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'maybe_rebuffer_starved|WAITING_NEXT_SEGMENT|clear_downlink_starvation_watch' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1680,1728p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `WAITING_NEXT_SEGMENT` no longer enters early upstream-starved rebuffer from
+  `maybe_rebuffer_starved()`
+- starvation watch is cleared in that window and segment-gap handling remains
+  the next recovery path
+
 ## Step 5.372
 Validate that `write_failed` recovery now consumes runtime-owned supply truth,
 and that `UPSTREAM_STARVED` in the `WAITING_NEXT_SEGMENT` window prefers
