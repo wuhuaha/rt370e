@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.378
+- playback runtime 现在显式区分：
+  - backend 仍保有 turn / restart 语义
+  - backend 底层 stream 是否真的 attached
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增更精确的 stream-attachment 语义：
+  - `river_cloud_xiaozhi_playback_backend_stream_attached(...)`
+  - `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` 不再被当成 attached stream
+- 以下边界不再对 `restart_pending` 误用 attached stop/flush 语义：
+  - `transport_reset`
+  - `session_start`
+  - `segment_gap_hold`
+  - `playback_abort`
+  - `playback_check_pending_stop`
+- `pending_stop` 现在会把 `restart_pending` 和其他 non-attached backend
+  统一按“非 attached queued audio”处理：
+  - 直接走 queue drop / terminal ack / runtime reset
+  - 不再等 drain deadline 后再对已脱离硬件的 backend 重复 stop 一次
+- 这一步继续把 downlink/playback 恢复真相从 coarse service state 中拆开，
+  避免 `restart_pending` 把 detached backend 重新污染成 attached stop/start 语义
+
 ## Step 5.377
 - downlink/playback runtime 现在显式区分：
   - cold start threshold

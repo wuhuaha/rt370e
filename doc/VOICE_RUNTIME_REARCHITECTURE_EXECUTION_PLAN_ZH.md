@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.378`
+  - playback runtime 现在显式区分：
+    - backend 仍保有 turn / restart 语义
+    - backend 底层 stream 是否真的 attached
+  - `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` 不再被 stop/flush/abort
+    边界误当成 attached stream
+  - `pending_stop` 现在会把 `restart_pending` 与其他 non-attached backend
+    统一按 queue drop / terminal ack / runtime reset 处理
+  - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已经脱离
+    硬件的 backend 再次 stop/flush
+  - 这一步继续把 playback runtime 从 coarse playback-service state 中解耦，
+    避免 `restart_pending` 重新污染 attached stop/start 语义
 - `Step 5.377`
   - downlink/playback runtime 现在显式拆分：
     - cold start threshold
@@ -2689,9 +2701,11 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 让 `dialog runtime` / `session coordinator` / cloud bridge 最终都只消费
   一条统一的 playback-runtime 真相，而不是再从局部 active/idle 信号二次猜测
 - 当前下一步继续聚焦：
-  - 审视 `pending_stop / restart_pending / abort-reset` 边界
-  - 把仍会把 attached recover 打回 detached stop/start 的残余路径继续削减
-  - 目标是把 restart churn 收口到真正的硬故障，而不是常态恢复
+  - 继续检查 `restart_pending` 是否仍在 duplex / capture / AEC gate 上被过度
+    当成“播放占用中”
+  - 继续评估 detached fresh-start 与 attached resume 门限是否还需进一步统一成
+    更精确的 typed start policy
+  - 继续把 restart churn 收口到真正的硬故障，而不是常态恢复
 
 ### Step E: 统一 turn timeline 与板端验证
 

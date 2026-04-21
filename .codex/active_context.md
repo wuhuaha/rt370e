@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.377 split cold-start threshold from attached resume threshold`
+  - `5.378 split restart_pending ownership from true stream attachment`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback runtime 现在显式区分：
+      - backend 仍保有 turn / restart 语义
+      - backend 底层 stream 是否真的 attached
+    - `RESTART_PENDING` 不再被 stop/flush/abort/pending-stop 这类边界
+      当成 attached stream
+    - `pending_stop` 现在会把 `restart_pending` 统一按 non-attached backend
+      立即 drop queue / ack / reset
+    - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
+      硬件的 backend 再次 stop/flush
+  - current next runtime slice:
+    - 继续检查 `restart_pending` 是否仍在 duplex / capture / AEC gate 上被过度
+      当成“播放占用中”
+    - 继续评估 detached fresh-start 与 attached resume 门限是否还需进一步统一
+      到更精确的 typed start policy
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
@@ -34,10 +49,6 @@ or top-of-tree verification target changes.
       - `start`
       - `resume`
       - `buffer`
-  - current next runtime slice:
-    - 检查 `pending_stop / restart_pending / abort-reset` 边界
-    - 继续找出仍会把 attached recover 打回 detached stop/start 的残余路径
-    - 目标是把 restart churn 进一步收口到真正的硬故障场景
   - newest landed runtime-ownership slice:
     - playback rebuffer 恢复决策现在收口到统一 helper
     - `UPSTREAM_STARVED + CURRENT_SEGMENT` 也开始优先 attached

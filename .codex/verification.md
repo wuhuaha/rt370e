@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.378
+Validate that `restart_pending` is no longer treated as a truly attached
+stream in playback-runtime stop/flush/abort boundaries, while still remaining
+restartable by the runtime:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'backend_stream_attached|non-attached queued audio|transport_reset|session_start|segment_gap_pause|playback_check_pending_stop|playback_abort_for_cause' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '108,126p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1390,1409p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1644,1663p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2670,2758p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING` no longer counts as an
+  attached stream for stop/flush/abort boundaries
+- `pending_stop` now drops queued audio immediately for non-attached backends,
+  including `restart_pending`
+- transport reset, session start, and segment-gap hold no longer try to stop or
+  flush a backend that has already fallen out of hardware attachment
+
 ## Step 5.377
 Validate that attached playback resume now uses a runtime-owned resume
 threshold instead of always reusing cold-start `start_frames`, and that the
