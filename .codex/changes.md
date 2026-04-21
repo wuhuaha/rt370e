@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.376
+- playback rebuffer 恢复决策现在统一收口到：
+  - `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `rebuffer_prefers_service_recover(...)` 的 attached recover-first 适用范围扩大到：
+  - `WRITE_FAILED`
+  - `UPSTREAM_STARVED + CURRENT_SEGMENT`
+  - `UPSTREAM_STARVED + WAITING_NEXT_SEGMENT`
+- `maybe_rebuffer_starved()` 不再默认先走 detached `stop_rebuffer`：
+  - 当前段内断流也会优先尝试 attached `service_recover`
+  - 只有 recover 失败时才回退到 stop
+- `write_failed` 与 `upstream gap` 两条恢复路径现在共用同一套恢复选择和回退日志
+- 这一步继续削减 `underrun/write_failed/starved -> stop/start` 风暴，把 residual
+  的 current-segment starvation 也推向 attached recovery-first
+
 ## Step 5.375
 - playback runtime / dialog runtime 新增 typed playback hold truth：
   - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)

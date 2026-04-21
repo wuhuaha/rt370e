@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.376
+Validate that residual rebuffer recovery now prefers attached `service_recover`
+for all upstream-starved windows that still expect more audio, and that timer
+starvation and write-failed paths share one recovery chooser:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'request_playback_rebuffer_recovery|rebuffer_prefers_service_recover|upstream gap rebuffer:|write failed: cause=|rebuffer requested:' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1728,1805p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1832,1888p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3100,3162p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `UPSTREAM_STARVED` no longer only gives attached recover-first in the
+  `WAITING_NEXT_SEGMENT` window
+- current-segment starvation now also prefers attached `service_recover`
+- timer-starved and write-failed rebuffer paths now share one recovery chooser
+- detached `stop_rebuffer` is retained only as fallback when attached recover
+  cannot be used successfully
+
 ## Step 5.375
 Validate that playback pause semantics now expose a typed hold truth, and that
 dialog runtime no longer interprets `OWNED_PAUSED` segment-gap hold as generic

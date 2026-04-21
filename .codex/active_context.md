@@ -15,11 +15,18 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.375 split segment-gap hold truth out of recovering semantics`
+  - `5.376 shrink residual rebuffer stop/start with attached recover-first`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback rebuffer 恢复决策现在收口到统一 helper
+    - `UPSTREAM_STARVED + CURRENT_SEGMENT` 也开始优先 attached
+      `service_recover`
+    - `maybe_rebuffer_starved()` 不再默认先走 detached `stop_rebuffer`
+    - timer-starved / write-failed 两条恢复路径现在共用同一套恢复选择与回退
+      语义
   - newest landed runtime-ownership slice:
     - playback runtime / dialog runtime 现在显式导出 `playback_hold_kind`
     - `owned_paused + waiting_segment` 会被 typed 成

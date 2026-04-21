@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.376`
+  - playback rebuffer 恢复决策现在统一收口到
+    `request_playback_rebuffer_recovery(...)`
+  - attached recover-first 的适用范围扩大到：
+    - `WRITE_FAILED`
+    - `UPSTREAM_STARVED + CURRENT_SEGMENT`
+    - `UPSTREAM_STARVED + WAITING_NEXT_SEGMENT`
+  - `maybe_rebuffer_starved()` 不再默认先走 detached `stop_rebuffer`
+  - timer-starved / write-failed 两条恢复路径现在共用同一套恢复选择与回退语义
+  - 这一步继续压缩 residual `stop/start` 恢复分叉，把 current-segment
+    starvation 也推进到 attached recovery-first
 - `Step 5.375`
   - playback runtime / dialog runtime 新增 typed playback hold truth：
     - `RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP`
