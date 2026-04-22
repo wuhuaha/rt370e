@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.400`
+  - XiaoZhi playback runtime 继续把观测面收口到显式 `playback_truth_view`
+  - `playback_truth_view` 现在额外派生 `hold_kind`，使执行面和观测面共用同一份
+    phase/backend/hold/supply 真相
+  - `dump_playback_status()` 现在改为一次性捕获 truth-view，并在
+    `playback_terminal` / `downlink` 诊断日志里复用：
+    - `phase`
+    - `hold`
+    - `backend`
+    - `supply`
+  - `fill_playback_runtime_snapshot()` 现在也直接消费同一份 truth-view，而不再
+    单独重建 backend-source
+  - 这一步继续减少“执行面按一套 truth 决策、诊断面按另一套 helper 读取”的漂移
 - `Step 5.399`
   - XiaoZhi playback runtime 继续把 downlink worker 的核心分支收口到显式
     `playback_truth_view`

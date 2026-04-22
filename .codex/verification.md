@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.400
+Validate that playback diagnostics and runtime snapshots now consume the same
+truth-view used by the worker instead of separately rebuilding phase/backend
+state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '560,620p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1290,1488p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'hold_kind|dump_playback_status|fill_playback_runtime_snapshot|playback_terminal phase=|xiaozhi downlink queue=' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `playback_truth_view` now derives `hold_kind` together with
+  `phase/backend/supply/output_active`
+- `dump_playback_status()` captures one truth-view and reuses it for
+  `playback_terminal` and `downlink` diagnostic logs
+- `fill_playback_runtime_snapshot()` now consumes the same truth-view instead
+  of rebuilding a separate backend-source view
+
 ## Step 5.399
 Validate that the downlink worker now reuses a single truth-view snapshot for
 the paused-resume, backend gating, and write-failed rebuffer paths instead of

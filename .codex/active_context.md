@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.399 让 downlink worker 复用 truth-view`
+  - `5.400 让 playback 观测面复用 truth-view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 继续把观测面收口到显式 `playback_truth_view`
+    - `playback_truth_view` 现在额外派生 `hold_kind`，使执行面和观测面共用
+      同一份 phase/backend/hold/supply 真相
+    - `dump_playback_status()` 现在改为一次性捕获 truth-view，并在
+      `playback_terminal` / `downlink` 诊断日志里复用：
+      - `phase`
+      - `hold`
+      - `backend`
+      - `supply`
+    - `fill_playback_runtime_snapshot()` 现在也直接消费同一份 truth-view，而不再
+      单独重建 backend-source
+    - 这一步继续减少“执行面按一套 truth 决策、诊断面按另一套 helper 读取”的漂移
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 继续把 downlink worker 的核心分支收口到显式
       `playback_truth_view`
@@ -312,10 +325,11 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续收口 worker / dump / snapshot 里的组合 truth 读边界
     - 下一刀优先判断：
-      - `dump_playback_status()` / `fill_playback_runtime_snapshot()` 是否要进一步合并成
-        更完整的 playback-truth dump source，减少观测面与执行面的判定漂移
       - `pending_stop` / `abort` / `start_if_needed` 这类仍直接读取
         `backend_state` 的边界，是否也要收口到更统一的 truth-source
+      - `playback_check_pending_stop()` / `playback_abort_for_cause()` /
+        `start_playback_if_needed()` 是否要继续按相同方式复用 truth-view，减少
+        control-path 与 worker-path 的 backend 判定分叉
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
