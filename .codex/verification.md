@@ -1,5 +1,28 @@
 # Verification
 
+## Step 5.385
+Validate that `dialog runtime` now clears local playback stream ownership only
+after confirming the event belongs to the dialog-owned stream, so foreign
+`IDLE` events cannot erase owner tracking first:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '808,826p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `RIVER_PLAYBACK_IDLE` ownership cleanup now happens only after
+  `should_absorb` has been confirmed
+- foreign playback streams can no longer clear
+  `local_playback_stream_owned/name` just by emitting an unrelated `IDLE`
+
 ## Step 5.384
 Validate that `dialog runtime` now keeps separate internal error sources for
 ASR and local-playback fallback, and only derives outward

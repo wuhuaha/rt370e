@@ -819,13 +819,13 @@ static void river_dialog_runtime_reduce_local_playback_event(
         should_absorb = true;
     }
 
-    if (state == RIVER_PLAYBACK_IDLE) {
-        g_river_dialog_runtime.local_playback_stream_owned = false;
-        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
-    }
     if (!should_absorb) {
         river_dialog_runtime_unlock();
         return;
+    }
+    if (state == RIVER_PLAYBACK_IDLE) {
+        g_river_dialog_runtime.local_playback_stream_owned = false;
+        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
     }
 
     prev_playback_active = g_river_dialog_runtime.snapshot.playback_active;

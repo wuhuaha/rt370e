@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.385`
+  - `dialog runtime` 现在只会在 local playback event 已确认属于当前
+    dialog-owned stream 时，才在 `IDLE` 上清理：
+    - `local_playback_stream_owned`
+    - `local_playback_stream_name`
+  - owner 清理从 `should_absorb` 判断之前移动到了判断之后
+  - 这意味着 foreign playback stream 的 `IDLE` 事件不再先把 dialog runtime
+    当前 owned stream tracking 擦掉
+  - 这一步继续把 local playback ownership 真相收口到：
+    - 只消费本 dialog stream 的事件
 - `Step 5.384`
   - `dialog runtime` 已把内部 `error_recovering` 拆成两路 typed source：
     - `asr_error_recovering`
