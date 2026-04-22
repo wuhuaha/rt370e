@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.398
+- XiaoZhi playback runtime 现在为 recovery 关键分支引入显式
+  `river_cloud_xiaozhi_playback_truth_view_t`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `river_cloud_xiaozhi_capture_playback_truth_view(...)`，一次性锁存并派生：
+  - `backend_source`
+  - `supply_source`
+  - `backend_state`
+  - `supply_kind`
+  - `output_active`
+- `river_cloud_xiaozhi_maybe_pause_for_segment_gap()` 与
+  `river_cloud_xiaozhi_maybe_rebuffer_starved()` 现在都开始复用同一份
+  truth-view，而不再各自分别重读 `phase` / `backend` / `supply`
+- `segment_gap_hold` 关键日志也改成复用 truth-view 里的 `phase/backend`
+- 这一步不改变 hold / starved-rebuffer 的触发语义，只继续把 recovery
+  分支的判定边界收口成“显式 truth-view -> recovery decision”的单向派生，
+  减少 worker loop 内部的组合读偏斜
+
 ## Step 5.397
 - XiaoZhi playback runtime 现在为 supply 判定引入显式
   `river_cloud_xiaozhi_playback_supply_source_t`：

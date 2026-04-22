@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.398
+Validate that playback recovery now reuses a single truth-view snapshot instead
+of separately re-reading phase/backend/supply across the segment-gap and
+starved-rebuffer branches:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '548,620p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1815,2028p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_truth_view|capture_playback_truth_view|maybe_pause_for_segment_gap|maybe_rebuffer_starved' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_truth_view_t` exists and captures the derived
+  recovery truth needed by the worker
+- `river_cloud_xiaozhi_capture_playback_truth_view(...)` locks backend/supply
+  source and derives `backend_state` / `supply_kind` / `output_active` once
+- `maybe_pause_for_segment_gap()` and `maybe_rebuffer_starved()` now reuse that
+  same truth-view instead of separately re-reading phase/backend/supply helpers
+
 ## Step 5.397
 Validate that playback supply derivation now consumes an explicit supply-source
 snapshot and that `waiting_next_segment` / `supply_kind` / phase-source reuse

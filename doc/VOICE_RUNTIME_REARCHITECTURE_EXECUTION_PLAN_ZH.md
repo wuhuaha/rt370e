@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.398`
+  - XiaoZhi playback runtime 现在为 recovery 关键分支引入显式
+    `playback_truth_view`
+  - `capture_playback_truth_view(...)` 会一次性锁存并派生：
+    - `backend_source`
+    - `supply_source`
+    - `backend_state`
+    - `supply_kind`
+    - `output_active`
+  - `maybe_pause_for_segment_gap()` 与 `maybe_rebuffer_starved()` 现在都开始复用
+    同一份 truth-view，而不再各自分别重读 `phase` / `backend` / `supply`
+  - `segment_gap_hold` 关键日志也改成直接使用 truth-view 里的
+    `phase/backend`
+  - 这一步不改变 recovery 判定结论，只继续把
+    `segment_gap_hold / upstream_starved_rebuffer` 推进成
+    “显式 truth-view -> recovery decision”的单向派生
 - `Step 5.397`
   - XiaoZhi playback runtime 现在为 supply 判定引入显式
     `playback_supply_source`
