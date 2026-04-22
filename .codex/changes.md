@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.409
+- dialog runtime 继续把 interaction/raw facts 从 exported snapshot 中剥离：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部真相载体：
+  - `river_dialog_runtime_cloud_round_facts_t`
+  - `river_dialog_runtime_cloud_io_facts_t`
+  - `g_river_dialog_runtime.cloud_round_facts`
+  - `g_river_dialog_runtime.cloud_io_facts`
+- 新增导出镜像辅助层：
+  - `river_dialog_runtime_export_round_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_io_facts_to_snapshot_locked(...)`
+- `river_dialog_runtime_capture_interaction_projection_locked(...)` 现在改为直接读取：
+  - internal `cloud_round_facts`
+  - internal `cloud_io_facts`
+  不再从 `snapshot.conversation/window/cloud_*` 和 `snapshot.input/output_lane`
+  原始字段散读
+- `river_dialog_runtime_capture_playback_projection_locked(...)` 的
+  `output_lane` 现在也改为读取 internal `cloud_io_facts`
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` 现在先写：
+  - internal `cloud_round_facts`
+  - internal `cloud_io_facts`
+  然后统一镜像到 exported snapshot
+- 这一步继续把 dialog runtime 推进成唯一真相源，进一步明确
+  “内部 round/io raw facts” 与 “对外 snapshot export” 的分层，为后续继续剥离
+  turn/session metadata 与其他 raw facts 做准备
+
 ## Step 5.408
 - dialog runtime 开始把内部 playback raw facts 从导出 snapshot 中剥离：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

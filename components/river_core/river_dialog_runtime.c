@@ -32,6 +32,23 @@ typedef struct {
 } river_dialog_runtime_cloud_playback_facts_t;
 
 typedef struct {
+    bool conversation_window_active;
+    uint32_t conversation_window_remaining_ms;
+    bool cloud_listening;
+    bool cloud_stream_active;
+    bool cloud_listen_stop_pending;
+    bool cloud_local_close_pending;
+    uint32_t local_close_remaining_ms;
+} river_dialog_runtime_cloud_round_facts_t;
+
+typedef struct {
+    char input_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    char output_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    river_dialog_input_lane_t input_lane;
+    river_dialog_output_lane_t output_lane;
+} river_dialog_runtime_cloud_io_facts_t;
+
+typedef struct {
     bool initialized;
     bool cloud_runtime_available;
     bool local_playback_stream_owned;
@@ -39,6 +56,8 @@ typedef struct {
     bool local_playback_error_recovering;
     char local_playback_stream_name[32];
     river_playback_state_t playback_state;
+    river_dialog_runtime_cloud_round_facts_t cloud_round_facts;
+    river_dialog_runtime_cloud_io_facts_t cloud_io_facts;
     river_dialog_runtime_cloud_playback_facts_t cloud_playback_facts;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
@@ -287,6 +306,38 @@ static bool river_dialog_runtime_capture_cloud_import(
     cloud_import->playback_start_cautious_history =
         snapshot.playback_start_cautious_history;
     return true;
+}
+
+static void river_dialog_runtime_export_round_facts_to_snapshot_locked(void)
+{
+    g_river_dialog_runtime.snapshot.conversation_window_active =
+        g_river_dialog_runtime.cloud_round_facts.conversation_window_active;
+    g_river_dialog_runtime.snapshot.conversation_window_remaining_ms =
+        g_river_dialog_runtime.cloud_round_facts.conversation_window_remaining_ms;
+    g_river_dialog_runtime.snapshot.cloud_listening =
+        g_river_dialog_runtime.cloud_round_facts.cloud_listening;
+    g_river_dialog_runtime.snapshot.cloud_stream_active =
+        g_river_dialog_runtime.cloud_round_facts.cloud_stream_active;
+    g_river_dialog_runtime.snapshot.cloud_listen_stop_pending =
+        g_river_dialog_runtime.cloud_round_facts.cloud_listen_stop_pending;
+    g_river_dialog_runtime.snapshot.cloud_local_close_pending =
+        g_river_dialog_runtime.cloud_round_facts.cloud_local_close_pending;
+    g_river_dialog_runtime.snapshot.local_close_remaining_ms =
+        g_river_dialog_runtime.cloud_round_facts.local_close_remaining_ms;
+}
+
+static void river_dialog_runtime_export_io_facts_to_snapshot_locked(void)
+{
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.input_state_text,
+                                   sizeof(g_river_dialog_runtime.snapshot.input_state_text),
+                                   g_river_dialog_runtime.cloud_io_facts.input_state_text);
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.output_state_text,
+                                   sizeof(g_river_dialog_runtime.snapshot.output_state_text),
+                                   g_river_dialog_runtime.cloud_io_facts.output_state_text);
+    g_river_dialog_runtime.snapshot.input_lane =
+        g_river_dialog_runtime.cloud_io_facts.input_lane;
+    g_river_dialog_runtime.snapshot.output_lane =
+        g_river_dialog_runtime.cloud_io_facts.output_lane;
 }
 
 static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
@@ -616,9 +667,11 @@ typedef struct {
 static void river_dialog_runtime_capture_playback_projection_locked(
     river_dialog_runtime_playback_projection_t *projection)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
     const river_dialog_runtime_cloud_playback_facts_t *playback_facts =
         &g_river_dialog_runtime.cloud_playback_facts;
+    const river_dialog_runtime_cloud_io_facts_t *io_facts =
+        &g_river_dialog_runtime.cloud_io_facts;
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
 
     if (projection == NULL) {
         return;
@@ -640,7 +693,7 @@ static void river_dialog_runtime_capture_playback_projection_locked(
     projection->backend_state_kind = playback_facts->backend_state_kind;
     projection->hold_kind = playback_facts->hold_kind;
     projection->terminal_wait_kind = playback_facts->terminal_wait_kind;
-    projection->output_lane = snapshot->output_lane;
+    projection->output_lane = io_facts->output_lane;
     projection->local_shadow_active =
         river_dialog_runtime_local_playback_shadow_active_fallback_locked();
     projection->local_shadow_recovering =
@@ -817,6 +870,10 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
     river_dialog_runtime_interaction_projection_t *projection)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+    const river_dialog_runtime_cloud_round_facts_t *round_facts =
+        &g_river_dialog_runtime.cloud_round_facts;
+    const river_dialog_runtime_cloud_io_facts_t *io_facts =
+        &g_river_dialog_runtime.cloud_io_facts;
 
     if (projection == NULL) {
         return;
@@ -829,17 +886,17 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
     projection->asr_session_active = snapshot->asr_session_active;
     projection->wake_confirmed = snapshot->wake_confirmed;
     projection->wake_admission_pending = snapshot->wake_admission_pending;
-    projection->conversation_window_active = snapshot->conversation_window_active;
-    projection->cloud_listening = snapshot->cloud_listening;
-    projection->cloud_stream_active = snapshot->cloud_stream_active;
-    projection->cloud_listen_stop_pending = snapshot->cloud_listen_stop_pending;
-    projection->cloud_local_close_pending = snapshot->cloud_local_close_pending;
+    projection->conversation_window_active = round_facts->conversation_window_active;
+    projection->cloud_listening = round_facts->cloud_listening;
+    projection->cloud_stream_active = round_facts->cloud_stream_active;
+    projection->cloud_listen_stop_pending = round_facts->cloud_listen_stop_pending;
+    projection->cloud_local_close_pending = round_facts->cloud_local_close_pending;
     projection->playback_active = snapshot->playback_active;
     projection->playback_recovering = snapshot->playback_recovering;
     projection->playback_terminal_closed = snapshot->playback_terminal_closed;
     projection->tts_interrupt_requested = snapshot->tts_interrupt_requested;
-    projection->input_lane = snapshot->input_lane;
-    projection->output_lane = snapshot->output_lane;
+    projection->input_lane = io_facts->input_lane;
+    projection->output_lane = io_facts->output_lane;
     projection->interaction_state = snapshot->interaction_state;
     projection->output_turn_engaged =
         river_dialog_runtime_output_turn_engaged_from_projection(
@@ -1060,18 +1117,19 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
     }
 
     g_river_dialog_runtime.cloud_runtime_available = cloud_import->runtime_available;
-    g_river_dialog_runtime.snapshot.conversation_window_active =
+    g_river_dialog_runtime.cloud_round_facts.conversation_window_active =
         cloud_import->conversation_window_active;
-    g_river_dialog_runtime.snapshot.conversation_window_remaining_ms =
+    g_river_dialog_runtime.cloud_round_facts.conversation_window_remaining_ms =
         cloud_import->conversation_window_remaining_ms;
-    g_river_dialog_runtime.snapshot.cloud_listening = cloud_import->cloud_listening;
-    g_river_dialog_runtime.snapshot.cloud_stream_active =
+    g_river_dialog_runtime.cloud_round_facts.cloud_listening =
+        cloud_import->cloud_listening;
+    g_river_dialog_runtime.cloud_round_facts.cloud_stream_active =
         cloud_import->cloud_stream_active;
-    g_river_dialog_runtime.snapshot.cloud_listen_stop_pending =
+    g_river_dialog_runtime.cloud_round_facts.cloud_listen_stop_pending =
         cloud_import->cloud_listen_stop_pending;
-    g_river_dialog_runtime.snapshot.cloud_local_close_pending =
+    g_river_dialog_runtime.cloud_round_facts.cloud_local_close_pending =
         cloud_import->cloud_local_close_pending;
-    g_river_dialog_runtime.snapshot.local_close_remaining_ms =
+    g_river_dialog_runtime.cloud_round_facts.local_close_remaining_ms =
         cloud_import->local_close_remaining_ms;
     g_river_dialog_runtime.cloud_playback_facts.cloud_playback_active =
         cloud_import->playback_cloud_active;
@@ -1128,11 +1186,11 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
         sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
         cloud_import->playback_terminal_wait_reason);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.input_state_text,
-                                   sizeof(g_river_dialog_runtime.snapshot.input_state_text),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_io_facts.input_state_text,
+                                   sizeof(g_river_dialog_runtime.cloud_io_facts.input_state_text),
                                    cloud_import->input_state_text);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.output_state_text,
-                                   sizeof(g_river_dialog_runtime.snapshot.output_state_text),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_io_facts.output_state_text,
+                                   sizeof(g_river_dialog_runtime.cloud_io_facts.output_state_text),
                                    cloud_import->output_state_text);
     g_river_dialog_runtime.cloud_playback_facts.start_frames =
         cloud_import->playback_start_frames;
@@ -1140,10 +1198,12 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         cloud_import->playback_prefetch_frames;
     g_river_dialog_runtime.cloud_playback_facts.start_cautious_history =
         cloud_import->playback_start_cautious_history;
-    g_river_dialog_runtime.snapshot.input_lane =
+    g_river_dialog_runtime.cloud_io_facts.input_lane =
         river_dialog_runtime_parse_input_lane(cloud_import->input_state_text);
-    g_river_dialog_runtime.snapshot.output_lane =
+    g_river_dialog_runtime.cloud_io_facts.output_lane =
         river_dialog_runtime_parse_output_lane(cloud_import->output_state_text);
+    river_dialog_runtime_export_round_facts_to_snapshot_locked();
+    river_dialog_runtime_export_io_facts_to_snapshot_locked();
     river_dialog_runtime_export_playback_facts_to_snapshot_locked();
 }
 

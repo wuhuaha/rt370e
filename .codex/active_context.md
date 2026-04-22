@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.408 让 dialog runtime playback projection 改读内部 playback facts`
+  - `5.409 让 dialog runtime interaction projection 改读内部 round/io facts`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 继续把 interaction/raw facts 从 exported snapshot 中剥离
+    - 新增：
+      - `river_dialog_runtime_cloud_round_facts_t`
+      - `river_dialog_runtime_cloud_io_facts_t`
+      - `river_dialog_runtime_export_round_facts_to_snapshot_locked(...)`
+      - `river_dialog_runtime_export_io_facts_to_snapshot_locked(...)`
+    - `capture_interaction_projection_locked(...)` 现在改为直接读取 internal：
+      - `cloud_round_facts`
+      - `cloud_io_facts`
+    - `capture_playback_projection_locked(...)` 的 `output_lane` 现在也改读
+      internal `cloud_io_facts`
+    - `import_cloud_snapshot_locked(...)` 现在先写 round/io facts，再统一镜像到
+      exported snapshot
+    - 这一步继续把 dialog runtime 推进成唯一真相源，进一步明确内部 round/io raw facts
+      与对外 snapshot export 的分层，为后续继续剥离 turn/session metadata 做准备
   - newest landed runtime-ownership slice:
     - dialog runtime 开始把内部 playback raw facts 与 exported snapshot 拆层
     - 新增：
