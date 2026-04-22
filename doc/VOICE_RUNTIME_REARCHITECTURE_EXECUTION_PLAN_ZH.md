@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.401`
+  - XiaoZhi playback runtime 继续把 control-path 收口到显式
+    `playback_truth_view`
+  - 以下边界现在都改为先捕获 truth-view，再消费同一份
+    `backend/phase/hold/output_active` 真相：
+    - `apply_transport_reset_playback_policy()`
+    - `apply_session_start_playback_policy()`
+    - `playback_note_duplex_ready()`
+    - `reset_playback_state()`
+    - `playback_check_pending_stop()`
+    - `playback_abort_for_cause()`
+    - `start_playback_if_needed()`
+  - `playback_abort` 日志现在也直接打印 truth-view 里的
+    `phase/hold/backend`
+  - 这一步继续减少 control-path 与 worker-path 对 playback backend 的分叉判定
 - `Step 5.400`
   - XiaoZhi playback runtime 继续把观测面收口到显式 `playback_truth_view`
   - `playback_truth_view` 现在额外派生 `hold_kind`，使执行面和观测面共用同一份

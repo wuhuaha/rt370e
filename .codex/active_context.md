@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.400 让 playback 观测面复用 truth-view`
+  - `5.401 让 playback control-path 复用 truth-view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 继续把 control-path 收口到显式
+      `playback_truth_view`
+    - 以下边界现在都改为先捕获 truth-view，再消费同一份
+      `backend/phase/hold/output_active` 真相：
+      - `apply_transport_reset_playback_policy()`
+      - `apply_session_start_playback_policy()`
+      - `playback_note_duplex_ready()`
+      - `reset_playback_state()`
+      - `playback_check_pending_stop()`
+      - `playback_abort_for_cause()`
+      - `start_playback_if_needed()`
+    - `playback_abort` 日志现在也直接打印 truth-view 里的
+      `phase/hold/backend`
+    - 这一步继续减少 control-path 与 worker-path 对 playback backend 的分叉判定
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 继续把观测面收口到显式 `playback_truth_view`
     - `playback_truth_view` 现在额外派生 `hold_kind`，使执行面和观测面共用
@@ -325,11 +340,11 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续收口 worker / dump / snapshot 里的组合 truth 读边界
     - 下一刀优先判断：
-      - `pending_stop` / `abort` / `start_if_needed` 这类仍直接读取
-        `backend_state` 的边界，是否也要收口到更统一的 truth-source
-      - `playback_check_pending_stop()` / `playback_abort_for_cause()` /
-        `start_playback_if_needed()` 是否要继续按相同方式复用 truth-view，减少
-        control-path 与 worker-path 的 backend 判定分叉
+      - `playback_physical_active()` / `playback_turn_active()` /
+        `playback_terminal_open()` 这类 wrapper 是否也要进一步纳入更完整的
+        dialog/playback truth-source
+      - dialog runtime 主真相源是否要开始直接消费 playback truth-view，而不是
+        继续只拿 snapshot 投影
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

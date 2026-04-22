@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.401
+Validate that the playback control-path now reuses the shared truth-view instead
+of independently re-reading backend/output state across stop, abort, and start
+boundaries:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1588,1678p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2880,3098p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'apply_transport_reset_playback_policy|apply_session_start_playback_policy|playback_note_duplex_ready|reset_playback_state|playback_check_pending_stop|playback_abort_for_cause|start_playback_if_needed|phase=%s hold=%s backend=%s' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the listed control-path functions now capture and reuse one
+  `playback_truth_view`
+- `playback_check_pending_stop()` and `start_playback_if_needed()` no longer
+  independently re-read backend state inside the function body
+- `playback_abort_for_cause()` logs `phase/hold/backend` from the shared
+  truth-view snapshot
+
 ## Step 5.400
 Validate that playback diagnostics and runtime snapshots now consume the same
 truth-view used by the worker instead of separately rebuilding phase/backend
