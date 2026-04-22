@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.422
+Validate that cloud playback internal `backend_state/hold_kind/output_active`
+semantics no longer reconstruct from coarse playback phase:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '35,215p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '585,640p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '715,735p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '915,935p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'phase_is_output_active|phase_retains_output_turn|REBUFFERING|WAITING_SEGMENT|backend_source_output_active|truth_view_retains_output_turn|waiting_next_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_backend_source_t` now mirrors:
+  - `stop_pending`
+  - `rebuffer_pending`
+  - `physical_active`
+  - `waiting_next_segment`
+- `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)` no
+  longer uses `phase == REBUFFERING` or `phase_is_output_active(...)`
+- `river_cloud_xiaozhi_playback_hold_kind_from_source(...)` now reads
+  `waiting_next_segment` instead of `phase == WAITING_SEGMENT`
+- `river_cloud_xiaozhi_playback_output_active()` and
+  `river_cloud_xiaozhi_output_speaking_active()` reuse typed backend/truth-view
+  helpers instead of phase-only helpers
+
 ## Step 5.421
 Validate that cloud playback lane/turn exported semantics no longer reconstruct
 `lane_engaged` from `phase != IDLE`:

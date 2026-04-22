@@ -1,5 +1,37 @@
 # Change Log
 
+## Step 5.422
+- `cloud playback runtime` 继续把内部播放语义从 coarse phase 解耦：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_playback_backend_source_t` 现在额外镜像：
+  - `stop_pending`
+  - `rebuffer_pending`
+  - `physical_active`
+  - `waiting_next_segment`
+- `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)`
+  不再读取：
+  - `phase == REBUFFERING`
+  - `phase_is_output_active(...)`
+- 现在直接用底层 truth 决定：
+  - recovering
+  - owned_active
+  - owned_paused
+- `river_cloud_xiaozhi_playback_hold_kind_from_source(...)` 不再读取：
+  - `phase == WAITING_SEGMENT`
+- 现在改为直接读取：
+  - `waiting_next_segment`
+  - `rebuffer_pending`
+- `river_cloud_xiaozhi_playback_output_active()` 与
+  `river_cloud_xiaozhi_output_speaking_active()` 现在统一复用 truth view helper：
+  - `river_cloud_xiaozhi_playback_backend_source_output_active(...)`
+  - `river_cloud_xiaozhi_playback_truth_view_retains_output_turn(...)`
+- 这一步继续把 phase 从“内部决策输入”降级为“观测值”，进一步收口：
+  - backend_state
+  - hold_kind
+  - output_active
+  - speaking retain-output-turn
+  对 coarse phase 的依赖
+
 ## Step 5.421
 - `cloud playback runtime` 继续清理导出链中对 coarse playback phase 的直接依赖：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

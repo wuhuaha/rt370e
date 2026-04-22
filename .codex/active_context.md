@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.421 让 cloud playback lane/turn 改读 typed truth`
+  - `5.422 让 playback backend/hold/output 改读底层 truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `cloud playback runtime` 继续把内部播放语义从 coarse phase 解耦
+    - `river_cloud_xiaozhi_playback_backend_source_t` 现在额外镜像：
+      - `stop_pending`
+      - `rebuffer_pending`
+      - `physical_active`
+      - `waiting_next_segment`
+    - `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)`
+      不再读取：
+      - `phase == REBUFFERING`
+      - `phase_is_output_active(...)`
+      现在直接从底层 truth 判定 recovering / owned_active / owned_paused
+    - `river_cloud_xiaozhi_playback_hold_kind_from_source(...)` 不再依赖
+      `phase == WAITING_SEGMENT`
+    - `river_cloud_xiaozhi_playback_output_active()` /
+      `river_cloud_xiaozhi_output_speaking_active()` 也统一改读：
+      - `backend_source_output_active(...)`
+      - `truth_view_retains_output_turn(...)`
+      让 phase 进一步退回到观测值角色
   - newest landed runtime-ownership slice:
     - `cloud playback runtime` 继续把导出链上的 coarse phase 依赖向 typed truth
       收口

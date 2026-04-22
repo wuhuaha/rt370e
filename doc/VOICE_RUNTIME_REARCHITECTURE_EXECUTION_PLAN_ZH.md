@@ -26,6 +26,33 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.422`
+  - `cloud playback runtime` 继续把内部播放语义从 coarse phase 解耦
+  - `river_cloud_xiaozhi_playback_backend_source_t` 现在额外镜像：
+    - `stop_pending`
+    - `rebuffer_pending`
+    - `physical_active`
+    - `waiting_next_segment`
+  - `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)`
+    不再读取：
+    - `phase == REBUFFERING`
+    - `phase_is_output_active(...)`
+    现在改为直接使用底层 truth 判定 recovering / owned_active / owned_paused
+  - `river_cloud_xiaozhi_playback_hold_kind_from_source(...)` 不再依赖
+    `phase == WAITING_SEGMENT`
+  - 现在改为直接读取：
+    - `waiting_next_segment`
+    - `rebuffer_pending`
+  - `river_cloud_xiaozhi_playback_output_active()` 与
+    `river_cloud_xiaozhi_output_speaking_active()` 也统一改读 typed helper：
+    - `river_cloud_xiaozhi_playback_backend_source_output_active(...)`
+    - `river_cloud_xiaozhi_playback_truth_view_retains_output_turn(...)`
+  - 这一步继续把 phase 从“内部决策输入”降级为“观测值”，进一步压缩：
+    - backend_state
+    - hold_kind
+    - output_active
+    - speaking retain-output-turn
+    对 coarse phase 的依赖
 - `Step 5.421`
   - `cloud playback runtime` 继续清理导出链中对 coarse playback phase 的直接依赖
   - `river_cloud_xiaozhi_playback_truth_view_t` 现在额外镜像：
