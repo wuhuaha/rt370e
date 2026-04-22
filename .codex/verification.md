@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.425
+Validate that cloud playback runtime exports phase observability through a
+dedicated observe view instead of reading it back from truth view:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '545,635p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1548,1585p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_observe_view|capture_playback_observe_view|playback_phase_known|playback_phase_kind|playback_phase' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_observe_view_t` exists and carries phase
+  observability
+- `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` reads phase fields
+  from `observe_view`, not `truth_view.backend_source.phase`
+
 ## Step 5.424
 Validate that dialog runtime stores playback phase observation separately from
 typed playback semantics:

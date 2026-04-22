@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.425
+- `cloud playback runtime` 开始把 phase 观测值从 truth 导出链里拆出去：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增独立观测结构：
+  - `river_cloud_xiaozhi_playback_observe_view_t`
+  - `river_cloud_xiaozhi_capture_playback_observe_view(...)`
+- `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 现在同时读取：
+  - `truth_view`
+  - `observe_view`
+- `playback_phase_known`
+  - `playback_phase_kind`
+  - `playback_phase` 文本
+  现在都改为从 `observe_view` 导出，而不是再从 `truth_view.backend_source.phase`
+  间接读取
+- 这一步继续把 cloud runtime 内部的：
+  - typed playback truth
+  - playback phase observability
+  两条链拆开，为后续把日志链也从 truth 结构里解耦做准备
+
 ## Step 5.424
 - `dialog runtime` 继续清理内部“语义事实”和“观测字段”的边界：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

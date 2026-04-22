@@ -561,6 +561,11 @@ typedef struct {
 } river_cloud_xiaozhi_playback_truth_view_t;
 
 typedef struct {
+    bool phase_known;
+    river_cloud_playback_phase_t phase_kind;
+} river_cloud_xiaozhi_playback_observe_view_t;
+
+typedef struct {
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
     uint32_t queued_frames;
     uint32_t hold_frames;
@@ -597,6 +602,18 @@ static void river_cloud_xiaozhi_capture_playback_truth_view(
         river_cloud_xiaozhi_playback_backend_source_output_active(
             &view->backend_source) &&
         river_cloud_xiaozhi_playback_backend_output_active(view->backend_state);
+}
+
+static void river_cloud_xiaozhi_capture_playback_observe_view(
+    river_cloud_xiaozhi_playback_observe_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    view->phase_known = true;
+    view->phase_kind = river_cloud_xiaozhi_playback_phase();
 }
 
 static bool river_cloud_xiaozhi_playback_supply_engages_lane(
@@ -1545,25 +1562,27 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     river_cloud_runtime_snapshot_t *snapshot)
 {
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
+    river_cloud_xiaozhi_playback_observe_view_t observe_view;
 
     if (snapshot == NULL) {
         return;
     }
 
     river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
+    river_cloud_xiaozhi_capture_playback_observe_view(&observe_view);
     snapshot->playback_active = truth_view.output_active;
     snapshot->playback_lane_engaged =
         river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(&truth_view);
     snapshot->playback_turn_active =
         river_cloud_xiaozhi_playback_turn_active_from_truth_view(&truth_view);
     snapshot->playback_rebuffer_pending = truth_view.rebuffer_pending;
-    snapshot->playback_phase_known = true;
+    snapshot->playback_phase_known = observe_view.phase_known;
     snapshot->playback_backend_state_kind = truth_view.backend_state;
     snapshot->playback_supply_kind = truth_view.supply_kind;
     snapshot->playback_hold_kind = truth_view.hold_kind;
     snapshot->playback_terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     snapshot->playback_terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
-    snapshot->playback_phase_kind = truth_view.backend_source.phase;
+    snapshot->playback_phase_kind = observe_view.phase_kind;
     snapshot->playback_terminal_wait_kind =
         g_river_cloud.xiaozhi_playback_terminal_wait_kind;
     snapshot->playback_terminal_state_kind =
@@ -1576,7 +1595,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,
                                            sizeof(snapshot->playback_phase),
                                            river_cloud_playback_phase_name(
-                                               truth_view.backend_source.phase));
+                                               observe_view.phase_kind));
     river_cloud_xiaozhi_copy_optional_text(
         snapshot->playback_rebuffer_cause,
         sizeof(snapshot->playback_rebuffer_cause),

@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.425`
+  - `cloud playback runtime` 开始把 phase 观测值从 truth 导出链里拆出去
+  - 新增独立观测结构：
+    - `river_cloud_xiaozhi_playback_observe_view_t`
+    - `river_cloud_xiaozhi_capture_playback_observe_view(...)`
+  - `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 现在同时读取：
+    - `truth_view`
+    - `observe_view`
+  - `playback_phase_known`
+    - `playback_phase_kind`
+    - `playback_phase` 文本
+    现在统一改为从 `observe_view` 导出，不再从
+    `truth_view.backend_source.phase` 间接读取
+  - 这一步继续把：
+    - typed playback truth
+    - playback phase observability
+    两条内部链路拆开，为后续把日志链也从 truth 结构里解耦做准备
 - `Step 5.424`
   - `dialog runtime` 继续清理“语义事实”和“观测字段”的边界
   - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
