@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.406
+Validate that dialog runtime ingress now captures a dialog-owned cloud import
+carrier before reducer import, instead of directly feeding the adapter runtime
+snapshot into dialog reducers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '24,110p' components/river_core/river_dialog_runtime.c
+sed -n '160,260p' components/river_core/river_dialog_runtime.c
+sed -n '300,340p' components/river_core/river_dialog_runtime.c
+sed -n '920,1020p' components/river_core/river_dialog_runtime.c
+sed -n '1170,1278p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_import|capture_cloud_import|import_cloud_snapshot_locked|commit_cloud_event|sync_cloud_state|reduce_local_playback_event' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_import_t` exists and contains the dialog-owned
+  cloud raw-fact carrier fields
+- `river_dialog_runtime_capture_cloud_import(...)` is the only remaining place
+  in dialog runtime that directly touches `river_cloud_runtime_snapshot_t`
+- `import_cloud_snapshot_locked(...)` now imports from
+  `river_dialog_runtime_cloud_import_t`
+- cloud-event, cloud-sync, and local-playback ingress all capture the same
+  dialog-owned import carrier before entering `import -> reconcile -> finalize`
+
 ## Step 5.405
 Validate that dialog runtime now separates cloud raw-fact import from dialog
 truth reconciliation, and that the main ingress paths explicitly follow

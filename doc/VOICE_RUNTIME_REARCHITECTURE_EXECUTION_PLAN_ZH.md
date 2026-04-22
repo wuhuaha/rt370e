@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.406`
+  - dialog runtime 继续把 cloud ingress 收口成 dialog-owned import carrier：
+    - `river_dialog_runtime_cloud_import_t`
+    - `river_dialog_runtime_capture_cloud_import(...)`
+  - `river_dialog_runtime_capture_cloud_import(...)` 现在是 dialog runtime 内
+    唯一直接接触 `river_cloud_runtime_snapshot_t` 的入口；它会把 adapter runtime
+    snapshot 复制为 dialog 自己拥有的 raw-fact 载体
+  - `import_cloud_snapshot_locked(...)` 现在改为只消费
+    `river_dialog_runtime_cloud_import_t`，不再把
+    `river_cloud_runtime_snapshot_t` 直接作为 reducer 输入
+  - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+    `reduce_local_playback_event(...)` 现在统一显式走：
+    - capture cloud import
+    - import facts
+    - reconcile facts
+    - finalize commit
+  - 这一步继续把 dialog runtime 推进成唯一 dialog 真相源，进一步切断 reducer
+    与 cloud adapter export snapshot 结构之间的直接耦合，为下一步继续收紧
+    typed ingress / reducer 分层做准备
 - `Step 5.405`
   - dialog runtime 已把 cloud snapshot 路径从单个混合 helper 拆成显式两阶段：
     - `import_cloud_snapshot_locked(...)`

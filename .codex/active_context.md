@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.405 让 dialog runtime cloud import/reconcile 分层`
+  - `5.406 让 dialog runtime 通过 cloud import carrier 吸收云态`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 继续把 cloud ingress 收口成 dialog-owned
+      `cloud_import` 载体
+    - 新增：
+      - `river_dialog_runtime_cloud_import_t`
+      - `river_dialog_runtime_capture_cloud_import(...)`
+    - dialog runtime 现在只在 `capture_cloud_import(...)` 这一层接触
+      `river_cloud_runtime_snapshot_t`
+    - `import_cloud_snapshot_locked(...)` 现在改为只消费 dialog 自己拥有的
+      `cloud_import` 原始事实，而不再把 adapter export snapshot 直接送入 reducer
+    - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+      `reduce_local_playback_event(...)` 现在统一先：
+      - capture cloud import
+      - import facts
+      - reconcile facts
+      - finalize commit
+    - 这一步继续把 dialog runtime 推进成 dialog 真相源，削弱 reducer 对
+      cloud adapter 导出结构的耦合，为下一步继续压缩 typed ingress / reducer
+      管线做准备
   - newest landed runtime-ownership slice:
     - dialog runtime 已把 cloud snapshot 路径从单个混合 helper 拆成：
       - `import_cloud_snapshot_locked(...)`

@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.406
+- dialog runtime 继续把 cloud ingress 从直接消费 adapter snapshot 收口成
+  dialog-owned import carrier：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部类型：
+  - `river_dialog_runtime_cloud_import_t`
+- 新增 `river_dialog_runtime_capture_cloud_import(...)`，由它在 dialog runtime 边界内
+  吸收 `river_cloud_runtime_snapshot_t`，并复制为 dialog 自己拥有的 import 载体
+- `import_cloud_snapshot_locked(...)` 现在改为只消费
+  `river_dialog_runtime_cloud_import_t`，不再把
+  `river_cloud_runtime_snapshot_t` 直接作为 reducer 输入
+- 以下 ingress 入口现在统一改为：
+  - 先 `capture_cloud_import(...)`
+  - 再 `import_cloud_snapshot_locked(...)`
+  - 再 `reconcile_facts_locked(...)`
+  - 最后 `finalize_commit_locked(...)`
+  - `river_dialog_runtime_commit_cloud_event(...)`
+  - `river_dialog_runtime_sync_cloud_state(...)`
+  - `river_dialog_runtime_reduce_local_playback_event(...)`
+- 这一步继续把 dialog runtime 推进成唯一 dialog 真相源，切断 reducer 对
+  cloud adapter export snapshot 结构的直接依赖，为下一步继续压缩 ingress typed
+  reducer / import pipeline 做准备
+
 ## Step 5.405
 - dialog runtime 继续把 cloud snapshot 路径从“import + reconcile 混合 helper”
   拆成显式两阶段：
