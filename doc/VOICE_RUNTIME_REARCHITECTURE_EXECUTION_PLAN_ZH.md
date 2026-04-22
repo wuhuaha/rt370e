@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.415`
+  - XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复延迟
+  - 当 cause 仍是 `WRITE_FAILED` 且 recovery=`service_recover` 时，worker 现在会在
+    inline `river_playback_service_recover_stream_ex(...)` 成功后，同一轮立即重写
+    当前 frame，而不是留到下一次 poll 再通过 `retry_valid` 重放
+  - `xiaozhi_downlink_retry_valid` 现在只在真正进入 recover fallback / inline replay
+    fallback / 非 inline rebuffer 时才置位；recover 成功且即时重写成功的路径不再污染
+    retry / rebuffer 状态
+  - 新增诊断日志：
+    - `xiaozhi playback inline recover replay succeeded`
+    - `xiaozhi playback rebuffer requested after inline replay fallback`
+  - 这一步继续把 downlink write-fail recovery 从“recover 成功但仍要再等一轮 worker”
+    收紧到“recover 成功即刻重写当前帧”，进一步缩小一次 poll 周期带来的播放卡顿窗口，
+    也减少了瞬时写失败把后续 start-gate / streak 错抬高的概率
 - `Step 5.414`
   - XiaoZhi downlink / playback 继续拆分 `write_failed` 的 recover 与 rebuffer
     语义

@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.415
+- XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复延迟：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 当 cause 仍是纯 `RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_WRITE_FAILED` 且 recovery
+  路径选择 `service_recover` 时，worker 现在会在 recover 成功后，同一轮立即重写
+  当前 frame，而不是留到下一次 poll 再重试
+- `xiaozhi_downlink_retry_valid` 现在只在真正进入：
+  - recover fallback
+  - inline replay fallback
+  - 非 inline rebuffer/retry
+  时才置位，不再被每次 recover 成功的瞬时写失败污染
+- 新增更细的诊断日志：
+  - `xiaozhi playback inline recover replay succeeded`
+  - `xiaozhi playback rebuffer requested after inline replay fallback`
+- 这一步继续把纯 `write_failed` 的恢复从“recover 成功，但还要再等一轮 worker”
+  收紧到“recover 成功即刻重写当前帧”，进一步缩短一次 poll 周期的额外播放卡顿窗口，
+  并继续降低 `rebuffer_pending / streak / start_gate` 的误触发概率
+
 ## Step 5.414
 - XiaoZhi downlink / playback 继续拆分 `write_failed` 的 recover 与 rebuffer 语义：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

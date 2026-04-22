@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.414 让纯 write_failed 先走 service recover 再进入 rebuffer`
+  - `5.415 让 write_failed recover 成功后同轮立即重写当前帧`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复窗口
+    - 当 cause 仍是 `WRITE_FAILED` 且 recovery=`service_recover` 时，worker 现在会在
+      `river_playback_service_recover_stream_ex(...)` 成功后，同一轮立即重写当前帧，
+      不再额外等待下一次 poll 才消费 `retry_valid`
+    - `xiaozhi_downlink_retry_valid` 现在只在真正进入：
+      - recover fallback
+      - inline replay fallback
+      - 非 inline rebuffer/retry
+      时才置位；recover 成功且即时重写成功的路径不再污染 retry/rebuffer 语义
+    - 新增诊断日志：
+      - `xiaozhi playback inline recover replay succeeded`
+      - `xiaozhi playback rebuffer requested after inline replay fallback`
+    - 这一步继续把 downlink write-fail recovery 从“recover 成功但仍要等下一轮”
+      收紧到“recover 成功即刻重写当前帧”，进一步缩小一次 poll 周期带来的可闻卡顿窗口
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续拆分 `write_failed` 的 recover 与 rebuffer 语义
     - 纯 `WRITE_FAILED` 且 recovery=`service_recover` 的路径现在不再立刻：

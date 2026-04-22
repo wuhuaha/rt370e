@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.415
+Validate that pure `write_failed` recovery now retries the same frame in the
+same worker iteration after a successful inline `service_recover`, instead of
+waiting for the next poll cycle:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '3390,3605p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'inline_rewrite_succeeded|inline recover replay succeeded|rebuffer requested after inline replay fallback|xiaozhi_downlink_retry_valid = true|service recover requested' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the pure `WRITE_FAILED + service_recover` path now attempts an immediate
+  second `river_playback_service_write(...)` in the same branch after recover
+- `xiaozhi_downlink_retry_valid` is no longer set before every inline recover
+  attempt; it is deferred until the code actually falls back to replay/rebuffer
+- successful inline recover replay now falls through the normal success tail:
+  - clear retry flag
+  - `try_start_current_playback_segment(...)`
+  - `update_playback_ack_progress()`
+  - `playback_check_pending_stop()`
+- only recover failure or inline replay failure now escalates into
+  `note_playback_rebuffer(...)` and stop/restart semantics
+
 ## Step 5.414
 Validate that pure `write_failed` recovery no longer enters rebuffer semantics
 before an inline `service_recover` attempt:
