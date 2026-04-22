@@ -15,11 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.389 在 AEC/duplex 诊断中外显 dialog typed truth`
+  - `5.390 让 native ref unavailable 不再反推 raw playback state`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `voice runtime` 在 `uses_native_capture_ref` 且 native ref 尚未可用时，
+      不再重新读取 raw `playback_state_active()` 去区分：
+      - `ref_idle`
+      - `ref_missing`
+    - 现在只要已经通过前置 AEC playback gate，就统一把这类窗口解释成
+      `ref_idle`
+    - 这意味着 native reference 的缺席不再在 AEC/duplex 评估末端再次从
+      物理 playback state 反推语义，reference 分类与前面已接受的
+      dialog/playback gate 真相保持一致
+    - 这一步继续清理 `voice runtime` 内 residual 的 raw playback-state
+      语义依赖，让 `ref_idle/ref_missing` 的边界更贴近 runtime gate 真相
   - newest landed runtime-ownership slice:
     - `voice runtime` 的 AEC/duplex 评估结构现在开始显式携带
       `dialog runtime` 导出的：

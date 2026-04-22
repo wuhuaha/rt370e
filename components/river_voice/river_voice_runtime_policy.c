@@ -432,9 +432,13 @@ void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
                                                      RIVER_REFERENCE_IDLE;
         if (!native_ref.available) {
             eval->reference_last_write_age_ms = 0U;
-            ref_activity = river_playback_service_state_active(aec_eval.playback_state) ?
-                               RIVER_VOICE_REFERENCE_ACTIVITY_IDLE :
-                               RIVER_VOICE_REFERENCE_ACTIVITY_MISSING;
+            /*
+             * AEC playback gating has already accepted this path. If the native
+             * reference stream is not observable yet, treat it as an idle
+             * reference window rather than re-infer semantics from the raw
+             * playback service state again.
+             */
+            ref_activity = RIVER_VOICE_REFERENCE_ACTIVITY_IDLE;
         } else {
             now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
             eval->reference_last_write_age_ms =

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.390
+Validate that native-capture-reference fallback no longer re-infers
+`ref_idle/ref_missing` from the raw playback service state after the AEC
+playback gate has already accepted the path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '424,442p' components/river_voice/river_voice_runtime_policy.c
+rg -n 'river_playback_service_state_active\\(aec_eval.playback_state\\)|RIVER_VOICE_REFERENCE_ACTIVITY_IDLE' \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- inside the `uses_native_capture_ref && !native_ref.available` branch:
+  - `ref_activity` is now assigned directly to
+    `RIVER_VOICE_REFERENCE_ACTIVITY_IDLE`
+  - there is no longer a fallback that re-reads
+    `river_playback_service_state_active(aec_eval.playback_state)`
+- `native ref unavailable` therefore means:
+  - playback gate already accepted the window
+  - native reference is currently idle/unobserved
+  rather than forcing a second semantic split from raw playback state
+
 ## Step 5.389
 Validate that AEC/duplex diagnostics now expose the typed
 `dialog runtime playback_owner_kind/error_kind` alongside the raw playback

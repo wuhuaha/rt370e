@@ -1,5 +1,16 @@
 # Change Log
 
+## Step 5.390
+- `voice runtime` 在 `uses_native_capture_ref` 且 native reference 尚未可用时，
+  不再回退依赖 raw `playback_state_active()` 去区分 `ref_idle/ref_missing`：
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 现在只要前面的 AEC playback gate 已经接受当前路径，就统一把这类 native-ref
+  空窗解释成：
+  - `RIVER_VOICE_REFERENCE_ACTIVITY_IDLE`
+- 这一步不改变 duplex ready 的 ready/not-ready 结论，只收紧 reference
+  activity 的语义边界，避免在评估尾部再次从 raw playback service state
+  反推语义
+
 ## Step 5.389
 - `voice runtime` 的 AEC/duplex 评估结构现在显式携带 `dialog runtime`
   导出的 typed truth：
