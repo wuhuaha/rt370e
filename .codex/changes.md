@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.421
+- `cloud playback runtime` 继续清理导出链中对 coarse playback phase 的直接依赖：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_playback_truth_view_t` 现在额外镜像：
+  - `queued_frames`
+  - `tts_stop_pending`
+  - `rebuffer_pending`
+- 新增统一 typed helper：
+  - `river_cloud_xiaozhi_playback_supply_engages_lane(...)`
+  - `river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(...)`
+  - `river_cloud_xiaozhi_playback_turn_active_from_truth_view(...)`
+- `river_cloud_xiaozhi_playback_lane_engaged()` 不再直接读取：
+  - `phase != IDLE`
+- `river_cloud_xiaozhi_playback_turn_active()` 也不再通过 `lane_engaged <- phase`
+  的链路间接重建 turn 语义
+- `river_cloud_xiaozhi_capture_held_by_playback(...)` 与
+  `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 现在统一复用同一套
+  typed helper，不再在导出路径上回退到：
+  - `phase != IDLE`
+- 这一步把：
+  - public `lane_engaged`
+  - public `turn_active`
+  - capture-held 判定
+  - cloud runtime snapshot 导出
+  全部收口到同一条 typed truth 语义链，继续压缩 phase 在 playback 导出层的职责
+
 ## Step 5.420
 - `dialog runtime` 继续去掉内部派生逻辑对 coarse playback phase 的直接依赖：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

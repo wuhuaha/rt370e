@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.421
+Validate that cloud playback lane/turn exported semantics no longer reconstruct
+`lane_engaged` from `phase != IDLE`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '540,820p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1535,1555p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'phase != RIVER_CLOUD_PLAYBACK_PHASE_IDLE|lane_engaged_from_truth_view|turn_active_from_truth_view|capture_held_by_playback|playback_lane_engaged =|playback_turn_active =' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_truth_view_t` now mirrors:
+  - `queued_frames`
+  - `tts_stop_pending`
+  - `rebuffer_pending`
+- `river_cloud_xiaozhi_playback_lane_engaged()` delegates to
+  `river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(...)` instead of
+  directly checking `phase != IDLE`
+- `river_cloud_xiaozhi_playback_turn_active()` delegates to
+  `river_cloud_xiaozhi_playback_turn_active_from_truth_view(...)`
+- `river_cloud_xiaozhi_capture_held_by_playback(...)` and
+  `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` also reuse the same
+  typed helper path
+
 ## Step 5.420
 Validate that dialog runtime playback projections no longer use coarse
 `WAITING_SEGMENT/REBUFFERING` phase checks for waiting/recovering semantics:

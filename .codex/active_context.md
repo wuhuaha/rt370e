@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.420 让 dialog runtime 改读 waiting/recovering typed truth`
+  - `5.421 让 cloud playback lane/turn 改读 typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `cloud playback runtime` 继续把导出链上的 coarse phase 依赖向 typed truth
+      收口
+    - `river_cloud_xiaozhi_playback_truth_view_t` 现在额外镜像：
+      - `queued_frames`
+      - `tts_stop_pending`
+      - `rebuffer_pending`
+    - 新增统一 typed helper：
+      - `river_cloud_xiaozhi_playback_supply_engages_lane(...)`
+      - `river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(...)`
+      - `river_cloud_xiaozhi_playback_turn_active_from_truth_view(...)`
+    - `river_cloud_xiaozhi_playback_lane_engaged()` /
+      `river_cloud_xiaozhi_playback_turn_active()` /
+      `river_cloud_xiaozhi_capture_held_by_playback(...)` /
+      `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)`
+      现在统一复用这套 helper，不再在导出链上回退到 `phase != IDLE`
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续去掉内部派生逻辑对 coarse playback phase 的直接依赖
     - `river_dialog_runtime_playback_projection_t` 现在显式镜像：

@@ -26,6 +26,28 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.421`
+  - `cloud playback runtime` 继续清理导出链中对 coarse playback phase 的直接依赖
+  - `river_cloud_xiaozhi_playback_truth_view_t` 现在额外镜像：
+    - `queued_frames`
+    - `tts_stop_pending`
+    - `rebuffer_pending`
+  - 新增统一 typed helper：
+    - `river_cloud_xiaozhi_playback_supply_engages_lane(...)`
+    - `river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(...)`
+    - `river_cloud_xiaozhi_playback_turn_active_from_truth_view(...)`
+  - `river_cloud_xiaozhi_playback_lane_engaged()` 不再直接读取：
+    - `phase != IDLE`
+  - `river_cloud_xiaozhi_playback_turn_active()` 不再通过
+    `lane_engaged <- phase` 间接重建 turn 语义
+  - `river_cloud_xiaozhi_capture_held_by_playback(...)` 与
+    `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 也统一改读同一套
+    typed helper，不再在导出路径上回退到 `phase != IDLE`
+  - 这一步继续把：
+    - cloud runtime 负责导出 lane / turn / capture-held 所需的 typed playback truth
+    - dialog runtime 只镜像导出的 truth
+    - voice/runtime policy 只消费镜像后的 truth
+    这条职责边界压实
 - `Step 5.420`
   - `dialog runtime` 继续去掉内部派生逻辑对 coarse playback phase 的直接依赖
   - `river_dialog_runtime_playback_projection_t` 现在显式镜像：
