@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.420
+- `dialog runtime` 继续去掉内部派生逻辑对 coarse playback phase 的直接依赖：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_playback_projection_t` 现在显式镜像：
+  - `supply_kind`
+- `river_dialog_runtime_playback_waiting_segment_from_projection(...)` 不再读取：
+  - `phase_known`
+  - `phase_kind == WAITING_SEGMENT`
+- 现在改为直接消费已经由 playback runtime 导出的：
+  - `playback_supply_kind == RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT`
+- `river_dialog_runtime_playback_turn_retains_output_turn_from_projection(...)`
+  也不再用：
+  - `phase_kind == REBUFFERING`
+  来决定是否维持 output turn
+- 现在改为复用新的 typed helper：
+  - `river_dialog_runtime_playback_turn_recovering_from_projection(...)`
+  - 读取：
+    - `rebuffer_pending`
+    - `backend_state_kind == OWNED_RECOVERING`
+    - `backend_state_kind == RESTART_PENDING`
+- 同时保留原有保守兜底：
+  - `phase_unknown && !cloud_runtime_available`
+  仍允许退回本地 shadow fallback 语义，不引入 cloud snapshot 缺席时的回归
+- 这一步继续把 `dialog runtime` 从“根据 phase 重建播放语义”推进到“直接消费
+  playback runtime 已导出的 typed truth”，进一步压实：
+  - waiting-next-segment 由 supply truth 解释
+  - retain-output-turn 由 recovering truth 解释
+
 ## Step 5.419
 - XiaoZhi downlink / playback 继续把 detached quiet-window 从 phase fallback
   收口到显式的 supply truth：

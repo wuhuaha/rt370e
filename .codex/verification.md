@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.420
+Validate that dialog runtime playback projections no longer use coarse
+`WAITING_SEGMENT/REBUFFERING` phase checks for waiting/recovering semantics:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '740,960p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_waiting_segment_from_projection|playback_turn_recovering_from_projection|WAITING_SEGMENT|REBUFFERING|supply_kind' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_playback_projection_t` now includes `supply_kind`
+- `river_dialog_runtime_playback_waiting_segment_from_projection(...)` uses
+  `RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT` instead of
+  `phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT`
+- `river_dialog_runtime_playback_turn_retains_output_turn_from_projection(...)`
+  now delegates to `river_dialog_runtime_playback_turn_recovering_from_projection(...)`
+  instead of directly checking `phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING`
+- the existing conservative fallback for `!phase_known && !cloud_runtime_available`
+  remains present
+
 ## Step 5.419
 Validate that detached quiet-window / restart-pending gating now reads exported
 `playback_supply_kind` truth instead of phase fallback:

@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.419 导出 playback supply truth 替代 detached phase fallback`
+  - `5.420 让 dialog runtime 改读 waiting/recovering typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续去掉内部派生逻辑对 coarse playback phase 的直接依赖
+    - `river_dialog_runtime_playback_projection_t` 现在显式镜像：
+      - `supply_kind`
+    - `river_dialog_runtime_playback_waiting_segment_from_projection(...)`
+      现在改为直接读取：
+      - `playback_supply_kind == WAITING_NEXT_SEGMENT`
+      不再依赖 `phase_kind == WAITING_SEGMENT`
+    - `river_dialog_runtime_playback_turn_retains_output_turn_from_projection(...)`
+      现在改为通过 typed helper 读取：
+      - `rebuffer_pending`
+      - `backend_state_kind == OWNED_RECOVERING`
+      - `backend_state_kind == RESTART_PENDING`
+      不再直接依赖 `phase_kind == REBUFFERING`
+    - 同时保留：
+      - `!phase_known && !cloud_runtime_available`
+      的保守 fallback，避免 cloud snapshot 缺席时误伤本地 shadow 语义
   - newest landed runtime-ownership slice:
     - playback runtime 继续把 detached quiet-window 的最后一段 phase fallback
       替换成 typed supply truth

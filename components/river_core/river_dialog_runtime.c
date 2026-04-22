@@ -745,6 +745,7 @@ typedef struct {
     bool tts_stop_pending;
     river_cloud_playback_phase_t phase_kind;
     river_cloud_playback_backend_state_t backend_state_kind;
+    river_cloud_playback_supply_kind_t supply_kind;
     river_cloud_playback_hold_kind_t hold_kind;
     river_cloud_playback_terminal_wait_kind_t terminal_wait_kind;
     river_dialog_output_lane_t output_lane;
@@ -802,6 +803,7 @@ static void river_dialog_runtime_capture_playback_projection_locked(
     projection->tts_stop_pending = playback_facts->tts_stop_pending;
     projection->phase_kind = playback_facts->phase_kind;
     projection->backend_state_kind = playback_facts->backend_state_kind;
+    projection->supply_kind = playback_facts->supply_kind;
     projection->hold_kind = playback_facts->hold_kind;
     projection->terminal_wait_kind = playback_facts->terminal_wait_kind;
     projection->output_lane = io_facts->output_lane;
@@ -814,8 +816,9 @@ static void river_dialog_runtime_capture_playback_projection_locked(
 static bool river_dialog_runtime_playback_waiting_segment_from_projection(
     const river_dialog_runtime_playback_projection_t *projection)
 {
-    return projection != NULL && projection->phase_known &&
-           projection->phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+    return projection != NULL &&
+           projection->supply_kind ==
+               RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT;
 }
 
 static bool river_dialog_runtime_playback_segment_gap_hold_from_projection(
@@ -894,6 +897,17 @@ static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
            projection.cloud_playback_active;
 }
 
+static bool river_dialog_runtime_playback_turn_recovering_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    return projection != NULL &&
+           (projection->rebuffer_pending ||
+            projection->backend_state_kind ==
+                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
+            projection->backend_state_kind ==
+                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING);
+}
+
 static bool river_dialog_runtime_compute_playback_active_from_projection(
     const river_dialog_runtime_playback_projection_t *projection)
 {
@@ -929,8 +943,8 @@ static bool river_dialog_runtime_playback_turn_retains_output_turn_from_projecti
     if (!projection->phase_known) {
         return !projection->cloud_runtime_available;
     }
-
-    return projection->phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
+    return river_dialog_runtime_playback_turn_recovering_from_projection(
+        projection);
 }
 
 static bool river_dialog_runtime_output_speaking_effective_from_projection(
