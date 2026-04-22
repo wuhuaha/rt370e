@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.404
+- dialog runtime 为 cloud event / cloud sync / local playback reducer 新增统一的
+  `commit checkpoint + commit policy` 提交边界：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部类型：
+  - `river_dialog_runtime_commit_policy_t`
+  - `river_dialog_runtime_commit_checkpoint_t`
+- 新增统一辅助层：
+  - `capture_commit_checkpoint_locked(...)`
+  - `commit_checkpoint_changed(...)`
+  - `finalize_commit_locked(...)`
+- `river_dialog_runtime_commit_cloud_event(...)` 与
+  `river_dialog_runtime_sync_cloud_state(...)` 现在都通过同一
+  `finalize_commit_locked(...)` 完成提交，而不再直接各自调用
+  `publish_locked(...)`
+- `river_dialog_runtime_reduce_local_playback_event(...)` 不再手工保存：
+  - `prev_playback_active`
+  - `prev_playback_recovering`
+  - `prev_error_recovering`
+  - `prev_interaction_state`
+  并在函数尾部拼接一段专属 publish gating
+- 这一步把 dialog runtime 从“各入口各自判断是否 publish”继续推进成
+  “同一 reducer/commit 边界 -> 同一提交策略”，为下一步继续拆
+  cloud import / reducer / publish 分层做准备
+
 ## Step 5.403
 - dialog runtime 继续为输入侧 / 会话侧派生引入内部
   `river_dialog_runtime_interaction_projection_t`：

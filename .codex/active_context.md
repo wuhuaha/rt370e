@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.403 让 dialog runtime interaction 投影收口`
+  - `5.404 让 dialog runtime reducer/commit 边界收口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 现在为 cloud event / cloud sync / local playback reducer
+      引入统一的 `commit checkpoint + commit policy`
+    - 新增内部辅助层：
+      - `capture_commit_checkpoint_locked(...)`
+      - `commit_checkpoint_changed(...)`
+      - `finalize_commit_locked(...)`
+    - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+      `reduce_local_playback_event(...)` 现在开始共用同一条提交边界
+    - local playback reducer 不再单独手工维护：
+      - `prev_playback_active`
+      - `prev_playback_recovering`
+      - `prev_error_recovering`
+      - `prev_interaction_state`
+    - 这一步继续把 dialog runtime 从“各入口各自拼 publish gating”推进成
+      “single reducer/commit boundary -> publish policy”
   - newest landed runtime-ownership slice:
     - dialog runtime 继续为输入侧 / 会话侧派生引入内部
       `interaction_projection`

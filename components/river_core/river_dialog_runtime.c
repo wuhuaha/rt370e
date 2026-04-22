@@ -30,6 +30,19 @@ typedef enum {
     RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_ERROR
 } river_dialog_runtime_cloud_event_t;
 
+typedef enum {
+    RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS = 0,
+    RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE
+} river_dialog_runtime_commit_policy_t;
+
+typedef struct {
+    bool cloud_runtime_available;
+    bool playback_active;
+    bool playback_recovering;
+    bool error_recovering;
+    river_interaction_state_t interaction_state;
+} river_dialog_runtime_commit_checkpoint_t;
+
 static river_dialog_runtime_context_t g_river_dialog_runtime;
 
 static void river_dialog_runtime_apply_cloud_snapshot_locked(
@@ -38,6 +51,12 @@ static void river_dialog_runtime_publish_locked(const char *reason);
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
 static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending);
 static void river_dialog_runtime_refresh_error_recovering_locked(void);
+static bool river_dialog_runtime_cloud_runtime_available_locked(void);
+static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void);
+static void river_dialog_runtime_finalize_commit_locked(
+    const river_dialog_runtime_commit_checkpoint_t *before,
+    river_dialog_runtime_commit_policy_t policy,
+    const char *reason);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -199,8 +218,11 @@ static void river_dialog_runtime_commit_cloud_event(
     if (have_snapshot) {
         river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
     }
-    river_dialog_runtime_publish_locked(reason != NULL ? reason :
-                                        river_dialog_runtime_cloud_event_default_reason(event));
+    river_dialog_runtime_finalize_commit_locked(
+        NULL,
+        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS,
+        reason != NULL ? reason :
+                         river_dialog_runtime_cloud_event_default_reason(event));
     river_dialog_runtime_unlock();
 }
 
@@ -700,6 +722,63 @@ static river_interaction_state_t river_dialog_runtime_compute_interaction_state_
     return RIVER_INTERACTION_WAKE_MONITORING;
 }
 
+static void river_dialog_runtime_capture_commit_checkpoint_locked(
+    river_dialog_runtime_commit_checkpoint_t *checkpoint,
+    bool derive_interaction_state)
+{
+    if (checkpoint == NULL) {
+        return;
+    }
+
+    memset(checkpoint, 0, sizeof(*checkpoint));
+    checkpoint->cloud_runtime_available =
+        river_dialog_runtime_cloud_runtime_available_locked();
+    checkpoint->playback_active = g_river_dialog_runtime.snapshot.playback_active;
+    checkpoint->playback_recovering = g_river_dialog_runtime.snapshot.playback_recovering;
+    checkpoint->error_recovering = g_river_dialog_runtime.snapshot.error_recovering;
+    checkpoint->interaction_state =
+        derive_interaction_state ? river_dialog_runtime_compute_interaction_state_locked() :
+                                   g_river_dialog_runtime.snapshot.interaction_state;
+}
+
+static bool river_dialog_runtime_commit_checkpoint_changed(
+    const river_dialog_runtime_commit_checkpoint_t *before,
+    const river_dialog_runtime_commit_checkpoint_t *after)
+{
+    if (before == NULL || after == NULL) {
+        return true;
+    }
+
+    return before->playback_active != after->playback_active ||
+           before->playback_recovering != after->playback_recovering ||
+           before->error_recovering != after->error_recovering ||
+           before->interaction_state != after->interaction_state;
+}
+
+static void river_dialog_runtime_finalize_commit_locked(
+    const river_dialog_runtime_commit_checkpoint_t *before,
+    river_dialog_runtime_commit_policy_t policy,
+    const char *reason)
+{
+    river_dialog_runtime_commit_checkpoint_t after;
+
+    if (policy == RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE &&
+        before != NULL) {
+        river_dialog_runtime_capture_commit_checkpoint_locked(&after, true);
+        if (after.cloud_runtime_available &&
+            !river_dialog_runtime_commit_checkpoint_changed(before, &after)) {
+            if (reason != NULL && reason[0] != '\0') {
+                river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
+                                               sizeof(g_river_dialog_runtime.snapshot.reason),
+                                               reason);
+            }
+            return;
+        }
+    }
+
+    river_dialog_runtime_publish_locked(reason);
+}
+
 static void river_dialog_runtime_publish_locked(const char *reason)
 {
     river_interaction_state_t next_state;
@@ -982,12 +1061,8 @@ static void river_dialog_runtime_reduce_local_playback_event(
     river_cloud_runtime_snapshot_t cloud_snapshot;
     bool have_cloud_snapshot = river_dialog_runtime_capture_cloud_snapshot(&cloud_snapshot);
     bool should_absorb = false;
-    bool prev_playback_active;
-    bool prev_playback_recovering;
-    bool prev_error_recovering;
+    river_dialog_runtime_commit_checkpoint_t commit_before;
     bool managed_recovery = false;
-    river_interaction_state_t prev_interaction_state;
-    river_interaction_state_t next_interaction_state;
     const char *effective_reason = reason;
 
     if (!river_dialog_runtime_lock()) {
@@ -1013,10 +1088,7 @@ static void river_dialog_runtime_reduce_local_playback_event(
         g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
     }
 
-    prev_playback_active = g_river_dialog_runtime.snapshot.playback_active;
-    prev_playback_recovering = g_river_dialog_runtime.snapshot.playback_recovering;
-    prev_error_recovering = g_river_dialog_runtime.snapshot.error_recovering;
-    prev_interaction_state = g_river_dialog_runtime.snapshot.interaction_state;
+    river_dialog_runtime_capture_commit_checkpoint_locked(&commit_before, false);
     if (have_cloud_snapshot) {
         river_dialog_runtime_apply_cloud_snapshot_locked(&cloud_snapshot);
     }
@@ -1042,22 +1114,10 @@ static void river_dialog_runtime_reduce_local_playback_event(
             g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         }
     }
-    next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();
-    if (river_dialog_runtime_cloud_runtime_available_locked() &&
-        prev_playback_active == g_river_dialog_runtime.snapshot.playback_active &&
-        prev_playback_recovering == g_river_dialog_runtime.snapshot.playback_recovering &&
-        prev_error_recovering == g_river_dialog_runtime.snapshot.error_recovering &&
-        prev_interaction_state == next_interaction_state) {
-        if (effective_reason != NULL && effective_reason[0] != '\0') {
-            river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
-                                           sizeof(g_river_dialog_runtime.snapshot.reason),
-                                           effective_reason);
-        }
-        river_dialog_runtime_unlock();
-        return;
-    }
-    river_dialog_runtime_publish_locked(effective_reason != NULL ? effective_reason :
-                                                            "playback_state");
+    river_dialog_runtime_finalize_commit_locked(
+        &commit_before,
+        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE,
+        effective_reason != NULL ? effective_reason : "playback_state");
     river_dialog_runtime_unlock();
 }
 
@@ -1098,7 +1158,10 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
     }
 
     river_dialog_runtime_apply_cloud_snapshot_locked(&snapshot);
-    river_dialog_runtime_publish_locked(reason != NULL ? reason : "cloud_state_sync");
+    river_dialog_runtime_finalize_commit_locked(
+        NULL,
+        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS,
+        reason != NULL ? reason : "cloud_state_sync");
     river_dialog_runtime_unlock();
 }
 

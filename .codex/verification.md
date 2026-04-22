@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.404
+Validate that dialog runtime now shares one commit boundary for cloud-event,
+cloud-sync, and local-playback reducer paths instead of duplicating publish
+gating in each ingress:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '24,64p' components/river_core/river_dialog_runtime.c
+sed -n '700,790p' components/river_core/river_dialog_runtime.c
+sed -n '1055,1168p' components/river_core/river_dialog_runtime.c
+rg -n 'commit_policy|commit_checkpoint|finalize_commit_locked|commit_cloud_event|reduce_local_playback_event|sync_cloud_state' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_commit_policy_t` and
+  `river_dialog_runtime_commit_checkpoint_t` exist
+- cloud-event, cloud-sync, and local-playback ingress all finish through the
+  shared `finalize_commit_locked(...)` boundary
+- the old local-playback reducer no longer manually keeps and compares
+  `prev_playback_active / prev_playback_recovering / prev_error_recovering / prev_interaction_state`
+
 ## Step 5.403
 Validate that dialog runtime now derives input/session interaction truth from a
 single interaction projection instead of repeatedly reading scattered snapshot

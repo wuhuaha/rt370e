@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.404`
+  - dialog runtime 现在为 cloud event / cloud sync / local playback reducer
+    引入统一的 `commit checkpoint + commit policy`
+  - 新增：
+    - `river_dialog_runtime_commit_policy_t`
+    - `river_dialog_runtime_commit_checkpoint_t`
+  - 新增统一辅助层：
+    - `capture_commit_checkpoint_locked(...)`
+    - `commit_checkpoint_changed(...)`
+    - `finalize_commit_locked(...)`
+  - `commit_cloud_event(...)` 与 `sync_cloud_state(...)` 现在都改为通过同一
+    `finalize_commit_locked(...)` 完成提交
+  - `reduce_local_playback_event(...)` 不再单独手工保存：
+    - `prev_playback_active`
+    - `prev_playback_recovering`
+    - `prev_error_recovering`
+    - `prev_interaction_state`
+    再在尾部拼接专属 publish gating
+  - 这一步开始把 dialog runtime 的 reducer/commit 边界也推进成
+    “single checkpoint -> single publish policy”，为下一步继续拆
+    cloud import / reducer / publish 分层做准备
 - `Step 5.403`
   - dialog runtime 继续为输入侧 / 会话侧派生引入内部
     `interaction_projection`
@@ -2983,6 +3004,14 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 下一步焦点：
 
+- 继续把 `dialog runtime` 里的 cloud snapshot 导入和 reducer 派生分层：
+  - 让 `apply_cloud_snapshot_locked(...)` 更像 import
+  - 让 commit/reducer helper 负责是否发布
+  - 避免入口函数继续同时承担“抓取 cloud / 合并 truth / 决定 publish”
+- 继续检查 `dialog runtime` 内是否还能把 cloud-event / cloud-sync /
+  local-playback 进一步收口成更少的 typed reducer，减少：
+  - stale cloud snapshot
+  - local edge 抢跑 aggregate 派生
 - 继续把本地 `flush/restart` 收窄到更少的真正硬故障场景，并评估是否还能把
   某些 stop/restart 恢复再进一步收敛成更轻量的原地 resume 语义
 - 继续把 `write_failed` 路径收紧成“前置 starvation 没拦住时的剩余硬故障”，
