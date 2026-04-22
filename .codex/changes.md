@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.394
+- XiaoZhi playback runtime 现在把本文件内 residual 的
+  `g_river_cloud.xiaozhi_playback_active` 读取收口到
+  `river_cloud_xiaozhi_playback_physical_active()`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `compute_playback_phase()` 与 `river_cloud_xiaozhi_arm_playback_stop()` 现在都显式消费
+ 这份 named physical truth，而不再裸读 shadow 成员
+- `playback phase`、`interrupt hint`、`hint-only endpoint`、`duplex dump`
+ 诊断日志现在把字段明确命名为：
+  - `playback_physical`
+  并补齐：
+  - `phase`
+  - `backend`
+- 这一步不改变 phase / backend 判定逻辑本身，只把 playback runtime 内“物理播放中”
+  和“语义播放占用中”继续拆开命名，减少板端继续把单个 `playback=yes/no`
+  日志字段误当成 semantic truth
+
 ## Step 5.393
 - XiaoZhi playback runtime 的两处策略层判断现在不再直接依赖
   `g_river_cloud.xiaozhi_playback_active` 影子布尔：

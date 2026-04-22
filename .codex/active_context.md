@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.393 让 downlink 唤醒与 segment prefetch 跟随 output-active 真相`
+  - `5.394 外显 playback physical truth 并收紧 endpoint 诊断语义`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 现在把本文件内 residual 的
+      `xiaozhi_playback_active` 读取统一收口到
+      `river_cloud_xiaozhi_playback_physical_active()`
+    - `compute_playback_phase()` 与 `arm_playback_stop()` 现在都显式消费这份
+      named physical truth，而不再裸读 shadow 成员
+    - `playback phase`、`interrupt hint`、`hint-only endpoint`、`duplex dump`
+      诊断日志现在把字段明确标成：
+      - `playback_physical`
+      并补齐：
+      - `phase`
+      - `backend`
+    - 这一步继续把 playback runtime 内“物理播放中”和“语义播放占用中”拆开命名，
+      避免板端继续把单个 `playback=yes/no` 字段误当成 semantic truth
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 的策略层又收紧了两处
       `xiaozhi_playback_active` shadow 消费：
@@ -215,9 +229,8 @@ or top-of-tree verification target changes.
     - 下一刀优先判断：
       - `compute_playback_phase()` 内部保留影子布尔作为底层物理态输入是否仍是
         合理边界，还是应该继续拆分为显式 physical/semantic 双视图
-      - endpoint soft close / hint-only 诊断面是否也应把 raw physical active 与
-        semantic phase/backend truth 并列外显，避免板端继续把日志字段混用成同一种
-        “播放中”语义
+      - 是否需要继续把 `playback_phase` 的派生输入从单一 physical active
+        扩展为显式 phase-source 结构，避免 phase/backend 互相反推时仍共享同一影子位
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

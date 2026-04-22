@@ -48,6 +48,11 @@ static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
     river_cloud_playback_backend_state_t backend_state);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
 
+static bool river_cloud_xiaozhi_playback_physical_active(void)
+{
+    return g_river_cloud.xiaozhi_playback_active;
+}
+
 static bool river_cloud_xiaozhi_playback_phase_is_output_active(
     river_cloud_playback_phase_t phase)
 {
@@ -183,7 +188,7 @@ static river_cloud_playback_phase_t river_cloud_xiaozhi_compute_playback_phase(v
     if (g_river_cloud.xiaozhi_playback_rebuffer_pending) {
         return RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
     }
-    if (g_river_cloud.xiaozhi_playback_active) {
+    if (river_cloud_xiaozhi_playback_physical_active()) {
         return RIVER_CLOUD_PLAYBACK_PHASE_PLAYING;
     }
     if (river_cloud_xiaozhi_playback_queued_frames() != 0U ||
@@ -207,12 +212,12 @@ static bool river_cloud_xiaozhi_refresh_playback_phase(const char *reason)
     }
 
     g_river_cloud.xiaozhi_playback_phase = new_phase;
-    RIVER_LOGI("xiaozhi playback phase: %s -> %s reason=%s queued=%lu active=%s backend=%s rebuffer=%s cause=%s stop=%s",
+    RIVER_LOGI("xiaozhi playback phase: %s -> %s reason=%s queued=%lu physical=%s backend=%s rebuffer=%s cause=%s stop=%s",
                river_cloud_playback_phase_name(old_phase),
                river_cloud_playback_phase_name(new_phase),
                reason != NULL && reason[0] != '\0' ? reason : "-",
                (unsigned long)river_cloud_xiaozhi_playback_queued_frames(),
-               g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
+               river_cloud_xiaozhi_playback_physical_active() ? "yes" : "no",
                river_cloud_playback_backend_state_name(
                    river_cloud_xiaozhi_playback_backend_state()),
                g_river_cloud.xiaozhi_playback_rebuffer_pending ? "yes" : "no",
@@ -721,14 +726,18 @@ void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger, const char *re
         return;
     }
 
-    RIVER_LOGI("xiaozhi interrupt hint: trigger=%s reason=%s preview_id=%s stream=%s playback=%s",
+    RIVER_LOGI("xiaozhi interrupt hint: trigger=%s reason=%s preview_id=%s stream=%s playback_physical=%s phase=%s backend=%s",
                trigger != NULL ? trigger : "-",
                reason != NULL ? reason : "-",
                g_river_cloud.xiaozhi_preview_id[0] != '\0' ?
                    g_river_cloud.xiaozhi_preview_id :
                    "-",
                g_river_cloud.stream_active ? "yes" : "no",
-               g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+               river_cloud_xiaozhi_playback_physical_active() ? "yes" : "no",
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_phase()),
+               river_cloud_playback_backend_state_name(
+                   river_cloud_xiaozhi_playback_backend_state()));
 }
 
 void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger, const char *reason)
@@ -747,14 +756,18 @@ void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger, const char
     g_river_cloud.xiaozhi_endpoint_soft_close_deadline_ms =
         (uint64_t)rtos_time_get_current_system_time_ms() +
         (uint64_t)RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS;
-    RIVER_LOGI("xiaozhi hint-only endpoint: trigger=%s reason=%s wait_ms=%u stream=%s playback=%s",
+    RIVER_LOGI("xiaozhi hint-only endpoint: trigger=%s reason=%s wait_ms=%u stream=%s playback_physical=%s phase=%s backend=%s",
                trigger != NULL ? trigger : "-",
                river_cloud_xiaozhi_endpoint_soft_close_reason() != NULL ?
                    river_cloud_xiaozhi_endpoint_soft_close_reason() :
                    "-",
                (unsigned int)RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS,
                g_river_cloud.stream_active ? "yes" : "no",
-               g_river_cloud.xiaozhi_playback_active ? "yes" : "no");
+               river_cloud_xiaozhi_playback_physical_active() ? "yes" : "no",
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_phase()),
+               river_cloud_playback_backend_state_name(
+                   river_cloud_xiaozhi_playback_backend_state()));
 }
 
 bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason, size_t reason_size)
@@ -1199,7 +1212,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                    g_river_cloud.xiaozhi_playback_last_segment_segment_id :
                    "-",
                river_cloud_xiaozhi_playback_last_segment_observed() ? "yes" : "no");
-    RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s playback=%s/%s error=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu playback_active=%s backend=%s duplex_seen=%s",
+    RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s playback=%s/%s error=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu playback_physical=%s backend=%s duplex_seen=%s",
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
@@ -1214,7 +1227,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned long)duplex_eval.reference_queue_frames,
                (unsigned long)duplex_eval.reference_queue_peak_frames,
                (unsigned long)duplex_eval.reference_last_write_age_ms,
-               g_river_cloud.xiaozhi_playback_active ? "yes" : "no",
+               river_cloud_xiaozhi_playback_physical_active() ? "yes" : "no",
                river_cloud_playback_backend_state_name(backend_state),
                g_river_cloud.xiaozhi_playback_duplex_ready_seen ? "yes" : "no");
     RIVER_LOGI("xiaozhi duplex_policy default_on=%s default_reason=%s voice_collaboration=%s server_endpoint=%s/%s preview_events=%s playback_ack=%s",
@@ -1458,7 +1471,7 @@ void river_cloud_xiaozhi_mark_playback_started(void)
 
 void river_cloud_xiaozhi_arm_playback_stop(uint32_t drain_ms)
 {
-    if (!g_river_cloud.xiaozhi_playback_active || drain_ms == 0U) {
+    if (!river_cloud_xiaozhi_playback_physical_active() || drain_ms == 0U) {
         return;
     }
 

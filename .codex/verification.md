@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.394
+Validate that playback runtime now names physical playback truth explicitly and
+that endpoint/hint diagnostics no longer expose an ambiguous single
+`playback=yes/no` field:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '36,60p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '174,226p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '720,770p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1214,1234p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1460,1470p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_physical|playback_physical_active|arm_playback_stop' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- a dedicated helper
+  `river_cloud_xiaozhi_playback_physical_active()` now exists
+- `compute_playback_phase()` and `river_cloud_xiaozhi_arm_playback_stop()` now
+  consume the named physical helper instead of directly reading
+  `g_river_cloud.xiaozhi_playback_active`
+- `interrupt hint` / `hint-only endpoint` / `playback phase` / `duplex dump`
+  logs now expose `playback_physical` and, where applicable, `phase` and
+  `backend`, so board traces no longer need to guess whether a `playback=yes/no`
+  field meant physical output or semantic playback ownership
+
 ## Step 5.393
 Validate that downlink wakeup and segment predictive prefetch decisions now
 follow runtime-owned `output_active` truth instead of the local

@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.394`
+  - XiaoZhi playback runtime 现在把本文件内 residual 的
+    `xiaozhi_playback_active` 读取统一收口到
+    `river_cloud_xiaozhi_playback_physical_active()`
+  - `compute_playback_phase()` 与 `arm_playback_stop()` 现在都显式消费这份
+    named physical truth，而不再裸读 shadow 成员
+  - `playback phase`、`interrupt hint`、`hint-only endpoint`、`duplex dump`
+    诊断日志现在把字段明确标成：
+    - `playback_physical`
+    并补齐：
+    - `phase`
+    - `backend`
+  - 这一步不改变 phase / backend 判定逻辑本身，只继续把 playback runtime
+    内“物理播放中”和“语义播放占用中”拆开命名，减少板端日志再把单个
+    `playback=yes/no` 字段误当成 semantic truth
 - `Step 5.393`
   - XiaoZhi playback runtime 的两处策略层判断：
     - `playback_has_work()`
