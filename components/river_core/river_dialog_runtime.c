@@ -49,6 +49,18 @@ typedef struct {
 } river_dialog_runtime_cloud_io_facts_t;
 
 typedef struct {
+    bool turn_accepted;
+    bool barge_in_enabled_known;
+    bool barge_in_enabled;
+    char provider_name[RIVER_CLOUD_RUNTIME_PROVIDER_MAX];
+    char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
+    char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
+    char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+} river_dialog_runtime_cloud_session_facts_t;
+
+typedef struct {
     bool initialized;
     bool cloud_runtime_available;
     bool local_playback_stream_owned;
@@ -58,6 +70,7 @@ typedef struct {
     river_playback_state_t playback_state;
     river_dialog_runtime_cloud_round_facts_t cloud_round_facts;
     river_dialog_runtime_cloud_io_facts_t cloud_io_facts;
+    river_dialog_runtime_cloud_session_facts_t cloud_session_facts;
     river_dialog_runtime_cloud_playback_facts_t cloud_playback_facts;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
@@ -340,6 +353,36 @@ static void river_dialog_runtime_export_io_facts_to_snapshot_locked(void)
         g_river_dialog_runtime.cloud_io_facts.output_lane;
 }
 
+static void river_dialog_runtime_export_session_facts_to_snapshot_locked(void)
+{
+    g_river_dialog_runtime.snapshot.turn_accepted =
+        g_river_dialog_runtime.cloud_session_facts.turn_accepted;
+    g_river_dialog_runtime.snapshot.barge_in_enabled_known =
+        g_river_dialog_runtime.cloud_session_facts.barge_in_enabled_known;
+    g_river_dialog_runtime.snapshot.barge_in_enabled =
+        g_river_dialog_runtime.cloud_session_facts.barge_in_enabled;
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.provider_name,
+                                   sizeof(g_river_dialog_runtime.snapshot.provider_name),
+                                   g_river_dialog_runtime.cloud_session_facts.provider_name);
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
+                                   sizeof(g_river_dialog_runtime.snapshot.session_id),
+                                   g_river_dialog_runtime.cloud_session_facts.session_id);
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.turn_id,
+                                   sizeof(g_river_dialog_runtime.snapshot.turn_id),
+                                   g_river_dialog_runtime.cloud_session_facts.turn_id);
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
+                                   sizeof(g_river_dialog_runtime.snapshot.accept_reason),
+                                   g_river_dialog_runtime.cloud_session_facts.accept_reason);
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_terminal_reason,
+        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
+        g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason);
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
+        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
+        g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason);
+}
+
 static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
 {
     g_river_dialog_runtime.snapshot.playback_cloud_active =
@@ -461,9 +504,10 @@ static void river_dialog_runtime_apply_cloud_event_locked(
     river_dialog_runtime_refresh_error_recovering_locked();
 
     if (sid != NULL && sid[0] != '\0') {
-        river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
-                                       sizeof(g_river_dialog_runtime.snapshot.session_id),
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.session_id,
+                                       sizeof(g_river_dialog_runtime.cloud_session_facts.session_id),
                                        sid);
+        river_dialog_runtime_export_session_facts_to_snapshot_locked();
     }
 }
 
@@ -1161,30 +1205,31 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         cloud_import->playback_rebuffer_cause_kind;
     g_river_dialog_runtime.cloud_playback_facts.start_policy_kind =
         cloud_import->playback_start_policy_kind;
-    g_river_dialog_runtime.snapshot.turn_accepted = cloud_import->turn_accepted;
-    g_river_dialog_runtime.snapshot.barge_in_enabled_known =
+    g_river_dialog_runtime.cloud_session_facts.turn_accepted =
+        cloud_import->turn_accepted;
+    g_river_dialog_runtime.cloud_session_facts.barge_in_enabled_known =
         cloud_import->barge_in_enabled_known;
-    g_river_dialog_runtime.snapshot.barge_in_enabled =
+    g_river_dialog_runtime.cloud_session_facts.barge_in_enabled =
         cloud_import->barge_in_enabled;
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.provider_name,
-                                   sizeof(g_river_dialog_runtime.snapshot.provider_name),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.provider_name,
+                                   sizeof(g_river_dialog_runtime.cloud_session_facts.provider_name),
                                    cloud_import->provider_name);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
-                                   sizeof(g_river_dialog_runtime.snapshot.session_id),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.session_id,
+                                   sizeof(g_river_dialog_runtime.cloud_session_facts.session_id),
                                    cloud_import->session_id);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.turn_id,
-                                   sizeof(g_river_dialog_runtime.snapshot.turn_id),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.turn_id,
+                                   sizeof(g_river_dialog_runtime.cloud_session_facts.turn_id),
                                    cloud_import->turn_id);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
-                                   sizeof(g_river_dialog_runtime.snapshot.accept_reason),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.accept_reason,
+                                   sizeof(g_river_dialog_runtime.cloud_session_facts.accept_reason),
                                    cloud_import->accept_reason);
     river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.snapshot.playback_terminal_reason,
-        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
+        g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason,
+        sizeof(g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason),
         cloud_import->playback_terminal_reason);
     river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
-        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
+        g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason,
+        sizeof(g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason),
         cloud_import->playback_terminal_wait_reason);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_io_facts.input_state_text,
                                    sizeof(g_river_dialog_runtime.cloud_io_facts.input_state_text),
@@ -1204,6 +1249,7 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         river_dialog_runtime_parse_output_lane(cloud_import->output_state_text);
     river_dialog_runtime_export_round_facts_to_snapshot_locked();
     river_dialog_runtime_export_io_facts_to_snapshot_locked();
+    river_dialog_runtime_export_session_facts_to_snapshot_locked();
     river_dialog_runtime_export_playback_facts_to_snapshot_locked();
 }
 

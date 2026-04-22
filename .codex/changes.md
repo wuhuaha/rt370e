@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.410
+- dialog runtime 继续把 turn/session/terminal metadata 从 exported snapshot 中剥离：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部真相载体：
+  - `river_dialog_runtime_cloud_session_facts_t`
+  - `g_river_dialog_runtime.cloud_session_facts`
+- 新增 `river_dialog_runtime_export_session_facts_to_snapshot_locked(...)`，统一把：
+  - `turn_accepted`
+  - `barge_in_enabled_*`
+  - `provider/session/turn/accept_reason`
+  - `playback_terminal_* reason`
+  从 internal session facts 镜像到 exported snapshot
+- `river_dialog_runtime_apply_cloud_event_locked(...)` 里的 `sid` 更新现在改为写入
+  internal `cloud_session_facts`，不再直接修改 exported snapshot
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` 现在先写 internal
+  session facts，再统一导出到 snapshot
+- 这一步继续把 dialog runtime 推进成唯一真相源，进一步减少
+  “修改 exported snapshot 就是在修改内部真相” 的残留路径，为后续继续剥离
+  boot/wake/asr/error 等 residual state 做准备
+
 ## Step 5.409
 - dialog runtime 继续把 interaction/raw facts 从 exported snapshot 中剥离：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.410
+Validate that dialog runtime session/turn/terminal metadata now lives in an
+internal session-facts carrier and is only mirrored to the exported snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '40,85p' components/river_core/river_dialog_runtime.c
+sed -n '350,385p' components/river_core/river_dialog_runtime.c
+sed -n '500,515p' components/river_core/river_dialog_runtime.c
+sed -n '1200,1255p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_session_facts|export_session_facts_to_snapshot_locked|apply_cloud_event_locked|import_cloud_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_session_facts_t` exists
+- `apply_cloud_event_locked(...)` now updates `sid` through internal
+  `cloud_session_facts`
+- `import_cloud_snapshot_locked(...)` now populates internal session facts
+  before calling `river_dialog_runtime_export_session_facts_to_snapshot_locked(...)`
+- exported snapshot still exposes the same turn/session/terminal metadata for
+  external consumers and diagnostics, but is no longer the internal source of truth
+
 ## Step 5.409
 Validate that dialog runtime interaction/playback projections now read internal
 round/io raw facts instead of treating the exported snapshot as the internal
