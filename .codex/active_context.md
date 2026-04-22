@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.390 让 native ref unavailable 不再反推 raw playback state`
+  - `5.391 让 restart_pending hard block 以 dialog backend truth 为主`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `voice runtime` 的 `restart_pending` hard block 现在优先消费
+      `dialog runtime` 导出的 typed backend truth
+    - 当前只要 dialog snapshot 仍认定：
+      - `playback_owner_kind == CLOUD`
+      - backend=`restart_pending`
+      - 且不在 quiet phase
+      就会继续落到
+      `RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING`
+    - raw `playback_state == RESTART_PENDING` 现在只在拿不到 dialog snapshot 时
+      才作为兜底路径
+    - 这一步继续把 AEC restart gate 从“先看物理 service state 再问语义”推进到
+      “先看 dialog/runtime backend 真相，再用 raw state 兜底”
   - newest landed runtime-ownership slice:
     - `voice runtime` 在 `uses_native_capture_ref` 且 native ref 尚未可用时，
       不再重新读取 raw `playback_state_active()` 去区分：

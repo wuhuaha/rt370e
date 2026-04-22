@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.391`
+  - `voice runtime` 的 `restart_pending` hard block 现在优先消费
+    `dialog runtime` 导出的 typed backend truth
+  - `river_voice_runtime_restart_pending_requires_block(...)` 现在只在
+    dialog snapshot 缺失时，才回退使用 raw
+    `playback_state == RIVER_PLAYBACK_RESTART_PENDING`
+  - 一旦 dialog snapshot 在场，就直接按 snapshot 的：
+    - cloud owner
+    - backend=`restart_pending`
+    - quiet-phase 过滤
+    决定是否继续 hard block
+  - 这一步继续把 AEC restart gate 从“先看物理 playback service state”
+    推进到“先看 dialog/runtime backend 真相，raw state 仅做缺失兜底”
 - `Step 5.390`
   - `voice runtime` 在 `uses_native_capture_ref` 且 native reference 尚未可用时，
     不再重新读取 raw `playback_state_active()` 去区分：

@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.391
+Validate that the AEC `restart_pending` hard block now primarily follows the
+typed `dialog runtime` backend truth, and only falls back to raw playback
+state when no dialog snapshot is available:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '52,92p' components/river_voice/river_voice_runtime_policy.c
+sed -n '312,320p' components/river_voice/river_voice_runtime_policy.c
+rg -n 'restart_pending_requires_block\\(|RIVER_PLAYBACK_RESTART_PENDING' \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_voice_runtime_restart_pending_requires_block(...)` now accepts
+  `playback_state` only as a missing-snapshot fallback
+- when a dialog snapshot exists, the hard block is decided from:
+  - `playback_owner_kind == CLOUD`
+  - `playback_backend_state_kind == RESTART_PENDING`
+  - quiet-phase filtering
+- `aec_gate_eval_base(...)` no longer requires a separate outer
+  `eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING` guard before
+  consulting dialog/backend truth
+
 ## Step 5.390
 Validate that native-capture-reference fallback no longer re-infers
 `ref_idle/ref_missing` from the raw playback service state after the AEC

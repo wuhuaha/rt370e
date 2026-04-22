@@ -76,10 +76,11 @@ static bool river_voice_runtime_dialog_cloud_playback_engaged(
 }
 
 static bool river_voice_runtime_restart_pending_requires_block(
-    const river_dialog_runtime_snapshot_t *snapshot)
+    const river_dialog_runtime_snapshot_t *snapshot,
+    river_playback_state_t playback_state)
 {
     if (snapshot == NULL) {
-        return true;
+        return playback_state == RIVER_PLAYBACK_RESTART_PENDING;
     }
 
     if (!river_voice_runtime_dialog_cloud_playback_engaged(snapshot)) {
@@ -311,8 +312,8 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
         return;
     }
 
-    if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING &&
-        river_voice_runtime_restart_pending_requires_block(dialog_snapshot_ptr)) {
+    if (river_voice_runtime_restart_pending_requires_block(dialog_snapshot_ptr,
+                                                           eval->playback_state)) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
         return;
     }

@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.391
+- `voice runtime` 的 `restart_pending` hard block 现在优先消费
+  `dialog runtime` 的 typed backend truth：
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- `river_voice_runtime_restart_pending_requires_block(...)` 新增 raw
+  `playback_state` 兜底参数：
+  - 拿不到 dialog snapshot 时，仍退回
+    `playback_state == RIVER_PLAYBACK_RESTART_PENDING`
+  - 一旦拿到 dialog snapshot，就直接按 snapshot 的：
+    - cloud owner
+    - backend=`restart_pending`
+    - quiet-phase 过滤
+    来决定是否继续 hard block
+- 这一步继续把 AEC `restart_pending` gate 从“先看物理 service state 再看语义”
+  收口到“以 dialog/backend typed truth 为主，raw state 仅做缺失兜底”
+
 ## Step 5.390
 - `voice runtime` 在 `uses_native_capture_ref` 且 native reference 尚未可用时，
   不再回退依赖 raw `playback_state_active()` 去区分 `ref_idle/ref_missing`：
