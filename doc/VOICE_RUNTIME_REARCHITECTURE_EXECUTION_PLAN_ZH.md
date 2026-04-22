@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.408`
+  - dialog runtime 开始把内部 playback raw facts 与 exported snapshot 拆层：
+    - `river_dialog_runtime_cloud_playback_facts_t`
+    - `g_river_dialog_runtime.cloud_playback_facts`
+    - `river_dialog_runtime_export_playback_facts_to_snapshot_locked(...)`
+  - `capture_playback_projection_locked(...)` 现在改为直接读取 internal
+    playback facts，而不再从 `snapshot.playback_*` 原始字段散读
+  - `import_cloud_snapshot_locked(...)` 现在先写入 internal playback facts，
+    再统一镜像到 exported snapshot
+  - 这一步继续把 dialog runtime 推进成唯一真相源，开始把
+    “内部 raw playback facts” 与 “对外 snapshot export” 显式拆层，为后续继续剥离
+    turn/input/output raw facts 做准备
 - `Step 5.407`
   - dialog runtime 继续把入口层收口成统一的 dialog-owned ingress reducer：
     - `river_dialog_runtime_local_playback_import_t`

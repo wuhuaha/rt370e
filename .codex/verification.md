@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.408
+Validate that dialog runtime playback projection now reads internal playback
+raw facts instead of treating the exported snapshot as the internal playback
+truth source:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,80p' components/river_core/river_dialog_runtime.c
+sed -n '280,340p' components/river_core/river_dialog_runtime.c
+sed -n '616,680p' components/river_core/river_dialog_runtime.c
+sed -n '1068,1150p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_playback_facts|export_playback_facts_to_snapshot_locked|capture_playback_projection_locked|import_cloud_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_playback_facts_t` exists
+- `capture_playback_projection_locked(...)` now reads playback raw fields from
+  `g_river_dialog_runtime.cloud_playback_facts`
+- `import_cloud_snapshot_locked(...)` now populates internal playback facts
+  first, then mirrors them through
+  `river_dialog_runtime_export_playback_facts_to_snapshot_locked(...)`
+- exported snapshot remains available for diagnostics/external consumers, but
+  playback truth derivation no longer uses it as the internal raw fact source
+
 ## Step 5.407
 Validate that dialog runtime ingress now routes cloud-event, cloud-sync, and
 local-playback updates through one dialog-owned ingress reducer instead of each
