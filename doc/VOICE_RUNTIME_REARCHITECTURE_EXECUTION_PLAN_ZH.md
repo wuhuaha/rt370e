@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.387`
+  - `dialog runtime` 现在正式把 playback ownership truth 外显成 snapshot
+    级别的 `playback_owner_kind`
+  - 新增 `river_dialog_playback_owner_kind_t`：
+    - `NONE`
+    - `CLOUD`
+    - `LOCAL_FALLBACK`
+  - `refresh_playback_locked()` 现在统一同时派生：
+    - `playback_active`
+    - `playback_recovering`
+    - `playback_owner_kind`
+  - `dialog_runtime_dump_status()` 也已新增：
+    - `owner=<kind>`
+  - 这一步继续把 `dialog runtime` 从“依赖外部反推当前由谁驱动 playback
+    truth”推进成“直接导出 typed playback ownership truth”
 - `Step 5.386`
   - `dialog runtime` 现在正式把 typed error source 外显成 snapshot 级别的
     `error_kind`

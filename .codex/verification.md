@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.387
+Validate that `dialog runtime` now exports typed playback ownership truth in
+the public snapshot, so consumers can distinguish cloud/runtime-owned
+playback from local fallback shadow playback without reverse-inferring it from
+other booleans:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RIVER_DIALOG_PLAYBACK_OWNER_KIND|playback_owner_kind|river_dialog_playback_owner_kind_name|owner=%s' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+sed -n '24,40p' include/river/river_dialog_runtime.h
+sed -n '330,382p' components/river_core/river_dialog_runtime.c
+sed -n '1090,1116p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_snapshot_t` now exports `playback_owner_kind`
+- `refresh_playback_locked()` now derives `playback_owner_kind` together with
+  the aggregate playback booleans
+- `dialog_runtime_dump_status()` now logs `owner=<kind>`
+- consumers can now directly distinguish:
+  - `cloud`
+  - `local_fallback`
+  - `none`
+  without relying on implicit local-shadow / cloud-bool combinations
+
 ## Step 5.386
 Validate that `dialog runtime` now exports typed `error_kind` truth in the
 public snapshot, and that error diagnostics no longer stop at a single

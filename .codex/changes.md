@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.387
+- `dialog runtime` 现在正式把 playback ownership truth 外显成 snapshot 级别的
+  `playback_owner_kind`：
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 `river_dialog_playback_owner_kind_t`：
+  - `NONE`
+  - `CLOUD`
+  - `LOCAL_FALLBACK`
+- `refresh_playback_locked()` 现在统一同时派生：
+  - `snapshot.playback_active`
+  - `snapshot.playback_recovering`
+  - `snapshot.playback_owner_kind`
+- `dialog_runtime_dump_status()` 的播放观测面现在新增：
+  - `owner=<kind>`
+- 这一步继续把 `dialog runtime` 从“靠外部反推当前是谁在驱动 playback
+  truth”推进到“直接导出 typed playback ownership truth”
+
 ## Step 5.386
 - `dialog runtime` 现在正式把 typed error source 外显成 snapshot 级别的
   `error_kind`：

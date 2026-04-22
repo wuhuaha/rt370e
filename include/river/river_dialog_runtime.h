@@ -25,6 +25,12 @@ typedef enum {
 } river_dialog_output_lane_t;
 
 typedef enum {
+    RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE = 0,
+    RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD,
+    RIVER_DIALOG_PLAYBACK_OWNER_KIND_LOCAL_FALLBACK
+} river_dialog_playback_owner_kind_t;
+
+typedef enum {
     RIVER_DIALOG_ERROR_KIND_NONE = 0,
     RIVER_DIALOG_ERROR_KIND_ASR,
     RIVER_DIALOG_ERROR_KIND_LOCAL_PLAYBACK,
@@ -46,6 +52,7 @@ typedef struct {
     bool playback_cloud_active;
     bool playback_lane_engaged;
     bool playback_turn_active;
+    river_dialog_playback_owner_kind_t playback_owner_kind;
     bool playback_active;
     bool playback_rebuffer_pending;
     bool playback_recovering;
@@ -111,6 +118,8 @@ river_status_t river_dialog_runtime_get_snapshot(river_dialog_runtime_snapshot_t
 void river_dialog_runtime_dump_status(void);
 const char *river_dialog_input_lane_name(river_dialog_input_lane_t state);
 const char *river_dialog_output_lane_name(river_dialog_output_lane_t state);
+const char *river_dialog_playback_owner_kind_name(
+    river_dialog_playback_owner_kind_t kind);
 const char *river_dialog_error_kind_name(river_dialog_error_kind_t kind);
 
 #endif
