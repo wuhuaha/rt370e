@@ -70,9 +70,21 @@ static void river_dialog_runtime_copy_text(char *dst, size_t dst_size, const cha
 
 static void river_dialog_runtime_refresh_error_recovering_locked(void)
 {
+    bool asr_error = g_river_dialog_runtime.asr_error_recovering;
+    bool local_playback_error = g_river_dialog_runtime.local_playback_error_recovering;
+
     g_river_dialog_runtime.snapshot.error_recovering =
-        g_river_dialog_runtime.asr_error_recovering ||
-        g_river_dialog_runtime.local_playback_error_recovering;
+        asr_error || local_playback_error;
+    if (asr_error && local_playback_error) {
+        g_river_dialog_runtime.snapshot.error_kind = RIVER_DIALOG_ERROR_KIND_MIXED;
+    } else if (asr_error) {
+        g_river_dialog_runtime.snapshot.error_kind = RIVER_DIALOG_ERROR_KIND_ASR;
+    } else if (local_playback_error) {
+        g_river_dialog_runtime.snapshot.error_kind =
+            RIVER_DIALOG_ERROR_KIND_LOCAL_PLAYBACK;
+    } else {
+        g_river_dialog_runtime.snapshot.error_kind = RIVER_DIALOG_ERROR_KIND_NONE;
+    }
 }
 
 static bool river_dialog_runtime_is_dialog_playback_stream_locked(
@@ -252,6 +264,21 @@ const char *river_dialog_output_lane_name(river_dialog_output_lane_t state)
         return "speaking";
     default:
         return "unknown";
+    }
+}
+
+const char *river_dialog_error_kind_name(river_dialog_error_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_DIALOG_ERROR_KIND_ASR:
+        return "asr";
+    case RIVER_DIALOG_ERROR_KIND_LOCAL_PLAYBACK:
+        return "local_playback";
+    case RIVER_DIALOG_ERROR_KIND_MIXED:
+        return "mixed";
+    case RIVER_DIALOG_ERROR_KIND_NONE:
+    default:
+        return "none";
     }
 }
 
@@ -1032,7 +1059,7 @@ void river_dialog_runtime_dump_status(void)
         river_dialog_runtime_local_playback_state_recovering_locked();
     river_dialog_runtime_unlock();
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s phase_known=%s backend_state=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s/%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -1080,6 +1107,7 @@ void river_dialog_runtime_dump_status(void)
                (unsigned long)snapshot.conversation_window_remaining_ms,
                snapshot.wake_confirmed ? "yes" : "no",
                snapshot.error_recovering ? "yes" : "no",
+               river_dialog_error_kind_name(snapshot.error_kind),
                snapshot.turn_id[0] != '\0' ? snapshot.turn_id : "-",
                snapshot.accept_reason[0] != '\0' ? snapshot.accept_reason : "-",
                snapshot.reason[0] != '\0' ? snapshot.reason : "-",

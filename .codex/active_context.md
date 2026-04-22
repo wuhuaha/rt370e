@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.385 收紧 dialog runtime 的 local playback ownership 清理边界`
+  - `5.386 外显 dialog runtime 的 typed error_kind`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 现在已把 typed error source 正式外显成
+      snapshot 级别的 `error_kind`
+    - 新增公开枚举：
+      - `NONE`
+      - `ASR`
+      - `LOCAL_PLAYBACK`
+      - `MIXED`
+    - `refresh_error_recovering_locked()` 现在统一同时派生：
+      - `error_recovering`
+      - `error_kind`
+    - dump 观测面也从 `error=yes/no` 升级为 `error=yes/no/<kind>`
+    - 这一步继续把 `dialog runtime` 从聚合 bool 推进成 typed truth export
   - newest landed runtime-ownership slice:
     - `dialog runtime` 现在只会在事件已确认属于当前 dialog-owned playback
       stream 时，才在 `IDLE` 上清理：
@@ -100,9 +113,10 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 `dialog runtime` 是否需要把 typed error / ownership truth
-      进一步外显成 `error_kind` / `playback_owner_kind`，避免外部仍只能看聚合后的
-      `error_recovering` 和隐式 owner shadow
+    - 继续检查 `dialog runtime` 是否需要把 local playback ownership 也外显成
+      `playback_owner_kind`，避免外部仍无法区分：
+      - cloud/runtime-owned playback
+      - local fallback shadow ownership
     - 继续检查 voice/playback runtime 内剩余 raw playback-service state 读取，
       是否还能进一步统一到 dialog/runtime owned truth
   - newest landed runtime-ownership slice:

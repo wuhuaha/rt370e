@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.386
+Validate that `dialog runtime` now exports typed `error_kind` truth in the
+public snapshot, and that error diagnostics no longer stop at a single
+aggregate boolean:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'RIVER_DIALOG_ERROR_KIND|error_kind|river_dialog_error_kind_name|error=%s/%s' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c
+sed -n '24,36p' include/river/river_dialog_runtime.h
+sed -n '68,90p' components/river_core/river_dialog_runtime.c
+sed -n '267,280p' components/river_core/river_dialog_runtime.c
+sed -n '1050,1086p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_snapshot_t` now exports `error_kind`
+- `refresh_error_recovering_locked()` now derives both the aggregate bool and
+  the typed `error_kind`
+- `dialog_runtime_dump_status()` now logs `error=<bool>/<kind>`
+- consumers can now distinguish `asr`, `local_playback`, and `mixed` error
+  truth without reverse-inferring it from internal implementation details
+
 ## Step 5.385
 Validate that `dialog runtime` now clears local playback stream ownership only
 after confirming the event belongs to the dialog-owned stream, so foreign

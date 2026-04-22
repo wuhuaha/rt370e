@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.386
+- `dialog runtime` 现在正式把 typed error source 外显成 snapshot 级别的
+  `error_kind`：
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 `river_dialog_error_kind_t`：
+  - `NONE`
+  - `ASR`
+  - `LOCAL_PLAYBACK`
+  - `MIXED`
+- `refresh_error_recovering_locked()` 现在统一同时派生：
+  - `snapshot.error_recovering`
+  - `snapshot.error_kind`
+- `dialog_runtime_dump_status()` 的错误观测面现在从：
+  - `error=yes/no`
+  变成：
+  - `error=yes/no/<kind>`
+- 这一步继续把 `dialog runtime` 从“只导出聚合 bool”推进到
+  “导出可消费的 typed error truth”
+
 ## Step 5.385
 - `dialog runtime` 现在只会在 local playback event 已确认属于当前
   dialog-owned stream 时，才在 `IDLE` 上清理

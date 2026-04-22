@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.386`
+  - `dialog runtime` 现在正式把 typed error source 外显成 snapshot 级别的
+    `error_kind`
+  - 新增 `river_dialog_error_kind_t`：
+    - `NONE`
+    - `ASR`
+    - `LOCAL_PLAYBACK`
+    - `MIXED`
+  - `refresh_error_recovering_locked()` 现在统一同时派生：
+    - `error_recovering`
+    - `error_kind`
+  - `dialog_runtime_dump_status()` 也已升级为：
+    - `error=yes/no/<kind>`
+  - 这一步继续把 `dialog runtime` 从聚合 bool 推进成 typed truth export
 - `Step 5.385`
   - `dialog runtime` 现在只会在 local playback event 已确认属于当前
     dialog-owned stream 时，才在 `IDLE` 上清理：

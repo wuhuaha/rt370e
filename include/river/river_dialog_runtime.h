@@ -24,11 +24,19 @@ typedef enum {
     RIVER_DIALOG_OUTPUT_LANE_SPEAKING
 } river_dialog_output_lane_t;
 
+typedef enum {
+    RIVER_DIALOG_ERROR_KIND_NONE = 0,
+    RIVER_DIALOG_ERROR_KIND_ASR,
+    RIVER_DIALOG_ERROR_KIND_LOCAL_PLAYBACK,
+    RIVER_DIALOG_ERROR_KIND_MIXED
+} river_dialog_error_kind_t;
+
 typedef struct {
     bool boot_ready;
     bool wake_confirmed;
     bool asr_session_active;
     bool error_recovering;
+    river_dialog_error_kind_t error_kind;
     bool wake_admission_pending;
     bool conversation_window_active;
     bool cloud_listening;
@@ -103,5 +111,6 @@ river_status_t river_dialog_runtime_get_snapshot(river_dialog_runtime_snapshot_t
 void river_dialog_runtime_dump_status(void);
 const char *river_dialog_input_lane_name(river_dialog_input_lane_t state);
 const char *river_dialog_output_lane_name(river_dialog_output_lane_t state);
+const char *river_dialog_error_kind_name(river_dialog_error_kind_t kind);
 
 #endif
