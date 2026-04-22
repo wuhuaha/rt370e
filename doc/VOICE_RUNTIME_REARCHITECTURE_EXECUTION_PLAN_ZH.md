@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.413`
+  - playback service 继续拆分 `flush` / `recover` 的破坏边界：
+    - `river_playback_service_restart_started_track_locked(...)`
+  - `river_playback_service_flush_locked(...)` 现在继续保留 destructive flush 语义：
+    - reset reference
+    - restart track
+  - `river_playback_service_recover_locked(...)` 不再复用 flush 路径，而是直接重启
+    track，不再在 transient `playback_write_failed` recover 成功时清空
+    reference/AEC 历史
+  - recover 成功后仍回到 `RIVER_PLAYBACK_RUNNING`；如果 restart 失败，则继续保持
+    原有回退：
+    - `close_locked(true)`
+    - `RIVER_PLAYBACK_RESTART_PENDING`
+  - 这一步把 downlink write-fail recovery 的 blast radius 从
+    “flush track + reset reference” 收紧到“优先仅恢复 track”，为后续继续重建
+    rebuffer / recovery policy 提供更稳定的 AEC 连续性
 - `Step 5.412`
   - XiaoZhi downlink / playback 继续重建 segment-gap 恢复链：
     - `river_cloud_xiaozhi_segment_gap_hold_view_t`

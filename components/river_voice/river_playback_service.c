@@ -406,57 +406,53 @@ static river_status_t river_playback_service_stop_locked(bool interrupted, const
     return RIVER_OK;
 }
 
-static river_status_t river_playback_service_flush_locked(const char *reason)
+static river_status_t river_playback_service_restart_started_track_locked(void)
 {
-    bool recovering = g_river_playback_service.stats.state == RIVER_PLAYBACK_RECOVERING;
-
-    if (!river_playback_service_state_active(g_river_playback_service.stats.state) &&
-        !recovering) {
+    if (g_river_playback_service.track == NULL || !g_river_playback_service.track_started) {
         return RIVER_OK;
     }
 
-    river_playback_service_record_control_locked(recovering ? "recover" : "flush", reason);
+    AudioTrack_Pause(g_river_playback_service.track);
+    AudioTrack_Flush(g_river_playback_service.track);
+    AudioTrack_Stop(g_river_playback_service.track);
+    if (AudioTrack_Start(g_river_playback_service.track) != 0) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    g_river_playback_service.track_started = true;
+    river_playback_service_apply_volume_locked();
+    return RIVER_OK;
+}
+
+static river_status_t river_playback_service_flush_locked(const char *reason)
+{
+    river_status_t restart_status;
+
+    if (!river_playback_service_state_active(g_river_playback_service.stats.state)) {
+        return RIVER_OK;
+    }
+
+    river_playback_service_record_control_locked("flush", reason);
     river_playback_service_advance_epoch_locked(reason != NULL ? reason : "flush");
 
     if (g_river_playback_service.ref_owned) {
         river_reference_service_reset();
     }
 
-    if (g_river_playback_service.track != NULL && g_river_playback_service.track_started) {
-        AudioTrack_Pause(g_river_playback_service.track);
-        AudioTrack_Flush(g_river_playback_service.track);
-        AudioTrack_Stop(g_river_playback_service.track);
-        if (AudioTrack_Start(g_river_playback_service.track) != 0) {
-            if (recovering) {
-                char stream_name[sizeof(g_river_playback_service.stats.stream_name)];
-
-                memcpy(stream_name,
-                       g_river_playback_service.stats.stream_name,
-                       sizeof(stream_name));
-                stream_name[sizeof(stream_name) - 1U] = '\0';
-                river_playback_service_close_locked(true);
-                river_playback_service_set_state_locked(RIVER_PLAYBACK_RESTART_PENDING);
-                RIVER_LOGW("playback recover fallback: stream=%s epoch=%lu reason=restart_failed",
-                           stream_name[0] != '\0' ? stream_name : "-",
-                           (unsigned long)g_river_playback_service.stats.epoch);
-                return RIVER_ERR_BUSY;
-            }
-            river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
-            river_playback_service_close_locked(true);
-            river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
-            RIVER_LOGE("playback flush restart failed");
-            return RIVER_ERR_UNSUPPORTED;
-        }
-        g_river_playback_service.track_started = true;
-        river_playback_service_apply_volume_locked();
+    restart_status = river_playback_service_restart_started_track_locked();
+    if (restart_status != RIVER_OK) {
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
+        river_playback_service_close_locked(true);
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_IDLE);
+        RIVER_LOGE("playback flush restart failed");
+        return RIVER_ERR_UNSUPPORTED;
     }
 
-    if (recovering) {
+    if (g_river_playback_service.stats.state == RIVER_PLAYBACK_RECOVERING) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
     }
     g_river_playback_service.stats.flush_count++;
-    RIVER_LOGI("playback %s: stream=%s epoch=%lu",
-               recovering ? "recover" : "flush",
+    RIVER_LOGI("playback flush: stream=%s epoch=%lu",
                g_river_playback_service.stats.stream_name[0] != '\0' ?
                    g_river_playback_service.stats.stream_name :
                    "-",
@@ -466,6 +462,8 @@ static river_status_t river_playback_service_flush_locked(const char *reason)
 
 static river_status_t river_playback_service_recover_locked(const char *reason)
 {
+    river_status_t restart_status;
+
     if (!river_playback_service_state_active(g_river_playback_service.stats.state) &&
         g_river_playback_service.stats.state != RIVER_PLAYBACK_RECOVERING) {
         return RIVER_OK;
@@ -474,7 +472,35 @@ static river_status_t river_playback_service_recover_locked(const char *reason)
     if (g_river_playback_service.stats.state != RIVER_PLAYBACK_RECOVERING) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_RECOVERING);
     }
-    return river_playback_service_flush_locked(reason);
+
+    river_playback_service_record_control_locked("recover", reason);
+    river_playback_service_advance_epoch_locked(reason != NULL ? reason : "recover");
+
+    restart_status = river_playback_service_restart_started_track_locked();
+    if (restart_status != RIVER_OK) {
+        char stream_name[sizeof(g_river_playback_service.stats.stream_name)];
+
+        memcpy(stream_name,
+               g_river_playback_service.stats.stream_name,
+               sizeof(stream_name));
+        stream_name[sizeof(stream_name) - 1U] = '\0';
+        river_playback_service_close_locked(true);
+        river_playback_service_set_state_locked(RIVER_PLAYBACK_RESTART_PENDING);
+        RIVER_LOGW("playback recover fallback: stream=%s epoch=%lu reason=restart_failed",
+                   stream_name[0] != '\0' ? stream_name : "-",
+                   (unsigned long)g_river_playback_service.stats.epoch);
+        return RIVER_ERR_BUSY;
+    }
+
+    river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
+    g_river_playback_service.stats.flush_count++;
+    RIVER_LOGI("playback recover: stream=%s epoch=%lu ref=%s",
+               g_river_playback_service.stats.stream_name[0] != '\0' ?
+                   g_river_playback_service.stats.stream_name :
+                   "-",
+               (unsigned long)g_river_playback_service.stats.epoch,
+               g_river_playback_service.ref_owned ? "preserved" : "n/a");
+    return RIVER_OK;
 }
 
 static river_status_t river_playback_service_set_duck_locked(bool enabled, float gain, const char *reason)

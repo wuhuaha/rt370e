@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.412 让 downlink segment-gap hold 提前到低水位触发`
+  - `5.413 让 playback recover 保留 reference 服务`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback service 继续拆分 `flush` / `recover` 的破坏边界
+    - 新增：
+      - `river_playback_service_restart_started_track_locked(...)`
+    - `river_playback_service_flush_locked(...)` 现在继续保留 destructive flush 语义：
+      - reset reference
+      - restart track
+    - `river_playback_service_recover_locked(...)` 现在改为直接重启 track，不再在
+      transient `playback_write_failed` 恢复成功时调用
+      `river_reference_service_reset()`
+    - recover 失败时仍保持原有回退：
+      - `close_locked(true)`
+      - `RIVER_PLAYBACK_RESTART_PENDING`
+    - 这一步把 downlink write-fail recovery 的 blast radius 从
+      “reset reference + restart track” 收紧到“优先仅恢复 track”，为后续继续重建
+      rebuffer / restart policy 提供更稳定的 AEC 连续性
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续重建 segment-gap 恢复链
     - 新增：

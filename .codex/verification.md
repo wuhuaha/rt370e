@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.413
+Validate that playback `recover` no longer shares the destructive `flush`
+path and preserves reference service continuity on successful transient restart:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '408,520p' components/river_voice/river_playback_service.c
+sed -n '780,800p' components/river_voice/river_playback_service.c
+rg -n 'restart_started_track_locked|river_reference_service_reset\\(|playback recover:|playback recover fallback|playback_write_failed|recover_locked|flush_locked' \
+  components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_playback_service_restart_started_track_locked(...)` exists
+- `river_playback_service_flush_locked(...)` remains the only path here that
+  calls `river_reference_service_reset()`
+- `river_playback_service_recover_locked(...)` no longer delegates to
+  `river_playback_service_flush_locked(...)`
+- `river_playback_service_write(...)` still moves `write_failed` into
+  `RIVER_PLAYBACK_RECOVERING`
+- successful recover keeps the service in `RIVER_PLAYBACK_RUNNING` without
+  resetting reference/AEC history, while restart failure still falls back to
+  `RIVER_PLAYBACK_RESTART_PENDING`
+
 ## Step 5.412
 Validate that XiaoZhi downlink now pre-holds segment gaps at a low-water
 threshold instead of waiting for the queue to drain to zero:

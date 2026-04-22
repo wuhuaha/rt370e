@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.413
+- playback service 继续拆分 `flush` / `recover` 的破坏边界：
+  - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)
+- 新增内部辅助层：
+  - `river_playback_service_restart_started_track_locked(...)`
+- `river_playback_service_flush_locked(...)` 现在只保留 destructive flush 语义：
+  - 先 `river_reference_service_reset()`
+  - 再重启 `AudioTrack`
+- `river_playback_service_recover_locked(...)` 不再复用 flush 路径，而是直接走
+  track restart，不再在 transient `playback_write_failed` recover 成功时清空
+  reference/AEC 历史
+- recover 成功后仍回到 `RIVER_PLAYBACK_RUNNING`，但如果 restart 失败，仍保持原有
+  失败回退语义：
+  - `close_locked(true)`
+  - `RIVER_PLAYBACK_RESTART_PENDING`
+- 这一步把 downlink write-fail recovery 的 blast radius 从
+  “write failed -> flush track + reset reference” 收紧到
+  “write failed -> 尝试仅恢复 track；只有恢复失败才进入更重的重启路径”，为后续继续
+  重建 rebuffer / recovery policy 提供更稳定的 AEC 连续性
+
 ## Step 5.412
 - XiaoZhi downlink / playback 继续重建 segment-gap 恢复链：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
