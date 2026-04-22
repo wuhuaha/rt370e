@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.403
+Validate that dialog runtime now derives input/session interaction truth from a
+single interaction projection instead of repeatedly reading scattered snapshot
+fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '360,750p' components/river_core/river_dialog_runtime.c
+sed -n '1120,1198p' components/river_core/river_dialog_runtime.c
+rg -n 'interaction_projection|capture_interaction_projection_locked|tts_interrupt_inflight_from_projection|cloud_round_active_locked|compute_interaction_state_locked|wakeword_block_reason_locked|allows_barge_in_interrupt' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_interaction_projection_t` exists and captures the
+  input/session truth needed by dialog runtime
+- cloud-round / interrupt-inflight / interaction-state / wakeword-block /
+  barge-in decisions now reuse the same interaction projection
+- the affected dialog runtime paths no longer repeatedly read scattered
+  snapshot fields for the same decision
+
 ## Step 5.402
 Validate that dialog runtime now derives playback/output-turn truth from a
 single internal playback projection instead of repeatedly reading scattered

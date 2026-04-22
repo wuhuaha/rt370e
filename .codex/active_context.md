@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.402 让 dialog runtime playback 投影收口`
+  - `5.403 让 dialog runtime interaction 投影收口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 继续为输入侧 / 会话侧派生引入内部
+      `interaction_projection`
+    - `capture_interaction_projection_locked(...)` 会一次性锁存：
+      - boot / error / asr / wake / window
+      - cloud close / listen-stop
+      - `tts_interrupt_requested`
+      - input/output lane
+      - 当前 interaction state
+      - 复用的 playback projection
+    - 以下派生现在开始复用同一份 interaction projection，而不再散读
+      `g_river_dialog_runtime.snapshot`：
+      - `cloud_round_active`
+      - `tts_interrupt_inflight`
+      - `interaction_state`
+      - `wakeword_block_reason`
+      - `allows_barge_in_interrupt`
+    - 这一步开始把 dialog runtime 输入侧 / 会话侧真相也推进成
+      “single interaction projection -> admission / interaction truth”
   - newest landed runtime-ownership slice:
     - dialog runtime 现在为 playback 派生引入内部
       `playback_projection`
@@ -358,10 +377,10 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续收口 worker / dump / snapshot 里的组合 truth 读边界
     - 下一刀优先判断：
-      - dialog runtime 主真相源是否要继续收口输入侧 / window / interrupt truth，
-        引入与 playback projection 对称的 input/session projection
-      - cloud runtime snapshot 对 dialog runtime 的 playback 投影字段是否还需继续
+      - cloud runtime snapshot 对 dialog runtime 的 projection 输入字段是否还需继续
         消减和分层，避免 snapshot 同时承担 transport export 与 dialog truth 中转
+      - dialog runtime 是否要进一步把 publish/sync/reduce-local-playback 这些入口
+        也收口到显式 reducer/commit 边界，彻底形成单向状态归约
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.403`
+  - dialog runtime 继续为输入侧 / 会话侧派生引入内部
+    `interaction_projection`
+  - `capture_interaction_projection_locked(...)` 会一次性锁存：
+    - boot / error / asr / wake / window
+    - cloud close / listen-stop
+    - `tts_interrupt_requested`
+    - input/output lane
+    - 当前 interaction state
+    - 复用的 playback projection
+  - 以下派生现在开始复用同一份 interaction projection，而不再散读
+    `g_river_dialog_runtime.snapshot`：
+    - `cloud_round_active`
+    - `tts_interrupt_inflight`
+    - `interaction_state`
+    - `wakeword_block_reason`
+    - `allows_barge_in_interrupt`
+  - 这一步开始把 dialog runtime 输入侧 / 会话侧真相也推进成
+    “single interaction projection -> admission / interaction truth”
 - `Step 5.402`
   - dialog runtime 现在为 playback 派生引入内部
     `playback_projection`

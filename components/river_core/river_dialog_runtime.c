@@ -35,7 +35,6 @@ static river_dialog_runtime_context_t g_river_dialog_runtime;
 static void river_dialog_runtime_apply_cloud_snapshot_locked(
     const river_cloud_runtime_snapshot_t *snapshot);
 static void river_dialog_runtime_publish_locked(const char *reason);
-static bool river_dialog_runtime_output_turn_engaged_locked(void);
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
 static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending);
 static void river_dialog_runtime_refresh_error_recovering_locked(void);
@@ -360,6 +359,28 @@ typedef struct {
     bool local_shadow_recovering;
 } river_dialog_runtime_playback_projection_t;
 
+typedef struct {
+    river_dialog_runtime_playback_projection_t playback;
+    bool boot_ready;
+    bool error_recovering;
+    bool asr_session_active;
+    bool wake_confirmed;
+    bool wake_admission_pending;
+    bool conversation_window_active;
+    bool cloud_listening;
+    bool cloud_stream_active;
+    bool cloud_listen_stop_pending;
+    bool cloud_local_close_pending;
+    bool playback_active;
+    bool playback_recovering;
+    bool playback_terminal_closed;
+    bool tts_interrupt_requested;
+    bool output_turn_engaged;
+    river_dialog_input_lane_t input_lane;
+    river_dialog_output_lane_t output_lane;
+    river_interaction_state_t interaction_state;
+} river_dialog_runtime_interaction_projection_t;
+
 static void river_dialog_runtime_capture_playback_projection_locked(
     river_dialog_runtime_playback_projection_t *projection)
 {
@@ -558,6 +579,48 @@ static bool river_dialog_runtime_output_turn_engaged_from_projection(
                playback_active);
 }
 
+static void river_dialog_runtime_capture_interaction_projection_locked(
+    river_dialog_runtime_interaction_projection_t *projection)
+{
+    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+
+    if (projection == NULL) {
+        return;
+    }
+
+    memset(projection, 0, sizeof(*projection));
+    river_dialog_runtime_capture_playback_projection_locked(&projection->playback);
+    projection->boot_ready = snapshot->boot_ready;
+    projection->error_recovering = snapshot->error_recovering;
+    projection->asr_session_active = snapshot->asr_session_active;
+    projection->wake_confirmed = snapshot->wake_confirmed;
+    projection->wake_admission_pending = snapshot->wake_admission_pending;
+    projection->conversation_window_active = snapshot->conversation_window_active;
+    projection->cloud_listening = snapshot->cloud_listening;
+    projection->cloud_stream_active = snapshot->cloud_stream_active;
+    projection->cloud_listen_stop_pending = snapshot->cloud_listen_stop_pending;
+    projection->cloud_local_close_pending = snapshot->cloud_local_close_pending;
+    projection->playback_active = snapshot->playback_active;
+    projection->playback_recovering = snapshot->playback_recovering;
+    projection->playback_terminal_closed = snapshot->playback_terminal_closed;
+    projection->tts_interrupt_requested = snapshot->tts_interrupt_requested;
+    projection->input_lane = snapshot->input_lane;
+    projection->output_lane = snapshot->output_lane;
+    projection->interaction_state = snapshot->interaction_state;
+    projection->output_turn_engaged =
+        river_dialog_runtime_output_turn_engaged_from_projection(
+            &projection->playback,
+            projection->playback_active);
+}
+
+static bool river_dialog_runtime_tts_interrupt_inflight_from_projection(
+    const river_dialog_runtime_interaction_projection_t *projection)
+{
+    return projection != NULL &&
+           (projection->playback.tts_stop_pending ||
+            projection->tts_interrupt_requested);
+}
+
 static void river_dialog_runtime_refresh_playback_locked(void)
 {
     river_dialog_runtime_playback_projection_t projection;
@@ -590,61 +653,48 @@ static bool river_dialog_runtime_output_turn_quiesced_locked(void)
            !projection.terminal_waiting;
 }
 
-static bool river_dialog_runtime_output_turn_engaged_locked(void)
-{
-    river_dialog_runtime_playback_projection_t projection;
-
-    river_dialog_runtime_capture_playback_projection_locked(&projection);
-    return river_dialog_runtime_output_turn_engaged_from_projection(
-        &projection,
-        g_river_dialog_runtime.snapshot.playback_active);
-}
-
 static bool river_dialog_runtime_cloud_round_active_locked(void)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+    river_dialog_runtime_interaction_projection_t projection;
 
-    return snapshot->cloud_listening ||
-           snapshot->cloud_stream_active ||
-           snapshot->cloud_listen_stop_pending ||
-           snapshot->cloud_local_close_pending ||
-           snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
-           snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED;
-}
-
-static bool river_dialog_runtime_tts_interrupt_inflight_locked(void)
-{
-    return g_river_dialog_runtime.snapshot.tts_stop_pending ||
-           g_river_dialog_runtime.snapshot.tts_interrupt_requested;
+    river_dialog_runtime_capture_interaction_projection_locked(&projection);
+    return projection.cloud_listening ||
+           projection.cloud_stream_active ||
+           projection.cloud_listen_stop_pending ||
+           projection.cloud_local_close_pending ||
+           projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
+           projection.input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED;
 }
 
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
-    bool output_turn_engaged = river_dialog_runtime_output_turn_engaged_locked();
+    river_dialog_runtime_interaction_projection_t projection;
 
-    if (!snapshot->boot_ready) {
+    river_dialog_runtime_capture_interaction_projection_locked(&projection);
+    if (!projection.boot_ready) {
         return RIVER_INTERACTION_BOOTING;
     }
-    if (snapshot->error_recovering) {
+    if (projection.error_recovering) {
         return RIVER_INTERACTION_ERROR_RECOVERING;
     }
-    if (output_turn_engaged) {
-        if (snapshot->asr_session_active || snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
+    if (projection.output_turn_engaged) {
+        if (projection.asr_session_active ||
+            projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
             return RIVER_INTERACTION_BARGE_IN_LISTENING;
         }
         return RIVER_INTERACTION_SPEAKING;
     }
-    if (snapshot->output_lane == RIVER_DIALOG_OUTPUT_LANE_THINKING) {
+    if (projection.output_lane == RIVER_DIALOG_OUTPUT_LANE_THINKING) {
         return RIVER_INTERACTION_THINKING;
     }
-    if (snapshot->asr_session_active || snapshot->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
+    if (projection.asr_session_active ||
+        projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
         return RIVER_INTERACTION_ASR_STREAMING;
     }
-    if (snapshot->wake_confirmed) {
+    if (projection.wake_confirmed) {
         return RIVER_INTERACTION_WAKE_CONFIRMED;
     }
-    if (snapshot->conversation_window_active) {
+    if (projection.conversation_window_active) {
         return RIVER_INTERACTION_FOLLOW_UP;
     }
     return RIVER_INTERACTION_WAKE_MONITORING;
@@ -1054,22 +1104,23 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
 
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void)
 {
-    if (g_river_dialog_runtime.snapshot.wake_admission_pending) {
+    river_dialog_runtime_interaction_projection_t projection;
+
+    river_dialog_runtime_capture_interaction_projection_locked(&projection);
+    if (projection.wake_admission_pending) {
         return "wake_admission_pending";
     }
-    if (g_river_dialog_runtime.snapshot.conversation_window_active) {
+    if (projection.conversation_window_active) {
         return "conversation_window_active";
     }
-    if (g_river_dialog_runtime.snapshot.cloud_local_close_pending) {
+    if (projection.cloud_local_close_pending) {
         return "cloud_local_close_pending";
     }
-    if (g_river_dialog_runtime.snapshot.cloud_listen_stop_pending) {
+    if (projection.cloud_listen_stop_pending) {
         return "cloud_listen_stop_pending";
     }
-    if (g_river_dialog_runtime.snapshot.interaction_state !=
-        RIVER_INTERACTION_WAKE_MONITORING) {
-        return river_interaction_state_name(
-            g_river_dialog_runtime.snapshot.interaction_state);
+    if (projection.interaction_state != RIVER_INTERACTION_WAKE_MONITORING) {
+        return river_interaction_state_name(projection.interaction_state);
     }
     return NULL;
 }
@@ -1103,6 +1154,7 @@ const char *river_dialog_runtime_wakeword_admission_block_reason(void)
 bool river_dialog_runtime_allows_barge_in_interrupt(void)
 {
     bool allowed = false;
+    river_dialog_runtime_interaction_projection_t projection;
 
     if (!g_river_dialog_runtime.initialized) {
         return false;
@@ -1111,13 +1163,15 @@ bool river_dialog_runtime_allows_barge_in_interrupt(void)
         return false;
     }
 
-    allowed = g_river_dialog_runtime.snapshot.asr_session_active &&
-              river_dialog_runtime_output_turn_engaged_locked() &&
-              !river_dialog_runtime_tts_interrupt_inflight_locked() &&
-              !g_river_dialog_runtime.snapshot.playback_terminal_closed &&
-              (g_river_dialog_runtime.snapshot.interaction_state ==
+    river_dialog_runtime_capture_interaction_projection_locked(&projection);
+    allowed = projection.asr_session_active &&
+              projection.output_turn_engaged &&
+              !river_dialog_runtime_tts_interrupt_inflight_from_projection(
+                  &projection) &&
+              !projection.playback_terminal_closed &&
+              (projection.interaction_state ==
                    RIVER_INTERACTION_SPEAKING ||
-               g_river_dialog_runtime.snapshot.interaction_state ==
+               projection.interaction_state ==
                    RIVER_INTERACTION_BARGE_IN_LISTENING);
 
     river_dialog_runtime_unlock();
