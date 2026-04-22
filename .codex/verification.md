@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.399
+Validate that the downlink worker now reuses a single truth-view snapshot for
+the paused-resume, backend gating, and write-failed rebuffer paths instead of
+re-reading backend/supply state multiple times inside one loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '2160,2215p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3240,3425p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'maybe_resume_paused_playback|capture_playback_truth_view|playback write failed|playback rebuffer requested' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_maybe_resume_paused_playback(...)` now takes the
+  caller-provided truth-view and logs `phase/backend` from that snapshot
+- the downlink worker captures `playback_truth_view` once per decision window
+  and reuses it across paused-resume / start gating / recovering checks
+- the `write failed -> rebuffer` path reuses the same truth-view to derive
+  `supply_kind`, `phase/backend` logs, and recovery selection
+
 ## Step 5.398
 Validate that playback recovery now reuses a single truth-view snapshot instead
 of separately re-reading phase/backend/supply across the segment-gap and

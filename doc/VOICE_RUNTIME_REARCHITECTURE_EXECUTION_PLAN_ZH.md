@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.399`
+  - XiaoZhi playback runtime 继续把 downlink worker 的核心分支收口到显式
+    `playback_truth_view`
+  - `maybe_resume_paused_playback()` 现在改为消费已捕获的 truth-view，而不再
+    在函数内部重新读取 `phase/backend`
+  - downlink worker 主循环在单次决策窗口内开始复用同一份 truth-view，用于：
+    - `rebuffer_resume_ready`
+    - `tts_stop_pending`
+    - `paused -> resume`
+    - `needs_start / recovering / start_threshold`
+  - `playback write failed -> rebuffer` 路径现在也复用同一份 truth-view 来驱动：
+    - `supply_kind`
+    - `phase/backend` 诊断日志
+    - recovery path 选择
+  - 这一步继续把 downlink worker 从“循环内多 helper 重读”推进成
+    “single worker decision -> single truth-view”
 - `Step 5.398`
   - XiaoZhi playback runtime 现在为 recovery 关键分支引入显式
     `playback_truth_view`

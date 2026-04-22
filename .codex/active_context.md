@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.398 让 playback recovery 分支共享 truth-view`
+  - `5.399 让 downlink worker 复用 truth-view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 继续把 downlink worker 的核心分支收口到显式
+      `playback_truth_view`
+    - `maybe_resume_paused_playback()` 现在改为消费已捕获的 truth-view，而不再
+      在函数内部重新读取 `phase/backend`
+    - downlink worker 主循环在单次决策窗口内开始复用同一份 truth-view，用于：
+      - `rebuffer_resume_ready`
+      - `tts_stop_pending`
+      - `paused -> resume`
+      - `needs_start / recovering / start_threshold`
+    - `playback write failed -> rebuffer` 路径现在也复用同一份 truth-view 来驱动：
+      - `supply_kind`
+      - `phase/backend` 诊断日志
+      - recovery path 选择
+    - 这一步继续把 worker 从“循环内多 helper 重读”推进成
+      “single worker decision -> single truth-view”，减少一次循环内的
+      backend/supply 读偏斜
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 现在把 recovery 关键分支收口到显式
       `playback_truth_view`
@@ -295,10 +312,10 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续收口 worker / dump / snapshot 里的组合 truth 读边界
     - 下一刀优先判断：
-      - write-failed rebuffer 分支与 downlink worker 主循环是否也应复用统一的
-        playback truth-view，而不是继续单独查询 `backend_state` / `supply_kind`
       - `dump_playback_status()` / `fill_playback_runtime_snapshot()` 是否要进一步合并成
         更完整的 playback-truth dump source，减少观测面与执行面的判定漂移
+      - `pending_stop` / `abort` / `start_if_needed` 这类仍直接读取
+        `backend_state` 的边界，是否也要收口到更统一的 truth-source
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

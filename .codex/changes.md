@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.399
+- XiaoZhi playback runtime 继续把 downlink worker 的核心分支收口到显式
+  `playback_truth_view`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_maybe_resume_paused_playback()` 现在改为直接消费
+  已捕获的 truth-view，而不再在函数内部重新读取 `phase/backend`
+- downlink worker 主循环在单次决策窗口内开始复用同一份 truth-view，用于：
+  - `rebuffer_resume_ready`
+  - `tts_stop_pending` 分支
+  - `paused -> resume`
+  - `needs_start / recovering / start_threshold`
+- `playback write failed -> rebuffer` 路径现在也改为复用同一份 truth-view 来驱动：
+  - `supply_kind`
+  - `phase/backend` 诊断日志
+  - recovery path 选择
+- 这一步继续把 worker 从“循环内多 helper 重读”推进成
+  “单次 worker decision -> single truth-view”，减少一次循环里 backend/supply
+  读偏斜导致的恢复抖动
+
 ## Step 5.398
 - XiaoZhi playback runtime 现在为 recovery 关键分支引入显式
   `river_cloud_xiaozhi_playback_truth_view_t`：
