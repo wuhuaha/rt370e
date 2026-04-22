@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "river/river_dialog_runtime.h"
 #include "river/river_interaction_state.h"
 #include "river/river_playback_service.h"
 #include "river/river_reference_service.h"
@@ -40,6 +41,8 @@ typedef enum {
 typedef struct {
     river_voice_aec_gate_reason_t reason;
     river_playback_state_t playback_state;
+    river_dialog_playback_owner_kind_t dialog_playback_owner_kind;
+    river_dialog_error_kind_t dialog_error_kind;
     river_interaction_state_t interaction_state;
     river_reference_state_t reference_state;
     river_voice_preproc_profile_t profile;
@@ -62,6 +65,8 @@ typedef struct {
     river_voice_duplex_ready_reason_t reason;
     river_voice_aec_gate_reason_t aec_reason;
     river_playback_state_t playback_state;
+    river_dialog_playback_owner_kind_t dialog_playback_owner_kind;
+    river_dialog_error_kind_t dialog_error_kind;
     river_interaction_state_t interaction_state;
     river_reference_state_t reference_state;
     river_voice_reference_activity_t reference_activity;

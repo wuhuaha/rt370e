@@ -1787,7 +1787,7 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
     river_cloud_xiaozhi_copy_semantic_text(g_river_cloud.xiaozhi_semantic_fallback_reason,
                                            sizeof(g_river_cloud.xiaozhi_semantic_fallback_reason),
                                            reason);
-    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_default_on=%s duplex_default_reason=%s duplex_ready=%s duplex_reason=%s sid=%s",
+    RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_default_on=%s duplex_default_reason=%s duplex_ready=%s duplex_reason=%s playback=%s/%s error=%s sid=%s",
                g_river_cloud.xiaozhi_semantic_fallback_reason,
                river_cloud_xiaozhi_turn_accepted() ? "yes" : "no",
                g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
@@ -1803,6 +1803,10 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
                duplex_default_reason != NULL ? duplex_default_reason : "-",
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
+               river_playback_service_state_name(duplex_eval.playback_state),
+               river_dialog_playback_owner_kind_name(
+                   duplex_eval.dialog_playback_owner_kind),
+               river_dialog_error_kind_name(duplex_eval.dialog_error_kind),
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
 }
 

@@ -216,9 +216,12 @@ static void river_voice_preproc_note_gate_reason(
 
     if (gate_eval->reason != context->last_gate_reason) {
         context->aec_gate_transitions++;
-        RIVER_LOGI("webrtc_aecm gate=%s playback=%s interaction=%s ref_path=%s ref_activity=%s native_ref=%u",
+        RIVER_LOGI("webrtc_aecm gate=%s playback=%s/%s error=%s interaction=%s ref_path=%s ref_activity=%s native_ref=%u",
                    river_voice_runtime_aec_gate_reason_name(gate_eval->reason),
                    river_playback_service_state_name(gate_eval->playback_state),
+                   river_dialog_playback_owner_kind_name(
+                       gate_eval->dialog_playback_owner_kind),
+                   river_dialog_error_kind_name(gate_eval->dialog_error_kind),
                    river_interaction_state_name(gate_eval->interaction_state),
                    river_reference_service_state_name(gate_eval->reference_state),
                    river_voice_runtime_reference_activity_name(ref_activity),

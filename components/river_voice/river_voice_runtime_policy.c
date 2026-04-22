@@ -291,6 +291,8 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
     profile_config = river_voice_profile_get(profile);
     eval->profile = profile;
     eval->playback_state = river_playback_service_state();
+    eval->dialog_playback_owner_kind = RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE;
+    eval->dialog_error_kind = RIVER_DIALOG_ERROR_KIND_NONE;
     eval->interaction_state = river_interaction_state_get();
     eval->reference_state = river_reference_service_state();
     eval->uses_native_capture_ref = profile_config->uses_native_capture_ref;
@@ -300,6 +302,8 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
 
     if (river_voice_runtime_dialog_snapshot_capture(&dialog_snapshot)) {
         dialog_snapshot_ptr = &dialog_snapshot;
+        eval->dialog_playback_owner_kind = dialog_snapshot.playback_owner_kind;
+        eval->dialog_error_kind = dialog_snapshot.error_kind;
     }
 
     if (!profile_config->experimental) {
@@ -391,6 +395,8 @@ void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
     eval->profile_supports_playback_reference =
         river_voice_runtime_profile_supports_playback_reference(profile);
     eval->playback_state = aec_eval.playback_state;
+    eval->dialog_playback_owner_kind = aec_eval.dialog_playback_owner_kind;
+    eval->dialog_error_kind = aec_eval.dialog_error_kind;
     eval->interaction_state = aec_eval.interaction_state;
     eval->reference_state = ref_stats.state;
     eval->reference_queue_frames = ref_stats.queue_frames;

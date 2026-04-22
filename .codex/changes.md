@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.389
+- `voice runtime` 的 AEC/duplex 评估结构现在显式携带 `dialog runtime`
+  导出的 typed truth：
+  - `dialog_playback_owner_kind`
+  - `dialog_error_kind`
+  - [include/river/river_voice_runtime_policy.h](/root/ameba-river/include/river/river_voice_runtime_policy.h)
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- `river_voice_runtime_aec_gate_eval_base(...)` 现在在抓取 dialog snapshot 时同步锁存：
+  - `playback_owner_kind`
+  - `error_kind`
+  并继续透传到 `river_voice_runtime_duplex_ready_eval(...)`
+- `preproc` 的 gate-transition 诊断日志现在直接打印：
+  - raw `playback_state`
+  - typed `playback_owner_kind`
+  - typed `error_kind`
+  - [components/river_voice/river_voice_preproc_fixed_dsb.c](/root/ameba-river/components/river_voice/river_voice_preproc_fixed_dsb.c)
+- XiaoZhi duplex/fallback 关键日志也同步补上了相同三元组：
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 这一步先不改 AEC/duplex 判定逻辑本身，只把诊断面与 `dialog runtime`
+  typed truth 对齐，减少板端继续依赖粗粒度 playback 布尔反推语义归属
+
 ## Step 5.388
 - voice runtime 现在开始显式消费 `dialog runtime` 导出的
   `playback_owner_kind`：

@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.388 让 voice runtime 显式消费 playback_owner_kind`
+  - `5.389 在 AEC/duplex 诊断中外显 dialog typed truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `voice runtime` 的 AEC/duplex 评估结构现在开始显式携带
+      `dialog runtime` 导出的：
+      - `playback_owner_kind`
+      - `error_kind`
+    - `preproc` 的 `webrtc_aecm gate=...` 迁移日志现在会直接打印：
+      - raw `playback_state`
+      - typed `playback_owner_kind`
+      - typed `error_kind`
+    - XiaoZhi duplex/fallback 关键日志也同步补上这三项，板端看到
+      `aec_blocked` / `duplex_ready=no` 时，不再需要从粗粒度布尔反推当前是：
+      - 物理 playback 不在场
+      - 还是 dialog 语义 owner 已切换
+      - 还是 error truth 仍挂在 fallback 阶段
+    - 这一步继续把 AEC/preproc 诊断面与 `dialog runtime` 真相源对齐，为下一步
+      继续清理 residual raw playback-state 语义依赖提供可观测基础
   - newest landed runtime-ownership slice:
     - voice runtime 现在开始显式消费 `dialog runtime` 导出的
       `playback_owner_kind`

@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.389`
+  - `voice runtime` 的 AEC/duplex 评估结构现在显式携带 `dialog runtime`
+    导出的 typed truth：
+    - `playback_owner_kind`
+    - `error_kind`
+  - `river_voice_runtime_aec_gate_eval_base(...)` 在抓取 dialog snapshot 时，
+    会同步锁存这两项并继续透传到 `river_voice_runtime_duplex_ready_eval(...)`
+  - `preproc` 的 `webrtc_aecm gate=...` 迁移日志现在直接打印：
+    - raw `playback_state`
+    - typed `playback_owner_kind`
+    - typed `error_kind`
+  - XiaoZhi duplex/fallback 关键日志也同步补齐这三项
+  - 这一步先不继续改 gate 判定逻辑，而是先把 AEC/preproc/duplex 的诊断面与
+    `dialog runtime` typed truth 对齐，为后续继续收紧 residual raw
+    playback-state 语义依赖提供板端可观测基础
 - `Step 5.388`
   - voice runtime 现在开始显式消费 `dialog runtime` 导出的
     `playback_owner_kind`

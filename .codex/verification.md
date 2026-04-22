@@ -1,5 +1,45 @@
 # Verification
 
+## Step 5.389
+Validate that AEC/duplex diagnostics now expose the typed
+`dialog runtime playback_owner_kind/error_kind` alongside the raw playback
+service state, so board traces no longer need to reverse-infer ownership or
+error truth from coarse booleans:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'dialog_playback_owner_kind|dialog_error_kind|webrtc_aecm gate=|playback=%s/%s error=%s' \
+  include/river/river_voice_runtime_policy.h \
+  components/river_voice/river_voice_runtime_policy.c \
+  components/river_voice/river_voice_preproc_fixed_dsb.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '15,36p' include/river/river_voice_runtime_policy.h
+sed -n '286,320p' components/river_voice/river_voice_runtime_policy.c
+sed -n '214,231p' components/river_voice/river_voice_preproc_fixed_dsb.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- AEC/duplex evaluation structs now carry:
+  - `dialog_playback_owner_kind`
+  - `dialog_error_kind`
+- `webrtc_aecm gate=...` transition logs now print:
+  - raw playback service state
+  - typed playback owner kind
+  - typed error kind
+- XiaoZhi duplex/fallback logs now expose the same typed truth, so `aec_blocked`
+  / `duplex_ready=no` traces can distinguish:
+  - physical playback state
+  - dialog playback ownership
+  - dialog error source
+
 ## Step 5.388
 Validate that voice runtime now consumes the typed
 `dialog runtime playback_owner_kind` for its dialog-playback fallback, so the
