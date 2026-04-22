@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.395`
+  - XiaoZhi playback runtime 现在为 phase 派生引入显式
+    `playback_phase_source`
+  - `capture_playback_phase_source(...)` 会一次性锁存：
+    - `stop_pending`
+    - `rebuffer_pending`
+    - `physical_active`
+    - `queued_frames`
+    - `segment_count`
+    - `waiting_next_segment`
+  - `compute_playback_phase_from_source(...)` 现在只消费这份 source，不再在
+    phase 派生过程中散落读取全局态
+  - `refresh_playback_phase(...)` 也直接复用同一份 source 打日志，观测面新增：
+    - `segments`
+    - `wait_next`
+  - 这一步不改变 phase 判定结论，只继续把 playback phase 推进成
+    “显式 physical + queue/segment source -> phase”的单向派生
 - `Step 5.394`
   - XiaoZhi playback runtime 现在把本文件内 residual 的
     `xiaozhi_playback_active` 读取统一收口到

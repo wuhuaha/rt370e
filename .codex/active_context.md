@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.394 外显 playback physical truth 并收紧 endpoint 诊断语义`
+  - `5.395 将 playback phase 派生收口到显式 phase-source`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 现在为 phase 派生引入了显式
+      `playback_phase_source`
+    - `capture_playback_phase_source(...)` 会一次性锁存：
+      - `stop_pending`
+      - `rebuffer_pending`
+      - `physical_active`
+      - `queued_frames`
+      - `segment_count`
+      - `waiting_next_segment`
+    - `compute_playback_phase_from_source(...)` 现在只消费这份 source，
+      不再在 phase 派生过程中散落读取全局态
+    - `refresh_playback_phase(...)` 也直接复用同一份 source 打日志，观测面补齐：
+      - `segments`
+      - `wait_next`
+    - 这一步继续把 playback phase 从“混合读取 shadow/queue/wait 状态”
+      推进成“显式 physical + queue/segment semantic source -> phase”的单向派生
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 现在把本文件内 residual 的
       `xiaozhi_playback_active` 读取统一收口到
@@ -227,10 +244,10 @@ or top-of-tree verification target changes.
     - 继续检查 playback runtime 内剩余 `g_river_cloud.xiaozhi_playback_active`
       直接消费点
     - 下一刀优先判断：
-      - `compute_playback_phase()` 内部保留影子布尔作为底层物理态输入是否仍是
-        合理边界，还是应该继续拆分为显式 physical/semantic 双视图
-      - 是否需要继续把 `playback_phase` 的派生输入从单一 physical active
-        扩展为显式 phase-source 结构，避免 phase/backend 互相反推时仍共享同一影子位
+      - `playback_backend_state()` 是否也应从显式 backend-source 派生，避免继续
+        在 backend truth 里反向查询 phase
+      - `playback_waiting_next_segment()` 这类 helper 是否应继续直接读全局，还是改成
+        消费统一 source/snapshot，减少 worker 与 dump 之间的读时差
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

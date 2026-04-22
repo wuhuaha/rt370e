@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.395
+- XiaoZhi playback runtime 现在为 phase 派生引入显式
+  `river_cloud_xiaozhi_playback_phase_source_t`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `river_cloud_xiaozhi_capture_playback_phase_source(...)`，一次性锁存：
+  - `stop_pending`
+  - `rebuffer_pending`
+  - `physical_active`
+  - `queued_frames`
+  - `segment_count`
+  - `waiting_next_segment`
+- `river_cloud_xiaozhi_compute_playback_phase_from_source(...)` 现在只消费这份
+  source，不再在 phase 派生过程中散落读取全局态
+- `river_cloud_xiaozhi_refresh_playback_phase(...)` 也开始复用同一份 source 打日志，
+  观测面新增：
+  - `segments`
+  - `wait_next`
+- 这一步不改变 `PLAYING/PREFETCHING/WAITING_SEGMENT/...` 的判定结论，只把
+  playback phase 的真相边界继续收口到“显式 physical + queue/segment source ->
+  phase”的单向派生
+
 ## Step 5.394
 - XiaoZhi playback runtime 现在把本文件内 residual 的
   `g_river_cloud.xiaozhi_playback_active` 读取收口到

@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.395
+Validate that playback phase derivation now consumes an explicit phase-source
+snapshot instead of reading stop/rebuffer/physical/queue state piecemeal from
+globals:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '16,40p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '168,236p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_phase_source|capture_playback_phase_source|compute_playback_phase_from_source|wait_next=' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_phase_source_t` exists and includes the phase
+  inputs needed for derivation
+- `river_cloud_xiaozhi_capture_playback_phase_source(...)` locks those inputs
+  once per phase refresh
+- `river_cloud_xiaozhi_compute_playback_phase_from_source(...)` now derives the
+  phase only from that source snapshot
+- phase transition logs now expose `segments` and `wait_next`, so phase
+  reasoning can be read directly from the logged source instead of reverse
+  inferring it from multiple globals
+
 ## Step 5.394
 Validate that playback runtime now names physical playback truth explicitly and
 that endpoint/hint diagnostics no longer expose an ambiguous single
