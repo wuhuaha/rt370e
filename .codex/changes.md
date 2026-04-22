@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.405
+- dialog runtime 继续把 cloud snapshot 路径从“import + reconcile 混合 helper”
+  拆成显式两阶段：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `apply_cloud_snapshot_locked(...)` 已拆分为：
+  - `import_cloud_snapshot_locked(...)`
+  - `reconcile_facts_locked(...)`
+- `import_cloud_snapshot_locked(...)` 现在只负责导入 cloud raw facts：
+  - cloud runtime availability
+  - round/window/playback raw fields
+  - input/output lane text 与解析后的 lane
+- `reconcile_facts_locked(...)` 现在统一负责 dialog 侧收敛：
+  - clear local playback error shadow when cloud runtime is available
+  - refresh error truth
+  - latch cloud-round-backed `asr_session_active`
+  - refresh playback truth
+  - clear `tts_interrupt_requested` when output turn is quiesced
+- `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+  `reduce_local_playback_event(...)` 现在都显式走：
+  - import facts
+  - reconcile facts
+  - finalize commit
+- 这一步继续把 dialog runtime 入口从“抓 cloud + 合并 truth + publish”推进成
+  更清楚的 reducer 管线，为下一步继续把 raw cloud snapshot 包装成更明确的
+  dialog import 载体做准备
+
 ## Step 5.404
 - dialog runtime 为 cloud event / cloud sync / local playback reducer 新增统一的
   `commit checkpoint + commit policy` 提交边界：

@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.405
+Validate that dialog runtime now separates cloud raw-fact import from dialog
+truth reconciliation, and that the main ingress paths explicitly follow
+`import -> reconcile -> finalize_commit`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '44,60p' components/river_core/river_dialog_runtime.c
+sed -n '820,928p' components/river_core/river_dialog_runtime.c
+sed -n '1092,1168p' components/river_core/river_dialog_runtime.c
+rg -n 'import_cloud_snapshot_locked|reconcile_facts_locked|finalize_commit_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `apply_cloud_snapshot_locked(...)` no longer exists
+- `import_cloud_snapshot_locked(...)` only imports cloud raw facts
+- `reconcile_facts_locked(...)` owns the dialog-side refresh and cleanup logic
+- cloud-event, cloud-sync, and local-playback reducer ingress all now show the
+  same `import -> reconcile -> finalize_commit` structure
+
 ## Step 5.404
 Validate that dialog runtime now shares one commit boundary for cloud-event,
 cloud-sync, and local-playback reducer paths instead of duplicating publish

@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.404 让 dialog runtime reducer/commit 边界收口`
+  - `5.405 让 dialog runtime cloud import/reconcile 分层`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 已把 cloud snapshot 路径从单个混合 helper 拆成：
+      - `import_cloud_snapshot_locked(...)`
+      - `reconcile_facts_locked(...)`
+    - `import_cloud_snapshot_locked(...)` 现在只导入 cloud raw facts
+    - `reconcile_facts_locked(...)` 现在统一负责：
+      - clear local playback error shadow when cloud runtime is available
+      - refresh error/playback truth
+      - latch cloud-round-backed `asr_session_active`
+      - clear quiesced `tts_interrupt_requested`
+    - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+      `reduce_local_playback_event(...)` 现在都显式复用：
+      - import facts
+      - reconcile facts
+      - finalize commit
+    - 这一步继续把 dialog runtime 入口推进成更清楚的 reducer 管线，为后续把
+      raw cloud snapshot 再收成更明确的 dialog import carrier 做准备
   - newest landed runtime-ownership slice:
     - dialog runtime 现在为 cloud event / cloud sync / local playback reducer
       引入统一的 `commit checkpoint + commit policy`

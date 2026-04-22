@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.405`
+  - dialog runtime 已把 cloud snapshot 路径从单个混合 helper 拆成显式两阶段：
+    - `import_cloud_snapshot_locked(...)`
+    - `reconcile_facts_locked(...)`
+  - `import_cloud_snapshot_locked(...)` 现在只负责导入 cloud raw facts：
+    - availability
+    - round/window/playback raw fields
+    - input/output lane text 与 parsed lane
+  - `reconcile_facts_locked(...)` 现在统一负责 dialog 侧收敛：
+    - clear local playback error shadow when cloud runtime is available
+    - refresh error truth
+    - latch cloud-round-backed `asr_session_active`
+    - refresh playback truth
+    - clear quiesced `tts_interrupt_requested`
+  - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+    `reduce_local_playback_event(...)` 现在都显式走：
+    - import facts
+    - reconcile facts
+    - finalize commit
+  - 这一步继续把 dialog runtime 入口推进成更清楚的 reducer 管线，为下一步把
+    raw cloud snapshot 再收成更明确的 dialog import carrier 做准备
 - `Step 5.404`
   - dialog runtime 现在为 cloud event / cloud sync / local playback reducer
     引入统一的 `commit checkpoint + commit policy`
@@ -3004,10 +3025,18 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 下一步焦点：
 
-- 继续把 `dialog runtime` 里的 cloud snapshot 导入和 reducer 派生分层：
-  - 让 `apply_cloud_snapshot_locked(...)` 更像 import
-  - 让 commit/reducer helper 负责是否发布
-  - 避免入口函数继续同时承担“抓取 cloud / 合并 truth / 决定 publish”
+- 继续把当前仍直接暴露为 `river_cloud_runtime_snapshot_t` 的 raw cloud 输入，
+  收成更明确的 dialog import carrier，减少 dialog runtime 长期直接依赖
+  transport/export snapshot 结构
+- 继续检查 `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+  `reduce_local_playback_event(...)` 是否还能进一步共用更少的 reducer 入口，
+  让入口函数只保留：
+  - 写入 facts
+  - 选择 commit policy
+- 继续把 `dialog runtime` 里的 cloud import / reconcile / commit 三层边界压实：
+  - 让 raw import carrier 更稳定
+  - 让 reconcile helper 只负责 dialog truth 收敛
+  - 让 commit helper 只负责 publish policy
 - 继续检查 `dialog runtime` 内是否还能把 cloud-event / cloud-sync /
   local-playback 进一步收口成更少的 typed reducer，减少：
   - stale cloud snapshot
