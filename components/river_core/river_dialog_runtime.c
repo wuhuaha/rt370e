@@ -83,6 +83,25 @@ typedef struct {
     bool playback_start_cautious_history;
 } river_dialog_runtime_cloud_import_t;
 
+typedef struct {
+    bool config_present;
+    river_playback_state_t state;
+    river_playback_priority_t priority;
+    char stream_name[32];
+} river_dialog_runtime_local_playback_import_t;
+
+typedef struct {
+    bool has_cloud_import;
+    river_dialog_runtime_cloud_import_t cloud_import;
+    bool has_cloud_event;
+    river_dialog_runtime_cloud_event_t cloud_event;
+    char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
+    bool has_local_playback_import;
+    river_dialog_runtime_local_playback_import_t local_playback_import;
+    river_dialog_runtime_commit_policy_t commit_policy;
+    const char *reason;
+} river_dialog_runtime_ingress_t;
+
 static river_dialog_runtime_context_t g_river_dialog_runtime;
 
 static void river_dialog_runtime_import_cloud_snapshot_locked(
@@ -98,6 +117,8 @@ static void river_dialog_runtime_finalize_commit_locked(
     const river_dialog_runtime_commit_checkpoint_t *before,
     river_dialog_runtime_commit_policy_t policy,
     const char *reason);
+static void river_dialog_runtime_commit_ingress(
+    const river_dialog_runtime_ingress_t *ingress);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -147,24 +168,28 @@ static void river_dialog_runtime_refresh_error_recovering_locked(void)
 }
 
 static bool river_dialog_runtime_is_dialog_playback_stream_locked(
-    const river_playback_stream_config_t *config)
+    const river_dialog_runtime_local_playback_import_t *local_playback_import)
 {
-    return config != NULL && config->priority == RIVER_PLAYBACK_PRIO_TTS;
+    return local_playback_import != NULL &&
+           local_playback_import->config_present &&
+           local_playback_import->priority == RIVER_PLAYBACK_PRIO_TTS;
 }
 
 static bool river_dialog_runtime_matches_owned_playback_stream_locked(
-    const river_playback_stream_config_t *config)
+    const river_dialog_runtime_local_playback_import_t *local_playback_import)
 {
     if (!g_river_dialog_runtime.local_playback_stream_owned) {
         return false;
     }
-    if (config == NULL || config->stream_name == NULL || config->stream_name[0] == '\0') {
+    if (local_playback_import == NULL || !local_playback_import->config_present ||
+        local_playback_import->stream_name[0] == '\0') {
         return true;
     }
     if (g_river_dialog_runtime.local_playback_stream_name[0] == '\0') {
         return true;
     }
-    return strcmp(g_river_dialog_runtime.local_playback_stream_name, config->stream_name) == 0;
+    return strcmp(g_river_dialog_runtime.local_playback_stream_name,
+                  local_playback_import->stream_name) == 0;
 }
 
 static bool river_dialog_runtime_capture_cloud_import(
@@ -242,6 +267,28 @@ static bool river_dialog_runtime_capture_cloud_import(
     return true;
 }
 
+static void river_dialog_runtime_capture_local_playback_import(
+    river_dialog_runtime_local_playback_import_t *local_playback_import,
+    river_playback_state_t state,
+    const river_playback_stream_config_t *config)
+{
+    if (local_playback_import == NULL) {
+        return;
+    }
+
+    memset(local_playback_import, 0, sizeof(*local_playback_import));
+    local_playback_import->state = state;
+    if (config == NULL) {
+        return;
+    }
+
+    local_playback_import->config_present = true;
+    local_playback_import->priority = config->priority;
+    river_dialog_runtime_copy_text(local_playback_import->stream_name,
+                                   sizeof(local_playback_import->stream_name),
+                                   config->stream_name);
+}
+
 static const char *river_dialog_runtime_cloud_event_default_reason(
     river_dialog_runtime_cloud_event_t event)
 {
@@ -312,24 +359,19 @@ static void river_dialog_runtime_commit_cloud_event(
     const char *sid,
     const char *reason)
 {
-    river_dialog_runtime_cloud_import_t cloud_import;
-    bool have_cloud_import = river_dialog_runtime_capture_cloud_import(&cloud_import);
+    river_dialog_runtime_ingress_t ingress;
 
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    river_dialog_runtime_apply_cloud_event_locked(event, sid);
-    if (have_cloud_import) {
-        river_dialog_runtime_import_cloud_snapshot_locked(&cloud_import);
-    }
-    river_dialog_runtime_reconcile_facts_locked();
-    river_dialog_runtime_finalize_commit_locked(
-        NULL,
-        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS,
-        reason != NULL ? reason :
-                         river_dialog_runtime_cloud_event_default_reason(event));
-    river_dialog_runtime_unlock();
+    memset(&ingress, 0, sizeof(ingress));
+    ingress.has_cloud_import =
+        river_dialog_runtime_capture_cloud_import(&ingress.cloud_import);
+    ingress.has_cloud_event = true;
+    ingress.cloud_event = event;
+    ingress.commit_policy = RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS;
+    ingress.reason = reason;
+    river_dialog_runtime_copy_text(ingress.session_id,
+                                   sizeof(ingress.session_id),
+                                   sid);
+    river_dialog_runtime_commit_ingress(&ingress);
 }
 
 static river_dialog_input_lane_t river_dialog_runtime_parse_input_lane(const char *state)
@@ -885,6 +927,28 @@ static void river_dialog_runtime_finalize_commit_locked(
     river_dialog_runtime_publish_locked(reason);
 }
 
+static const char *river_dialog_runtime_ingress_default_reason(
+    const river_dialog_runtime_ingress_t *ingress)
+{
+    if (ingress == NULL) {
+        return "dialog_runtime";
+    }
+    if (ingress->reason != NULL && ingress->reason[0] != '\0') {
+        return ingress->reason;
+    }
+    if (ingress->has_cloud_event) {
+        return river_dialog_runtime_cloud_event_default_reason(
+            ingress->cloud_event);
+    }
+    if (ingress->has_local_playback_import) {
+        return "playback_state";
+    }
+    if (ingress->has_cloud_import) {
+        return "cloud_state_sync";
+    }
+    return "dialog_runtime";
+}
+
 static void river_dialog_runtime_publish_locked(const char *reason)
 {
     river_interaction_state_t next_state;
@@ -1018,6 +1082,70 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         river_dialog_runtime_parse_output_lane(cloud_import->output_state_text);
 }
 
+static bool river_dialog_runtime_prepare_local_playback_import_locked(
+    const river_dialog_runtime_local_playback_import_t *local_playback_import)
+{
+    bool should_absorb = false;
+
+    if (local_playback_import == NULL) {
+        return false;
+    }
+
+    if (river_dialog_runtime_is_dialog_playback_stream_locked(local_playback_import)) {
+        g_river_dialog_runtime.local_playback_stream_owned = true;
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.local_playback_stream_name,
+                                       sizeof(g_river_dialog_runtime.local_playback_stream_name),
+                                       local_playback_import->stream_name);
+        should_absorb = true;
+    } else if (river_dialog_runtime_matches_owned_playback_stream_locked(
+                   local_playback_import)) {
+        should_absorb = true;
+    }
+
+    if (!should_absorb) {
+        return false;
+    }
+    if (local_playback_import->state == RIVER_PLAYBACK_IDLE) {
+        g_river_dialog_runtime.local_playback_stream_owned = false;
+        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
+    }
+    return true;
+}
+
+static void river_dialog_runtime_apply_local_playback_import_locked(
+    const river_dialog_runtime_local_playback_import_t *local_playback_import,
+    const char **effective_reason)
+{
+    bool managed_recovery = false;
+    river_playback_state_t state;
+
+    if (local_playback_import == NULL) {
+        return;
+    }
+
+    state = local_playback_import->state;
+    river_dialog_runtime_apply_local_playback_state_locked(state);
+
+    if (!river_dialog_runtime_local_playback_shadow_drives_truth_locked()) {
+        return;
+    }
+
+    if (state == RIVER_PLAYBACK_ERROR) {
+        managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
+        if (managed_recovery) {
+            g_river_dialog_runtime.local_playback_error_recovering = false;
+            *effective_reason = "playback_recovering";
+        } else {
+            g_river_dialog_runtime.local_playback_error_recovering = true;
+        }
+    } else {
+        g_river_dialog_runtime.local_playback_error_recovering = false;
+    }
+    if (state == RIVER_PLAYBACK_ERROR && !managed_recovery) {
+        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
+    }
+}
+
 static void river_dialog_runtime_reconcile_facts_locked(void)
 {
     if (river_dialog_runtime_cloud_runtime_available_locked()) {
@@ -1031,6 +1159,59 @@ static void river_dialog_runtime_reconcile_facts_locked(void)
     if (river_dialog_runtime_output_turn_quiesced_locked()) {
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
     }
+}
+
+static void river_dialog_runtime_commit_ingress(
+    const river_dialog_runtime_ingress_t *ingress)
+{
+    river_dialog_runtime_commit_checkpoint_t commit_before;
+    const char *effective_reason;
+    bool have_commit_before = false;
+
+    if (ingress == NULL) {
+        return;
+    }
+    if (!river_dialog_runtime_lock()) {
+        return;
+    }
+
+    effective_reason = river_dialog_runtime_ingress_default_reason(ingress);
+    if (ingress->has_local_playback_import &&
+        !river_dialog_runtime_prepare_local_playback_import_locked(
+            &ingress->local_playback_import)) {
+        river_dialog_runtime_unlock();
+        return;
+    }
+    if (ingress->commit_policy ==
+        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE) {
+        river_dialog_runtime_capture_commit_checkpoint_locked(&commit_before, false);
+        have_commit_before = true;
+    }
+    if (ingress->has_cloud_event) {
+        river_dialog_runtime_apply_cloud_event_locked(
+            ingress->cloud_event,
+            ingress->session_id[0] != '\0' ? ingress->session_id : NULL);
+    }
+    if (ingress->has_cloud_import) {
+        river_dialog_runtime_import_cloud_snapshot_locked(&ingress->cloud_import);
+    }
+    if (ingress->has_local_playback_import) {
+        river_dialog_runtime_apply_local_playback_import_locked(
+            &ingress->local_playback_import,
+            &effective_reason);
+    }
+    if (!ingress->has_cloud_event && !ingress->has_cloud_import &&
+        !ingress->has_local_playback_import) {
+        river_dialog_runtime_unlock();
+        return;
+    }
+
+    river_dialog_runtime_reconcile_facts_locked();
+    river_dialog_runtime_finalize_commit_locked(
+        have_commit_before ? &commit_before : NULL,
+        ingress->commit_policy,
+        effective_reason);
+    river_dialog_runtime_unlock();
 }
 
 static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending)
@@ -1174,64 +1355,19 @@ static void river_dialog_runtime_reduce_local_playback_event(
     const river_playback_stream_config_t *config,
     const char *reason)
 {
-    river_dialog_runtime_cloud_import_t cloud_import;
-    bool have_cloud_import = river_dialog_runtime_capture_cloud_import(&cloud_import);
-    bool should_absorb = false;
-    river_dialog_runtime_commit_checkpoint_t commit_before;
-    bool managed_recovery = false;
-    const char *effective_reason = reason;
+    river_dialog_runtime_ingress_t ingress;
 
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    if (river_dialog_runtime_is_dialog_playback_stream_locked(config)) {
-        g_river_dialog_runtime.local_playback_stream_owned = true;
-        river_dialog_runtime_copy_text(g_river_dialog_runtime.local_playback_stream_name,
-                                       sizeof(g_river_dialog_runtime.local_playback_stream_name),
-                                       config->stream_name);
-        should_absorb = true;
-    } else if (river_dialog_runtime_matches_owned_playback_stream_locked(config)) {
-        should_absorb = true;
-    }
-
-    if (!should_absorb) {
-        river_dialog_runtime_unlock();
-        return;
-    }
-    if (state == RIVER_PLAYBACK_IDLE) {
-        g_river_dialog_runtime.local_playback_stream_owned = false;
-        g_river_dialog_runtime.local_playback_stream_name[0] = '\0';
-    }
-
-    river_dialog_runtime_capture_commit_checkpoint_locked(&commit_before, false);
-    if (have_cloud_import) {
-        river_dialog_runtime_import_cloud_snapshot_locked(&cloud_import);
-    }
-    river_dialog_runtime_apply_local_playback_state_locked(state);
-
-    if (river_dialog_runtime_local_playback_shadow_drives_truth_locked()) {
-        if (state == RIVER_PLAYBACK_ERROR) {
-            managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
-            if (managed_recovery) {
-                g_river_dialog_runtime.local_playback_error_recovering = false;
-                effective_reason = "playback_recovering";
-            } else {
-                g_river_dialog_runtime.local_playback_error_recovering = true;
-            }
-        } else {
-            g_river_dialog_runtime.local_playback_error_recovering = false;
-        }
-        if (state == RIVER_PLAYBACK_ERROR && !managed_recovery) {
-            g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
-        }
-    }
-    river_dialog_runtime_reconcile_facts_locked();
-    river_dialog_runtime_finalize_commit_locked(
-        &commit_before,
-        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE,
-        effective_reason != NULL ? effective_reason : "playback_state");
-    river_dialog_runtime_unlock();
+    memset(&ingress, 0, sizeof(ingress));
+    ingress.has_cloud_import =
+        river_dialog_runtime_capture_cloud_import(&ingress.cloud_import);
+    ingress.has_local_playback_import = true;
+    ingress.commit_policy =
+        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE;
+    ingress.reason = reason;
+    river_dialog_runtime_capture_local_playback_import(&ingress.local_playback_import,
+                                                       state,
+                                                       config);
+    river_dialog_runtime_commit_ingress(&ingress);
 }
 
 void river_dialog_runtime_on_playback_state(river_playback_state_t state,
@@ -1261,22 +1397,17 @@ void river_dialog_runtime_on_cloud_state_sync(const char *reason, void *user_dat
 
 void river_dialog_runtime_sync_cloud_state(const char *reason)
 {
-    river_dialog_runtime_cloud_import_t cloud_import;
+    river_dialog_runtime_ingress_t ingress;
 
-    if (!river_dialog_runtime_capture_cloud_import(&cloud_import)) {
+    memset(&ingress, 0, sizeof(ingress));
+    ingress.has_cloud_import =
+        river_dialog_runtime_capture_cloud_import(&ingress.cloud_import);
+    if (!ingress.has_cloud_import) {
         return;
     }
-    if (!river_dialog_runtime_lock()) {
-        return;
-    }
-
-    river_dialog_runtime_import_cloud_snapshot_locked(&cloud_import);
-    river_dialog_runtime_reconcile_facts_locked();
-    river_dialog_runtime_finalize_commit_locked(
-        NULL,
-        RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS,
-        reason != NULL ? reason : "cloud_state_sync");
-    river_dialog_runtime_unlock();
+    ingress.commit_policy = RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS;
+    ingress.reason = reason;
+    river_dialog_runtime_commit_ingress(&ingress);
 }
 
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void)

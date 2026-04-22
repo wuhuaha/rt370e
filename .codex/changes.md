@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.407
+- dialog runtime 继续把入口层收口成统一的 dialog-owned ingress reducer：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部载体：
+  - `river_dialog_runtime_local_playback_import_t`
+  - `river_dialog_runtime_ingress_t`
+- 新增 `river_dialog_runtime_capture_local_playback_import(...)`，把 playback listener
+  的 `state + config` 先复制为 dialog 自己拥有的 local import 载体，再进入 reducer
+- 新增统一提交器：
+  - `river_dialog_runtime_commit_ingress(...)`
+  - `river_dialog_runtime_ingress_default_reason(...)`
+  - `river_dialog_runtime_prepare_local_playback_import_locked(...)`
+  - `river_dialog_runtime_apply_local_playback_import_locked(...)`
+- 以下入口现在都只负责组装 dialog-owned ingress，再走同一条提交路径：
+  - `river_dialog_runtime_commit_cloud_event(...)`
+  - `river_dialog_runtime_sync_cloud_state(...)`
+  - `river_dialog_runtime_reduce_local_playback_event(...)`
+- 统一 ingress 仍保持原有关键顺序不变：
+  - cloud event 先 apply，再 import cloud facts
+  - local playback 先 resolve ownership，再 import cloud facts，再 apply local shadow
+- 这一步继续把 dialog runtime 推进成唯一 dialog 真相源，进一步切断 callback /
+  adapter 配置对象对 reducer 提交面的直接影响，为后续继续压缩 raw-fact /
+  derived-truth 边界做准备
+
 ## Step 5.406
 - dialog runtime 继续把 cloud ingress 从直接消费 adapter snapshot 收口成
   dialog-owned import carrier：

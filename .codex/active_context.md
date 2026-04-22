@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.406 让 dialog runtime 通过 cloud import carrier 吸收云态`
+  - `5.407 让 dialog runtime 通过统一 ingress reducer 收口入口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 继续把入口层收口成统一的 dialog-owned ingress reducer
+    - 新增：
+      - `river_dialog_runtime_local_playback_import_t`
+      - `river_dialog_runtime_ingress_t`
+      - `river_dialog_runtime_capture_local_playback_import(...)`
+      - `river_dialog_runtime_commit_ingress(...)`
+    - `commit_cloud_event(...)` / `sync_cloud_state(...)` /
+      `reduce_local_playback_event(...)` 现在都只负责组装 dialog-owned ingress，
+      再走同一条 reducer 提交路径
+    - local playback callback 不再把外部 `river_playback_stream_config_t`
+      直接带进 reducer 提交逻辑，而是先复制为 dialog 自己拥有的 local import 载体
+    - 统一 ingress 仍保持既有关键顺序：
+      - cloud-event: apply event -> import cloud -> reconcile -> finalize
+      - local-playback: resolve ownership -> import cloud -> apply local shadow -> reconcile -> finalize
+    - 这一步继续把 dialog runtime 推进成唯一 dialog 真相源，进一步削弱 callback /
+      adapter 结构对 reducer 提交面的直接影响，为后续继续拆 raw-fact 与
+      derived-truth 边界做准备
   - newest landed runtime-ownership slice:
     - dialog runtime 继续把 cloud ingress 收口成 dialog-owned
       `cloud_import` 载体

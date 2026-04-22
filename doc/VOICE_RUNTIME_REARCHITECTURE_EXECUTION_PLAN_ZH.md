@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.407`
+  - dialog runtime 继续把入口层收口成统一的 dialog-owned ingress reducer：
+    - `river_dialog_runtime_local_playback_import_t`
+    - `river_dialog_runtime_ingress_t`
+    - `river_dialog_runtime_capture_local_playback_import(...)`
+    - `river_dialog_runtime_commit_ingress(...)`
+  - `river_dialog_runtime_commit_cloud_event(...)` /
+    `river_dialog_runtime_sync_cloud_state(...)` /
+    `river_dialog_runtime_reduce_local_playback_event(...)`
+    现在都只负责组装 dialog-owned ingress，再走同一条 reducer 提交路径
+  - playback listener 输入不再把外部
+    `river_playback_stream_config_t` 直接带进 reducer 提交逻辑，而是先复制为
+    dialog-owned `local_playback_import`
+  - 统一 ingress 保持既有 reducer 顺序不变：
+    - cloud-event：apply event -> import cloud -> reconcile -> finalize
+    - local-playback：resolve ownership -> import cloud -> apply local shadow ->
+      reconcile -> finalize
+  - 这一步继续把 dialog runtime 推进成唯一 dialog 真相源，进一步压缩入口层对
+    callback / adapter 外部结构的直接依赖，为后续继续拆 raw-fact 与 derived-truth
+    边界做准备
 - `Step 5.406`
   - dialog runtime 继续把 cloud ingress 收口成 dialog-owned import carrier：
     - `river_dialog_runtime_cloud_import_t`

@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.407
+Validate that dialog runtime ingress now routes cloud-event, cloud-sync, and
+local-playback updates through one dialog-owned ingress reducer instead of each
+entry manually stitching its own lock/import/commit sequence:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '70,140p' components/river_core/river_dialog_runtime.c
+sed -n '250,390p' components/river_core/river_dialog_runtime.c
+sed -n '920,1228p' components/river_core/river_dialog_runtime.c
+sed -n '1350,1415p' components/river_core/river_dialog_runtime.c
+rg -n 'local_playback_import|ingress_t|capture_local_playback_import|commit_ingress|prepare_local_playback_import_locked|apply_local_playback_import_locked|commit_cloud_event|sync_cloud_state|reduce_local_playback_event' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_local_playback_import_t` and
+  `river_dialog_runtime_ingress_t` exist
+- playback listener input is first copied by
+  `river_dialog_runtime_capture_local_playback_import(...)`
+- cloud-event, cloud-sync, and local-playback ingress all now terminate via the
+  shared `river_dialog_runtime_commit_ingress(...)`
+- the new ingress path preserves the reducer ordering:
+  - cloud-event: `apply event -> import cloud -> reconcile -> finalize`
+  - local-playback: `resolve ownership -> import cloud -> apply local shadow -> reconcile -> finalize`
+
 ## Step 5.406
 Validate that dialog runtime ingress now captures a dialog-owned cloud import
 carrier before reducer import, instead of directly feeding the adapter runtime
