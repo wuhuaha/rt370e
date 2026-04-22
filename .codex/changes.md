@@ -1,11 +1,15 @@
 # Change Log
 
 ## Step 5.425
-- `cloud playback runtime` 开始把 phase 观测值从 truth 导出链里拆出去：
+- `cloud playback runtime` 继续把 phase 观测值从 truth 链里彻底拆出去：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
 - 新增独立观测结构：
   - `river_cloud_xiaozhi_playback_observe_view_t`
   - `river_cloud_xiaozhi_capture_playback_observe_view(...)`
+- 新增统一观测读取 helper：
+  - `river_cloud_xiaozhi_playback_observed_phase_kind()`
+- `river_cloud_xiaozhi_playback_backend_source_t` 不再承载：
+  - `phase`
 - `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 现在同时读取：
   - `truth_view`
   - `observe_view`
@@ -14,6 +18,12 @@
   - `playback_phase` 文本
   现在都改为从 `observe_view` 导出，而不是再从 `truth_view.backend_source.phase`
   间接读取
+- playback 相关日志/诊断路径也统一改读：
+  - `river_cloud_xiaozhi_playback_observed_phase_kind()`
+  不再从：
+  - `playback_source.phase`
+  - `truth_view.backend_source.phase`
+  取 phase
 - 这一步继续把 cloud runtime 内部的：
   - typed playback truth
   - playback phase observability

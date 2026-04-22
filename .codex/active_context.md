@@ -21,16 +21,21 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest landed runtime-ownership slice:
-    - `cloud playback runtime` 开始把 phase 观测值从 truth 导出链里拆出去
+    - `cloud playback runtime` 继续把 phase 观测值从 truth 链里彻底拆出去
     - 新增：
       - `river_cloud_xiaozhi_playback_observe_view_t`
       - `river_cloud_xiaozhi_capture_playback_observe_view(...)`
+      - `river_cloud_xiaozhi_playback_observed_phase_kind()`
+    - `river_cloud_xiaozhi_playback_backend_source_t` 不再承载：
+      - `phase`
     - `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` 现在同时读取：
       - `truth_view`
       - `observe_view`
     - `playback_phase_known/playback_phase_kind/playback_phase` 文本
       统一改为从 `observe_view` 导出，不再从 `truth_view.backend_source.phase`
       间接读取
+    - playback 日志/诊断路径也统一改读
+      `river_cloud_xiaozhi_playback_observed_phase_kind()`
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续清理“语义事实”和“观测字段”的边界
     - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：

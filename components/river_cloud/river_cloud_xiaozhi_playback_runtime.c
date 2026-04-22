@@ -44,7 +44,6 @@ typedef struct {
     bool rebuffer_pending;
     bool physical_active;
     bool waiting_next_segment;
-    river_cloud_playback_phase_t phase;
 } river_cloud_xiaozhi_playback_backend_source_t;
 
 typedef struct {
@@ -146,7 +145,6 @@ static void river_cloud_xiaozhi_capture_playback_backend_source(
     source->waiting_next_segment =
         river_cloud_xiaozhi_compute_playback_waiting_next_segment_from_source(
             &supply_source);
-    source->phase = river_cloud_xiaozhi_playback_phase();
 }
 
 static river_cloud_playback_backend_state_t
@@ -616,6 +614,11 @@ static void river_cloud_xiaozhi_capture_playback_observe_view(
     view->phase_kind = river_cloud_xiaozhi_playback_phase();
 }
 
+static river_cloud_playback_phase_t river_cloud_xiaozhi_playback_observed_phase_kind(void)
+{
+    return river_cloud_xiaozhi_playback_phase();
+}
+
 static bool river_cloud_xiaozhi_playback_supply_engages_lane(
     river_cloud_playback_supply_kind_t supply_kind)
 {
@@ -853,7 +856,8 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
                    river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                    (unsigned int)duplex_eval.native_reference_peak,
                    (unsigned int)duplex_eval.native_reference_ratio_q15,
-                   river_cloud_playback_phase_name(playback_source.phase),
+                   river_cloud_playback_phase_name(
+                       river_cloud_xiaozhi_playback_observed_phase_kind()),
                    river_cloud_playback_backend_state_name(backend_state),
                    g_river_cloud.stream_active ? "yes" : "no",
                    g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
@@ -879,7 +883,8 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
                (unsigned long)duplex_eval.reference_queue_frames,
                (unsigned long)duplex_eval.reference_queue_peak_frames,
                (unsigned long)duplex_eval.reference_last_write_age_ms,
-               river_cloud_playback_phase_name(playback_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_backend_state_name(backend_state));
     river_cloud_xiaozhi_close_local_round_for_cause(
         RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
@@ -922,7 +927,8 @@ static void river_cloud_xiaozhi_apply_playback_started_round_policy(void)
                river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                (unsigned int)duplex_eval.native_reference_peak,
                (unsigned int)duplex_eval.native_reference_ratio_q15,
-               river_cloud_playback_phase_name(playback_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_backend_state_name(backend_state),
                g_river_cloud.stream_active ? "yes" : "no",
                g_river_cloud.xiaozhi_listen_stop_pending ? "yes" : "no",
@@ -1448,7 +1454,8 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                g_river_cloud.xiaozhi_playback_completed_reported ? "yes" : "no",
                river_cloud_xiaozhi_playback_segment_context_valid() ? "yes" : "no");
     RIVER_LOGI("xiaozhi playback_terminal phase=%s hold=%s state=%s ack=%s reason=%s wait=%s wait_reason=%s queued_segments=%lu last_started=%s last_fully_heard=%s",
-               river_cloud_playback_phase_name(truth_view.backend_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_hold_kind_name(truth_view.hold_kind),
                g_river_cloud.xiaozhi_playback_terminal_state_kind !=
                        RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE ?
@@ -1548,7 +1555,8 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned long)g_river_cloud.xiaozhi_playback_last_meta_gap_ms,
                river_cloud_xiaozhi_playback_supply_kind_name(
                    truth_view.supply_kind),
-               river_cloud_playback_phase_name(truth_view.backend_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_backend_state_name(truth_view.backend_state),
                river_cloud_playback_hold_kind_name(truth_view.hold_kind),
                g_river_cloud.xiaozhi_playback_rebuffer_pending ? "yes" : "no",
@@ -2035,7 +2043,7 @@ static bool river_cloud_xiaozhi_maybe_pause_for_segment_gap(void)
                (unsigned long)hold_view.queued_frames,
                (unsigned int)hold_view.hold_frames,
                river_cloud_playback_phase_name(
-                   hold_view.truth_view.backend_source.phase),
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_backend_state_name(
                    hold_view.truth_view.backend_state),
                attached_hold ? "attached_recover" : "detached_stop");
@@ -2337,7 +2345,8 @@ static bool river_cloud_xiaozhi_maybe_resume_paused_playback(
                (unsigned int)resume_frames,
                (unsigned int)start_frames,
                (unsigned int)river_cloud_xiaozhi_playback_buffer_frame_budget(),
-               river_cloud_playback_phase_name(truth_view->backend_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_backend_state_name(truth_view->backend_state));
     return true;
 }
@@ -3128,7 +3137,8 @@ river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
                interrupt_stream ? "yes" : "no",
                had_work ? "yes" : "no",
                stream_was_attached ? "yes" : "no",
-               river_cloud_playback_phase_name(truth_view.backend_source.phase),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                river_cloud_playback_hold_kind_name(truth_view.hold_kind),
                river_cloud_playback_backend_state_name(truth_view.backend_state));
     river_cloud_xiaozhi_reset_playback_state();
@@ -3540,7 +3550,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                            recover_cause),
                        river_cloud_xiaozhi_playback_supply_kind_name(
                            truth_view.supply_kind),
-                       river_cloud_playback_phase_name(truth_view.backend_source.phase),
+                       river_cloud_playback_phase_name(
+                           river_cloud_xiaozhi_playback_observed_phase_kind()),
                        river_cloud_playback_backend_state_name(
                            truth_view.backend_state),
                        (unsigned long)mono_bytes,
@@ -3557,7 +3568,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                            river_cloud_xiaozhi_playback_supply_kind_name(
                                truth_view.supply_kind),
                            river_cloud_playback_phase_name(
-                               truth_view.backend_source.phase),
+                               river_cloud_xiaozhi_playback_observed_phase_kind()),
                            river_cloud_playback_backend_state_name(
                                truth_view.backend_state),
                            (unsigned long)queued_frames,
@@ -3583,7 +3594,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                    river_cloud_xiaozhi_playback_supply_kind_name(
                                        truth_view.supply_kind),
                                    river_cloud_playback_phase_name(
-                                       truth_view.backend_source.phase),
+                                       river_cloud_xiaozhi_playback_observed_phase_kind()),
                                    river_cloud_playback_backend_state_name(
                                        truth_view.backend_state),
                                    (unsigned long)queued_frames,
@@ -3601,7 +3612,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                    river_cloud_xiaozhi_playback_supply_kind_name(
                                        truth_view.supply_kind),
                                    river_cloud_playback_phase_name(
-                                       truth_view.backend_source.phase),
+                                       river_cloud_xiaozhi_playback_observed_phase_kind()),
                                    river_cloud_playback_backend_state_name(
                                        truth_view.backend_state),
                                    (unsigned long)queued_frames,
@@ -3639,7 +3650,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                                river_cloud_xiaozhi_playback_supply_kind_name(
                                    truth_view.supply_kind),
                                river_cloud_playback_phase_name(
-                                   truth_view.backend_source.phase),
+                                   river_cloud_xiaozhi_playback_observed_phase_kind()),
                                river_cloud_playback_backend_state_name(
                                    truth_view.backend_state),
                                (unsigned long)queued_frames,
@@ -3676,7 +3687,7 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
                            river_cloud_xiaozhi_playback_supply_kind_name(
                                truth_view.supply_kind),
                            river_cloud_playback_phase_name(
-                               truth_view.backend_source.phase),
+                               river_cloud_xiaozhi_playback_observed_phase_kind()),
                            river_cloud_playback_backend_state_name(
                                truth_view.backend_state),
                            (unsigned long)queued_frames,
