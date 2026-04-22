@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.417
+Validate that `segment_gap_hold` now uses a dynamic low-water threshold derived
+from the attached-resume gate instead of a fixed `1 frame` constant:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '60,75p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '600,620p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1840,1878p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'segment_gap_hold_frames|attached_resume_threshold_frames|starved_low_water_frames|hold_frames =' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the fixed `RIVER_CLOUD_XIAOZHI_SEGMENT_GAP_HOLD_FRAMES` constant is gone
+- `river_cloud_xiaozhi_downlink_segment_gap_hold_frames()` exists and derives
+  hold frames from:
+  - `attached_resume_threshold_frames - 1`
+  - `starved_low_water_frames`
+- `capture_segment_gap_hold_view(...)` now reads that helper instead of a
+  fixed literal/constant
+- the computed hold threshold stays strictly below the attached resume
+  threshold when possible, so hold does not immediately auto-resume
+
 ## Step 5.416
 Validate that `segment_gap_hold` now prefers attached `recover` instead of
 destructive `flush`, preserving reference/AEC continuity during next-segment

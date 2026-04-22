@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.417
+- XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 移除了固定的 `RIVER_CLOUD_XIAOZHI_SEGMENT_GAP_HOLD_FRAMES=1`
+- 新增：
+  - `river_cloud_xiaozhi_downlink_segment_gap_hold_frames()`
+- `segment_gap_hold` 现在改为使用：
+  - `attached_resume_threshold_frames - 1`
+  - 再受 `starved_low_water_frames` 约束
+  - 最终保持至少 `1 frame`
+- 这意味着段间 hold 不再等到只剩固定 `1 frame` 才触发，而是可以在仍低于
+  attached resume 门槛、但已接近尾部 underrun 风险的窗口里更早挂起
+- 同时由于 hold 阈值始终低于 attached resume 阈值，worker 不会因为刚进入 hold
+  就立刻满足 resume 条件而自解
+- 这一步继续把段间恢复从“硬编码 1 frame 猜测”收紧到“依赖 runtime start/resume 真相的
+  typed low-water hold”，进一步减少尾部 underrun 先发生再恢复的概率
+
 ## Step 5.416
 - XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

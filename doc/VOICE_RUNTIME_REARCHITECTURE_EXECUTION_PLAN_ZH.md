@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.417`
+  - XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位
+  - 固定的 `1 frame` hold 常量已经移除，当前 hold 阈值改由
+    `river_cloud_xiaozhi_downlink_segment_gap_hold_frames()` 统一派生：
+    - `attached_resume_threshold_frames - 1`
+    - 再受 `starved_low_water_frames` 约束
+    - 至少保持 `1 frame`
+  - 这让 worker 能在“仍低于 attached resume 门槛、但已接近尾部 underrun 风险”的
+    区间里更早进入 segment-gap hold，而不是等到只剩固定 `1 frame`
+  - 同时 hold 阈值始终尽量低于 attached resume 门槛，避免 hold 之后下一轮立刻
+    满足 resume 条件而自解
+  - 这一步继续把段间恢复从硬编码 `1 frame` 猜测推进成依赖 runtime
+    start/resume 真相的动态 low-water hold
 - `Step 5.416`
   - XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界
   - `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` 的 attached 路径现在不再

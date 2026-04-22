@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.416 让 segment-gap hold 优先走 attached recover`
+  - `5.417 让 segment-gap hold 改用动态低水位阈值`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位
+    - 固定的 `1 frame` hold 常量已经移除，当前 hold 阈值现在统一由
+      `river_cloud_xiaozhi_downlink_segment_gap_hold_frames()` 派生：
+      - `attached_resume_threshold_frames - 1`
+      - 再受 `starved_low_water_frames` 约束
+      - 至少保持 `1 frame`
+    - 这让 worker 能在“仍低于 attached resume 门槛、但已接近尾部 underrun 风险”的
+      区间里更早进入 segment-gap hold，而不是等到只剩固定 `1 frame`
+    - 同时 hold 阈值始终尽量低于 attached resume 门槛，避免 hold 之后下一轮立刻
+      自动 resume
+    - 这一步继续把段间恢复从硬编码 `1 frame` 猜测推进成依赖 runtime
+      start/resume 真相的动态 low-water hold
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界
     - `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` 的 attached 路径现在

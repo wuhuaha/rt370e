@@ -15,8 +15,6 @@
 
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_NUM 1
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_GAIN_DEN 1
-#define RIVER_CLOUD_XIAOZHI_SEGMENT_GAP_HOLD_FRAMES 1U
-
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
 typedef struct {
     river_cloud_playback_start_policy_t policy;
@@ -65,6 +63,8 @@ static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_frames(void);
 static uint32_t river_cloud_xiaozhi_playback_buffer_frame_budget(void);
 static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(void);
+static uint32_t river_cloud_xiaozhi_downlink_segment_gap_hold_frames(void);
+static uint32_t river_cloud_xiaozhi_downlink_starved_low_water_frames(void);
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
     river_cloud_playback_backend_state_t backend_state);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
@@ -605,7 +605,7 @@ static void river_cloud_xiaozhi_capture_segment_gap_hold_view(
     memset(view, 0, sizeof(*view));
     river_cloud_xiaozhi_capture_playback_truth_view(&view->truth_view);
     view->queued_frames = river_cloud_xiaozhi_playback_queued_frames();
-    view->hold_frames = RIVER_CLOUD_XIAOZHI_SEGMENT_GAP_HOLD_FRAMES;
+    view->hold_frames = river_cloud_xiaozhi_downlink_segment_gap_hold_frames();
     view->ready =
         view->truth_view.output_active &&
         !g_river_cloud.xiaozhi_tts_stop_pending &&
@@ -1841,6 +1841,24 @@ static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(vo
         return start_frames;
     }
     return buffer_frames < start_frames ? buffer_frames : start_frames;
+}
+
+static uint32_t river_cloud_xiaozhi_downlink_segment_gap_hold_frames(void)
+{
+    uint32_t resume_frames = river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
+    uint32_t low_water_frames = river_cloud_xiaozhi_downlink_starved_low_water_frames();
+    uint32_t hold_frames = 1U;
+
+    if (resume_frames > 1U) {
+        hold_frames = resume_frames - 1U;
+    }
+    if (low_water_frames != 0U && hold_frames > low_water_frames) {
+        hold_frames = low_water_frames;
+    }
+    if (hold_frames == 0U) {
+        hold_frames = 1U;
+    }
+    return hold_frames;
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
