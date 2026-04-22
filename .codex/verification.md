@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.424
+Validate that dialog runtime stores playback phase observation separately from
+typed playback semantics:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '10,40p' components/river_core/river_dialog_runtime.c
+sed -n '448,468p' components/river_core/river_dialog_runtime.c
+sed -n '1264,1278p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_playback_observe|phase_known|phase_kind' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_playback_facts_t` no longer contains:
+  - `phase_known`
+  - `phase_kind`
+- `river_dialog_runtime_cloud_playback_observe_t` exists and owns playback phase
+  observability
+- snapshot export now reads `playback_phase_known/playback_phase_kind` from
+  `cloud_playback_observe`
+
 ## Step 5.423
 Validate that dialog runtime playback projection no longer mirrors
 `phase_known/phase_kind` for internal retain-output-turn decisions:

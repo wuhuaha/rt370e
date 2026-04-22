@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.424
+- `dialog runtime` 继续清理内部“语义事实”和“观测字段”的边界：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
+  - `phase_known`
+  - `phase_kind`
+- 新增独立观测结构：
+  - `river_dialog_runtime_cloud_playback_observe_t`
+- `dialog runtime` 现在把 cloud snapshot 的 phase 观测值单独存放到：
+  - `cloud_playback_observe`
+- `river_dialog_runtime_export_playback_facts_to_snapshot_locked()` 改为从
+  `cloud_playback_observe` 导出 `playback_phase_known/playback_phase_kind`
+- 这一步进一步避免 phase 观测字段与：
+  - lane/turn/recovering/hold/supply
+  这些语义事实混放，降低后续被误当作业务真相再次读回去的风险
+
 ## Step 5.423
 - `dialog runtime` 继续缩减内部 projection 对 coarse playback phase 的依赖：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

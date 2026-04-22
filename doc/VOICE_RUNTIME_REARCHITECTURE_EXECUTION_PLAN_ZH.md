@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.424`
+  - `dialog runtime` 继续清理“语义事实”和“观测字段”的边界
+  - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
+    - `phase_known`
+    - `phase_kind`
+  - 新增独立观测结构：
+    - `river_dialog_runtime_cloud_playback_observe_t`
+  - cloud snapshot 的 `playback_phase_known/playback_phase_kind` 现在单独存放到：
+    - `cloud_playback_observe`
+  - `river_dialog_runtime_export_playback_facts_to_snapshot_locked()`
+    改为从 `cloud_playback_observe` 导出 phase 观测值
+  - 这一步继续把：
+    - typed playback semantics
+    - playback phase observability
+    这两类数据分层，避免 phase 再次混回语义结构中
 - `Step 5.423`
   - `dialog runtime` 继续缩减内部 projection 对 coarse playback phase 的依赖
   - `river_dialog_runtime_playback_projection_t` 不再镜像：

@@ -15,8 +15,6 @@ typedef struct {
     bool lane_engaged;
     bool turn_active;
     bool rebuffer_pending;
-    bool phase_known;
-    river_cloud_playback_phase_t phase_kind;
     river_cloud_playback_backend_state_t backend_state_kind;
     river_cloud_playback_supply_kind_t supply_kind;
     river_cloud_playback_hold_kind_t hold_kind;
@@ -31,6 +29,11 @@ typedef struct {
     uint32_t prefetch_frames;
     bool start_cautious_history;
 } river_dialog_runtime_cloud_playback_facts_t;
+
+typedef struct {
+    bool phase_known;
+    river_cloud_playback_phase_t phase_kind;
+} river_dialog_runtime_cloud_playback_observe_t;
 
 typedef struct {
     bool conversation_window_active;
@@ -92,6 +95,7 @@ typedef struct {
     river_dialog_runtime_cloud_io_facts_t cloud_io_facts;
     river_dialog_runtime_cloud_session_facts_t cloud_session_facts;
     river_dialog_runtime_cloud_playback_facts_t cloud_playback_facts;
+    river_dialog_runtime_cloud_playback_observe_t cloud_playback_observe;
     river_dialog_runtime_control_facts_t control_facts;
     river_dialog_runtime_derived_facts_t derived_facts;
     rtos_mutex_t lock;
@@ -456,9 +460,9 @@ static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
     g_river_dialog_runtime.snapshot.playback_rebuffer_pending =
         g_river_dialog_runtime.cloud_playback_facts.rebuffer_pending;
     g_river_dialog_runtime.snapshot.playback_phase_known =
-        g_river_dialog_runtime.cloud_playback_facts.phase_known;
+        g_river_dialog_runtime.cloud_playback_observe.phase_known;
     g_river_dialog_runtime.snapshot.playback_phase_kind =
-        g_river_dialog_runtime.cloud_playback_facts.phase_kind;
+        g_river_dialog_runtime.cloud_playback_observe.phase_kind;
     g_river_dialog_runtime.snapshot.playback_backend_state_kind =
         g_river_dialog_runtime.cloud_playback_facts.backend_state_kind;
     g_river_dialog_runtime.snapshot.playback_supply_kind =
@@ -1267,9 +1271,9 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
         cloud_import->playback_turn_active;
     g_river_dialog_runtime.cloud_playback_facts.rebuffer_pending =
         cloud_import->playback_rebuffer_pending;
-    g_river_dialog_runtime.cloud_playback_facts.phase_known =
+    g_river_dialog_runtime.cloud_playback_observe.phase_known =
         cloud_import->playback_phase_known;
-    g_river_dialog_runtime.cloud_playback_facts.phase_kind =
+    g_river_dialog_runtime.cloud_playback_observe.phase_kind =
         cloud_import->playback_phase_kind;
     g_river_dialog_runtime.cloud_playback_facts.backend_state_kind =
         cloud_import->playback_backend_state_kind;

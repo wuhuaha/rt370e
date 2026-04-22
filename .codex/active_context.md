@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.423 让 dialog projection 不再镜像 phase truth`
+  - `5.424 拆分 dialog runtime 的 phase 观测存放`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续清理“语义事实”和“观测字段”的边界
+    - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
+      - `phase_known`
+      - `phase_kind`
+    - 新增独立观测结构：
+      - `river_dialog_runtime_cloud_playback_observe_t`
+    - cloud snapshot 的 `playback_phase_known/playback_phase_kind` 现在单独落到
+      `cloud_playback_observe`
+    - `dialog_runtime` 导出 snapshot 时再从 observe 结构镜像 phase 观测值，
+      避免 phase 与 typed playback 语义事实混放
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续缩减内部 projection 对 coarse playback phase 的依赖
     - `river_dialog_runtime_playback_projection_t` 不再镜像：
