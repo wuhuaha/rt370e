@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.419
+- XiaoZhi downlink / playback 继续把 detached quiet-window 从 phase fallback
+  收口到显式的 supply truth：
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 新增公开的 playback supply truth：
+  - `river_cloud_playback_supply_kind_t`
+  - `river_cloud_playback_supply_kind_name(...)`
+- `river_cloud_runtime_snapshot_t` 与 `river_dialog_runtime_snapshot_t` 现在都显式导出：
+  - `playback_supply_kind`
+- `dialog runtime` 的 cloud import / playback facts / exported snapshot 也同步纳入
+  这条 supply truth，`dialog_runtime dump` 日志新增 `supply=...`
+- `river_cloud_xiaozhi_playback_quiet_window_from_gate_view()` 在
+  `BACKEND_DETACHED` 场景下不再回落到：
+  - `PREFETCHING`
+  - `REBUFFERING`
+  - `WAITING_SEGMENT`
+  这些 coarse phase
+- 现在它直接读取：
+  - `CURRENT_SEGMENT`
+  - `WAITING_NEXT_SEGMENT`
+  - `TERMINAL_TAIL`
+  这些 typed supply truth 来识别 detached 静默窗口
+- `river_voice_runtime_dialog_playback_quiet_window()` 也同步改成读取
+  dialog snapshot 的 `playback_supply_kind`，去掉 detached quiet-window 的 phase 兜底
+- 这一步把 `quiet_window` / `restart_pending` 在 detached 场景下最后一段对 phase 的
+  常态依赖也替换成了 typed supply truth，进一步靠近：
+  - playback runtime 负责导出媒体供给语义
+  - dialog runtime 只镜像这条真相
+  - voice runtime 只消费镜像后的 typed truth
+
 ## Step 5.418
 - XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held` 从粗 phase
   判定收口到 typed playback truth：

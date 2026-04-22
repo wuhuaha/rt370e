@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.419
+Validate that detached quiet-window / restart-pending gating now reads exported
+`playback_supply_kind` truth instead of phase fallback:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '75,105p' include/river/river_cloud.h
+sed -n '58,70p' include/river/river_dialog_runtime.h
+sed -n '500,670p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '80,105p' components/river_voice/river_voice_runtime_policy.c
+rg -n 'playback_supply_kind|PLAYBACK_SUPPLY_|supply=' \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_core/river_dialog_runtime.c \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public headers now define and export:
+  - `river_cloud_playback_supply_kind_t`
+  - `playback_supply_kind` in both cloud/dialog runtime snapshots
+- `river_cloud_xiaozhi_playback_quiet_window_from_gate_view(...)` uses
+  `truth_view.supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_NONE` for detached
+  quiet-window detection, instead of phase checks
+- `river_voice_runtime_dialog_playback_quiet_window(...)` now reads
+  `snapshot->playback_supply_kind` for detached quiet-window detection
+- `dialog_runtime_dump_status()` now logs `supply=...`, confirming the typed
+  supply truth is mirrored through dialog runtime
+
 ## Step 5.418
 Validate that playback quiet-window / capture-held / restart-pending gating now
 prefers typed playback truth over coarse phase-only checks:

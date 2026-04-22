@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.418 让 quiet-window / restart-pending 改读 typed playback truth`
+  - `5.419 导出 playback supply truth 替代 detached phase fallback`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - playback runtime 继续把 detached quiet-window 的最后一段 phase fallback
+      替换成 typed supply truth
+    - 新增公开枚举：
+      - `river_cloud_playback_supply_kind_t`
+      - `river_cloud_playback_supply_kind_name(...)`
+    - `river_cloud_runtime_snapshot_t` 与 `river_dialog_runtime_snapshot_t`
+      现在都显式导出：
+      - `playback_supply_kind`
+    - `dialog runtime` 的 cloud import / playback facts / exported snapshot 也
+      同步镜像了这条 supply truth，`dialog_runtime dump` 新增 `supply=...`
+    - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view()` 在 detached
+      场景下改为直接读取 `supply_kind != NONE`
+    - `river_voice_runtime_dialog_playback_quiet_window()` 也同步改成读取
+      `snapshot->playback_supply_kind`
+    - 这一步继续把 quiet-window / restart-pending 在 detached 场景下最后一段对
+      coarse phase 的常态依赖替换成 typed supply truth
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held`
       从粗 phase 判定收口到 typed playback truth

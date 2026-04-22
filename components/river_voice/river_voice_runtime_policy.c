@@ -91,15 +91,7 @@ static bool river_voice_runtime_dialog_playback_quiet_window(
     case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
         return true;
     case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
-        if (!snapshot->playback_phase_known) {
-            return false;
-        }
-        return snapshot->playback_phase_kind ==
-                   RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
-               snapshot->playback_phase_kind ==
-                   RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
-               snapshot->playback_phase_kind ==
-                   RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+        return snapshot->playback_supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_NONE;
     default:
         return false;
     }

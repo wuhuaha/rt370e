@@ -61,6 +61,7 @@ typedef struct {
     bool playback_terminal_waiting;
     river_cloud_playback_phase_t playback_phase_kind;
     river_cloud_playback_backend_state_t playback_backend_state_kind;
+    river_cloud_playback_supply_kind_t playback_supply_kind;
     river_cloud_playback_hold_kind_t playback_hold_kind;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;

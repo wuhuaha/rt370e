@@ -86,6 +86,22 @@ const char *river_cloud_playback_backend_state_name(
     }
 }
 
+const char *river_cloud_playback_supply_kind_name(
+    river_cloud_playback_supply_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_CLOUD_PLAYBACK_SUPPLY_CURRENT_SEGMENT:
+        return "current_segment";
+    case RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT:
+        return "waiting_next_segment";
+    case RIVER_CLOUD_PLAYBACK_SUPPLY_TERMINAL_TAIL:
+        return "terminal_tail";
+    case RIVER_CLOUD_PLAYBACK_SUPPLY_NONE:
+    default:
+        return "none";
+    }
+}
+
 const char *river_cloud_playback_hold_kind_name(
     river_cloud_playback_hold_kind_t kind)
 {

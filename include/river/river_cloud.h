@@ -78,6 +78,13 @@ typedef enum {
 } river_cloud_playback_backend_state_t;
 
 typedef enum {
+    RIVER_CLOUD_PLAYBACK_SUPPLY_NONE = 0,
+    RIVER_CLOUD_PLAYBACK_SUPPLY_CURRENT_SEGMENT,
+    RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT,
+    RIVER_CLOUD_PLAYBACK_SUPPLY_TERMINAL_TAIL
+} river_cloud_playback_supply_kind_t;
+
+typedef enum {
     RIVER_CLOUD_PLAYBACK_HOLD_NONE = 0,
     RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP
 } river_cloud_playback_hold_kind_t;
@@ -126,6 +133,7 @@ typedef struct {
     bool playback_terminal_waiting;
     river_cloud_playback_phase_t playback_phase_kind;
     river_cloud_playback_backend_state_t playback_backend_state_kind;
+    river_cloud_playback_supply_kind_t playback_supply_kind;
     river_cloud_playback_hold_kind_t playback_hold_kind;
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;
@@ -185,6 +193,8 @@ river_status_t river_cloud_asr_batch_submit_segment(const uint8_t *pcm,
 const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase);
 const char *river_cloud_playback_backend_state_name(
     river_cloud_playback_backend_state_t state);
+const char *river_cloud_playback_supply_kind_name(
+    river_cloud_playback_supply_kind_t kind);
 const char *river_cloud_playback_hold_kind_name(
     river_cloud_playback_hold_kind_t kind);
 const char *river_cloud_playback_rebuffer_cause_name(

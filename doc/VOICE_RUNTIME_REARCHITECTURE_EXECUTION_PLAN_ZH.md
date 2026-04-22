@@ -26,6 +26,35 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.419`
+  - playback runtime 继续把 detached quiet-window 的最后一段 phase fallback
+    替换成 typed supply truth
+  - 新增公开枚举：
+    - `river_cloud_playback_supply_kind_t`
+    - `river_cloud_playback_supply_kind_name(...)`
+  - `river_cloud_runtime_snapshot_t` 与 `river_dialog_runtime_snapshot_t` 现在都显式导出：
+    - `playback_supply_kind`
+  - `dialog runtime` 的 cloud import / playback facts / exported snapshot 也同步镜像
+    了这条 supply truth，`dialog_runtime dump` 新增 `supply=...`
+  - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view()` 在
+    `BACKEND_DETACHED` 场景下不再依赖：
+    - `PREFETCHING`
+    - `REBUFFERING`
+    - `WAITING_SEGMENT`
+    这些 coarse phase
+  - 它现在改为直接读取：
+    - `CURRENT_SEGMENT`
+    - `WAITING_NEXT_SEGMENT`
+    - `TERMINAL_TAIL`
+    这些 typed supply truth 来识别 detached 的静默窗口
+  - `river_voice_runtime_dialog_playback_quiet_window()` 也同步改成读取
+    dialog snapshot 的 `playback_supply_kind`，去掉 detached quiet-window 的
+    phase 兜底
+  - 这一步继续把：
+    - playback runtime 负责导出供给语义
+    - dialog runtime 只镜像这条真相
+    - voice runtime 只消费镜像后的 typed truth
+    这条边界压实，进一步减少 quiet-window / restart-pending 对 coarse phase 的常态依赖
 - `Step 5.418`
   - XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held` 从 coarse
     playback phase 收口到 typed playback truth
