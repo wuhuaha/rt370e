@@ -574,6 +574,13 @@ typedef struct {
     bool ready;
 } river_cloud_xiaozhi_segment_gap_hold_view_t;
 
+typedef struct {
+    river_cloud_xiaozhi_playback_truth_view_t truth_view;
+    bool terminal_waiting;
+    river_cloud_playback_terminal_wait_kind_t terminal_wait_kind;
+    bool tts_stop_pending;
+} river_cloud_xiaozhi_playback_gate_view_t;
+
 static void river_cloud_xiaozhi_capture_playback_truth_view(
     river_cloud_xiaozhi_playback_truth_view_t *view)
 {
@@ -615,6 +622,54 @@ static void river_cloud_xiaozhi_capture_segment_gap_hold_view(
         view->queued_frames <= view->hold_frames &&
         river_cloud_xiaozhi_playback_backend_stream_attached(
             view->truth_view.backend_state);
+}
+
+static void river_cloud_xiaozhi_capture_playback_gate_view(
+    river_cloud_xiaozhi_playback_gate_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    river_cloud_xiaozhi_capture_playback_truth_view(&view->truth_view);
+    view->terminal_waiting = g_river_cloud.xiaozhi_playback_terminal_waiting;
+    view->terminal_wait_kind = g_river_cloud.xiaozhi_playback_terminal_wait_kind;
+    view->tts_stop_pending = g_river_cloud.xiaozhi_tts_stop_pending;
+}
+
+static bool river_cloud_xiaozhi_playback_quiet_window_from_gate_view(
+    const river_cloud_xiaozhi_playback_gate_view_t *view)
+{
+    if (view == NULL || view->truth_view.output_active) {
+        return false;
+    }
+
+    if (view->tts_stop_pending) {
+        return true;
+    }
+    if (view->terminal_waiting &&
+        view->terminal_wait_kind != RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE) {
+        return true;
+    }
+    if (view->truth_view.hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE) {
+        return true;
+    }
+
+    switch (view->truth_view.backend_state) {
+    case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING:
+    case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
+        return true;
+    case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
+        return view->truth_view.backend_source.phase ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
+               view->truth_view.backend_source.phase ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
+               view->truth_view.backend_source.phase ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+    default:
+        return false;
+    }
 }
 
 static bool river_cloud_xiaozhi_rebuffer_prefers_service_recover(
@@ -682,16 +737,10 @@ static void river_cloud_xiaozhi_clear_followup_reopen_state(void)
 
 static bool river_cloud_xiaozhi_playback_quiet_window_allows_vad_open(void)
 {
-    river_cloud_playback_phase_t phase = river_cloud_xiaozhi_playback_phase();
+    river_cloud_xiaozhi_playback_gate_view_t gate_view;
 
-    if (phase == RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
-        phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
-        phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT) {
-        return true;
-    }
-
-    return g_river_cloud.xiaozhi_tts_stop_pending &&
-           !river_cloud_xiaozhi_playback_output_active();
+    river_cloud_xiaozhi_capture_playback_gate_view(&gate_view);
+    return river_cloud_xiaozhi_playback_quiet_window_from_gate_view(&gate_view);
 }
 
 bool river_cloud_xiaozhi_playback_allows_vad_open(void)
@@ -715,9 +764,11 @@ bool river_cloud_xiaozhi_capture_held_by_playback(
     const river_voice_duplex_ready_eval_t *eval,
     const char **fallback_reason)
 {
+    river_cloud_xiaozhi_playback_gate_view_t gate_view;
     const char *resolved_reason = river_cloud_xiaozhi_duplex_fallback_reason(eval);
 
-    if (river_cloud_xiaozhi_playback_quiet_window_allows_vad_open()) {
+    river_cloud_xiaozhi_capture_playback_gate_view(&gate_view);
+    if (river_cloud_xiaozhi_playback_quiet_window_from_gate_view(&gate_view)) {
         if (fallback_reason != NULL) {
             *fallback_reason = NULL;
         }
@@ -728,7 +779,9 @@ bool river_cloud_xiaozhi_capture_held_by_playback(
         *fallback_reason = resolved_reason;
     }
 
-    return river_cloud_xiaozhi_playback_lane_engaged() && resolved_reason != NULL;
+    return gate_view.truth_view.backend_source.phase !=
+               RIVER_CLOUD_PLAYBACK_PHASE_IDLE &&
+           resolved_reason != NULL;
 }
 
 void river_cloud_xiaozhi_apply_tts_start_round_policy(void)

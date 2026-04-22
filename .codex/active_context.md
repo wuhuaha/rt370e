@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.417 让 segment-gap hold 改用动态低水位阈值`
+  - `5.418 让 quiet-window / restart-pending 改读 typed playback truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held`
+      从粗 phase 判定收口到 typed playback truth
+    - playback runtime 新增：
+      - `river_cloud_xiaozhi_playback_gate_view_t`
+      - `river_cloud_xiaozhi_capture_playback_gate_view(...)`
+      - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view(...)`
+    - `playback_quiet_window_allows_vad_open()` 现在优先读取：
+      - `backend_state`
+      - `hold_kind`
+      - `terminal_wait_kind`
+      - `tts_stop_pending`
+      - `output_active`
+      不再直接把整类 `PREFETCHING/REBUFFERING/WAITING_SEGMENT` 全部视为静默窗口
+    - `capture_held_by_playback(...)` 也改为复用同一 gate truth
+    - `river_voice_runtime_restart_pending_requires_block(...)` 现在同步改成
+      基于 dialog snapshot typed playback truth 的 quiet-window 语义，不再依赖
+      单独的 coarse `restart_pending_quiet_phase(...)`
+    - 当前仅在 `DETACHED` 的残余过渡态继续保留 phase fallback；后续还可以继续把
+      supply/waiting truth 显式导出后去掉这层兜底
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位
     - 固定的 `1 frame` hold 常量已经移除，当前 hold 阈值现在统一由

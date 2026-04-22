@@ -26,6 +26,32 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.418`
+  - XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held` 从 coarse
+    playback phase 收口到 typed playback truth
+  - playback runtime 新增：
+    - `river_cloud_xiaozhi_playback_gate_view_t`
+    - `river_cloud_xiaozhi_capture_playback_gate_view(...)`
+    - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view(...)`
+  - `playback_quiet_window_allows_vad_open()` 现在优先读取：
+    - `backend_state`
+    - `hold_kind`
+    - `terminal_wait_kind`
+    - `tts_stop_pending`
+    - `output_active`
+    而不再直接把整类 `PREFETCHING/REBUFFERING/WAITING_SEGMENT` 全部视为静默窗口
+  - `capture_held_by_playback(...)` 也改为复用同一 gate truth，避免 adapter 再次
+    自己重建 quiet-window 语义
+  - `river_voice_runtime_restart_pending_requires_block(...)` 现在同步改成基于
+    dialog snapshot 的 typed playback truth 做判定，不再依赖独立的 coarse
+    `restart_pending_quiet_phase(...)`
+  - 当前仅在 `DETACHED` 的残余过渡态继续保留 phase 兜底，这是因为 supply-side
+    waiting truth 还没有完全显式导出；后续可以继续把这部分 phase fallback 也替换掉
+  - 这一步继续把：
+    - cloud runtime 的 quiet-window
+    - capture-held during playback
+    - voice runtime 的 restart-pending AEC 阻断
+    三处语义收口到同一套 playback truth 上，减少模块间各自重猜播放占用状态
 - `Step 5.417`
   - XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位
   - 固定的 `1 frame` hold 常量已经移除，当前 hold 阈值改由

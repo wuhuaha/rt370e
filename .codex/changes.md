@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.418
+- XiaoZhi downlink / playback 继续把 `quiet_window` / `capture_held` 从粗 phase
+  判定收口到 typed playback truth：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 新增统一 gate 视图：
+  - `river_cloud_xiaozhi_playback_gate_view_t`
+  - `river_cloud_xiaozhi_capture_playback_gate_view(...)`
+  - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view(...)`
+- `river_cloud_xiaozhi_playback_quiet_window_allows_vad_open()` 不再直接把整个：
+  - `PREFETCHING`
+  - `REBUFFERING`
+  - `WAITING_SEGMENT`
+  都当作静音窗口
+- 现在优先消费的 typed truth 是：
+  - `backend_state`
+  - `hold_kind`
+  - `terminal_wait_kind`
+  - `tts_stop_pending`
+  - `output_active`
+- 只有 `DETACHED` 的残余过渡态才继续回落到 phase 兜底，避免完全失去对尚未
+  导出 supply truth 的兼容
+- `river_cloud_xiaozhi_capture_held_by_playback(...)` 也改为复用同一 gate truth，
+  不再先各自重复猜测 quiet-window
+- `river_voice_runtime_restart_pending_requires_block(...)` 不再依赖单独的
+  `restart_pending_quiet_phase(...)` 粗 phase helper，而是改为读取 dialog
+  snapshot 中已导出的 typed playback truth：
+  - `playback_backend_state_kind`
+  - `playback_hold_kind`
+  - `playback_terminal_wait_kind`
+  - `tts_stop_pending`
+  - `playback_active`
+- 这一步把 cloud runtime 与 voice runtime 对“当前是否属于可开放 VAD 的静默恢复窗口”
+  的语义进一步对齐到同一套 playback truth 上，减少：
+  - `restart_pending` 被误当作持续播放占用
+  - segment-gap / terminal wait / stop-pending 被不同模块各自粗判
+  - capture reopen / AEC gate / follow-up reopen 之间的语义漂移
+
 ## Step 5.417
 - XiaoZhi downlink / playback 继续把 `segment_gap_hold` 从固定阈值收紧为动态低水位：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

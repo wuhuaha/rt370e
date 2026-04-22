@@ -52,14 +52,6 @@ static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t
            state == RIVER_INTERACTION_ASR_STREAMING;
 }
 
-static bool river_voice_runtime_restart_pending_quiet_phase(
-    river_cloud_playback_phase_t phase)
-{
-    return phase == RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
-           phase == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
-           phase == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
-}
-
 static bool river_voice_runtime_dialog_snapshot_capture(
     river_dialog_runtime_snapshot_t *snapshot)
 {
@@ -73,6 +65,44 @@ static bool river_voice_runtime_dialog_cloud_playback_engaged(
            snapshot->playback_owner_kind == RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD &&
            (snapshot->playback_lane_engaged || snapshot->playback_recovering ||
             snapshot->playback_turn_active);
+}
+
+static bool river_voice_runtime_dialog_playback_quiet_window(
+    const river_dialog_runtime_snapshot_t *snapshot)
+{
+    if (snapshot == NULL || snapshot->playback_active) {
+        return false;
+    }
+
+    if (snapshot->tts_stop_pending) {
+        return true;
+    }
+    if (snapshot->playback_terminal_waiting &&
+        snapshot->playback_terminal_wait_kind !=
+            RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE) {
+        return true;
+    }
+    if (snapshot->playback_hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE) {
+        return true;
+    }
+
+    switch (snapshot->playback_backend_state_kind) {
+    case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING:
+    case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
+        return true;
+    case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
+        if (!snapshot->playback_phase_known) {
+            return false;
+        }
+        return snapshot->playback_phase_kind ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_PREFETCHING ||
+               snapshot->playback_phase_kind ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING ||
+               snapshot->playback_phase_kind ==
+                   RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+    default:
+        return false;
+    }
 }
 
 static bool river_voice_runtime_restart_pending_requires_block(
@@ -92,13 +122,7 @@ static bool river_voice_runtime_restart_pending_requires_block(
         return false;
     }
 
-    if (snapshot->playback_phase_known &&
-        river_voice_runtime_restart_pending_quiet_phase(
-            snapshot->playback_phase_kind)) {
-        return false;
-    }
-
-    return true;
+    return !river_voice_runtime_dialog_playback_quiet_window(snapshot);
 }
 
 static bool river_voice_runtime_profile_supports_playback_reference(

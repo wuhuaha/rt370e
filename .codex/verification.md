@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.418
+Validate that playback quiet-window / capture-held / restart-pending gating now
+prefers typed playback truth over coarse phase-only checks:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '570,790p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '40,125p' components/river_voice/river_voice_runtime_policy.c
+rg -n 'playback_gate_view|quiet_window_from_gate_view|playback_terminal_wait_kind|playback_hold_kind|dialog_playback_quiet_window|restart_pending_requires_block' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- cloud playback runtime now defines:
+  - `river_cloud_xiaozhi_playback_gate_view_t`
+  - `river_cloud_xiaozhi_capture_playback_gate_view(...)`
+  - `river_cloud_xiaozhi_playback_quiet_window_from_gate_view(...)`
+- `river_cloud_xiaozhi_playback_quiet_window_allows_vad_open()` no longer
+  hardcodes only `PREFETCHING/REBUFFERING/WAITING_SEGMENT`
+- `river_cloud_xiaozhi_capture_held_by_playback(...)` reuses the same gate-view
+  quiet-window helper instead of independently re-deriving the condition
+- voice runtime no longer defines `restart_pending_quiet_phase(...)`
+- `river_voice_runtime_restart_pending_requires_block(...)` now delegates to a
+  snapshot-based helper that reads typed playback truth:
+  - `playback_backend_state_kind`
+  - `playback_hold_kind`
+  - `playback_terminal_wait_kind`
+  - `tts_stop_pending`
+  - `playback_active`
+
 ## Step 5.417
 Validate that `segment_gap_hold` now uses a dynamic low-water threshold derived
 from the attached-resume gate instead of a fixed `1 frame` constant:
