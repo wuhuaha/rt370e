@@ -739,11 +739,9 @@ typedef struct {
     bool turn_active;
     bool rebuffer_pending;
     bool playback_recovering;
-    bool phase_known;
     bool terminal_closed;
     bool terminal_waiting;
     bool tts_stop_pending;
-    river_cloud_playback_phase_t phase_kind;
     river_cloud_playback_backend_state_t backend_state_kind;
     river_cloud_playback_supply_kind_t supply_kind;
     river_cloud_playback_hold_kind_t hold_kind;
@@ -797,11 +795,9 @@ static void river_dialog_runtime_capture_playback_projection_locked(
     projection->turn_active = playback_facts->turn_active;
     projection->rebuffer_pending = playback_facts->rebuffer_pending;
     projection->playback_recovering = derived_facts->playback_recovering;
-    projection->phase_known = playback_facts->phase_known;
     projection->terminal_closed = playback_facts->terminal_closed;
     projection->terminal_waiting = playback_facts->terminal_waiting;
     projection->tts_stop_pending = playback_facts->tts_stop_pending;
-    projection->phase_kind = playback_facts->phase_kind;
     projection->backend_state_kind = playback_facts->backend_state_kind;
     projection->supply_kind = playback_facts->supply_kind;
     projection->hold_kind = playback_facts->hold_kind;
@@ -940,8 +936,8 @@ static bool river_dialog_runtime_playback_turn_retains_output_turn_from_projecti
                  river_dialog_runtime_terminal_wait_suppresses_speaking_from_projection(
                      projection));
     }
-    if (!projection->phase_known) {
-        return !projection->cloud_runtime_available;
+    if (!projection->cloud_runtime_available) {
+        return true;
     }
     return river_dialog_runtime_playback_turn_recovering_from_projection(
         projection);

@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.422 让 playback backend/hold/output 改读底层 truth`
+  - `5.423 让 dialog projection 不再镜像 phase truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续缩减内部 projection 对 coarse playback phase 的依赖
+    - `river_dialog_runtime_playback_projection_t` 不再镜像：
+      - `phase_known`
+      - `phase_kind`
+    - `river_dialog_runtime_capture_playback_projection_locked(...)`
+      不再把 cloud playback phase 塞进 projection 内部语义
+    - `river_dialog_runtime_playback_turn_retains_output_turn_from_projection(...)`
+      只保留：
+      - `!cloud_runtime_available -> true`
+      这个保守 fallback，不再依赖 `!phase_known`
+    - phase 继续保留在 cloud/dialog snapshot 里做观测，但 projection 内部决策
+      现在只消费 typed playback truth 与 runtime availability
   - newest landed runtime-ownership slice:
     - `cloud playback runtime` 继续把内部播放语义从 coarse phase 解耦
     - `river_cloud_xiaozhi_playback_backend_source_t` 现在额外镜像：
