@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.393
+Validate that downlink wakeup and segment predictive prefetch decisions now
+follow runtime-owned `output_active` truth instead of the local
+`xiaozhi_playback_active` shadow boolean:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '472,486p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '883,905p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_has_work\\(|segment_prefetch_target_needed\\(|playback_output_active\\(' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_has_work()` no longer directly checks
+  `g_river_cloud.xiaozhi_playback_active`
+- `river_cloud_xiaozhi_segment_prefetch_target_needed()` no longer directly
+  checks `g_river_cloud.xiaozhi_playback_active`
+- both strategy helpers now gate on
+  `river_cloud_xiaozhi_playback_output_active()`, so worker wakeup and
+  prefetch suppression follow runtime `phase + backend` truth rather than a
+  local shadow bool
+
 ## Step 5.392
 Validate that playback recovery branches now consume runtime-owned
 `output_active` truth instead of the local `xiaozhi_playback_active` shadow

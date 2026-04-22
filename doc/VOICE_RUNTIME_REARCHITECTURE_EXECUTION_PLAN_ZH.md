@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.393`
+  - XiaoZhi playback runtime 的两处策略层判断：
+    - `playback_has_work()`
+    - `segment_prefetch_target_needed()`
+    现在不再直接消费
+    `g_river_cloud.xiaozhi_playback_active`
+  - 两者现在统一改为依赖
+    `river_cloud_xiaozhi_playback_output_active()`
+  - 这意味着：
+    - downlink 唤醒条件
+    - segment predictive prefetch 的抑制条件
+    开始统一跟随 runtime `phase + backend` typed truth
+  - 这一步继续把 playback runtime 的策略层从 coarse shadow bool 收口到
+    semantic output-active truth，降低 foreign/recovering/non-owned backend
+    窗口对本流 start/prefetch 策略的污染
 - `Step 5.392`
   - XiaoZhi playback runtime 的两个 recovery 分支：
     - `maybe_pause_for_segment_gap()`

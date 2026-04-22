@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.392 让 playback recovery 分支以 output-active runtime truth 为主`
+  - `5.393 让 downlink 唤醒与 segment prefetch 跟随 output-active 真相`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 的策略层又收紧了两处
+      `xiaozhi_playback_active` shadow 消费：
+      - `playback_has_work()`
+      - `segment_prefetch_target_needed()`
+    - 两者现在统一改为消费
+      `river_cloud_xiaozhi_playback_output_active()`
+    - 这意味着：
+      - downlink task 的唤醒条件
+      - segment predictive prefetch 的抑制条件
+      都开始直接跟随 runtime `phase + backend` typed truth
+    - 这一步继续把 playback runtime 的策略层从 coarse shadow bool 收口到
+      semantic output-active truth，为后续继续处理 `compute_playback_phase()`
+      内部残留的 physical/semantic 混用做准备
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 的两个 recovery 分支现在不再直接看
       `g_river_cloud.xiaozhi_playback_active` 这个影子布尔：
@@ -199,10 +213,11 @@ or top-of-tree verification target changes.
     - 继续检查 playback runtime 内剩余 `g_river_cloud.xiaozhi_playback_active`
       直接消费点
     - 下一刀优先判断：
-      - `segment_prefetch_target_needed(...)` 这种预测型策略，是否也应转成
-        runtime-owned lane/output truth
       - `compute_playback_phase()` 内部保留影子布尔作为底层物理态输入是否仍是
         合理边界，还是应该继续拆分为显式 physical/semantic 双视图
+      - endpoint soft close / hint-only 诊断面是否也应把 raw physical active 与
+        semantic phase/backend truth 并列外显，避免板端继续把日志字段混用成同一种
+        “播放中”语义
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.393
+- XiaoZhi playback runtime 的两处策略层判断现在不再直接依赖
+  `g_river_cloud.xiaozhi_playback_active` 影子布尔：
+  - `river_cloud_xiaozhi_playback_has_work()`
+  - `river_cloud_xiaozhi_segment_prefetch_target_needed()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 两处现在统一改为消费
+  `river_cloud_xiaozhi_playback_output_active()`
+- 这意味着：
+  - downlink task 的唤醒条件
+  - segment predictive prefetch 的抑制条件
+  都开始跟随 runtime `phase + backend` typed truth，而不是继续直接使用局部
+  shadow bool
+- 这一步继续把 playback runtime 的策略层从 coarse active shadow 收口到
+  semantic output-active truth，减少 foreign/recovering/non-owned backend
+  窗口对本流策略判断的污染
+
 ## Step 5.392
 - XiaoZhi playback runtime 的两个 recovery 分支现在不再直接依赖
   `g_river_cloud.xiaozhi_playback_active` 影子布尔：
