@@ -1677,7 +1677,8 @@ static bool river_cloud_xiaozhi_maybe_pause_for_segment_gap(void)
     river_cloud_playback_backend_state_t backend_state;
     bool attached_hold = false;
 
-    if (!g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
+    if (!river_cloud_xiaozhi_playback_output_active() ||
+        g_river_cloud.xiaozhi_tts_stop_pending ||
         g_river_cloud.xiaozhi_playback_rebuffer_pending ||
         !river_cloud_xiaozhi_playback_waiting_next_segment()) {
         return false;
@@ -1797,7 +1798,8 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
     uint32_t trigger_wait_ms;
     const char *recover_path = "stop_rebuffer";
 
-    if (!g_river_cloud.xiaozhi_playback_active || g_river_cloud.xiaozhi_tts_stop_pending ||
+    if (!river_cloud_xiaozhi_playback_output_active() ||
+        g_river_cloud.xiaozhi_tts_stop_pending ||
         g_river_cloud.xiaozhi_playback_rebuffer_pending ||
         backend_state != RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE) {
         river_cloud_xiaozhi_clear_downlink_starvation_watch();

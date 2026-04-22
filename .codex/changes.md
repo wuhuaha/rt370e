@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.392
+- XiaoZhi playback runtime 的两个 recovery 分支现在不再直接依赖
+  `g_river_cloud.xiaozhi_playback_active` 影子布尔：
+  - `river_cloud_xiaozhi_maybe_pause_for_segment_gap()`
+  - `river_cloud_xiaozhi_maybe_rebuffer_starved()`
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 两处 guard 现在统一改为消费
+  `river_cloud_xiaozhi_playback_output_active()`
+- 这意味着段间 hold 与 starvation rebuffer 的触发前提开始直接跟随：
+  - runtime `phase`
+  - typed `backend_state`
+  而不再继续跟随局部 `playback_active` shadow
+- 这一步继续把 downlink/playback recovery 判定从 coarse bool 收口到
+  runtime-owned semantic truth，减少恢复空窗里因影子位抖动导致的误跳过 /
+  误清理恢复路径
+
 ## Step 5.391
 - `voice runtime` 的 `restart_pending` hard block 现在优先消费
   `dialog runtime` 的 typed backend truth：

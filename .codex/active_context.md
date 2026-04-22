@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.391 让 restart_pending hard block 以 dialog backend truth 为主`
+  - `5.392 让 playback recovery 分支以 output-active runtime truth 为主`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 的两个 recovery 分支现在不再直接看
+      `g_river_cloud.xiaozhi_playback_active` 这个影子布尔：
+      - `maybe_pause_for_segment_gap()`
+      - `maybe_rebuffer_starved()`
+    - 两者现在统一改为消费
+      `river_cloud_xiaozhi_playback_output_active()`
+    - 这意味着段间 hold / starvation rebuffer 的触发前提开始直接跟随：
+      - runtime phase truth
+      - typed backend truth
+      而不是继续被局部 `playback_active` 影子位牵着走
+    - 这一步继续把 downlink/playback recovery 的判定边界从 coarse
+      shadow bool 收口到 runtime-owned semantic truth，为后面继续清理
+      prefetch / phase 内 residual `playback_active` 消费点打基础
   - newest landed runtime-ownership slice:
     - `voice runtime` 的 `restart_pending` hard block 现在优先消费
       `dialog runtime` 导出的 typed backend truth
@@ -182,16 +196,13 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 voice/playback runtime 内剩余 raw playback-service state 读取，
-      优先看哪些消费者可以直接改为消费 `dialog runtime` 新导出的：
-      - `playback_owner_kind`
-      - `error_kind`
-    - 重点继续区分：
-      - 哪些判断本质上是在问“dialog/runtime 语义归属”
-      - 哪些判断本质上仍必须看“物理播放是否真的存在”
-    - 下一刀优先检查：
-      - AEC / preproc 诊断面里残留的 dialog-style 布尔反推
-      - 还能否继续把 semantic ownership 从 raw service state 中剥离
+    - 继续检查 playback runtime 内剩余 `g_river_cloud.xiaozhi_playback_active`
+      直接消费点
+    - 下一刀优先判断：
+      - `segment_prefetch_target_needed(...)` 这种预测型策略，是否也应转成
+        runtime-owned lane/output truth
+      - `compute_playback_phase()` 内部保留影子布尔作为底层物理态输入是否仍是
+        合理边界，还是应该继续拆分为显式 physical/semantic 双视图
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

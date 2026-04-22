@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.392`
+  - XiaoZhi playback runtime 的两个 recovery 分支：
+    - `maybe_pause_for_segment_gap()`
+    - `maybe_rebuffer_starved()`
+    现在不再直接消费
+    `g_river_cloud.xiaozhi_playback_active`
+  - 两者现在统一改为依赖
+    `river_cloud_xiaozhi_playback_output_active()`
+  - 这意味着 playback recovery 的触发前提开始显式跟随：
+    - runtime `phase`
+    - typed `backend_state`
+    而不是继续跟随局部影子布尔
+  - 这一步继续把 downlink/playback recovery 的真相边界收口到
+    runtime-owned semantic truth，减少恢复空窗里因为 shadow bool 抖动带来的
+    hold / rebuffer 分支误跳过
 - `Step 5.391`
   - `voice runtime` 的 `restart_pending` hard block 现在优先消费
     `dialog runtime` 导出的 typed backend truth
