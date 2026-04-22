@@ -1,5 +1,43 @@
 # Change Log
 
+## Step 5.411
+- dialog runtime 继续把 residual control / derived state 从 exported snapshot 中剥离：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增内部真相载体：
+  - `river_dialog_runtime_control_facts_t`
+  - `river_dialog_runtime_derived_facts_t`
+  - `g_river_dialog_runtime.control_facts`
+  - `g_river_dialog_runtime.derived_facts`
+- 新增统一镜像辅助层：
+  - `river_dialog_runtime_export_control_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_derived_facts_to_snapshot_locked(...)`
+- 以下 residual dialog state 现在改由 internal facts 持有，再镜像到 exported snapshot：
+  - `boot_ready`
+  - `wake_confirmed`
+  - `asr_session_active`
+  - `wake_admission_pending`
+  - `tts_interrupt_requested`
+  - `error_recovering`
+  - `error_kind`
+  - `playback_active`
+  - `playback_recovering`
+  - `playback_owner_kind`
+  - `interaction_state`
+  - `transition_count`
+  - `reason`
+- `capture_playback_projection_locked(...)` 现在改读 internal `derived_facts` 的
+  `playback_recovering`
+- `capture_interaction_projection_locked(...)` 现在改读：
+  - internal `control_facts`
+  - internal `derived_facts`
+  不再把 exported snapshot 当作内部 dialog state 真相源
+- `refresh_error_recovering_locked(...)` / `refresh_playback_locked(...)` /
+  `publish_locked(...)` / `reconcile_facts_locked(...)` 现在统一更新 internal facts，
+  再导出到 snapshot
+- 这一步把 dialog runtime 内部 reducer / projection / publish 对 exported snapshot
+  的依赖进一步压缩到 export/get/dump 边界，为后续继续重建 downlink/playback
+  恢复路径提供稳定的单一 dialog 真相源
+
 ## Step 5.410
 - dialog runtime 继续把 turn/session/terminal metadata 从 exported snapshot 中剥离：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

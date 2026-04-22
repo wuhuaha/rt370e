@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.411
+Validate that dialog runtime residual control/derived state now lives in
+internal facts carriers and the exported snapshot is only a mirror for those
+fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '40,110p' components/river_core/river_dialog_runtime.c
+sed -n '390,455p' components/river_core/river_dialog_runtime.c
+sed -n '760,840p' components/river_core/river_dialog_runtime.c
+sed -n '975,1215p' components/river_core/river_dialog_runtime.c
+sed -n '1370,1605p' components/river_core/river_dialog_runtime.c
+rg -n 'control_facts|derived_facts|export_control_facts_to_snapshot_locked|export_derived_facts_to_snapshot_locked|capture_interaction_projection_locked|refresh_playback_locked|publish_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_control_facts_t` and
+  `river_dialog_runtime_derived_facts_t` exist
+- `capture_playback_projection_locked(...)` now reads `playback_recovering`
+  from internal `derived_facts`
+- `capture_interaction_projection_locked(...)` now reads boot/wake/asr/interrupt
+  and derived playback/error/interaction state from internal facts instead of
+  exported snapshot
+- `refresh_error_recovering_locked(...)`, `refresh_playback_locked(...)`, and
+  `publish_locked(...)` now update internal derived state and then mirror it to
+  the exported snapshot
+- direct `g_river_dialog_runtime.snapshot.*` use for these dialog-owned fields is
+  reduced to export/get/dump boundaries
+
 ## Step 5.410
 Validate that dialog runtime session/turn/terminal metadata now lives in an
 internal session-facts carrier and is only mirrored to the exported snapshot:
