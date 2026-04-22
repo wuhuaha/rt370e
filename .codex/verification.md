@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.384
+Validate that `dialog runtime` now keeps separate internal error sources for
+ASR and local-playback fallback, and only derives outward
+`snapshot.error_recovering` from the typed aggregate:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'asr_error_recovering|local_playback_error_recovering|refresh_error_recovering_locked|snapshot->available' \
+  components/river_core/river_dialog_runtime.c
+sed -n '12,28p' components/river_core/river_dialog_runtime.c
+sed -n '68,75p' components/river_core/river_dialog_runtime.c
+sed -n '132,161p' components/river_core/river_dialog_runtime.c
+sed -n '562,570p' components/river_core/river_dialog_runtime.c
+sed -n '842,853p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `dialog runtime` context now contains separate
+  `asr_error_recovering` / `local_playback_error_recovering`
+- `snapshot.error_recovering` is refreshed only through
+  `refresh_error_recovering_locked()`
+- cloud snapshot becoming available now clears the local-playback error shadow
+- local playback fallback and ASR error no longer fight over one directly
+  overwritten `snapshot.error_recovering` field
+
 ## Step 5.383
 Validate that local playback events in `dialog runtime` only drive
 `playback/error/interrupt` truth when cloud runtime is unavailable, and no

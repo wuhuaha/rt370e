@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.383 dialog runtime 仅在 cloud 缺失时让 local playback shadow 驱动真相`
+  - `5.384 拆分 dialog runtime 的 error_recovering 内部来源`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 内部已把 `error_recovering` 拆成：
+      - `asr_error_recovering`
+      - `local_playback_error_recovering`
+    - 对外导出的 `snapshot.error_recovering` 现在统一经
+      `refresh_error_recovering_locked()` 聚合
+    - cloud snapshot 一旦重新可用，会主动清掉
+      `local_playback_error_recovering` shadow
+    - 这一步继续把 `dialog runtime` 从 coarse error bool 推进成
+      typed internal truth
   - newest landed runtime-ownership slice:
     - `dialog runtime` 现在新增
       `local_playback_shadow_drives_truth_locked()`
@@ -81,9 +91,9 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 `dialog runtime` 内剩余 coarse `error_recovering` 归属，
-      是否需要拆成 typed error source，避免 playback-local / ASR / cloud recovery
-      继续共用同一 bool
+    - 继续检查 `dialog runtime` 是否需要把 typed error source 进一步外显成
+      `error_kind` / `recovery_kind`，避免外部仍只能看一个聚合后的
+      `error_recovering`
     - 继续检查 voice/playback runtime 内剩余 raw playback-service state 读取，
       是否还能进一步统一到 dialog/runtime owned truth
   - newest landed runtime-ownership slice:

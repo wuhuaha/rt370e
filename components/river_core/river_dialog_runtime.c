@@ -14,6 +14,8 @@ typedef struct {
     bool initialized;
     bool cloud_runtime_available;
     bool local_playback_stream_owned;
+    bool asr_error_recovering;
+    bool local_playback_error_recovering;
     char local_playback_stream_name[32];
     river_playback_state_t playback_state;
     rtos_mutex_t lock;
@@ -36,6 +38,7 @@ static void river_dialog_runtime_publish_locked(const char *reason);
 static bool river_dialog_runtime_output_turn_engaged_locked(void);
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
 static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending);
+static void river_dialog_runtime_refresh_error_recovering_locked(void);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -63,6 +66,13 @@ static void river_dialog_runtime_copy_text(char *dst, size_t dst_size, const cha
 
     strncpy(dst, src, dst_size - 1U);
     dst[dst_size - 1U] = '\0';
+}
+
+static void river_dialog_runtime_refresh_error_recovering_locked(void)
+{
+    g_river_dialog_runtime.snapshot.error_recovering =
+        g_river_dialog_runtime.asr_error_recovering ||
+        g_river_dialog_runtime.local_playback_error_recovering;
 }
 
 static bool river_dialog_runtime_is_dialog_playback_stream_locked(
@@ -123,6 +133,8 @@ static void river_dialog_runtime_apply_cloud_event_locked(
     switch (event) {
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_BOOT_READY:
         g_river_dialog_runtime.snapshot.boot_ready = true;
+        g_river_dialog_runtime.asr_error_recovering = false;
+        g_river_dialog_runtime.local_playback_error_recovering = false;
         g_river_dialog_runtime.snapshot.wake_admission_pending = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
@@ -133,7 +145,7 @@ static void river_dialog_runtime_apply_cloud_event_locked(
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_SESSION_STARTED:
         g_river_dialog_runtime.snapshot.asr_session_active = true;
-        g_river_dialog_runtime.snapshot.error_recovering = false;
+        g_river_dialog_runtime.asr_error_recovering = false;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
@@ -144,13 +156,14 @@ static void river_dialog_runtime_apply_cloud_event_locked(
         break;
     case RIVER_DIALOG_RUNTIME_CLOUD_EVENT_ASR_ERROR:
         g_river_dialog_runtime.snapshot.asr_session_active = false;
-        g_river_dialog_runtime.snapshot.error_recovering = true;
+        g_river_dialog_runtime.asr_error_recovering = true;
         g_river_dialog_runtime.snapshot.wake_confirmed = false;
         g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
         break;
     default:
         break;
     }
+    river_dialog_runtime_refresh_error_recovering_locked();
 
     if (sid != NULL && sid[0] != '\0') {
         river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
@@ -549,6 +562,9 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
     }
 
     g_river_dialog_runtime.cloud_runtime_available = snapshot->available;
+    if (g_river_dialog_runtime.cloud_runtime_available) {
+        g_river_dialog_runtime.local_playback_error_recovering = false;
+    }
     g_river_dialog_runtime.snapshot.conversation_window_active =
         snapshot->conversation_window_active;
     g_river_dialog_runtime.snapshot.conversation_window_remaining_ms =
@@ -627,6 +643,7 @@ static void river_dialog_runtime_apply_cloud_snapshot_locked(
         river_dialog_runtime_parse_input_lane(snapshot->input_state);
     g_river_dialog_runtime.snapshot.output_lane =
         river_dialog_runtime_parse_output_lane(snapshot->output_state);
+    river_dialog_runtime_refresh_error_recovering_locked();
     if (river_dialog_runtime_cloud_round_active_locked()) {
         g_river_dialog_runtime.snapshot.asr_session_active = true;
     }
@@ -825,14 +842,15 @@ static void river_dialog_runtime_reduce_local_playback_event(
         if (state == RIVER_PLAYBACK_ERROR) {
             managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
             if (managed_recovery) {
-                g_river_dialog_runtime.snapshot.error_recovering = false;
+                g_river_dialog_runtime.local_playback_error_recovering = false;
                 effective_reason = "playback_recovering";
             } else {
-                g_river_dialog_runtime.snapshot.error_recovering = true;
+                g_river_dialog_runtime.local_playback_error_recovering = true;
             }
         } else {
-            g_river_dialog_runtime.snapshot.error_recovering = false;
+            g_river_dialog_runtime.local_playback_error_recovering = false;
         }
+        river_dialog_runtime_refresh_error_recovering_locked();
         if ((state == RIVER_PLAYBACK_IDLE &&
              river_dialog_runtime_output_turn_quiesced_locked()) ||
             (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {

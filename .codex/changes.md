@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.384
+- `dialog runtime` 现在把内部 `error_recovering` 进一步拆成了两路 typed source：
+  - `asr_error_recovering`
+  - `local_playback_error_recovering`
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 `refresh_error_recovering_locked()`，对外暴露的
+  `snapshot.error_recovering` 不再由多个路径直接各自覆盖，而是统一由这两路
+  source 聚合
+- cloud snapshot 一旦重新可用，会主动清掉
+  `local_playback_error_recovering` shadow，避免本地 playback fallback 遗留的
+  error 状态继续挂在 dialog runtime 真相上
+- 这意味着：
+  - ASR error 不再被 local playback `RUNNING/IDLE` 之类事件误清
+  - local playback fallback 抬起的 error，也不再在 cloud truth 恢复后继续残留
+- 这一步继续把 `dialog runtime` 从 coarse `error_recovering` 单 bool
+  改造成 typed internal truth，再向外派生单一交互态
+
 ## Step 5.383
 - `dialog runtime` 现在进一步收紧 local playback shadow 对真相的写权限：
   - 新增 `local_playback_shadow_drives_truth_locked()`

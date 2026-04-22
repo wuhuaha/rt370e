@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.384`
+  - `dialog runtime` 已把内部 `error_recovering` 拆成两路 typed source：
+    - `asr_error_recovering`
+    - `local_playback_error_recovering`
+  - 新增 `refresh_error_recovering_locked()`，对外导出的
+    `snapshot.error_recovering` 现在统一由 typed source 聚合
+  - cloud snapshot 一旦重新可用，会主动清掉
+    `local_playback_error_recovering` shadow，避免 fallback 时代留下的本地
+    playback error 挂在 cloud/dialog 真相上
+  - 这一步继续把 `dialog runtime` 从 coarse error bool 推进成
+    typed internal truth
 - `Step 5.383`
   - `dialog runtime` 新增 `local_playback_shadow_drives_truth_locked()`
   - local playback event 在 cloud runtime 已可用时，仍会保留本地 playback
