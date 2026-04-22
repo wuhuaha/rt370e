@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.402`
+  - dialog runtime 现在为 playback 派生引入内部
+    `playback_projection`
+  - `capture_playback_projection_locked(...)` 会一次性锁存 dialog runtime 当前计算
+    playback truth 所需的投影输入，包括：
+    - cloud playback facts
+    - backend / phase / hold / terminal wait
+    - local playback shadow fallback
+    - output lane
+  - 以下派生现在都开始复用同一份 projection，而不再散读
+    `g_river_dialog_runtime.snapshot`：
+    - `playback_owner_kind`
+    - `playback_recovering`
+    - `playback_active`
+    - `output_turn_engaged`
+    - `output_turn_quiesced`
+  - 这一步开始把 dialog runtime 的 playback truth 从“多字段散读派生”
+    收口成“single projection -> playback/output truth”
 - `Step 5.401`
   - XiaoZhi playback runtime 继续把 control-path 收口到显式
     `playback_truth_view`

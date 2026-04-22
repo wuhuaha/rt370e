@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.402
+Validate that dialog runtime now derives playback/output-turn truth from a
+single internal playback projection instead of repeatedly reading scattered
+snapshot fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '340,640p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_projection|capture_playback_projection_locked|compute_playback_owner_kind_from_projection|compute_playback_recovering_from_projection|compute_playback_active_from_projection|output_turn_engaged_from_projection|output_turn_quiesced_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_playback_projection_t` exists and captures the playback
+  truth inputs needed by dialog runtime
+- playback owner / recovering / active / output-turn derivation now reuse the
+  same projection instead of re-reading scattered snapshot fields
+- old per-field helper branches for playback/output-turn derivation are removed
+  or no longer used
+
 ## Step 5.401
 Validate that the playback control-path now reuses the shared truth-view instead
 of independently re-reading backend/output state across stop, abort, and start

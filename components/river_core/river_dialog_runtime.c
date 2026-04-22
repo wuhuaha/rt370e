@@ -295,29 +295,6 @@ const char *river_dialog_error_kind_name(river_dialog_error_kind_t kind)
     }
 }
 
-static bool river_dialog_runtime_playback_terminal_closed_locked(void)
-{
-    return g_river_dialog_runtime.snapshot.playback_terminal_closed;
-}
-
-static bool river_dialog_runtime_playback_phase_known_locked(void)
-{
-    return g_river_dialog_runtime.snapshot.playback_phase_known;
-}
-
-static bool river_dialog_runtime_playback_waiting_segment_locked(void)
-{
-    return river_dialog_runtime_playback_phase_known_locked() &&
-           g_river_dialog_runtime.snapshot.playback_phase_kind ==
-               RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
-}
-
-static bool river_dialog_runtime_playback_segment_gap_hold_locked(void)
-{
-    return g_river_dialog_runtime.snapshot.playback_hold_kind ==
-           RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP;
-}
-
 static bool river_dialog_runtime_cloud_runtime_available_locked(void)
 {
     return g_river_dialog_runtime.cloud_runtime_available;
@@ -363,103 +340,80 @@ static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locke
     return river_dialog_runtime_local_playback_state_recovering_locked();
 }
 
-static river_dialog_playback_owner_kind_t
-river_dialog_runtime_compute_playback_owner_kind_locked(void)
+typedef struct {
+    bool cloud_runtime_available;
+    bool cloud_playback_active;
+    bool lane_engaged;
+    bool turn_active;
+    bool rebuffer_pending;
+    bool playback_recovering;
+    bool phase_known;
+    bool terminal_closed;
+    bool terminal_waiting;
+    bool tts_stop_pending;
+    river_cloud_playback_phase_t phase_kind;
+    river_cloud_playback_backend_state_t backend_state_kind;
+    river_cloud_playback_hold_kind_t hold_kind;
+    river_cloud_playback_terminal_wait_kind_t terminal_wait_kind;
+    river_dialog_output_lane_t output_lane;
+    bool local_shadow_active;
+    bool local_shadow_recovering;
+} river_dialog_runtime_playback_projection_t;
+
+static void river_dialog_runtime_capture_playback_projection_locked(
+    river_dialog_runtime_playback_projection_t *projection)
 {
     const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
 
-    if (river_dialog_runtime_cloud_runtime_available_locked() &&
-        (snapshot->playback_cloud_active || snapshot->playback_lane_engaged ||
-         snapshot->playback_turn_active || snapshot->playback_recovering ||
-         snapshot->playback_terminal_waiting || snapshot->playback_terminal_closed ||
-         snapshot->playback_hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE ||
-         snapshot->tts_stop_pending)) {
-        return RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD;
+    if (projection == NULL) {
+        return;
     }
 
-    if (river_dialog_runtime_local_playback_shadow_drives_truth_locked() &&
-        (river_dialog_runtime_local_playback_state_active_locked() ||
-         river_dialog_runtime_local_playback_state_recovering_locked())) {
-        return RIVER_DIALOG_PLAYBACK_OWNER_KIND_LOCAL_FALLBACK;
-    }
-
-    return RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE;
-}
-
-static bool river_dialog_runtime_compute_playback_recovering_locked(void)
-{
-    return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
-           river_dialog_runtime_local_playback_shadow_recovering_fallback_locked();
-}
-
-static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
-{
-    if (!river_dialog_runtime_cloud_runtime_available_locked()) {
-        return false;
-    }
-
-    return g_river_dialog_runtime.snapshot.playback_rebuffer_pending ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
-           g_river_dialog_runtime.snapshot.playback_backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
-           g_river_dialog_runtime.snapshot.playback_cloud_active;
-}
-
-static bool river_dialog_runtime_compute_playback_active_locked(void)
-{
-    bool cloud_playback_active = g_river_dialog_runtime.snapshot.playback_cloud_active;
-    bool recovering = g_river_dialog_runtime.snapshot.playback_recovering;
-    bool local_shadow_active =
+    memset(projection, 0, sizeof(*projection));
+    projection->cloud_runtime_available =
+        river_dialog_runtime_cloud_runtime_available_locked();
+    projection->cloud_playback_active = snapshot->playback_cloud_active;
+    projection->lane_engaged = snapshot->playback_lane_engaged;
+    projection->turn_active = snapshot->playback_turn_active;
+    projection->rebuffer_pending = snapshot->playback_rebuffer_pending;
+    projection->playback_recovering = snapshot->playback_recovering;
+    projection->phase_known = snapshot->playback_phase_known;
+    projection->terminal_closed = snapshot->playback_terminal_closed;
+    projection->terminal_waiting = snapshot->playback_terminal_waiting;
+    projection->tts_stop_pending = snapshot->tts_stop_pending;
+    projection->phase_kind = snapshot->playback_phase_kind;
+    projection->backend_state_kind = snapshot->playback_backend_state_kind;
+    projection->hold_kind = snapshot->playback_hold_kind;
+    projection->terminal_wait_kind = snapshot->playback_terminal_wait_kind;
+    projection->output_lane = snapshot->output_lane;
+    projection->local_shadow_active =
         river_dialog_runtime_local_playback_shadow_active_fallback_locked();
+    projection->local_shadow_recovering =
+        river_dialog_runtime_local_playback_shadow_recovering_fallback_locked();
+}
 
-    if (river_dialog_runtime_playback_terminal_closed_locked()) {
+static bool river_dialog_runtime_playback_waiting_segment_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    return projection != NULL && projection->phase_known &&
+           projection->phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_WAITING_SEGMENT;
+}
+
+static bool river_dialog_runtime_playback_segment_gap_hold_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    return projection != NULL &&
+           projection->hold_kind == RIVER_CLOUD_PLAYBACK_HOLD_SEGMENT_GAP;
+}
+
+static bool river_dialog_runtime_terminal_wait_suppresses_speaking_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    if (projection == NULL) {
         return false;
     }
 
-    if (cloud_playback_active || recovering ||
-        river_dialog_runtime_playback_segment_gap_hold_locked()) {
-        return true;
-    }
-
-    if (!local_shadow_active && !cloud_playback_active && !recovering &&
-        g_river_dialog_runtime.snapshot.playback_terminal_waiting) {
-        return false;
-    }
-
-    return local_shadow_active;
-}
-
-static void river_dialog_runtime_refresh_playback_locked(void)
-{
-    g_river_dialog_runtime.snapshot.playback_recovering =
-        river_dialog_runtime_compute_playback_recovering_locked();
-    g_river_dialog_runtime.snapshot.playback_active =
-        river_dialog_runtime_compute_playback_active_locked();
-    g_river_dialog_runtime.snapshot.playback_owner_kind =
-        river_dialog_runtime_compute_playback_owner_kind_locked();
-}
-
-static bool river_dialog_runtime_output_turn_quiesced_locked(void)
-{
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
-
-    return !river_dialog_runtime_output_turn_engaged_locked() &&
-           !snapshot->playback_turn_active &&
-           !snapshot->playback_recovering &&
-           !snapshot->tts_stop_pending &&
-           snapshot->playback_backend_state_kind !=
-               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING &&
-           !snapshot->playback_terminal_waiting;
-}
-
-static bool river_dialog_runtime_terminal_wait_suppresses_speaking_locked(void)
-{
-    switch (g_river_dialog_runtime.snapshot.playback_terminal_wait_kind) {
+    switch (projection->terminal_wait_kind) {
     case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_QUEUE_DRAIN:
     case RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_LAST_SEGMENT_TAIL:
         return true;
@@ -468,66 +422,182 @@ static bool river_dialog_runtime_terminal_wait_suppresses_speaking_locked(void)
     }
 }
 
-static bool river_dialog_runtime_playback_turn_retains_output_turn_locked(void)
+static river_dialog_playback_owner_kind_t
+river_dialog_runtime_compute_playback_owner_kind_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
-
-    if (!snapshot->playback_turn_active) {
-        return false;
-    }
-    if (!snapshot->playback_lane_engaged) {
-        return snapshot->output_lane == RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
-               !(snapshot->playback_terminal_waiting &&
-                 river_dialog_runtime_terminal_wait_suppresses_speaking_locked());
-    }
-    if (!river_dialog_runtime_playback_phase_known_locked()) {
-        return !river_dialog_runtime_cloud_runtime_available_locked();
+    if (projection == NULL) {
+        return RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE;
     }
 
-    return snapshot->playback_phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
+    if (projection->cloud_runtime_available &&
+        (projection->cloud_playback_active || projection->lane_engaged ||
+         projection->turn_active || projection->playback_recovering ||
+         projection->terminal_waiting || projection->terminal_closed ||
+         projection->hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE ||
+         projection->tts_stop_pending)) {
+        return RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD;
+    }
+
+    if (projection->local_shadow_active || projection->local_shadow_recovering) {
+        return RIVER_DIALOG_PLAYBACK_OWNER_KIND_LOCAL_FALLBACK;
+    }
+
+    return RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE;
 }
 
-static bool river_dialog_runtime_output_speaking_effective_locked(void)
+static bool river_dialog_runtime_compute_playback_recovering_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
+    return projection != NULL &&
+           (projection->rebuffer_pending ||
+            projection->backend_state_kind ==
+                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
+            projection->backend_state_kind ==
+                RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
+            projection->local_shadow_recovering);
+}
 
-    if (snapshot->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING) {
+static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
+{
+    river_dialog_runtime_playback_projection_t projection;
+
+    river_dialog_runtime_capture_playback_projection_locked(&projection);
+    if (!projection.cloud_runtime_available) {
         return false;
     }
-    if (river_dialog_runtime_playback_terminal_closed_locked()) {
+
+    return projection.rebuffer_pending ||
+           projection.backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
+           projection.backend_state_kind ==
+               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
+           projection.cloud_playback_active;
+}
+
+static bool river_dialog_runtime_compute_playback_active_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    if (projection == NULL || projection->terminal_closed) {
         return false;
     }
-    if (river_dialog_runtime_playback_waiting_segment_locked() &&
-        !snapshot->playback_cloud_active &&
-        !snapshot->playback_recovering) {
+
+    if (projection->cloud_playback_active || projection->playback_recovering ||
+        river_dialog_runtime_playback_segment_gap_hold_from_projection(projection)) {
+        return true;
+    }
+
+    if (!projection->local_shadow_active && !projection->cloud_playback_active &&
+        !projection->playback_recovering && projection->terminal_waiting) {
         return false;
     }
-    if (snapshot->playback_terminal_waiting &&
-        river_dialog_runtime_terminal_wait_suppresses_speaking_locked() &&
-        !snapshot->playback_active &&
-        !snapshot->playback_recovering) {
+
+    return projection->local_shadow_active;
+}
+
+static bool river_dialog_runtime_playback_turn_retains_output_turn_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection)
+{
+    if (projection == NULL || !projection->turn_active) {
         return false;
     }
-    if (!snapshot->playback_active &&
-        !snapshot->playback_recovering &&
-        !river_dialog_runtime_playback_turn_retains_output_turn_locked()) {
+    if (!projection->lane_engaged) {
+        return projection->output_lane == RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
+               !(projection->terminal_waiting &&
+                 river_dialog_runtime_terminal_wait_suppresses_speaking_from_projection(
+                     projection));
+    }
+    if (!projection->phase_known) {
+        return !projection->cloud_runtime_available;
+    }
+
+    return projection->phase_kind == RIVER_CLOUD_PLAYBACK_PHASE_REBUFFERING;
+}
+
+static bool river_dialog_runtime_output_speaking_effective_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection,
+    bool playback_active)
+{
+    if (projection == NULL ||
+        projection->output_lane != RIVER_DIALOG_OUTPUT_LANE_SPEAKING ||
+        projection->terminal_closed) {
+        return false;
+    }
+    if (river_dialog_runtime_playback_waiting_segment_from_projection(projection) &&
+        !projection->cloud_playback_active && !projection->playback_recovering) {
+        return false;
+    }
+    if (projection->terminal_waiting &&
+        river_dialog_runtime_terminal_wait_suppresses_speaking_from_projection(
+            projection) &&
+        !playback_active && !projection->playback_recovering) {
+        return false;
+    }
+    if (!playback_active && !projection->playback_recovering &&
+        !river_dialog_runtime_playback_turn_retains_output_turn_from_projection(
+            projection)) {
         return false;
     }
 
     return true;
 }
 
-static bool river_dialog_runtime_output_turn_engaged_locked(void)
+static bool river_dialog_runtime_output_turn_engaged_from_projection(
+    const river_dialog_runtime_playback_projection_t *projection,
+    bool playback_active)
 {
-    const river_dialog_runtime_snapshot_t *snapshot = &g_river_dialog_runtime.snapshot;
-
-    if (river_dialog_runtime_playback_terminal_closed_locked()) {
+    if (projection == NULL || projection->terminal_closed) {
         return false;
     }
 
-    return snapshot->playback_active ||
-           river_dialog_runtime_playback_turn_retains_output_turn_locked() ||
-           river_dialog_runtime_output_speaking_effective_locked();
+    return playback_active ||
+           river_dialog_runtime_playback_turn_retains_output_turn_from_projection(
+               projection) ||
+           river_dialog_runtime_output_speaking_effective_from_projection(
+               projection,
+               playback_active);
+}
+
+static void river_dialog_runtime_refresh_playback_locked(void)
+{
+    river_dialog_runtime_playback_projection_t projection;
+
+    river_dialog_runtime_capture_playback_projection_locked(&projection);
+    projection.playback_recovering =
+        river_dialog_runtime_compute_playback_recovering_from_projection(&projection);
+    g_river_dialog_runtime.snapshot.playback_recovering =
+        projection.playback_recovering;
+    g_river_dialog_runtime.snapshot.playback_active =
+        river_dialog_runtime_compute_playback_active_from_projection(&projection);
+    g_river_dialog_runtime.snapshot.playback_owner_kind =
+        river_dialog_runtime_compute_playback_owner_kind_from_projection(
+            &projection);
+}
+
+static bool river_dialog_runtime_output_turn_quiesced_locked(void)
+{
+    river_dialog_runtime_playback_projection_t projection;
+
+    river_dialog_runtime_capture_playback_projection_locked(&projection);
+    return !river_dialog_runtime_output_turn_engaged_from_projection(
+               &projection,
+               g_river_dialog_runtime.snapshot.playback_active) &&
+           !projection.turn_active &&
+           !projection.playback_recovering &&
+           !projection.tts_stop_pending &&
+           projection.backend_state_kind !=
+               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING &&
+           !projection.terminal_waiting;
+}
+
+static bool river_dialog_runtime_output_turn_engaged_locked(void)
+{
+    river_dialog_runtime_playback_projection_t projection;
+
+    river_dialog_runtime_capture_playback_projection_locked(&projection);
+    return river_dialog_runtime_output_turn_engaged_from_projection(
+        &projection,
+        g_river_dialog_runtime.snapshot.playback_active);
 }
 
 static bool river_dialog_runtime_cloud_round_active_locked(void)

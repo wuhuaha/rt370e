@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.401 让 playback control-path 复用 truth-view`
+  - `5.402 让 dialog runtime playback 投影收口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - dialog runtime 现在为 playback 派生引入内部
+      `playback_projection`
+    - `capture_playback_projection_locked(...)` 会一次性锁存 dialog runtime 当前计算
+      playback truth 所需的投影输入，包括：
+      - cloud playback facts
+      - backend / phase / hold / terminal wait
+      - local playback shadow fallback
+      - output lane
+    - 以下派生现在都开始复用同一份 projection，而不再散读
+      `g_river_dialog_runtime.snapshot`：
+      - `playback_owner_kind`
+      - `playback_recovering`
+      - `playback_active`
+      - `output_turn_engaged`
+      - `output_turn_quiesced`
+    - 这一步开始把 dialog runtime 的 playback truth 从“多字段散读派生”
+      收口成“single projection -> playback/output truth”
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 继续把 control-path 收口到显式
       `playback_truth_view`
@@ -340,11 +358,10 @@ or top-of-tree verification target changes.
   - current next runtime slice:
     - 继续收口 worker / dump / snapshot 里的组合 truth 读边界
     - 下一刀优先判断：
-      - `playback_physical_active()` / `playback_turn_active()` /
-        `playback_terminal_open()` 这类 wrapper 是否也要进一步纳入更完整的
-        dialog/playback truth-source
-      - dialog runtime 主真相源是否要开始直接消费 playback truth-view，而不是
-        继续只拿 snapshot 投影
+      - dialog runtime 主真相源是否要继续收口输入侧 / window / interrupt truth，
+        引入与 playback projection 对称的 input/session projection
+      - cloud runtime snapshot 对 dialog runtime 的 playback 投影字段是否还需继续
+        消减和分层，避免 snapshot 同时承担 transport export 与 dialog truth 中转
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
