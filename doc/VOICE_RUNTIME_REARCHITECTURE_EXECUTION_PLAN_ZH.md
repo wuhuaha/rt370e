@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.396`
+  - XiaoZhi playback runtime 现在为 backend 派生引入显式
+    `playback_backend_source`
+  - `capture_playback_backend_source(...)` 会一次性锁存：
+    - `service_view.state`
+    - `service_view.active`
+    - `service_view.owned_stream`
+    - `phase`
+  - `compute_playback_backend_state_from_source(...)` 现在只消费这份 source，
+    不再在 backend 派生过程中分别读取 service stats 与 phase
+  - 关键消费点也开始复用同一份 source：
+    - `playback_backend_state()`
+    - `playback_output_active()`
+    - `playback_hold_kind()`
+    - `fill_playback_runtime_snapshot()`
+  - `tts_start` / `playback_started` fallback 关键日志也改成复用同一份
+    phase/backend source，减少 phase/backend 双读导致的诊断读偏斜
+  - 这一步不改变 backend / output-active / hold 判定结论，只继续把
+    playback backend 推进成“显式 backend source -> backend truth”的单向派生
 - `Step 5.395`
   - XiaoZhi playback runtime 现在为 phase 派生引入显式
     `playback_phase_source`

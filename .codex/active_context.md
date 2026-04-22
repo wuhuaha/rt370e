@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.395 将 playback phase 派生收口到显式 phase-source`
+  - `5.396 将 playback backend 派生收口到显式 backend-source`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 现在为 backend 派生引入显式
+      `playback_backend_source`
+    - `capture_playback_backend_source(...)` 会一次性锁存：
+      - `service_view.state`
+      - `service_view.active`
+      - `service_view.owned_stream`
+      - `phase`
+    - `compute_playback_backend_state_from_source(...)` 现在只消费这份 source，
+      不再在 backend 判定过程中分别读取 service stats 与 phase
+    - 关键消费点也开始复用同一份 source：
+      - `playback_output_active()`
+      - `playback_hold_kind()`
+      - `fill_playback_runtime_snapshot()`
+      - `tts_start` / `playback_started` fallback 日志
+    - 这一步继续把 playback backend 从“service state + 全局 phase 混合读取”
+      推进成“显式 backend source -> backend truth”的单向派生，并减少 phase/backend
+      双读带来的诊断读偏斜
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 现在为 phase 派生引入了显式
       `playback_phase_source`
@@ -241,13 +259,13 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 playback runtime 内剩余 `g_river_cloud.xiaozhi_playback_active`
-      直接消费点
+    - 继续收口 `waiting_next_segment` / `supply_kind` 相关 helper 的输入边界
     - 下一刀优先判断：
-      - `playback_backend_state()` 是否也应从显式 backend-source 派生，避免继续
-        在 backend truth 里反向查询 phase
-      - `playback_waiting_next_segment()` 这类 helper 是否应继续直接读全局，还是改成
-        消费统一 source/snapshot，减少 worker 与 dump 之间的读时差
+      - 是否需要为 `playback_waiting_next_segment()` / `playback_supply_kind()`
+        引入显式 supply-source，避免继续直接混读 wait-context / segment_count /
+        terminal 尾态
+      - downlink worker 与诊断日志里成对出现的 `phase + backend` 是否也应进一步改成
+        共享 truth snapshot，减少 worker loop 内的多次重读
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold

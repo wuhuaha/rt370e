@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.396
+Validate that playback backend derivation now consumes an explicit
+backend-source snapshot and that the main phase/backend consumers reuse the same
+source instead of separately re-reading globals:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '20,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '140,190p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '500,560p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1318,1360p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_backend_source|capture_playback_backend_source|compute_playback_backend_state_from_source|playback_output_active\\(|playback_hold_kind_from_source' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_backend_source_t` exists and includes the
+  service-view + phase inputs needed for backend derivation
+- `river_cloud_xiaozhi_capture_playback_backend_source(...)` locks those inputs
+  once per consumer path
+- `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)` now
+  derives backend truth only from that source snapshot
+- `playback_output_active()` / `playback_hold_kind()` /
+  `fill_playback_runtime_snapshot()` reuse the same source instead of separately
+  re-reading phase and backend truth
+
 ## Step 5.395
 Validate that playback phase derivation now consumes an explicit phase-source
 snapshot instead of reading stop/rebuffer/physical/queue state piecemeal from

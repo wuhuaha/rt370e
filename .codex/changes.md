@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.396
+- XiaoZhi playback runtime 现在为 backend 派生引入显式
+  `river_cloud_xiaozhi_playback_backend_source_t`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `river_cloud_xiaozhi_capture_playback_backend_source(...)`，一次性锁存：
+  - `service_view.state`
+  - `service_view.active`
+  - `service_view.owned_stream`
+  - `phase`
+- `river_cloud_xiaozhi_compute_playback_backend_state_from_source(...)` 现在只消费
+  这份 source，不再在 backend 派生过程中分别读取 playback service stats 与
+  phase
+- 以下关键读取点开始复用同一份 backend-source：
+  - `river_cloud_xiaozhi_playback_backend_state()`
+  - `river_cloud_xiaozhi_playback_output_active()`
+  - `river_cloud_xiaozhi_playback_hold_kind()`
+  - `river_cloud_xiaozhi_fill_playback_runtime_snapshot()`
+- `tts_start` / `playback_started` fallback 关键日志也改成复用同一份
+  phase/backend source，避免日志里 phase 与 backend 各自单独重读
+- 这一步不改变 backend / output-active / hold 的判定语义，只继续把
+  playback backend 的真相边界收口成“显式 backend source -> backend truth”的
+  单向派生，并减少 phase/backend 双读导致的观测偏斜
+
 ## Step 5.395
 - XiaoZhi playback runtime 现在为 phase 派生引入显式
   `river_cloud_xiaozhi_playback_phase_source_t`：
