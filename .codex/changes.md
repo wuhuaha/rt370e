@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.397
+- XiaoZhi playback runtime 现在为 supply 判定引入显式
+  `river_cloud_xiaozhi_playback_supply_source_t`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 `river_cloud_xiaozhi_capture_playback_supply_source(...)`，一次性锁存：
+  - `wait_context_valid`
+  - `last_segment_observed`
+  - `segment_count`
+- `river_cloud_xiaozhi_compute_playback_waiting_next_segment_from_source(...)` 与
+  `river_cloud_xiaozhi_compute_playback_supply_kind_from_source(...)` 现在只消费
+  这份 source，不再在 supply 判定里分别重读 wait-context / segment_count /
+  last-segment terminal context
+- 以下关键读取点开始复用同一份 supply-source：
+  - `river_cloud_xiaozhi_playback_waiting_next_segment()`
+  - `river_cloud_xiaozhi_playback_supply_kind()`
+  - `river_cloud_xiaozhi_capture_playback_phase_source()`
+- 这一步不改变 `CURRENT_SEGMENT / WAITING_NEXT_SEGMENT / TERMINAL_TAIL`
+  的判定语义，只继续把 playback supply truth 收口成
+  “显式 supply source -> waiting/supply truth”的单向派生，并减少 phase/supply
+  双向反推里的读偏斜
+
 ## Step 5.396
 - XiaoZhi playback runtime 现在为 backend 派生引入显式
   `river_cloud_xiaozhi_playback_backend_source_t`：

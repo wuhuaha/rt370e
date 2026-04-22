@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.397
+Validate that playback supply derivation now consumes an explicit supply-source
+snapshot and that `waiting_next_segment` / `supply_kind` / phase-source reuse
+that same source instead of separately re-reading wait-context, segment-count,
+and terminal-tail state:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '24,80p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '216,290p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '486,525p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_supply_source|capture_playback_supply_source|compute_playback_waiting_next_segment_from_source|compute_playback_supply_kind_from_source' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_playback_supply_source_t` exists and includes the supply
+  inputs needed for waiting / supply derivation
+- `river_cloud_xiaozhi_capture_playback_supply_source(...)` locks those inputs
+  once per consumer path
+- `river_cloud_xiaozhi_compute_playback_waiting_next_segment_from_source(...)`
+  and `river_cloud_xiaozhi_compute_playback_supply_kind_from_source(...)` now
+  derive supply truth only from that snapshot
+- `playback_waiting_next_segment()` / `playback_supply_kind()` /
+  `capture_playback_phase_source()` now reuse the same supply-source instead of
+  separately re-reading wait-context, segment count, and terminal-tail state
+
 ## Step 5.396
 Validate that playback backend derivation now consumes an explicit
 backend-source snapshot and that the main phase/backend consumers reuse the same

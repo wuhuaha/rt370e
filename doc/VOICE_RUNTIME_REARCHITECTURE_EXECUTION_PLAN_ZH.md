@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.397`
+  - XiaoZhi playback runtime 现在为 supply 判定引入显式
+    `playback_supply_source`
+  - `capture_playback_supply_source(...)` 会一次性锁存：
+    - `wait_context_valid`
+    - `last_segment_observed`
+    - `segment_count`
+  - `compute_playback_waiting_next_segment_from_source(...)` 与
+    `compute_playback_supply_kind_from_source(...)` 现在只消费这份 source，
+    不再在 supply 判定里分别重读 wait-context / segment_count / terminal-tail
+  - 以下路径开始复用同一份 supply-source：
+    - `playback_waiting_next_segment()`
+    - `playback_supply_kind()`
+    - `capture_playback_phase_source()`
+  - 这一步不改变 `CURRENT_SEGMENT / WAITING_NEXT_SEGMENT / TERMINAL_TAIL`
+    的判定结论，只继续把 playback supply 推进成
+    “显式 supply source -> waiting/supply truth”的单向派生
 - `Step 5.396`
   - XiaoZhi playback runtime 现在为 backend 派生引入显式
     `playback_backend_source`

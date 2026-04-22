@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.396 将 playback backend 派生收口到显式 backend-source`
+  - `5.397 将 playback supply 判定收口到显式 supply-source`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi playback runtime 现在为 supply 判定引入显式
+      `playback_supply_source`
+    - `capture_playback_supply_source(...)` 会一次性锁存：
+      - `wait_context_valid`
+      - `last_segment_observed`
+      - `segment_count`
+    - `compute_playback_waiting_next_segment_from_source(...)` 与
+      `compute_playback_supply_kind_from_source(...)` 现在都只消费这份 source
+    - 以下路径开始复用同一份 supply-source：
+      - `playback_waiting_next_segment()`
+      - `playback_supply_kind()`
+      - `capture_playback_phase_source(...)`
+    - 这一步继续把 `waiting_next_segment / current_segment / terminal_tail`
+      的供给真相边界从多点混读收口成显式 supply source，减少 worker 与 phase
+      派生之间的 supply 读偏斜
   - newest landed runtime-ownership slice:
     - XiaoZhi playback runtime 现在为 backend 派生引入显式
       `playback_backend_source`
@@ -259,13 +275,13 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续收口 `waiting_next_segment` / `supply_kind` 相关 helper 的输入边界
+    - 继续收口 downlink worker / dump / recovery 分支中的组合读边界
     - 下一刀优先判断：
-      - 是否需要为 `playback_waiting_next_segment()` / `playback_supply_kind()`
-        引入显式 supply-source，避免继续直接混读 wait-context / segment_count /
-        terminal 尾态
-      - downlink worker 与诊断日志里成对出现的 `phase + backend` 是否也应进一步改成
-        共享 truth snapshot，减少 worker loop 内的多次重读
+      - `maybe_pause_for_segment_gap()` / `maybe_rebuffer_starved()` /
+        `request_playback_rebuffer_recovery()` 这类 recovery 分支是否应共享同一份
+        playback truth snapshot，而不是各自单独重读 phase/backend/supply
+      - `dump_playback_status()` 与 runtime snapshot 是否还需要进一步引入统一
+        playback-truth dump source，减少日志读面与 worker 判定面的语义漂移
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
