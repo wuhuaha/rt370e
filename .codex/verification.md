@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.388
+Validate that voice runtime now consumes the typed
+`dialog runtime playback_owner_kind` for its dialog-playback fallback, so the
+cloud-owned inactive-gap fallback no longer relies on implicit combinations of
+lane/recovering/turn booleans alone:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'dialog_cloud_playback_engaged|playback_owner_kind|RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD|restart_pending_requires_block' \
+  components/river_voice/river_voice_runtime_policy.c
+sed -n '60,92p' components/river_voice/river_voice_runtime_policy.c
+sed -n '312,320p' components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- voice runtime now has an explicit cloud-owner helper for dialog snapshot
+  playback fallback
+- generic dialog-playback fallback and dedicated `restart_pending` hard block
+  both require `playback_owner_kind == CLOUD`
+- raw playback-service state remains the primary source for actual local
+  playback activity, while dialog snapshot fallback is now explicitly scoped
+  to cloud-owned playback truth
+
 ## Step 5.387
 Validate that `dialog runtime` now exports typed playback ownership truth in
 the public snapshot, so consumers can distinguish cloud/runtime-owned

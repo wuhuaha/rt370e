@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.388
+- voice runtime 现在开始显式消费 `dialog runtime` 导出的
+  `playback_owner_kind`：
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- `dialog snapshot` 兜底保持 playback-engaged 的 helper 现在明确只接受：
+  - `playback_owner_kind == CLOUD`
+  - 且仍有：
+    - `playback_lane_engaged`
+    - 或 `playback_recovering`
+    - 或 `playback_turn_active`
+- dedicated `restart_pending` hard block 与 generic dialog-playback fallback
+  现在都复用这条显式 cloud-owner 判定
+- 本地 `river_playback_service_state()` 仍保留为“物理播放是否正在发生”的底层真相；
+  这一步只把 dialog snapshot fallback 从隐式布尔组合推进成 typed ownership
+  消费
+
 ## Step 5.387
 - `dialog runtime` 现在正式把 playback ownership truth 外显成 snapshot 级别的
   `playback_owner_kind`：

@@ -66,10 +66,11 @@ static bool river_voice_runtime_dialog_snapshot_capture(
     return snapshot != NULL && river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
 }
 
-static bool river_voice_runtime_dialog_playback_lane_engaged(
+static bool river_voice_runtime_dialog_cloud_playback_engaged(
     const river_dialog_runtime_snapshot_t *snapshot)
 {
     return snapshot != NULL &&
+           snapshot->playback_owner_kind == RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD &&
            (snapshot->playback_lane_engaged || snapshot->playback_recovering ||
             snapshot->playback_turn_active);
 }
@@ -81,7 +82,7 @@ static bool river_voice_runtime_restart_pending_requires_block(
         return true;
     }
 
-    if (!river_voice_runtime_dialog_playback_lane_engaged(snapshot)) {
+    if (!river_voice_runtime_dialog_cloud_playback_engaged(snapshot)) {
         return false;
     }
 
@@ -314,7 +315,7 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
 
     playback_active = river_playback_service_state_active(eval->playback_state);
     if (!playback_active &&
-        river_voice_runtime_dialog_playback_lane_engaged(dialog_snapshot_ptr)) {
+        river_voice_runtime_dialog_cloud_playback_engaged(dialog_snapshot_ptr)) {
         playback_active = true;
     }
 

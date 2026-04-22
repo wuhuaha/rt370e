@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.388`
+  - voice runtime 现在开始显式消费 `dialog runtime` 导出的
+    `playback_owner_kind`
+  - dialog snapshot 兜底保持 playback engaged 的 helper 现在明确只接受：
+    - `playback_owner_kind == CLOUD`
+    - 且仍有：
+      - `playback_lane_engaged`
+      - 或 `playback_recovering`
+      - 或 `playback_turn_active`
+  - dedicated `restart_pending` hard block 与 generic dialog-playback
+    fallback 现在都复用这条显式 cloud-owner 判定
+  - 本地 playback-service state 继续保留为“物理播放是否存在”的底层真相；
+    这一步只把 dialog snapshot fallback 从隐式布尔组合推进成 typed
+    ownership 消费
 - `Step 5.387`
   - `dialog runtime` 现在正式把 playback ownership truth 外显成 snapshot
     级别的 `playback_owner_kind`

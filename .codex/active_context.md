@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.387 外显 dialog runtime 的 playback_owner_kind`
+  - `5.388 让 voice runtime 显式消费 playback_owner_kind`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - voice runtime 现在开始显式消费 `dialog runtime` 导出的
+      `playback_owner_kind`
+    - dialog snapshot 兜底保持 playback-engaged 的 helper 现在明确只接受：
+      - `playback_owner_kind == CLOUD`
+      - 且仍有：
+        - `playback_lane_engaged`
+        - 或 `playback_recovering`
+        - 或 `playback_turn_active`
+    - dedicated `restart_pending` hard block 与 generic dialog-playback
+      fallback 现在都复用这条显式 cloud-owner 判定
+    - 本地 playback-service state 仍保留为“物理播放是否真的存在”的底层真相；
+      这一步只把 dialog snapshot fallback 从隐式布尔组合推进成 typed owner
+      truth 消费
   - newest landed runtime-ownership slice:
     - `dialog runtime` 现在已把 playback ownership truth 正式外显成
       snapshot 级别的 `playback_owner_kind`
@@ -131,9 +145,12 @@ or top-of-tree verification target changes.
       优先看哪些消费者可以直接改为消费 `dialog runtime` 新导出的：
       - `playback_owner_kind`
       - `error_kind`
-    - 重点继续压缩：
-      - 对 local playback shadow 组合布尔的反推
-      - 对 raw playback-service state 的直接行为判断
+    - 重点继续区分：
+      - 哪些判断本质上是在问“dialog/runtime 语义归属”
+      - 哪些判断本质上仍必须看“物理播放是否真的存在”
+    - 下一刀优先检查：
+      - AEC / preproc 诊断面里残留的 dialog-style 布尔反推
+      - 还能否继续把 semantic ownership 从 raw service state 中剥离
   - newest landed runtime-ownership slice:
     - downlink/playback runtime 现在显式拆分：
       - cold start threshold
