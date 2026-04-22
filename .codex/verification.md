@@ -1,5 +1,33 @@
 # Verification
 
+## Step 5.412
+Validate that XiaoZhi downlink now pre-holds segment gaps at a low-water
+threshold instead of waiting for the queue to drain to zero:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1860,1925p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3280,3315p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'segment_gap_hold_view|maybe_pause_for_segment_gap|RIVER_CLOUD_XIAOZHI_SEGMENT_GAP_HOLD_FRAMES|WAITING_NEXT_SEGMENT|queued_frames <= hold_frames' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_segment_gap_hold_view_t` exists
+- `river_cloud_xiaozhi_maybe_pause_for_segment_gap()` now uses a low-water
+  hold view and can trigger before `queued_frames` reaches zero
+- downlink worker now checks segment-gap hold before the hard zero-queue path,
+  reducing the chance that `underrun` / `write_failed` becomes the first
+  observed recovery event
+
 ## Step 5.411
 Validate that dialog runtime residual control/derived state now lives in
 internal facts carriers and the exported snapshot is only a mirror for those

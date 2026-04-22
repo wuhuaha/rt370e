@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.412`
+  - XiaoZhi downlink / playback 继续重建 segment-gap 恢复链：
+    - `river_cloud_xiaozhi_segment_gap_hold_view_t`
+  - `river_cloud_xiaozhi_maybe_pause_for_segment_gap()` 现在不再等到
+    `queued_frames == 0` 才触发，而是先捕获 `truth_view + queued_frames`，
+    当 supply 已进入 `WAITING_NEXT_SEGMENT` 且 queued 只剩 1 帧时，提前执行
+    segment-gap hold
+  - worker 主循环现在在 zero-queue 兜底前先处理低水位 hold，避免硬件先
+    underrun 再进入 `write_failed / rebuffer`
+  - 这一步把 segment-gap 恢复从“硬件先 underrun、再 write_failed/rebuffer”
+    前移到“接近队尾时主动挂起”，减少一个放大抖动的卡顿入口，为后续继续重建
+    downlink/playback 恢复路径提供更稳定的恢复边界
 - `Step 5.411`
   - dialog runtime 继续把 residual control / derived state 从 exported snapshot
     中剥离：

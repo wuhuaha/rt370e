@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.412
+- XiaoZhi downlink / playback 继续重建 segment-gap 恢复链：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增内部低水位 hold 视图：
+  - `river_cloud_xiaozhi_segment_gap_hold_view_t`
+- `waiting_next_segment` 现在不再等到 `queued_frames == 0` 才触发 hold，而是：
+  - 先捕获 `truth_view + queued_frames`
+  - 当 supply 已进入 `WAITING_NEXT_SEGMENT` 且 queued 只剩 1 帧时，提前执行 segment-gap hold
+- `river_cloud_xiaozhi_maybe_pause_for_segment_gap()` 现在在 worker 主循环里：
+  - `rebuffer_starved` 之前仍先判重缓冲
+  - 再依据低水位 hold view 预先挂起 playback
+  - `queued == 0` 分支退化为兜底检查
+- 这一步把 segment-gap 恢复从“硬件先 underrun、再 write_failed/rebuffer”前移到
+  “接近队尾时主动挂起”，减少了一个会放大抖动的卡顿入口，为后续继续重建
+  downlink recovery / resume 逻辑打基础
+
 ## Step 5.411
 - dialog runtime 继续把 residual control / derived state 从 exported snapshot 中剥离：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
