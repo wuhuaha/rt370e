@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.413 让 playback recover 保留 reference 服务`
+  - `5.414 让纯 write_failed 先走 service recover 再进入 rebuffer`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink / playback 继续拆分 `write_failed` 的 recover 与 rebuffer 语义
+    - 纯 `WRITE_FAILED` 且 recovery=`service_recover` 的路径现在不再立刻：
+      - `note_playback_rebuffer(...)`
+      - 进入 `rebuffer_pending`
+      - 累加 `rebuffer_streak`
+    - worker 现在先尝试 inline `river_playback_service_recover_stream_ex(...)`；
+      只有 recover 失败并回退到 `stop_rebuffer` 时，才正式登记 rebuffer
+    - 新增诊断日志：
+      - `xiaozhi playback service recover requested`
+      - `xiaozhi playback rebuffer requested after recover fallback`
+    - 这一步继续把 downlink write-fail recovery 从“瞬时写失败立即升级成 rebuffer”
+      收紧到“先尝试 service recover，只有 recover 失败才进入 rebuffer”，降低
+      `rebuffer_pending/streak/start_gate` 被误污染的概率
   - newest landed runtime-ownership slice:
     - playback service 继续拆分 `flush` / `recover` 的破坏边界
     - 新增：

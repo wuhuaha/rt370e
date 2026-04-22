@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.414
+- XiaoZhi downlink / playback 继续拆分 `write_failed` 的 recover 与 rebuffer 语义：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `write_failed` 分支现在会先区分：
+  - 纯 `RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_WRITE_FAILED`
+  - 被重分类成 `UPSTREAM_STARVED`
+- 当 cause 仍是 `WRITE_FAILED` 且 recovery 路径是 `service_recover` 时，worker
+  现在不再立刻：
+  - `note_playback_rebuffer(...)`
+  - 进入 `rebuffer_pending`
+  - 累加 `rebuffer_streak`
+  - 污染后续 `start_gate`
+- 这类纯写失败现在先走 inline `river_playback_service_recover_stream_ex(...)`；
+  只有 recover 失败并回退到 `stop_rebuffer` 时，才正式登记
+  `playback_rebuffer_pending`
+- 新增更细的诊断日志：
+  - `xiaozhi playback service recover requested`
+  - `xiaozhi playback rebuffer requested after recover fallback`
+- 这一步把 downlink write-fail recovery 从“瞬时写失败立即升级成 rebuffer 语义”
+  收紧到“先尝试轻量 service recover，只有 recover 失败才进入 rebuffer”，继续降低
+  rebuffer 风暴和 start-gate 被误抬高的风险
+
 ## Step 5.413
 - playback service 继续拆分 `flush` / `recover` 的破坏边界：
   - [components/river_voice/river_playback_service.c](/root/ameba-river/components/river_voice/river_playback_service.c)

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.414
+Validate that pure `write_failed` recovery no longer enters rebuffer semantics
+before an inline `service_recover` attempt:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '3390,3535p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'inline_service_recover|service recover requested|rebuffer requested after recover fallback|note_playback_rebuffer|playback_write_failed|UPSTREAM_STARVED' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- the `write_failed` branch distinguishes pure `WRITE_FAILED` from
+  `UPSTREAM_STARVED`
+- when cause remains `WRITE_FAILED` and recovery path is `service_recover`,
+  the code logs `service recover requested` before any
+  `note_playback_rebuffer(...)`
+- `note_playback_rebuffer(...)` is deferred until recover fallback for this
+  pure write-failed path, so `rebuffer_pending` / `rebuffer_streak` are no
+  longer polluted by every transient write error
+- the original rebuffer path remains intact for upstream-starved recovery and
+  for write-failed recover fallback
+
 ## Step 5.413
 Validate that playback `recover` no longer shares the destructive `flush`
 path and preserves reference service continuity on successful transient restart:
