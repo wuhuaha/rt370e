@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-21
+Last Updated: 2026-04-22
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.383`
+  - `dialog runtime` 新增 `local_playback_shadow_drives_truth_locked()`
+  - local playback event 在 cloud runtime 已可用时，仍会保留本地 playback
+    诊断 shadow，但不再继续直接：
+    - `refresh_playback`
+    - 改写 `error_recovering`
+    - 清理 `tts_interrupt_requested`
+  - 这意味着本地 playback `RUNNING/IDLE/ERROR` 事件不再在 cloud/dialog
+    真相已在场时：
+    - 把其他来源的 `error_recovering` 误清掉
+    - 或在 cloud recovery truth 尚未同步前，先把交互态误推成
+      `error_recovering`
+  - 这一步继续把 `dialog runtime` 收口到：
+    - cloud truth 优先
+    - local playback 仅在 cloud 不可用时兜底
 - `Step 5.382`
   - voice runtime 的 generic playback AEC gate 现在也消费 dialog runtime
     的 playback-lane truth，而不再只看本地 playback-service `active`

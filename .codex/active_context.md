@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.382 gate generic playback AEC truth with dialog lane`
+  - `5.383 dialog runtime 仅在 cloud 缺失时让 local playback shadow 驱动真相`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 现在新增
+      `local_playback_shadow_drives_truth_locked()`
+    - local playback event 在 cloud runtime 已可用时，仍会更新本地 playback
+      诊断 shadow，但不再继续直接：
+      - `refresh_playback`
+      - 改写 `error_recovering`
+      - 清理 `tts_interrupt_requested`
+    - 这一步把 `dialog runtime` 继续从“本地 playback 事件也能直接推交互态”
+      收口到“cloud truth 优先，local playback 只在 cloud 不可用时兜底”
   - newest landed runtime-ownership slice:
     - voice runtime 的 generic playback AEC gate 现在也消费 dialog runtime
       的 playback-lane truth
@@ -71,8 +81,9 @@ or top-of-tree verification target changes.
     - `transport_reset` / `session_start` / `segment_gap_hold` 也不再对已脱离
       硬件的 backend 再次 stop/flush
   - current next runtime slice:
-    - 继续检查 dialog runtime 内剩余 `local playback shadow` / service-active
-      fallback 是否还能继续退化成 purely-diagnostic shadow
+    - 继续检查 `dialog runtime` 内剩余 coarse `error_recovering` 归属，
+      是否需要拆成 typed error source，避免 playback-local / ASR / cloud recovery
+      继续共用同一 bool
     - 继续检查 voice/playback runtime 内剩余 raw playback-service state 读取，
       是否还能进一步统一到 dialog/runtime owned truth
   - newest landed runtime-ownership slice:

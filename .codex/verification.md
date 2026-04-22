@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.383
+Validate that local playback events in `dialog runtime` only drive
+`playback/error/interrupt` truth when cloud runtime is unavailable, and no
+longer clear or overwrite truth-level error state when cloud snapshot is
+already authoritative:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'local_playback_shadow_drives_truth|error_recovering|tts_interrupt_requested|refresh_playback' \
+  components/river_core/river_dialog_runtime.c
+sed -n '284,323p' components/river_core/river_dialog_runtime.c
+sed -n '811,840p' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `local_playback_shadow_drives_truth_locked()` exists and is reused by the
+  fallback helpers
+- `river_dialog_runtime_reduce_local_playback_event(...)` only refreshes
+  playback truth and touches `error_recovering` / `tts_interrupt_requested`
+  inside the `local playback shadow drives truth` branch
+- when cloud runtime is already available, local playback events are retained as
+  diagnostic shadow only and no longer directly override dialog-runtime truth
+
 ## Step 5.382
 Validate that the generic playback AEC gate now also uses dialog runtime
 playback-lane truth, so local playback-service inactive gaps do not

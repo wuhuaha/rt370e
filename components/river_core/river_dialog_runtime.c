@@ -287,9 +287,14 @@ static void river_dialog_runtime_apply_local_playback_state_locked(
     g_river_dialog_runtime.playback_state = state;
 }
 
+static bool river_dialog_runtime_local_playback_shadow_drives_truth_locked(void)
+{
+    return !river_dialog_runtime_cloud_runtime_available_locked();
+}
+
 static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(void)
 {
-    if (river_dialog_runtime_cloud_runtime_available_locked()) {
+    if (!river_dialog_runtime_local_playback_shadow_drives_truth_locked()) {
         return false;
     }
 
@@ -298,7 +303,7 @@ static bool river_dialog_runtime_local_playback_shadow_active_fallback_locked(vo
 
 static bool river_dialog_runtime_local_playback_shadow_recovering_fallback_locked(void)
 {
-    if (river_dialog_runtime_cloud_runtime_available_locked()) {
+    if (!river_dialog_runtime_local_playback_shadow_drives_truth_locked()) {
         return false;
     }
 
@@ -814,22 +819,25 @@ static void river_dialog_runtime_reduce_local_playback_event(
         river_dialog_runtime_apply_cloud_snapshot_locked(&cloud_snapshot);
     }
     river_dialog_runtime_apply_local_playback_state_locked(state);
-    river_dialog_runtime_refresh_playback_locked();
-    if (state == RIVER_PLAYBACK_ERROR) {
-        managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
-        if (managed_recovery) {
-            g_river_dialog_runtime.snapshot.error_recovering = false;
-            effective_reason = "playback_recovering";
+
+    if (river_dialog_runtime_local_playback_shadow_drives_truth_locked()) {
+        river_dialog_runtime_refresh_playback_locked();
+        if (state == RIVER_PLAYBACK_ERROR) {
+            managed_recovery = river_dialog_runtime_playback_error_is_managed_recovery_locked();
+            if (managed_recovery) {
+                g_river_dialog_runtime.snapshot.error_recovering = false;
+                effective_reason = "playback_recovering";
+            } else {
+                g_river_dialog_runtime.snapshot.error_recovering = true;
+            }
         } else {
-            g_river_dialog_runtime.snapshot.error_recovering = true;
+            g_river_dialog_runtime.snapshot.error_recovering = false;
         }
-    } else {
-        g_river_dialog_runtime.snapshot.error_recovering = false;
-    }
-    if ((state == RIVER_PLAYBACK_IDLE &&
-         river_dialog_runtime_output_turn_quiesced_locked()) ||
-        (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {
-        g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
+        if ((state == RIVER_PLAYBACK_IDLE &&
+             river_dialog_runtime_output_turn_quiesced_locked()) ||
+            (state == RIVER_PLAYBACK_ERROR && !managed_recovery)) {
+            g_river_dialog_runtime.snapshot.tts_interrupt_requested = false;
+        }
     }
     next_interaction_state = river_dialog_runtime_compute_interaction_state_locked();
     if (river_dialog_runtime_cloud_runtime_available_locked() &&
