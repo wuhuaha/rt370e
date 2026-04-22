@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.416
+Validate that `segment_gap_hold` now prefers attached `recover` instead of
+destructive `flush`, preserving reference/AEC continuity during next-segment
+waits:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1738,1932p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'hold_playback_for_segment_gap|recover_stream_ex|flush_stream_ex|segment gap hold|attached_recover|detached_stop' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` now prefers
+  `river_playback_service_recover_stream_ex(...)`
+- the attached hold path no longer calls
+  `river_playback_service_flush_stream_ex(...)`
+- segment-gap hold logs now report `mode=attached_recover` for the attached
+  path, and still fall back to `detached_stop` if recover fails
+- the existing `OWNED_PAUSED -> maybe_resume_paused_playback()` resume chain
+  remains unchanged
+
 ## Step 5.415
 Validate that pure `write_failed` recovery now retries the same frame in the
 same worker iteration after a successful inline `service_recover`, instead of

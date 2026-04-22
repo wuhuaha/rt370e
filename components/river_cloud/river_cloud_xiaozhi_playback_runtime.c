@@ -1744,7 +1744,7 @@ static river_status_t river_cloud_xiaozhi_hold_playback_for_segment_gap(const ch
     river_status_t status;
     bool attached = false;
 
-    status = river_playback_service_flush_stream_ex(reason);
+    status = river_playback_service_recover_stream_ex(reason);
     if (status == RIVER_OK) {
         attached = true;
     } else {
@@ -1924,7 +1924,7 @@ static bool river_cloud_xiaozhi_maybe_pause_for_segment_gap(void)
                    hold_view.truth_view.backend_source.phase),
                river_cloud_playback_backend_state_name(
                    hold_view.truth_view.backend_state),
-               attached_hold ? "attached_flush" : "detached_stop");
+               attached_hold ? "attached_recover" : "detached_stop");
     return true;
 }
 

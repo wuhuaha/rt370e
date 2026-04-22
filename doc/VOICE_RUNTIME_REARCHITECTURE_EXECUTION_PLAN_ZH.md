@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.416`
+  - XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界
+  - `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` 的 attached 路径现在不再
+    走 destructive `river_playback_service_flush_stream_ex(...)`，而是改为优先
+    `river_playback_service_recover_stream_ex(...)`
+  - 这继续保留现有的 attached hold / `OWNED_PAUSED -> maybe_resume_paused_playback()`
+    恢复链，但不再为常态的 next-segment 等待重置 reference/AEC 历史
+  - hold 日志也同步改为：
+    - `attached_recover`
+    - `detached_stop`
+  - 这一步继续把段间等待从“借 flush 实现暂停”收紧到“轻量 recover 实现 attached
+    hold”，减少段间抖动时 reference/AEC 被不必要打断的概率
 - `Step 5.415`
   - XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复延迟
   - 当 cause 仍是 `WRITE_FAILED` 且 recovery=`service_recover` 时，worker 现在会在

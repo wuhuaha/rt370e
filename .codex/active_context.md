@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.415 让 write_failed recover 成功后同轮立即重写当前帧`
+  - `5.416 让 segment-gap hold 优先走 attached recover`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界
+    - `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` 的 attached 路径现在
+      不再走 destructive `flush_stream_ex(...)`，而是改为优先
+      `river_playback_service_recover_stream_ex(...)`
+    - 这继续保留现有：
+      - attached hold
+      - `OWNED_PAUSED -> maybe_resume_paused_playback()` 恢复链
+      但不再为常态段间等待重置 reference/AEC 历史
+    - `segment gap hold` 诊断日志现在改为显式区分：
+      - `attached_recover`
+      - `detached_stop`
+    - 这一步继续把段间等待从“借 flush 实现暂停”收紧到“轻量 recover 实现 attached
+      hold”，减少段间抖动时 reference/AEC 被不必要打断的概率
   - newest landed runtime-ownership slice:
     - XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复窗口
     - 当 cause 仍是 `WRITE_FAILED` 且 recovery=`service_recover` 时，worker 现在会在

@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.416
+- XiaoZhi downlink / playback 继续收窄 `segment_gap_hold` 的破坏边界：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_hold_playback_for_segment_gap(...)` 的 attached 路径现在不再走
+  destructive `river_playback_service_flush_stream_ex(...)`，而是改为优先
+  `river_playback_service_recover_stream_ex(...)`
+- 这意味着段间 hold 仍然保持：
+  - attached hold
+  - `OWNED_PAUSED -> maybe_resume_paused_playback()` 现有恢复链
+  但不再为常态 next-segment 等待重置 reference/AEC 历史
+- hold 诊断模式也同步改成：
+  - `attached_recover`
+  - `detached_stop`
+- 这一步继续把段间等待从“借 flush 实现暂停”收紧到“轻量 recover 实现 attached
+  hold”，减少段间抖动时 reference/AEC 被不必要打断的概率
+
 ## Step 5.415
 - XiaoZhi downlink / playback 继续收紧纯 `write_failed` 的瞬时恢复延迟：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
