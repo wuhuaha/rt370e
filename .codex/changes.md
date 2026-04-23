@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.446
+- `downlink/playback` 继续把 prepare 阶段从 `result + out param` 收口成单一 cycle plan：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 删除中间 typed result：
+  - `river_cloud_xiaozhi_downlink_cycle_result_t`
+- 新增统一 plan：
+  - `river_cloud_xiaozhi_downlink_cycle_plan_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_prepare_downlink_cycle_plan(...)`
+- `river_cloud_xiaozhi_process_downlink_task_cycle(...)` 现在只按：
+  - `cycle_plan.ready`
+  - `cycle_plan.step_result`
+  - `cycle_plan.queued_frames`
+  决定后续执行
+- 这一步把：
+  - cycle result + queued_frames_out split contract
+  收口成：
+  - single cycle plan truth
+
 ## Step 5.445
 - `downlink/playback` 继续把 ready downlink cycle 的执行结果直接归一到 worker task-step：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

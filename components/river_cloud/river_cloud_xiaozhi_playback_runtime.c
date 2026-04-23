@@ -631,12 +631,6 @@ typedef enum {
 } river_cloud_xiaozhi_downlink_prepare_result_t;
 
 typedef enum {
-    RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_IDLE = 0,
-    RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_POLL,
-    RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_READY
-} river_cloud_xiaozhi_downlink_cycle_result_t;
-
-typedef enum {
     RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_RETRY_LATER = 0,
     RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY
 } river_cloud_xiaozhi_downlink_frame_acquire_result_t;
@@ -646,6 +640,12 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE
 } river_cloud_xiaozhi_downlink_task_step_result_t;
+
+typedef struct {
+    river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    uint32_t queued_frames;
+    bool ready;
+} river_cloud_xiaozhi_downlink_cycle_plan_t;
 
 static void river_cloud_xiaozhi_capture_playback_truth_view(
     river_cloud_xiaozhi_playback_truth_view_t *view)
@@ -3799,38 +3799,43 @@ river_cloud_xiaozhi_prepare_downlink_playback(uint32_t queued_frames, uint64_t n
 
 static bool river_cloud_xiaozhi_downlink_active(void);
 
-static river_cloud_xiaozhi_downlink_cycle_result_t
-river_cloud_xiaozhi_prepare_downlink_cycle(uint32_t *queued_frames_out)
+static river_cloud_xiaozhi_downlink_cycle_plan_t
+river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
 {
+    river_cloud_xiaozhi_downlink_cycle_plan_t plan = {
+        .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
+        .queued_frames = 0U,
+        .ready = false,
+    };
     uint32_t queued_frames;
     uint64_t now_ms;
 
     if (!river_cloud_xiaozhi_downlink_active()) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_IDLE;
+        plan.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE;
+        return plan;
     }
 
     queued_frames = river_cloud_xiaozhi_playback_queued_frames();
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     river_cloud_xiaozhi_update_playback_ack_progress();
     if (river_cloud_xiaozhi_maybe_rebuffer_starved(queued_frames, now_ms)) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_POLL;
+        return plan;
     }
     if (river_cloud_xiaozhi_maybe_pause_for_segment_gap()) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_POLL;
+        return plan;
     }
     if (queued_frames == 0U) {
         river_cloud_xiaozhi_playback_check_pending_stop();
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_POLL;
+        return plan;
     }
     if (river_cloud_xiaozhi_prepare_downlink_playback(queued_frames, now_ms) !=
         RIVER_CLOUD_XIAOZHI_DOWNLINK_PREPARE_READY) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_POLL;
+        return plan;
     }
 
-    if (queued_frames_out != NULL) {
-        *queued_frames_out = queued_frames;
-    }
-    return RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_READY;
+    plan.queued_frames = queued_frames;
+    plan.ready = true;
+    return plan;
 }
 
 static river_cloud_xiaozhi_downlink_frame_acquire_result_t
@@ -3887,18 +3892,14 @@ river_cloud_xiaozhi_execute_ready_downlink_cycle(uint32_t queued_frames)
 static river_cloud_xiaozhi_downlink_task_step_result_t
 river_cloud_xiaozhi_process_downlink_task_cycle(void)
 {
-    uint32_t queued_frames = 0U;
-    river_cloud_xiaozhi_downlink_cycle_result_t cycle_result;
+    river_cloud_xiaozhi_downlink_cycle_plan_t cycle_plan;
 
-    cycle_result = river_cloud_xiaozhi_prepare_downlink_cycle(&queued_frames);
-    if (cycle_result == RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_SLEEP_IDLE) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE;
-    }
-    if (cycle_result != RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_READY) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
+    cycle_plan = river_cloud_xiaozhi_prepare_downlink_cycle_plan();
+    if (!cycle_plan.ready) {
+        return cycle_plan.step_result;
     }
 
-    return river_cloud_xiaozhi_execute_ready_downlink_cycle(queued_frames);
+    return river_cloud_xiaozhi_execute_ready_downlink_cycle(cycle_plan.queued_frames);
 }
 
 static void river_cloud_xiaozhi_finish_downlink_task_cycle(

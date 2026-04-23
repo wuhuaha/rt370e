@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.445 收口 ready downlink cycle 的 step 结果归一`
+  - `5.446 将 prepare downlink cycle 提升成单一 cycle plan`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 prepare 阶段从 `result + out param`
+      收口成单一 cycle plan
+    - 删除中间 typed result：
+      - `river_cloud_xiaozhi_downlink_cycle_result_t`
+    - 新增统一 plan：
+      - `river_cloud_xiaozhi_downlink_cycle_plan_t`
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_prepare_downlink_cycle_plan(...)`
+    - `river_cloud_xiaozhi_process_downlink_task_cycle(...)` 现在只按：
+      - `cycle_plan.ready`
+      - `cycle_plan.step_result`
+      - `cycle_plan.queued_frames`
+      决定后续执行
+    - 这一步把：
+      - cycle result + queued_frames_out split contract
+      收口成：
+      - single cycle plan truth
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 ready downlink cycle 的执行结果直接归一到
       worker task-step
