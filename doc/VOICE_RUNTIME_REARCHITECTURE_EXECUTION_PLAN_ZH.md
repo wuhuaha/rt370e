@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-22
+Last Updated: 2026-04-23
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.433`
+  - `downlink/playback` 继续把 `playback_recovery_path` 推进成当前 response 内
+    稳定可见的最近恢复动作观测
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_set_playback_recovery_path(...)`
+  - `request_playback_rebuffer_recovery(...)` 不再只在 managed rebuffer 路径里
+    独自维护 recovery path；`write_failed` 的 inline `service_recover` 成功、
+    以及随后直接回退 `stop_rebuffer` 的分支，现在也都会写入同一条恢复路径真相
+  - `finish_playback_rebuffer()` 不再清空 `playback_recovery_path`，因此
+    `cloud runtime snapshot` / `dialog runtime snapshot` 会在当前 response
+    生命周期内保留最近一次实际恢复路径，而不是恢复一结束就丢
+  - XiaoZhi playback status dump 现在也开始打印：
+    - `recovery_path=...`
+  - 这一步继续把 `recovery_path` 从：
+    - 仅覆盖 managed rebuffer 的临时分支产物
+    推进成：
+    - inline recover / direct stop fallback / managed rebuffer 共用的最近恢复动作观测
 - `Step 5.432`
   - `downlink/playback` 继续把 actual recovery path 提升成 cloud/dialog 可见的
     typed observability

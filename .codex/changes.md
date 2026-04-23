@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.433
+- `downlink/playback` 继续把 `playback_recovery_path` 从“只在 managed rebuffer
+  分支里偶尔可见”的状态推进成当前 response 内稳定可见的最近恢复动作观测：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_set_playback_recovery_path(...)`
+- `request_playback_rebuffer_recovery(...)` 不再自己直写全局字段，改为统一经过
+  上述 helper 更新 `xiaozhi_playback_recovery_path` 并触发 state sync
+- `write_failed` 的 inline `service_recover` 成功、以及随后直接回退
+  `stop_rebuffer` 的分支，现在也都会写入同一条 recovery-path 真相链
+- `finish_playback_rebuffer()` 不再清空 `playback_recovery_path`，因此 cloud/dialog
+  snapshot 会在当前 response 生命周期内保留最近一次实际恢复路径，而不是恢复一结束就丢
+- XiaoZhi playback status dump 新增：
+  - `recovery_path=...`
+- 这一步继续把 recovery path 从：
+  - “managed rebuffer 内部临时字段”
+  推进成：
+  - “write_failed / inline recover / fallback / rebuffer 共用的最近恢复动作观测”
+
 ## Step 5.432
 - `downlink/playback` 继续把实际 recovery path 提升成跨模块可见的 typed
   observability：
