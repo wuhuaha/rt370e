@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.464
+- `dialog runtime` 继续把 commit checkpoint 的 `before/after` 判定收口到 raw
+  interaction evaluation：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增统一 checkpoint 转换 helper：
+  - `river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(...)`
+- `river_dialog_runtime_capture_commit_checkpoint_locked(...)` 不再回读：
+  - `derived_facts.playback_active`
+  - `derived_facts.playback_recovering`
+  - `derived_facts.error_recovering`
+  - `derived_facts.interaction_state`
+  而是统一从同一次 `interaction evaluation` 派生
+- `river_dialog_runtime_commit_ingress(...)` 与
+  `river_dialog_runtime_finalize_commit_locked(...)`
+  的 `before/after` checkpoint 现在都使用 shared raw checkpoint capture
+- 这一步把：
+  - commit publish gating <- derived checkpoint cache
+  收口成：
+  - raw interaction-eval checkpoint view
+
 ## Step 5.463
 - `dialog runtime` 继续把 interaction 的 `projection -> state/policy`
   评估链收口成单一 typed evaluation：

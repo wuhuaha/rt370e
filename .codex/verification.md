@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.464
+Validate that dialog runtime now captures commit checkpoints from raw interaction
+evaluation instead of reading cached derived facts:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1188,1260p' components/river_core/river_dialog_runtime.c
+sed -n '1458,1488p' components/river_core/river_dialog_runtime.c
+rg -n 'capture_commit_checkpoint_from_interaction_eval|capture_commit_checkpoint_locked\\(|derived_facts\\.playback_active|derived_facts\\.playback_recovering|derived_facts\\.error_recovering|derived_facts\\.interaction_state' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(...)`
+- `river_dialog_runtime_capture_commit_checkpoint_locked(...)` now derives:
+  - `cloud_runtime_available`
+  - `playback_active`
+  - `playback_recovering`
+  - `error_recovering`
+  - `interaction_state`
+  from raw interaction evaluation instead of `derived_facts`
+- commit-ingress `before` checkpoint and finalize `after` checkpoint now both
+  route through the same raw checkpoint capture
+
 ## Step 5.463
 Validate that dialog runtime now evaluates interaction state and interaction
 policies through a single typed interaction evaluation view:

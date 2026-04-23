@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.463 收口 interaction evaluation view`
+  - `5.464 收口 raw commit checkpoint view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 commit checkpoint 的 `before/after` 判定收口到
+      raw interaction evaluation
+    - 新增统一 checkpoint 转换 helper：
+      - `river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(...)`
+    - `river_dialog_runtime_capture_commit_checkpoint_locked(...)`
+      不再回读：
+      - `derived_facts.playback_active`
+      - `derived_facts.playback_recovering`
+      - `derived_facts.error_recovering`
+      - `derived_facts.interaction_state`
+      而是统一从同一次 interaction evaluation 派生
+    - `river_dialog_runtime_commit_ingress(...)` 与
+      `river_dialog_runtime_finalize_commit_locked(...)`
+      的 `before/after` checkpoint 现在都使用 shared raw checkpoint capture
+    - 这一步把：
+      - commit publish gating <- derived checkpoint cache
+      收口成：
+      - raw interaction-eval checkpoint view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 interaction 的 `projection -> state/policy`
       评估链收口成单一 typed evaluation

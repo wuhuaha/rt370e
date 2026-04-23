@@ -1193,24 +1193,35 @@ static river_interaction_state_t river_dialog_runtime_compute_interaction_state_
     return eval.state;
 }
 
-static void river_dialog_runtime_capture_commit_checkpoint_locked(
-    river_dialog_runtime_commit_checkpoint_t *checkpoint,
-    bool derive_interaction_state)
+static void river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(
+    const river_dialog_runtime_interaction_eval_t *eval,
+    river_dialog_runtime_commit_checkpoint_t *checkpoint)
 {
     if (checkpoint == NULL) {
         return;
     }
 
     memset(checkpoint, 0, sizeof(*checkpoint));
+    if (eval == NULL) {
+        return;
+    }
+
     checkpoint->cloud_runtime_available =
-        river_dialog_runtime_cloud_runtime_available_locked();
-    checkpoint->playback_active = g_river_dialog_runtime.derived_facts.playback_active;
-    checkpoint->playback_recovering =
-        g_river_dialog_runtime.derived_facts.playback_recovering;
-    checkpoint->error_recovering = g_river_dialog_runtime.derived_facts.error_recovering;
-    checkpoint->interaction_state =
-        derive_interaction_state ? river_dialog_runtime_compute_interaction_state_locked() :
-                                   g_river_dialog_runtime.derived_facts.interaction_state;
+        eval->projection.playback.cloud_runtime_available;
+    checkpoint->playback_active = eval->projection.playback_active;
+    checkpoint->playback_recovering = eval->projection.playback_recovering;
+    checkpoint->error_recovering = eval->projection.error_recovering;
+    checkpoint->interaction_state = eval->state;
+}
+
+static void river_dialog_runtime_capture_commit_checkpoint_locked(
+    river_dialog_runtime_commit_checkpoint_t *checkpoint)
+{
+    river_dialog_runtime_interaction_eval_t eval;
+
+    river_dialog_runtime_capture_interaction_eval_locked(&eval);
+    river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(&eval,
+                                                                        checkpoint);
 }
 
 static bool river_dialog_runtime_commit_checkpoint_changed(
@@ -1236,7 +1247,7 @@ static void river_dialog_runtime_finalize_commit_locked(
 
     if (policy == RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE &&
         before != NULL) {
-        river_dialog_runtime_capture_commit_checkpoint_locked(&after, true);
+        river_dialog_runtime_capture_commit_checkpoint_locked(&after);
         if (after.cloud_runtime_available &&
             !river_dialog_runtime_commit_checkpoint_changed(before, &after)) {
             if (reason != NULL && reason[0] != '\0') {
@@ -1459,7 +1470,7 @@ static void river_dialog_runtime_commit_ingress(
     have_local_playback_plan = ingress->has_local_playback_import;
     if (ingress->commit_policy ==
         RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE) {
-        river_dialog_runtime_capture_commit_checkpoint_locked(&commit_before, false);
+        river_dialog_runtime_capture_commit_checkpoint_locked(&commit_before);
         have_commit_before = true;
     }
     if (ingress->has_cloud_event) {
