@@ -86,11 +86,6 @@ static void river_cloud_xiaozhi_set_playback_recovery_path(
 static void river_cloud_xiaozhi_set_playback_recovery_outcome(
     river_cloud_playback_recovery_outcome_t outcome,
     const char *reason);
-static river_status_t river_cloud_xiaozhi_request_playback_rebuffer_recovery(
-    const char *reason,
-    river_cloud_playback_rebuffer_cause_t cause,
-    river_cloud_playback_supply_kind_t supply_kind,
-    const char **recover_path_out);
 static void river_cloud_xiaozhi_downlink_expand_stereo(const uint8_t *mono_frame,
                                                        size_t mono_bytes);
 static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t start_ms);
@@ -625,7 +620,7 @@ typedef struct {
     uint32_t prefetch_target_ms;
     uint32_t total_rebuffers;
     uint32_t rebuffer_streak;
-    const char *recover_path;
+    river_cloud_playback_recovery_path_t recovery_path;
 } river_cloud_xiaozhi_playback_rebuffer_observe_view_t;
 
 typedef enum {
@@ -653,11 +648,6 @@ typedef struct {
     river_status_t status;
     river_cloud_playback_recovery_path_t applied_path;
 } river_cloud_xiaozhi_rebuffer_recovery_result_t;
-
-typedef struct {
-    river_status_t status;
-    const char *recover_path;
-} river_cloud_xiaozhi_managed_rebuffer_recovery_result_t;
 
 typedef struct {
     bool inline_success;
@@ -724,7 +714,7 @@ static river_cloud_playback_phase_t river_cloud_xiaozhi_playback_observed_phase_
 
 static void river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
-    const char *recover_path,
+    river_cloud_playback_recovery_path_t recovery_path,
     river_cloud_xiaozhi_playback_rebuffer_observe_view_t *view)
 {
     if (recovery_plan == NULL || view == NULL) {
@@ -742,7 +732,7 @@ static void river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(
     view->prefetch_target_ms = g_river_cloud.xiaozhi_playback_prefetch_target_ms;
     view->total_rebuffers = g_river_cloud.xiaozhi_playback_rebuffer_count;
     view->rebuffer_streak = g_river_cloud.xiaozhi_playback_rebuffer_streak;
-    view->recover_path = recover_path != NULL ? recover_path : "stop_rebuffer";
+    view->recovery_path = recovery_path;
 }
 
 static bool river_cloud_xiaozhi_playback_supply_engages_lane(
@@ -850,11 +840,24 @@ static bool river_cloud_xiaozhi_write_failed_prefers_starved_rebuffer(
     uint32_t queued_frames,
     uint64_t now_ms,
     uint64_t *supply_gap_ms_out);
-static river_status_t river_cloud_xiaozhi_request_playback_rebuffer_recovery(
+static river_cloud_xiaozhi_rebuffer_recovery_result_t
+river_cloud_xiaozhi_request_playback_rebuffer_recovery(
     const char *reason,
     river_cloud_playback_rebuffer_cause_t cause,
-    river_cloud_playback_supply_kind_t supply_kind,
-    const char **recover_path_out);
+    river_cloud_playback_supply_kind_t supply_kind);
+
+static const char *river_cloud_xiaozhi_playback_recovery_path_label(
+    river_cloud_playback_recovery_path_t path,
+    const char *fallback)
+{
+    const char *name = river_cloud_playback_recovery_path_name(path);
+
+    if (name != NULL) {
+        return name;
+    }
+
+    return fallback != NULL ? fallback : "-";
+}
 
 uint32_t river_cloud_xiaozhi_playback_queued_frames(void)
 {
@@ -1523,17 +1526,17 @@ static void river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(
     request->force_stop_rebuffer = force_stop_rebuffer;
 }
 
-static river_cloud_xiaozhi_managed_rebuffer_recovery_result_t
+static river_cloud_xiaozhi_rebuffer_recovery_result_t
 river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(
     const char *reason,
     const river_cloud_xiaozhi_playback_recovery_plan_t *plan,
     bool force_stop_rebuffer)
 {
-    river_cloud_xiaozhi_managed_rebuffer_recovery_result_t result;
+    river_cloud_xiaozhi_rebuffer_recovery_result_t result;
 
     memset(&result, 0, sizeof(result));
     result.status = RIVER_ERR_ARG;
-    result.recover_path = "stop_rebuffer";
+    result.applied_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
     if (plan == NULL) {
         return result;
     }
@@ -1546,11 +1549,10 @@ river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(
         return result;
     }
 
-    result.status = river_cloud_xiaozhi_request_playback_rebuffer_recovery(
+    result = river_cloud_xiaozhi_request_playback_rebuffer_recovery(
         reason,
         plan->cause,
-        plan->truth_view.supply_kind,
-        &result.recover_path);
+        plan->truth_view.supply_kind);
     return result;
 }
 
@@ -1558,7 +1560,7 @@ static void river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
     const river_cloud_xiaozhi_managed_rebuffer_request_t *request,
     river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
     uint64_t now_ms,
-    const char **recover_path_io)
+    river_cloud_playback_recovery_path_t *recovery_path_io)
 {
     if (request == NULL || recovery_plan == NULL) {
         return;
@@ -1567,21 +1569,21 @@ static void river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
     river_cloud_xiaozhi_begin_managed_playback_rebuffer(recovery_plan,
                                                         now_ms,
                                                         request->keep_retry_frame);
-    if (recover_path_io != NULL && request->force_stop_rebuffer) {
-        *recover_path_io = "stop_rebuffer";
+    if (recovery_path_io != NULL && request->force_stop_rebuffer) {
+        *recovery_path_io = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
     }
 }
 
-static river_cloud_xiaozhi_managed_rebuffer_recovery_result_t
+static river_cloud_xiaozhi_rebuffer_recovery_result_t
 river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
     const river_cloud_xiaozhi_managed_rebuffer_request_t *request,
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan)
 {
-    river_cloud_xiaozhi_managed_rebuffer_recovery_result_t result;
+    river_cloud_xiaozhi_rebuffer_recovery_result_t result;
 
     memset(&result, 0, sizeof(result));
     result.status = RIVER_ERR_ARG;
-    result.recover_path = "stop_rebuffer";
+    result.applied_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
     if (request == NULL || recovery_plan == NULL) {
         return result;
     }
@@ -1597,8 +1599,9 @@ river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
                        recovery_plan->cause),
                    river_cloud_xiaozhi_playback_supply_kind_name(
                        recovery_plan->truth_view.supply_kind),
-                   result.recover_path != NULL ? result.recover_path :
-                                                 "stop_rebuffer");
+                   river_cloud_xiaozhi_playback_recovery_path_label(
+                       result.applied_path,
+                       "stop_rebuffer"));
     }
 
     return result;
@@ -1607,7 +1610,7 @@ river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
 static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
     const char *message,
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
-    const char *recover_path)
+    river_cloud_playback_recovery_path_t recovery_path)
 {
     river_cloud_xiaozhi_playback_rebuffer_observe_view_t observe;
 
@@ -1616,7 +1619,7 @@ static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
     }
 
     river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(recovery_plan,
-                                                               recover_path,
+                                                               recovery_path,
                                                                &observe);
     RIVER_LOGW("%s: cause=%s supply=%s phase=%s backend=%s queued=%lu low=%u start=%u policy=%s cautious=%s target_ms=%u total=%lu streak=%lu recovery=%s",
                message != NULL ? message : "xiaozhi playback rebuffer requested",
@@ -1632,7 +1635,9 @@ static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
                (unsigned int)observe.prefetch_target_ms,
                (unsigned long)observe.total_rebuffers,
                (unsigned long)observe.rebuffer_streak,
-               observe.recover_path);
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   observe.recovery_path,
+                   "stop_rebuffer"));
 }
 
 static river_cloud_xiaozhi_inline_recover_result_t
@@ -1641,7 +1646,7 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
     size_t mono_bytes,
     size_t stereo_bytes,
-    const char *recover_path)
+    river_cloud_playback_recovery_path_t recovery_path)
 {
     river_cloud_xiaozhi_playback_rebuffer_observe_view_t observe;
 
@@ -1650,7 +1655,7 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
     }
 
     river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(recovery_plan,
-                                                               recover_path,
+                                                               recovery_path,
                                                                &observe);
     RIVER_LOGW("xiaozhi playback service recover requested: cause=%s supply=%s phase=%s backend=%s queued=%lu low=%u start=%u policy=%s cautious=%s target_ms=%u total=%lu streak=%lu recovery=%s",
                river_cloud_playback_rebuffer_cause_name(observe.cause),
@@ -1665,7 +1670,9 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
                (unsigned int)observe.prefetch_target_ms,
                (unsigned long)observe.total_rebuffers,
                (unsigned long)observe.rebuffer_streak,
-               observe.recover_path);
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   observe.recovery_path,
+                   "stop_rebuffer"));
     if (river_playback_service_recover_stream_ex(recover_reason) != RIVER_OK) {
         return RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SERVICE_FAILED;
     }
@@ -1692,7 +1699,9 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
                river_cloud_playback_backend_state_name(observe.backend_state),
                (unsigned long)observe.queued_frames,
                (unsigned int)observe.low_water_frames,
-               observe.recover_path);
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   observe.recovery_path,
+                   "stop_rebuffer"));
     return RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SUCCEEDED;
 }
 
@@ -1752,10 +1761,10 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
 {
     river_cloud_xiaozhi_playback_recovery_plan_t recovery_plan;
     river_cloud_xiaozhi_inline_recover_result_t inline_result;
-    river_cloud_xiaozhi_managed_rebuffer_recovery_result_t managed_result;
     river_cloud_xiaozhi_write_failed_followup_t followup;
     const char *recover_reason = "xiaozhi_playback_write_failed";
-    const char *recover_path = "stop_rebuffer";
+    river_cloud_playback_recovery_path_t recovery_path =
+        RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
     uint64_t now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
 
     river_cloud_xiaozhi_capture_playback_recovery_plan(
@@ -1767,8 +1776,7 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
         RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_UPSTREAM_STARVED) {
         recover_reason = "xiaozhi_playback_starved_write";
     }
-    recover_path = river_cloud_playback_recovery_path_name(
-        recovery_plan.recovery_path);
+    recovery_path = recovery_plan.recovery_path;
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
     RIVER_LOGW("xiaozhi playback write failed: cause=%s supply=%s phase=%s backend=%s mono=%luB stereo=%luB queued=%lu low=%u supply_gap_ms=%lu recovery=%s",
                river_cloud_playback_rebuffer_cause_name(
@@ -1784,14 +1792,16 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
                (unsigned long)queued_frames,
                (unsigned int)recovery_plan.low_water_frames,
                (unsigned long)recovery_plan.supply_gap_ms,
-               recover_path);
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   recovery_path,
+                   "stop_rebuffer"));
 
     inline_result = river_cloud_xiaozhi_try_write_failed_inline_recover(
         recover_reason,
         &recovery_plan,
         mono_bytes,
         stereo_bytes,
-        recover_path);
+        recovery_path);
     river_cloud_xiaozhi_capture_write_failed_followup(inline_result,
                                                       recover_reason,
                                                       &followup);
@@ -1804,16 +1814,14 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
             &followup.rebuffer_request,
             &recovery_plan,
             now_ms,
-            &recover_path);
+            &recovery_path);
         river_cloud_xiaozhi_log_write_failed_rebuffer_request(
             followup.request_log,
             &recovery_plan,
-            recover_path);
-        managed_result = river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
+            recovery_path);
+        (void)river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
             &followup.rebuffer_request,
             &recovery_plan);
-        recover_path = managed_result.recover_path != NULL ? managed_result.recover_path :
-                                                              "stop_rebuffer";
     }
     return false;
 }
@@ -2732,12 +2740,12 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
 {
     river_cloud_xiaozhi_playback_recovery_plan_t recovery_plan;
     river_cloud_xiaozhi_playback_rebuffer_observe_view_t observe;
-    river_cloud_xiaozhi_managed_rebuffer_recovery_result_t managed_result;
     river_cloud_xiaozhi_managed_rebuffer_request_t rebuffer_request;
     uint64_t supply_gap_ms = 0U;
     uint64_t wait_ms;
     uint32_t trigger_wait_ms;
-    const char *recover_path = "stop_rebuffer";
+    river_cloud_playback_recovery_path_t recovery_path =
+        RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
 
     river_cloud_xiaozhi_capture_playback_truth_view(&recovery_plan.truth_view);
     if (!recovery_plan.truth_view.output_active ||
@@ -2796,15 +2804,14 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
         false,
         false,
         &rebuffer_request);
-    recover_path = river_cloud_playback_recovery_path_name(
-        recovery_plan.recovery_path);
+    recovery_path = recovery_plan.recovery_path;
     river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
         &rebuffer_request,
         &recovery_plan,
         now_ms,
-        &recover_path);
+        &recovery_path);
     river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(&recovery_plan,
-                                                               recover_path,
+                                                               recovery_path,
                                                                &observe);
 
     RIVER_LOGW("xiaozhi playback upstream gap rebuffer: cause=%s wait_ms=%lu supply_gap_ms=%lu trigger_ms=%u queued=%lu low=%u start=%u policy=%s cautious=%s target_ms=%u total=%lu streak=%lu recovery=%s",
@@ -2820,12 +2827,12 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
                (unsigned int)observe.prefetch_target_ms,
                (unsigned long)observe.total_rebuffers,
                (unsigned long)observe.rebuffer_streak,
-               observe.recover_path);
-    managed_result = river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   observe.recovery_path,
+                   "stop_rebuffer"));
+    (void)river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
         &rebuffer_request,
         &recovery_plan);
-    recover_path = managed_result.recover_path != NULL ? managed_result.recover_path :
-                                                          "stop_rebuffer";
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
     return true;
 }
@@ -2932,16 +2939,12 @@ static void river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(
     }
 
     RIVER_LOGW("xiaozhi playback recovery fallback: from=%s to=%s cause=%s supply=%s status=%d",
-               river_cloud_playback_recovery_path_name(
-                   attempt->requested_path) != NULL ?
-                   river_cloud_playback_recovery_path_name(
-                       attempt->requested_path) :
-                   "unknown",
-               river_cloud_playback_recovery_path_name(
-                   attempt->fallback_path) != NULL ?
-                   river_cloud_playback_recovery_path_name(
-                       attempt->fallback_path) :
-                   "unknown",
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   attempt->requested_path,
+                   "unknown"),
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   attempt->fallback_path,
+                   "unknown"),
                river_cloud_playback_rebuffer_cause_name(attempt->cause),
                river_cloud_xiaozhi_playback_supply_kind_name(
                    attempt->supply_kind),
@@ -2952,16 +2955,18 @@ static void river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(
         attempt->reason);
 }
 
-static river_status_t river_cloud_xiaozhi_request_playback_rebuffer_recovery(
+static river_cloud_xiaozhi_rebuffer_recovery_result_t
+river_cloud_xiaozhi_request_playback_rebuffer_recovery(
     const char *reason,
     river_cloud_playback_rebuffer_cause_t cause,
-    river_cloud_playback_supply_kind_t supply_kind,
-    const char **recover_path_out)
+    river_cloud_playback_supply_kind_t supply_kind)
 {
     river_cloud_xiaozhi_rebuffer_recovery_attempt_t attempt;
     river_cloud_xiaozhi_rebuffer_recovery_result_t result;
-    const char *recover_path;
 
+    memset(&result, 0, sizeof(result));
+    result.status = RIVER_ERR_ARG;
+    result.applied_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER;
     river_cloud_xiaozhi_capture_rebuffer_recovery_attempt(reason,
                                                           cause,
                                                           supply_kind,
@@ -2969,13 +2974,7 @@ static river_status_t river_cloud_xiaozhi_request_playback_rebuffer_recovery(
     river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(&attempt, &result);
     river_cloud_xiaozhi_set_playback_recovery_path(result.applied_path,
                                                    "playback_recovery_path");
-    recover_path = river_cloud_playback_recovery_path_name(result.applied_path);
-
-    if (recover_path_out != NULL) {
-        *recover_path_out = recover_path != NULL ? recover_path : "stop_rebuffer";
-    }
-
-    return result.status;
+    return result;
 }
 
 static bool river_cloud_xiaozhi_rebuffer_resume_ready(uint32_t queued_frames,

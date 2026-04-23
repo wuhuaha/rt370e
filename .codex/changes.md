@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.459
+- `downlink/playback runtime` 继续把 rebuffer recovery path 的本地真相源收口成 typed path：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_playback_rebuffer_observe_view_t` 不再保存
+  字符串 `recover_path`，而是保存：
+  - `river_cloud_playback_recovery_path_t recovery_path`
+- 删除仅为字符串路径服务的中间结果：
+  - `river_cloud_xiaozhi_managed_rebuffer_recovery_result_t`
+- managed rebuffer 执行链现在统一复用：
+  - `river_cloud_xiaozhi_rebuffer_recovery_result_t`
+- `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)` 不再返回：
+  - `river_status_t + recover_path_out`
+  而是直接返回 typed recovery result
+- `write_failed`、`inline recover request`、`managed rebuffer request`、`upstream gap rebuffer`
+  现在都在本地传递：
+  - `river_cloud_playback_recovery_path_t`
+  只在日志边界通过：
+  - `river_cloud_xiaozhi_playback_recovery_path_label(...)`
+  转成字符串
+- 这一步把：
+  - string-based recovery-path propagation
+  收口成：
+  - typed recovery-path truth + log-boundary translation
+
 ## Step 5.458
 - `downlink/playback runtime` 继续把 managed rebuffer 执行结果收口成 typed result：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
