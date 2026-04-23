@@ -15,11 +15,34 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.460 收口 playback diagnostics capture view`
+  - `5.461 收口 cloud playback import`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 cloud snapshot 的 playback 导入收口成单一
+      typed import
+    - 新增统一 playback import：
+      - `river_dialog_runtime_cloud_playback_import_t`
+    - `river_dialog_runtime_cloud_import_t` 不再只携带：
+      - `playback_facts`
+      而是统一携带：
+      - `playback.facts`
+      - `playback.observe`
+    - `river_dialog_runtime_capture_cloud_snapshot(...)`
+      不再额外输出独立的 `cloud_playback_observe`
+    - `river_dialog_runtime_import_cloud_snapshot_locked(...)`
+      现在一次性导入：
+      - `cloud_playback_facts`
+      - `cloud_playback_observe`
+    - `river_dialog_runtime_ingress_t` 与 commit 流程不再并行携带：
+      - `has_cloud_playback_observe`
+      - `cloud_playback_observe`
+    - 这一步把：
+      - split cloud-playback facts/observe ingress transport
+      收口成：
+      - single cloud-playback import
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 playback 对外观测导出收口成 typed
       diagnostics view

@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.461
+Validate that dialog runtime now transports cloud playback facts and observe
+state as a single typed playback import during cloud snapshot ingress:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,170p' components/river_core/river_dialog_runtime.c
+sed -n '266,360p' components/river_core/river_dialog_runtime.c
+sed -n '1238,1270p' components/river_core/river_dialog_runtime.c
+sed -n '1398,1430p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_playback_import_t|capture_cloud_snapshot\\(|has_cloud_playback_observe|cloud_playback_observe\\)|playback\\.facts|playback\\.observe' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_cloud_playback_import_t`
+- `river_dialog_runtime_cloud_import_t` now carries:
+  - `playback.facts`
+  - `playback.observe`
+- `river_dialog_runtime_capture_cloud_snapshot(...)` no longer requires a second
+  `cloud_playback_observe` out parameter
+- `river_dialog_runtime_ingress_t` and commit path no longer carry
+  `has_cloud_playback_observe`
+
 ## Step 5.460
 Validate that playback status dump and runtime snapshot now share a single typed
 diagnostics capture instead of sampling playback state independently:

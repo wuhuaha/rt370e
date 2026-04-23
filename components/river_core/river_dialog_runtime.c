@@ -40,6 +40,11 @@ typedef struct {
 } river_dialog_runtime_cloud_playback_observe_t;
 
 typedef struct {
+    river_dialog_runtime_cloud_playback_facts_t facts;
+    river_dialog_runtime_cloud_playback_observe_t observe;
+} river_dialog_runtime_cloud_playback_import_t;
+
+typedef struct {
     bool conversation_window_active;
     uint32_t conversation_window_remaining_ms;
     bool cloud_listening;
@@ -140,7 +145,7 @@ typedef struct {
     river_dialog_runtime_cloud_io_observe_t io_observe;
     river_dialog_runtime_cloud_session_facts_t session_facts;
     river_dialog_runtime_cloud_session_observe_t session_observe;
-    river_dialog_runtime_cloud_playback_facts_t playback_facts;
+    river_dialog_runtime_cloud_playback_import_t playback;
 } river_dialog_runtime_cloud_import_t;
 
 typedef struct {
@@ -153,8 +158,6 @@ typedef struct {
 typedef struct {
     bool has_cloud_import;
     river_dialog_runtime_cloud_import_t cloud_import;
-    bool has_cloud_playback_observe;
-    river_dialog_runtime_cloud_playback_observe_t cloud_playback_observe;
     bool has_cloud_event;
     river_dialog_runtime_cloud_event_t cloud_event;
     char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
@@ -170,8 +173,6 @@ static void river_dialog_runtime_export_control_facts_to_snapshot_locked(void);
 static void river_dialog_runtime_export_derived_facts_to_snapshot_locked(void);
 static void river_dialog_runtime_import_cloud_snapshot_locked(
     const river_dialog_runtime_cloud_import_t *cloud_import);
-static void river_dialog_runtime_import_cloud_playback_observe_locked(
-    const river_dialog_runtime_cloud_playback_observe_t *cloud_playback_observe);
 static void river_dialog_runtime_publish_locked(const char *reason);
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void);
 static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending);
@@ -264,17 +265,15 @@ static bool river_dialog_runtime_matches_owned_playback_stream_locked(
 }
 
 static bool river_dialog_runtime_capture_cloud_snapshot(
-    river_dialog_runtime_cloud_import_t *cloud_import,
-    river_dialog_runtime_cloud_playback_observe_t *cloud_playback_observe)
+    river_dialog_runtime_cloud_import_t *cloud_import)
 {
     river_cloud_runtime_snapshot_t snapshot;
 
-    if (cloud_import == NULL || cloud_playback_observe == NULL) {
+    if (cloud_import == NULL) {
         return false;
     }
 
     memset(cloud_import, 0, sizeof(*cloud_import));
-    memset(cloud_playback_observe, 0, sizeof(*cloud_playback_observe));
     memset(&snapshot, 0, sizeof(snapshot));
     if (river_cloud_adapter_get_runtime_snapshot(&snapshot) != RIVER_OK) {
         return false;
@@ -293,21 +292,21 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         snapshot.local_close_pending;
     cloud_import->round_facts.local_close_remaining_ms =
         snapshot.local_close_remaining_ms;
-    cloud_import->playback_facts.cloud_playback_active = snapshot.playback_active;
-    cloud_import->playback_facts.lane_engaged = snapshot.playback_lane_engaged;
-    cloud_import->playback_facts.turn_active = snapshot.playback_turn_active;
-    cloud_import->playback_facts.rebuffer_pending =
+    cloud_import->playback.facts.cloud_playback_active = snapshot.playback_active;
+    cloud_import->playback.facts.lane_engaged = snapshot.playback_lane_engaged;
+    cloud_import->playback.facts.turn_active = snapshot.playback_turn_active;
+    cloud_import->playback.facts.rebuffer_pending =
         snapshot.playback_rebuffer_pending;
-    cloud_import->playback_facts.backend_state_kind =
+    cloud_import->playback.facts.backend_state_kind =
         snapshot.playback_backend_state_kind;
-    cloud_import->playback_facts.supply_kind = snapshot.playback_supply_kind;
-    cloud_import->playback_facts.hold_kind = snapshot.playback_hold_kind;
-    cloud_import->playback_facts.terminal_closed =
+    cloud_import->playback.facts.supply_kind = snapshot.playback_supply_kind;
+    cloud_import->playback.facts.hold_kind = snapshot.playback_hold_kind;
+    cloud_import->playback.facts.terminal_closed =
         snapshot.playback_terminal_closed;
-    cloud_import->playback_facts.tts_stop_pending = snapshot.tts_stop_pending;
-    cloud_import->playback_facts.terminal_waiting =
+    cloud_import->playback.facts.tts_stop_pending = snapshot.tts_stop_pending;
+    cloud_import->playback.facts.terminal_waiting =
         snapshot.playback_terminal_waiting;
-    cloud_import->playback_facts.terminal_wait_kind =
+    cloud_import->playback.facts.terminal_wait_kind =
         snapshot.playback_terminal_wait_kind;
     cloud_import->session_facts.turn_accepted = snapshot.turn_accepted;
     cloud_import->session_facts.barge_in_enabled_known =
@@ -335,29 +334,29 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         river_dialog_runtime_parse_input_lane(snapshot.input_state);
     cloud_import->io_facts.output_lane =
         river_dialog_runtime_parse_output_lane(snapshot.output_state);
-    cloud_playback_observe->phase_known = snapshot.playback_phase_known;
-    cloud_playback_observe->phase_kind = snapshot.playback_phase_kind;
-    cloud_playback_observe->terminal_state_kind =
+    cloud_import->playback.observe.phase_known = snapshot.playback_phase_known;
+    cloud_import->playback.observe.phase_kind = snapshot.playback_phase_kind;
+    cloud_import->playback.observe.terminal_state_kind =
         snapshot.playback_terminal_state_kind;
-    cloud_playback_observe->rebuffer_cause_kind =
+    cloud_import->playback.observe.rebuffer_cause_kind =
         snapshot.playback_rebuffer_cause_kind;
-    cloud_playback_observe->recovery_path_kind =
+    cloud_import->playback.observe.recovery_path_kind =
         snapshot.playback_recovery_path_kind;
-    cloud_playback_observe->recovery_outcome_kind =
+    cloud_import->playback.observe.recovery_outcome_kind =
         snapshot.playback_recovery_outcome_kind;
-    cloud_playback_observe->start_policy_kind =
+    cloud_import->playback.observe.start_policy_kind =
         snapshot.playback_start_policy_kind;
     river_dialog_runtime_copy_text(
-        cloud_playback_observe->playback_terminal_reason,
-        sizeof(cloud_playback_observe->playback_terminal_reason),
+        cloud_import->playback.observe.playback_terminal_reason,
+        sizeof(cloud_import->playback.observe.playback_terminal_reason),
         snapshot.playback_terminal_reason);
     river_dialog_runtime_copy_text(
-        cloud_playback_observe->playback_terminal_wait_reason,
-        sizeof(cloud_playback_observe->playback_terminal_wait_reason),
+        cloud_import->playback.observe.playback_terminal_wait_reason,
+        sizeof(cloud_import->playback.observe.playback_terminal_wait_reason),
         snapshot.playback_terminal_wait_reason);
-    cloud_playback_observe->start_frames = snapshot.playback_start_frames;
-    cloud_playback_observe->prefetch_frames = snapshot.playback_prefetch_frames;
-    cloud_playback_observe->start_cautious_history =
+    cloud_import->playback.observe.start_frames = snapshot.playback_start_frames;
+    cloud_import->playback.observe.prefetch_frames = snapshot.playback_prefetch_frames;
+    cloud_import->playback.observe.start_cautious_history =
         snapshot.playback_start_cautious_history;
     return true;
 }
@@ -604,9 +603,7 @@ static void river_dialog_runtime_commit_cloud_event(
 
     memset(&ingress, 0, sizeof(ingress));
     ingress.has_cloud_import = river_dialog_runtime_capture_cloud_snapshot(
-        &ingress.cloud_import,
-        &ingress.cloud_playback_observe);
-    ingress.has_cloud_playback_observe = ingress.has_cloud_import;
+        &ingress.cloud_import);
     ingress.has_cloud_event = true;
     ingress.cloud_event = event;
     ingress.commit_policy = RIVER_DIALOG_RUNTIME_COMMIT_POLICY_PUBLISH_ALWAYS;
@@ -1256,22 +1253,12 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
     g_river_dialog_runtime.cloud_io_observe = cloud_import->io_observe;
     g_river_dialog_runtime.cloud_session_facts = cloud_import->session_facts;
     g_river_dialog_runtime.cloud_session_observe = cloud_import->session_observe;
-    g_river_dialog_runtime.cloud_playback_facts = cloud_import->playback_facts;
+    g_river_dialog_runtime.cloud_playback_facts = cloud_import->playback.facts;
+    g_river_dialog_runtime.cloud_playback_observe = cloud_import->playback.observe;
+    river_dialog_runtime_export_playback_facts_to_snapshot_locked();
     river_dialog_runtime_export_round_facts_to_snapshot_locked();
     river_dialog_runtime_export_io_facts_to_snapshot_locked();
     river_dialog_runtime_export_session_facts_to_snapshot_locked();
-    river_dialog_runtime_export_playback_facts_to_snapshot_locked();
-}
-
-static void river_dialog_runtime_import_cloud_playback_observe_locked(
-    const river_dialog_runtime_cloud_playback_observe_t *cloud_playback_observe)
-{
-    if (cloud_playback_observe == NULL) {
-        return;
-    }
-
-    g_river_dialog_runtime.cloud_playback_observe = *cloud_playback_observe;
-    river_dialog_runtime_export_playback_facts_to_snapshot_locked();
 }
 
 static bool river_dialog_runtime_prepare_local_playback_import_plan_locked(
@@ -1409,17 +1396,12 @@ static void river_dialog_runtime_commit_ingress(
     if (ingress->has_cloud_import) {
         river_dialog_runtime_import_cloud_snapshot_locked(&ingress->cloud_import);
     }
-    if (ingress->has_cloud_playback_observe) {
-        river_dialog_runtime_import_cloud_playback_observe_locked(
-            &ingress->cloud_playback_observe);
-    }
     if (have_local_playback_plan) {
         river_dialog_runtime_apply_local_playback_import_plan_locked(
             &local_playback_plan,
             &effective_reason);
     }
     if (!ingress->has_cloud_event && !ingress->has_cloud_import &&
-        !ingress->has_cloud_playback_observe &&
         !ingress->has_local_playback_import) {
         river_dialog_runtime_unlock();
         return;
@@ -1583,9 +1565,7 @@ static void river_dialog_runtime_reduce_local_playback_event(
 
     memset(&ingress, 0, sizeof(ingress));
     ingress.has_cloud_import = river_dialog_runtime_capture_cloud_snapshot(
-        &ingress.cloud_import,
-        &ingress.cloud_playback_observe);
-    ingress.has_cloud_playback_observe = ingress.has_cloud_import;
+        &ingress.cloud_import);
     ingress.has_local_playback_import = true;
     ingress.commit_policy =
         RIVER_DIALOG_RUNTIME_COMMIT_POLICY_SKIP_IF_CLOUD_DIALOG_STABLE;
@@ -1627,9 +1607,7 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
 
     memset(&ingress, 0, sizeof(ingress));
     ingress.has_cloud_import = river_dialog_runtime_capture_cloud_snapshot(
-        &ingress.cloud_import,
-        &ingress.cloud_playback_observe);
-    ingress.has_cloud_playback_observe = ingress.has_cloud_import;
+        &ingress.cloud_import);
     if (!ingress.has_cloud_import) {
         return;
     }

@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.461
+- `dialog runtime` 继续把 cloud snapshot 的 playback 导入收口成单一 typed import：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增统一 playback import：
+  - `river_dialog_runtime_cloud_playback_import_t`
+- `river_dialog_runtime_cloud_import_t` 不再只携带：
+  - `playback_facts`
+  而是统一携带：
+  - `playback.facts`
+  - `playback.observe`
+- `river_dialog_runtime_capture_cloud_snapshot(...)` 不再额外输出独立的
+  `cloud_playback_observe`
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` 现在一次性导入：
+  - `cloud_playback_facts`
+  - `cloud_playback_observe`
+- `river_dialog_runtime_ingress_t` 与 commit 流程不再并行携带：
+  - `has_cloud_playback_observe`
+  - `cloud_playback_observe`
+- 这一步把：
+  - split cloud-playback facts/observe ingress transport
+  收口成：
+  - single cloud-playback import
+
 ## Step 5.460
 - `downlink/playback runtime` 继续把 playback 对外观测导出收口成 typed diagnostics view：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
