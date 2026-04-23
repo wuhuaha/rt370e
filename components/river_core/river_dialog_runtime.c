@@ -30,6 +30,8 @@ typedef struct {
     river_cloud_playback_terminal_state_t terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t rebuffer_cause_kind;
     river_cloud_playback_start_policy_t start_policy_kind;
+    char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     uint32_t start_frames;
     uint32_t prefetch_frames;
     bool start_cautious_history;
@@ -66,8 +68,6 @@ typedef struct {
     char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-    char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-    char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
 } river_dialog_runtime_cloud_session_observe_t;
 
 typedef struct {
@@ -323,14 +323,6 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
     river_dialog_runtime_copy_text(cloud_import->session_observe.accept_reason,
                                    sizeof(cloud_import->session_observe.accept_reason),
                                    snapshot.accept_reason);
-    river_dialog_runtime_copy_text(
-        cloud_import->session_observe.playback_terminal_reason,
-        sizeof(cloud_import->session_observe.playback_terminal_reason),
-                                   snapshot.playback_terminal_reason);
-    river_dialog_runtime_copy_text(
-        cloud_import->session_observe.playback_terminal_wait_reason,
-        sizeof(cloud_import->session_observe.playback_terminal_wait_reason),
-        snapshot.playback_terminal_wait_reason);
     river_dialog_runtime_copy_text(cloud_import->io_observe.input_state_text,
                                    sizeof(cloud_import->io_observe.input_state_text),
                                    snapshot.input_state);
@@ -349,6 +341,14 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         snapshot.playback_rebuffer_cause_kind;
     cloud_playback_observe->start_policy_kind =
         snapshot.playback_start_policy_kind;
+    river_dialog_runtime_copy_text(
+        cloud_playback_observe->playback_terminal_reason,
+        sizeof(cloud_playback_observe->playback_terminal_reason),
+        snapshot.playback_terminal_reason);
+    river_dialog_runtime_copy_text(
+        cloud_playback_observe->playback_terminal_wait_reason,
+        sizeof(cloud_playback_observe->playback_terminal_wait_reason),
+        snapshot.playback_terminal_wait_reason);
     cloud_playback_observe->start_frames = snapshot.playback_start_frames;
     cloud_playback_observe->prefetch_frames = snapshot.playback_prefetch_frames;
     cloud_playback_observe->start_cautious_history =
@@ -408,14 +408,6 @@ static void river_dialog_runtime_export_session_facts_to_snapshot_locked(void)
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
                                    sizeof(g_river_dialog_runtime.snapshot.accept_reason),
                                    g_river_dialog_runtime.cloud_session_observe.accept_reason);
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.snapshot.playback_terminal_reason,
-        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
-        g_river_dialog_runtime.cloud_session_observe.playback_terminal_reason);
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
-        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
-        g_river_dialog_runtime.cloud_session_observe.playback_terminal_wait_reason);
 }
 
 static void river_dialog_runtime_export_control_facts_to_snapshot_locked(void)
@@ -487,6 +479,14 @@ static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
         g_river_dialog_runtime.cloud_playback_observe.rebuffer_cause_kind;
     g_river_dialog_runtime.snapshot.playback_start_policy_kind =
         g_river_dialog_runtime.cloud_playback_observe.start_policy_kind;
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_terminal_reason,
+        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
+        g_river_dialog_runtime.cloud_playback_observe.playback_terminal_reason);
+    river_dialog_runtime_copy_text(
+        g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
+        sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
+        g_river_dialog_runtime.cloud_playback_observe.playback_terminal_wait_reason);
     g_river_dialog_runtime.snapshot.playback_start_frames =
         g_river_dialog_runtime.cloud_playback_observe.start_frames;
     g_river_dialog_runtime.snapshot.playback_prefetch_frames =

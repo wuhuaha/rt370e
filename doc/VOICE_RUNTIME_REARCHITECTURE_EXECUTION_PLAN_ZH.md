@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.430`
+  - `dialog runtime` 继续把 playback terminal 文本观测从 `session_observe`
+    中拆出去
+  - `river_dialog_runtime_cloud_session_observe_t` 不再承载：
+    - `playback_terminal_reason`
+    - `playback_terminal_wait_reason`
+  - 上述字段现在统一并入：
+    - `river_dialog_runtime_cloud_playback_observe_t`
+  - `capture_cloud_snapshot(...)` 现在把 playback terminal/wait 文本直接写入
+    `cloud_playback_observe`
+  - `export_session_facts_to_snapshot_locked()` 不再导出 playback terminal 文本；
+    这些字段改由 `export_playback_facts_to_snapshot_locked()` 从
+    `cloud_playback_observe` 统一导出
+  - 这一步继续把：
+    - session 元数据 observe
+    - playback terminal observe
+    从结构边界上拆开，避免 playback 文本原因链继续寄存在 session observe
 - `Step 5.429`
   - `dialog runtime` 继续把 playback 里的 observe-only 字段从 typed facts 中拆出去
   - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：

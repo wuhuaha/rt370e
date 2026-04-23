@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.430
+Validate that dialog runtime playback terminal text observability no longer
+travels through `session_observe`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '20,80p' components/river_core/river_dialog_runtime.c
+sed -n '300,380p' components/river_core/river_dialog_runtime.c
+sed -n '392,510p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_terminal_reason|playback_terminal_wait_reason|cloud_session_observe|cloud_playback_observe' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_session_observe_t` no longer contains:
+  - `playback_terminal_reason`
+  - `playback_terminal_wait_reason`
+- `river_dialog_runtime_cloud_playback_observe_t` now owns both playback terminal
+  text fields
+- playback terminal text is exported from
+  `export_playback_facts_to_snapshot_locked()` instead of
+  `export_session_facts_to_snapshot_locked()`
+
 ## Step 5.429
 Validate that dialog runtime playback semantic facts no longer carry playback
 terminal/rebuffer/start-gate observability:

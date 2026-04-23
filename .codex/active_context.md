@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.429 让 dialog runtime 的 playback facts 只保留 typed truth`
+  - `5.430 让 dialog runtime 的 playback 文本观测归入 playback observe`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 playback terminal 文本观测从 `session_observe`
+      中拆出去
+    - `river_dialog_runtime_cloud_session_observe_t` 不再承载：
+      - `playback_terminal_reason`
+      - `playback_terminal_wait_reason`
+    - 上述字段现在统一并入：
+      - `river_dialog_runtime_cloud_playback_observe_t`
+    - snapshot capture/export 现在都改为从 `cloud_playback_observe` 搬运这些
+      playback terminal 文本观测
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 playback 里的 observe-only 字段从 typed facts 中拆出去
     - `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
