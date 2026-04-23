@@ -1,5 +1,41 @@
 # Verification
 
+## Step 5.455
+Validate that playback managed-rebuffer recovery now uses a shared typed request
+executor across write-failed and upstream-starved paths:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '620,636p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1450,1548p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1632,1764p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2665,2772p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'managed_rebuffer_request_t|capture_managed_playback_rebuffer_request|start_managed_playback_rebuffer_request|execute_managed_playback_rebuffer_request|handle_write_failed_managed_rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_managed_rebuffer_request_t`
+  - `river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(...)`
+  - `river_cloud_xiaozhi_start_managed_playback_rebuffer_request(...)`
+  - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(...)`
+- `river_cloud_xiaozhi_write_failed_followup_t` now carries:
+  - `rebuffer_request`
+  instead of exposing raw `force_stop_rebuffer`
+- `river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(...)` no longer exists
+- both:
+  - `river_cloud_xiaozhi_handle_playback_write_failed(...)`
+  - `river_cloud_xiaozhi_maybe_rebuffer_starved(...)`
+  now route managed rebuffer through the shared typed request executor
+
 ## Step 5.454
 Validate that playback write-failed recovery now routes inline-recover outcomes
 through a typed follow-up descriptor before executing managed rebuffer:

@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.454 收口 write_failed 的 typed follow-up`
+  - `5.455 收口 managed rebuffer 的 typed request executor`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 managed rebuffer 执行收口成 typed request executor
+    - 新增统一 managed request 描述与执行入口：
+      - `river_cloud_xiaozhi_managed_rebuffer_request_t`
+      - `river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(...)`
+      - `river_cloud_xiaozhi_start_managed_playback_rebuffer_request(...)`
+      - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(...)`
+    - `river_cloud_xiaozhi_write_failed_followup_t` 不再直接暴露
+      `force_stop_rebuffer`，而是携带完整 `rebuffer_request`
+    - `write_failed` 与 `upstream starved` 两条链路现在统一走：
+      - typed request capture
+      - managed rebuffer start
+      - caller-specific request log
+      - shared recovery execute / fallback log
+    - 删除旧的 write-failed 专用 wrapper：
+      - `river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(...)`
+    - 这一步把：
+      - per-caller managed-rebuffer begin/execute/fallback orchestration
+      收口成：
+      - shared typed managed-rebuffer request executor
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 write-failed 恢复链收口成 typed follow-up
     - 新增统一 follow-up 描述：
