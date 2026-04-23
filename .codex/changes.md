@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.437
+- `downlink/playback` 继续把 `write_failed` 从 downlink task 主循环里收口成单入口 handler：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_handle_playback_write_failed(...)`
+- 该 helper 现在统一接管：
+  - recovery plan capture
+  - initial write-failed log
+  - inline recover dispatch
+  - managed rebuffer fallback dispatch
+- `downlink task` 在 `river_playback_service_write(...)` 失败后现在只保留：
+  - call `handle_playback_write_failed(...)`
+  - delay + continue on non-inline recovery
+- 这一步把：
+  - write_failed local orchestration
+  收口成：
+  - single write-failure entrypoint
+
 ## Step 5.436
 - `downlink/playback` 继续把 `write_failed` 的恢复执行从 downlink task 主循环中抽成专用 helper：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

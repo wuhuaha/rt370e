@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.436 抽出 write_failed 的 playback recovery executor`
+  - `5.437 让 downlink task 改用单入口 write_failed handler`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 `write_failed` 从 downlink task 主循环里
+      收口成单入口 handler
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_handle_playback_write_failed(...)`
+    - `downlink task` 在 `river_playback_service_write(...)` 失败后现在只保留：
+      - call handler
+      - delay + continue on non-inline recovery
+    - `write_failed` 的：
+      - recovery plan capture
+      - initial failure log
+      - inline recover dispatch
+      - managed rebuffer fallback dispatch
+      现在都由专用 handler 接管
+    - 这一步把主循环从：
+      - write_failed local orchestration
+      推进到：
+      - single write-failure entrypoint
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 `write_failed` 的 inline recover / replay /
       managed rebuffer fallback 从 downlink task 主循环里抽成专用 helper

@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.437`
+  - `downlink/playback` 继续把 `write_failed` 从 downlink task 主循环里
+    收口成单入口 handler
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_handle_playback_write_failed(...)`
+  - `write_failed` 的：
+    - recovery plan capture
+    - initial failure log
+    - inline recover dispatch
+    - managed rebuffer fallback dispatch
+    现在都由该 helper 接管
+  - `downlink task` 在 `river_playback_service_write(...)` 失败后现在只保留：
+    - call handler
+    - delay + continue on non-inline recovery
+  - 这一步继续把 downlink/playback 从：
+    - write_failed local orchestration
+    推进到：
+    - single write-failure entrypoint
 - `Step 5.436`
   - `downlink/playback` 继续把 `write_failed` 的恢复执行从 downlink task
     主循环里抽成专用 helper

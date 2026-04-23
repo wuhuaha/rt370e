@@ -1,5 +1,31 @@
 # Verification
 
+## Step 5.437
+Validate that `write_failed` now goes through a single downlink-side handler
+entrypoint:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1590,1695p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3945,3985p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'handle_playback_write_failed|try_write_failed_inline_recover|handle_write_failed_managed_rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_handle_playback_write_failed(...)`
+- downlink task no longer inlines write-failed orchestration; it now delegates to
+  the single handler entrypoint and only decides whether to delay/continue
+- `write_failed` 的原有 inline recover 与 managed rebuffer fallback 语义保持不变
+
 ## Step 5.436
 Validate that the `write_failed` recovery executor is now extracted from the
 downlink task into typed inline-result helpers:
