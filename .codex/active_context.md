@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.465 收口 interaction publish view`
+  - `5.466 收口 reason publish boundary`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 interaction publish 的 `reason` 边界收口成
+      typed reason view
+    - 新增统一 reason publish carrier：
+      - `river_dialog_runtime_publish_observe_t`
+      - `river_dialog_runtime_publish_reason_view_t`
+      - `river_dialog_runtime_capture_publish_reason_view_locked(...)`
+      - `river_dialog_runtime_apply_publish_reason_view_locked(...)`
+    - `derived_facts.reason` 已退出 runtime 逻辑路径：
+      - `snapshot.reason` 现在从 `publish_observe.reason` 导出
+      - `publish_locked(...)` 不再反向读取 `derived_facts.reason`
+      - `finalize_commit_locked(...)`、`init(...)`、
+        `note_tts_interrupt_requested(...)`
+        也不再直接写 `derived_facts.reason`
+    - 这一步把：
+      - reason publish / snapshot export <- derived cache back-dependency
+      收口成：
+      - explicit publish reason boundary
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 interaction publish 的 `previous -> next`
       transition 收口成 typed publish view

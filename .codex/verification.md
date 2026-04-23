@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.466
+Validate that dialog runtime now publishes and stores interaction reasons
+through an explicit publish-reason boundary instead of `derived_facts.reason`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '90,125p' components/river_core/river_dialog_runtime.c
+sed -n '440,455p' components/river_core/river_dialog_runtime.c
+sed -n '1200,1370p' components/river_core/river_dialog_runtime.c
+sed -n '1568,1705p' components/river_core/river_dialog_runtime.c
+rg -n 'publish_observe|publish_reason_view|derived_facts\\.reason|snapshot\\.reason' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_publish_observe_t`
+  - `river_dialog_runtime_publish_reason_view_t`
+  - `river_dialog_runtime_capture_publish_reason_view_locked(...)`
+  - `river_dialog_runtime_apply_publish_reason_view_locked(...)`
+- `derived_facts.reason` no longer appears in
+  `components/river_core/river_dialog_runtime.c`
+- `snapshot.reason` now exports from `publish_observe.reason`
+- `publish_locked(...)`, `finalize_commit_locked(...)`, `init(...)`, and
+  `note_tts_interrupt_requested(...)` now all route through the shared publish
+  reason view instead of open-coding reason cache reads/writes
+
 ## Step 5.465
 Validate that dialog runtime now publishes interaction-state transitions through
 a typed publish view instead of hand-written next-state comparison logic:

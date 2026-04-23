@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.466
+- `dialog runtime` 继续把 interaction publish 的 `reason` 边界收口成 typed
+  publish reason view：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增统一 reason publish carrier：
+  - `river_dialog_runtime_publish_observe_t`
+  - `river_dialog_runtime_publish_reason_view_t`
+  - `river_dialog_runtime_capture_publish_reason_view_locked(...)`
+  - `river_dialog_runtime_apply_publish_reason_view_locked(...)`
+- `derived_facts.reason` 已退出 runtime 逻辑路径：
+  - `snapshot.reason` 现在从独立 `publish_observe.reason` 导出
+  - `publish_locked(...)` 不再反向读取 `derived_facts.reason`
+  - `finalize_commit_locked(...)`、`init(...)`、
+    `note_tts_interrupt_requested(...)` 也不再直接写 `derived_facts.reason`
+- `river_dialog_runtime_publish_locked(...)`、
+  `river_dialog_runtime_finalize_commit_locked(...)`、
+  `river_dialog_runtime_init(...)`、
+  `river_dialog_runtime_note_tts_interrupt_requested(...)`
+  现在统一复用同一套 typed reason view，显式区分：
+  - stored reason
+  - outward publish reason
+- 这一步把：
+  - reason publish / snapshot export <- derived cache back-dependency
+  收口成：
+  - explicit publish reason boundary
+
 ## Step 5.465
 - `dialog runtime` 继续把 interaction publish 的 `previous -> next`
   transition 收口成 typed publish view：

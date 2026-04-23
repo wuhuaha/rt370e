@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.466`
+  - `dialog runtime` 继续把 interaction publish 的 `reason` 边界收口成 typed
+    publish reason view
+  - 新增统一 reason publish carrier：
+    - `river_dialog_runtime_publish_observe_t`
+    - `river_dialog_runtime_publish_reason_view_t`
+    - `river_dialog_runtime_capture_publish_reason_view_locked(...)`
+    - `river_dialog_runtime_apply_publish_reason_view_locked(...)`
+  - `derived_facts.reason` 已退出 runtime 逻辑路径：
+    - `snapshot.reason` 现在从独立 `publish_observe.reason` 导出
+    - `publish_locked(...)` 不再反向读取 `derived_facts.reason`
+    - `finalize_commit_locked(...)`、`init(...)`、
+      `note_tts_interrupt_requested(...)`
+      也统一走 shared reason view
+  - 这一步继续把 `dialog runtime` 从：
+    - reason publish / snapshot export <- derived cache back-dependency
+    推进到：
+    - explicit publish reason boundary
+  - 下一步继续聚焦：
+    - 把 `interaction_state` / `transition_count` 也从 `derived_facts`
+      收到显式 publish state，切断 publish state 对 derived cache 的最后回读
 - `Step 5.465`
   - `dialog runtime` 继续把 interaction publish 的 `previous -> next`
     transition 收口成 typed publish view
