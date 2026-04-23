@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.445
+- `downlink/playback` 继续把 ready downlink cycle 的执行结果直接归一到 worker task-step：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 删除中间 typed result：
+  - `river_cloud_xiaozhi_downlink_execute_result_t`
+- `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)` 现在直接返回：
+  - `river_cloud_xiaozhi_downlink_task_step_result_t`
+- `river_cloud_xiaozhi_process_downlink_task_cycle(...)` 不再负责：
+  - execute-result -> task-step 的二次翻译
+- 该 helper 链现在统一接管：
+  - acquire miss -> sleep poll
+  - write retry -> sleep poll
+  - write abort/progress -> continue
+- 这一步把：
+  - ready-cycle local result fan-out
+  收口成：
+  - direct task-step outcome
+
 ## Step 5.444
 - `downlink/playback` 继续把 downlink worker 的 task-step 调度壳从 downlink task 主循环中收口成单一 cycle processor：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.445
+Validate that ready downlink cycle execution now returns the final worker
+task-step directly instead of translating through a separate execute-result:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '638,652p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3860,3910p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_task_step_result|execute_ready_downlink_cycle|process_downlink_task_cycle|downlink_execute_result' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime no longer defines:
+  - `river_cloud_xiaozhi_downlink_execute_result_t`
+- `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)` now returns:
+  - `river_cloud_xiaozhi_downlink_task_step_result_t`
+- `river_cloud_xiaozhi_process_downlink_task_cycle(...)` no longer translates:
+  - execute-result -> task-step
+- ready cycle now directly emits:
+  - sleep poll on acquire miss / write retry
+  - continue on write abort / write progress
+
 ## Step 5.444
 Validate that downlink task loop orchestration is now routed through a single
 task-step processor and delay finisher instead of branching inline:
