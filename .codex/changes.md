@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.444
+- `downlink/playback` 继续把 downlink worker 的 task-step 调度壳从 downlink task 主循环中收口成单一 cycle processor：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增本地 typed result：
+  - `river_cloud_xiaozhi_downlink_task_step_result_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_process_downlink_task_cycle(...)`
+  - `river_cloud_xiaozhi_finish_downlink_task_cycle(...)`
+- 该 helper 现在统一接管：
+  - prepare/execute result fan-in
+  - idle delay dispatch
+  - poll delay dispatch
+- `downlink task` 现在只保留：
+  - endless loop
+  - call `process_downlink_task_cycle(...)`
+  - call `finish_downlink_task_cycle(...)`
+- 这一步把：
+  - residual task-loop orchestration shell
+  收口成：
+  - single task-step processor + delay finisher
+
 ## Step 5.443
 - `downlink/playback` 继续把 ready 状态下的 downlink cycle 执行从 downlink task 主循环中收口成统一 executor：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

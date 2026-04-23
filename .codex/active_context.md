@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.443 收口 ready downlink cycle 的执行分发`
+  - `5.444 收口 downlink task-step 的调度壳`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 downlink worker 的 task-step 调度壳从主循环里
+      收口成单一 cycle processor
+    - 新增本地 typed result：
+      - `river_cloud_xiaozhi_downlink_task_step_result_t`
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_process_downlink_task_cycle(...)`
+      - `river_cloud_xiaozhi_finish_downlink_task_cycle(...)`
+    - 该 helper 现在统一接管：
+      - prepare/execute result fan-in
+      - idle delay dispatch
+      - poll delay dispatch
+    - `downlink task` 现在只保留：
+      - endless loop
+      - call `process_downlink_task_cycle(...)`
+      - call `finish_downlink_task_cycle(...)`
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 ready 状态下的 downlink cycle 执行从主循环里
       收口成统一 executor

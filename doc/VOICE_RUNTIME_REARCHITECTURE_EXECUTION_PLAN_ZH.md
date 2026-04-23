@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.444`
+  - `downlink/playback` 继续把 downlink worker 的 task-step 调度壳从主循环中
+    收口成单一 cycle processor
+  - 新增本地 typed result：
+    - `river_cloud_xiaozhi_downlink_task_step_result_t`
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_process_downlink_task_cycle(...)`
+    - `river_cloud_xiaozhi_finish_downlink_task_cycle(...)`
+  - 该 helper 现在统一接管：
+    - prepare/excute result fan-in
+    - idle delay dispatch
+    - poll delay dispatch
+  - `downlink task` 现在只保留：
+    - endless loop
+    - call `process_downlink_task_cycle(...)`
+    - call `finish_downlink_task_cycle(...)`
 - `Step 5.443`
   - `downlink/playback` 继续把 ready 状态下的 downlink cycle 执行从主循环中
     收口成统一 executor
