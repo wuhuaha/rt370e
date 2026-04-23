@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.425 拆分 cloud runtime snapshot 的 phase 观测导出`
+  - `5.426 拆分 dialog runtime cloud import 的 playback phase observe 载荷`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 cloud snapshot 输入层里的 playback 观测与语义事实拆开
+    - `river_dialog_runtime_cloud_import_t` 不再承载：
+      - `playback_phase_known`
+      - `playback_phase_kind`
+    - `river_dialog_runtime_ingress_t` 新增独立 observe 载荷：
+      - `has_cloud_playback_observe`
+      - `cloud_playback_observe`
+    - 新增统一 snapshot 捕获入口：
+      - `river_dialog_runtime_capture_cloud_snapshot(...)`
+      它会一次性拆出 semantic import 与 observe import
+    - 新增独立导入路径：
+      - `river_dialog_runtime_import_cloud_playback_observe_locked(...)`
+    - `commit_cloud_event` / `reduce_local_playback_event` / `sync_cloud_state`
+      现在都会单独携带 playback phase 观测值进入 reducer/import 边界
   - newest landed runtime-ownership slice:
     - `cloud playback runtime` 继续把 phase 观测值从 truth 链里彻底拆出去
     - 新增：

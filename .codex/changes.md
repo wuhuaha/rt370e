@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.426
+- `dialog runtime` 继续把 cloud snapshot 输入层里的 playback 观测与语义事实拆开：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_cloud_import_t` 不再承载：
+  - `playback_phase_known`
+  - `playback_phase_kind`
+- `river_dialog_runtime_ingress_t` 新增独立 observe 载荷：
+  - `has_cloud_playback_observe`
+  - `cloud_playback_observe`
+- 新增统一 snapshot 捕获入口：
+  - `river_dialog_runtime_capture_cloud_snapshot(...)`
+  它会一次性拆出：
+  - `cloud_import`
+  - `cloud_playback_observe`
+- 新增独立导入路径：
+  - `river_dialog_runtime_import_cloud_playback_observe_locked(...)`
+- `commit_cloud_event` / `reduce_local_playback_event` / `sync_cloud_state`
+  现在都会把 cloud playback phase 观测值作为独立载荷送入 reducer，而不是继续混在
+  cloud import 语义结构中
+- 这一步继续把 `dialog runtime` 的：
+  - cloud import semantic facts
+  - playback phase observability
+  在 ingress/import 边界彻底拆开，避免后续 reducer/import 路径把 phase 观测字段重新当成内部真相
+
 ## Step 5.425
 - `cloud playback runtime` 继续把 phase 观测值从 truth 链里彻底拆出去：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

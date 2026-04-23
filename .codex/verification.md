@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.426
+Validate that dialog runtime imports cloud playback phase observability through
+a dedicated observe ingress instead of mixing it into cloud semantic import:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '25,190p' components/river_core/river_dialog_runtime.c
+sed -n '275,360p' components/river_core/river_dialog_runtime.c
+sed -n '1245,1490p' components/river_core/river_dialog_runtime.c
+rg -n 'capture_cloud_snapshot|has_cloud_playback_observe|cloud_playback_observe|import_cloud_playback_observe_locked|playback_phase_known|playback_phase_kind' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_import_t` no longer contains:
+  - `playback_phase_known`
+  - `playback_phase_kind`
+- `river_dialog_runtime_ingress_t` now carries a separate:
+  - `has_cloud_playback_observe`
+  - `cloud_playback_observe`
+- `river_dialog_runtime_capture_cloud_snapshot(...)` splits a single cloud
+  snapshot into semantic import and observe import
+- `river_dialog_runtime_import_cloud_playback_observe_locked(...)` owns the
+  phase-observation import path independently from
+  `river_dialog_runtime_import_cloud_snapshot_locked(...)`
+
 ## Step 5.425
 Validate that cloud playback runtime exports phase observability through a
 dedicated observe path instead of reading it back from truth structures:
