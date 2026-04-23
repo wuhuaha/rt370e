@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.432`
+  - `downlink/playback` 继续把 actual recovery path 提升成 cloud/dialog 可见的
+    typed observability
+  - 新增公共枚举：
+    - `river_cloud_playback_recovery_path_t`
+  - `cloud runtime snapshot` 现在额外导出：
+    - `playback_recovery_path_kind`
+    - `playback_recovery_path`
+  - XiaoZhi playback runtime 新增持久观测字段：
+    - `xiaozhi_playback_recovery_path`
+    并在 `request_playback_rebuffer_recovery(...)` 里按 fallback 后的实际路径写入
+  - playback observe view / dialog playback observe 现在都会镜像这条路径；
+    `dialog runtime dump` 与 `xiaozhi runtime dump` 也开始打印
+    `recovery_path`
+  - 这一步继续把：
+    - internal recovery plan
+    - cloud/dialog exported observability
+    接到同一条路径真相上，避免外层只能靠 `rebuffer_pending + cause`
+    组合反推当前恢复链
 - `Step 5.431`
   - `downlink/playback` 继续把 `write_failed` / `starved` 恢复决策收口成统一
     typed recovery plan

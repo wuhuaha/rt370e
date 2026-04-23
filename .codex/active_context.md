@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.431 为 downlink/playback 引入统一 recovery plan`
+  - `5.432 导出 playback 的 actual recovery path`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 actual recovery path 提升成 cloud/dialog 可见的
+      typed observability
+    - 新增公共枚举：
+      - `river_cloud_playback_recovery_path_t`
+    - `cloud runtime snapshot` / `dialog runtime snapshot` 现在都会镜像：
+      - `playback_recovery_path_kind`
+    - XiaoZhi playback runtime 会在 `request_playback_rebuffer_recovery(...)`
+      内按 fallback 后的实际路径更新 `xiaozhi_playback_recovery_path`
+    - `dialog runtime dump` 与 `xiaozhi runtime dump` 也开始直接打印
+      `recovery_path`
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 `write_failed` / `starved` 恢复决策收口成统一
       typed recovery plan

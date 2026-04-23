@@ -29,6 +29,7 @@ typedef struct {
     river_cloud_playback_phase_t phase_kind;
     river_cloud_playback_terminal_state_t terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t rebuffer_cause_kind;
+    river_cloud_playback_recovery_path_t recovery_path_kind;
     river_cloud_playback_start_policy_t start_policy_kind;
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
@@ -339,6 +340,8 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         snapshot.playback_terminal_state_kind;
     cloud_playback_observe->rebuffer_cause_kind =
         snapshot.playback_rebuffer_cause_kind;
+    cloud_playback_observe->recovery_path_kind =
+        snapshot.playback_recovery_path_kind;
     cloud_playback_observe->start_policy_kind =
         snapshot.playback_start_policy_kind;
     river_dialog_runtime_copy_text(
@@ -477,6 +480,8 @@ static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
         g_river_dialog_runtime.cloud_playback_observe.terminal_state_kind;
     g_river_dialog_runtime.snapshot.playback_rebuffer_cause_kind =
         g_river_dialog_runtime.cloud_playback_observe.rebuffer_cause_kind;
+    g_river_dialog_runtime.snapshot.playback_recovery_path_kind =
+        g_river_dialog_runtime.cloud_playback_observe.recovery_path_kind;
     g_river_dialog_runtime.snapshot.playback_start_policy_kind =
         g_river_dialog_runtime.cloud_playback_observe.start_policy_kind;
     river_dialog_runtime_copy_text(
@@ -1741,7 +1746,7 @@ void river_dialog_runtime_dump_status(void)
         river_dialog_runtime_local_playback_state_recovering_locked();
     river_dialog_runtime_unlock();
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s owner=%s phase_known=%s backend_state=%s supply=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s/%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s owner=%s phase_known=%s backend_state=%s supply=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s recovery_path=%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s/%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -1769,6 +1774,11 @@ void river_dialog_runtime_dump_status(void)
                snapshot.playback_recovering ? "yes" : "no",
                river_cloud_playback_rebuffer_cause_name(
                    snapshot.playback_rebuffer_cause_kind),
+               river_cloud_playback_recovery_path_name(
+                   snapshot.playback_recovery_path_kind) != NULL ?
+                   river_cloud_playback_recovery_path_name(
+                       snapshot.playback_recovery_path_kind) :
+                   "-",
                playback_local_recovering ? "yes" : "no",
                snapshot.playback_terminal_closed ? "yes" : "no",
                snapshot.playback_terminal_state_kind !=

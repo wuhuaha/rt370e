@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.432
+Validate that playback actual recovery path is exported through cloud/dialog
+snapshots as typed observability:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '100,170p' include/river/river_cloud.h
+sed -n '50,80p' include/river/river_dialog_runtime.h
+sed -n '1645,1705p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2338,2398p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '330,350p' components/river_core/river_dialog_runtime.c
+sed -n '470,490p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_recovery_path' include/river components/river_cloud components/river_core
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public headers now define/export:
+  - `river_cloud_playback_recovery_path_t`
+  - `playback_recovery_path_kind`
+- XiaoZhi playback runtime snapshot fill path now exports both typed and text
+  recovery path
+- dialog runtime capture/export path now mirrors `playback_recovery_path_kind`
+- runtime/session dumps now include `recovery_path=...`
+
 ## Step 5.431
 Validate that XiaoZhi downlink/playback recovery now flows through a unified
 recovery plan and that fallback returns the actual recovery path:

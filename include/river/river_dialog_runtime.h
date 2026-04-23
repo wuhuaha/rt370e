@@ -66,6 +66,7 @@ typedef struct {
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
+    river_cloud_playback_recovery_path_t playback_recovery_path_kind;
     river_cloud_playback_start_policy_t playback_start_policy_kind;
     bool tts_stop_pending;
     bool tts_interrupt_requested;

@@ -45,6 +45,20 @@ const char *river_cloud_playback_rebuffer_cause_name(
     }
 }
 
+const char *river_cloud_playback_recovery_path_name(
+    river_cloud_playback_recovery_path_t path)
+{
+    switch (path) {
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_SERVICE_RECOVER:
+        return "service_recover";
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER:
+        return "stop_rebuffer";
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_NONE:
+    default:
+        return NULL;
+    }
+}
+
 const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase)
 {
     switch (phase) {

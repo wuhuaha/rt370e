@@ -111,6 +111,12 @@ typedef enum {
 } river_cloud_playback_rebuffer_cause_t;
 
 typedef enum {
+    RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_NONE = 0,
+    RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_SERVICE_RECOVER,
+    RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER
+} river_cloud_playback_recovery_path_t;
+
+typedef enum {
     RIVER_CLOUD_PLAYBACK_START_POLICY_BASELINE = 0,
     RIVER_CLOUD_PLAYBACK_START_POLICY_REBUFFER_FAST,
     RIVER_CLOUD_PLAYBACK_START_POLICY_PREFETCH_SEGMENT,
@@ -138,6 +144,7 @@ typedef struct {
     river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
     river_cloud_playback_terminal_state_t playback_terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
+    river_cloud_playback_recovery_path_t playback_recovery_path_kind;
     river_cloud_playback_start_policy_t playback_start_policy_kind;
     bool tts_stop_pending;
     bool turn_accepted;
@@ -149,6 +156,7 @@ typedef struct {
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_phase[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_rebuffer_cause[RIVER_CLOUD_RUNTIME_REASON_MAX];
+    char playback_recovery_path[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_start_policy[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_state[RIVER_CLOUD_RUNTIME_STATE_MAX];
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
@@ -199,6 +207,8 @@ const char *river_cloud_playback_hold_kind_name(
     river_cloud_playback_hold_kind_t kind);
 const char *river_cloud_playback_rebuffer_cause_name(
     river_cloud_playback_rebuffer_cause_t cause);
+const char *river_cloud_playback_recovery_path_name(
+    river_cloud_playback_recovery_path_t path);
 const char *river_cloud_playback_terminal_state_name(
     river_cloud_playback_terminal_state_t state);
 const char *river_cloud_playback_start_policy_name(

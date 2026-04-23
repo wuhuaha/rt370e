@@ -211,6 +211,7 @@ typedef struct {
     bool xiaozhi_playback_active;
     river_cloud_playback_phase_t xiaozhi_playback_phase;
     river_cloud_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;
+    river_cloud_playback_recovery_path_t xiaozhi_playback_recovery_path;
     bool xiaozhi_playback_rebuffer_pending;
     bool xiaozhi_playback_terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t xiaozhi_playback_terminal_wait_kind;

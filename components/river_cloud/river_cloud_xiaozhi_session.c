@@ -859,7 +859,7 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
     river_cloud_xiaozhi_fill_runtime_snapshot(&snapshot);
     endpoint_soft_close_left_ms = river_cloud_xiaozhi_endpoint_soft_close_remaining_ms(now_ms);
 
-    RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s phase=%s rebuffer=%s/%s stop_pending=%s close_pending=%s window=%s followup_left_ms=%lu close_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
+    RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s phase=%s rebuffer=%s/%s recovery_path=%s stop_pending=%s close_pending=%s window=%s followup_left_ms=%lu close_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
                g_river_cloud.xiaozhi_enabled ? "yes" : "no",
                g_river_cloud.xiaozhi_io_started ? "running" : "off",
                river_xiaozhi_session_open() ? "open" : "closed",
@@ -869,6 +869,9 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                snapshot.playback_rebuffer_pending ? "yes" : "no",
                snapshot.playback_rebuffer_cause[0] != '\0' ? snapshot.playback_rebuffer_cause :
                                                              "-",
+               snapshot.playback_recovery_path[0] != '\0' ?
+                   snapshot.playback_recovery_path :
+                   "-",
                snapshot.tts_stop_pending ? "yes" : "no",
                snapshot.local_close_pending ? "yes" : "no",
                snapshot.conversation_window_active ? "yes" : "no",
