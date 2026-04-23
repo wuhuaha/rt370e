@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.454
+Validate that playback write-failed recovery now routes inline-recover outcomes
+through a typed follow-up descriptor before executing managed rebuffer:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '608,636p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1598,1688p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'write_failed_followup|capture_write_failed_followup|INLINE_RECOVER_REPLAY_FAILED|INLINE_RECOVER_SERVICE_FAILED' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_write_failed_followup_t`
+  - `river_cloud_xiaozhi_capture_write_failed_followup(...)`
+- `river_cloud_xiaozhi_handle_playback_write_failed(...)` no longer expands:
+  - replay-failed -> managed-rebuffer fallback
+  - service-failed -> managed-rebuffer fallback
+  - not-attempted -> managed-rebuffer fallback
+  as three separate execution branches
+- write-failed follow-up now first resolves:
+  - `inline_success`
+  - `managed_rebuffer`
+  - `force_stop_rebuffer`
+  - `request_log`
+  and then executes one unified managed-rebuffer path
+
 ## Step 5.453
 Validate that dialog runtime now derives playback truth from a raw playback
 projection instead of backfilling projection state from derived facts:

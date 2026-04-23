@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.454
+- `downlink/playback runtime` 继续把 write-failed 恢复链收口成 typed follow-up：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增统一 follow-up 描述：
+  - `river_cloud_xiaozhi_write_failed_followup_t`
+  - `river_cloud_xiaozhi_capture_write_failed_followup(...)`
+- `river_cloud_xiaozhi_handle_playback_write_failed(...)` 不再手写三段
+  `inline_result -> managed_rebuffer/log/force_stop` 分支翻译：
+  - `inline_success`
+  - `managed_rebuffer`
+  - `force_stop_rebuffer`
+  - `request_log`
+  现在都先通过 typed follow-up 收口，再统一执行 managed rebuffer
+- 这一步把：
+  - split inline-result follow-up branching
+  收口成：
+  - single typed write-failed follow-up
+
 ## Step 5.453
 - `dialog runtime` 继续把 playback raw projection 与派生 truth 解耦：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

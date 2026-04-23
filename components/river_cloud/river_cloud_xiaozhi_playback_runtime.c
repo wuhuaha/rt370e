@@ -621,6 +621,13 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED
 } river_cloud_xiaozhi_inline_recover_result_t;
 
+typedef struct {
+    bool inline_success;
+    bool managed_rebuffer;
+    bool force_stop_rebuffer;
+    const char *request_log;
+} river_cloud_xiaozhi_write_failed_followup_t;
+
 typedef enum {
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE = 0,
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
@@ -1602,12 +1609,50 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
     return RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SUCCEEDED;
 }
 
+static void river_cloud_xiaozhi_capture_write_failed_followup(
+    river_cloud_xiaozhi_inline_recover_result_t inline_result,
+    river_cloud_xiaozhi_write_failed_followup_t *followup)
+{
+    if (followup == NULL) {
+        return;
+    }
+
+    memset(followup, 0, sizeof(*followup));
+    switch (inline_result) {
+    case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SUCCEEDED:
+        followup->inline_success = true;
+        return;
+
+    case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED:
+        followup->managed_rebuffer = true;
+        followup->force_stop_rebuffer = true;
+        followup->request_log =
+            "xiaozhi playback rebuffer requested after inline replay fallback";
+        return;
+
+    case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SERVICE_FAILED:
+        followup->managed_rebuffer = true;
+        followup->force_stop_rebuffer = true;
+        followup->request_log =
+            "xiaozhi playback rebuffer requested after recover fallback";
+        return;
+
+    case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_NOT_ATTEMPTED:
+    default:
+        followup->managed_rebuffer = true;
+        followup->force_stop_rebuffer = false;
+        followup->request_log = "xiaozhi playback rebuffer requested";
+        return;
+    }
+}
+
 static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_frames,
                                                              size_t mono_bytes,
                                                              size_t stereo_bytes)
 {
     river_cloud_xiaozhi_playback_recovery_plan_t recovery_plan;
     river_cloud_xiaozhi_inline_recover_result_t inline_result;
+    river_cloud_xiaozhi_write_failed_followup_t followup;
     const char *recover_reason = "xiaozhi_playback_write_failed";
     const char *recover_path = "stop_rebuffer";
     uint64_t now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
@@ -1647,41 +1692,21 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
         mono_bytes,
         stereo_bytes,
         recover_path);
-    if (inline_result == RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SUCCEEDED) {
+    river_cloud_xiaozhi_capture_write_failed_followup(inline_result, &followup);
+    if (followup.inline_success) {
         g_river_cloud.xiaozhi_downlink_retry_valid = false;
         return true;
     }
-    if (inline_result == RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED) {
+    if (followup.managed_rebuffer) {
         river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(
             &recovery_plan,
             now_ms,
             queued_frames,
             recover_reason,
-            "xiaozhi playback rebuffer requested after inline replay fallback",
-            true,
+            followup.request_log,
+            followup.force_stop_rebuffer,
             &recover_path);
-        return false;
     }
-    if (inline_result == RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SERVICE_FAILED) {
-        river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(
-            &recovery_plan,
-            now_ms,
-            queued_frames,
-            recover_reason,
-            "xiaozhi playback rebuffer requested after recover fallback",
-            true,
-            &recover_path);
-        return false;
-    }
-
-    river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(
-        &recovery_plan,
-        now_ms,
-        queued_frames,
-        recover_reason,
-        "xiaozhi playback rebuffer requested",
-        false,
-        &recover_path);
     return false;
 }
 

@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.453 收口 dialog runtime 的 playback truth 派生`
+  - `5.454 收口 write_failed 的 typed follow-up`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 write-failed 恢复链收口成 typed follow-up
+    - 新增统一 follow-up 描述：
+      - `river_cloud_xiaozhi_write_failed_followup_t`
+      - `river_cloud_xiaozhi_capture_write_failed_followup(...)`
+    - `river_cloud_xiaozhi_handle_playback_write_failed(...)` 不再手写三段
+      `inline_result -> managed_rebuffer/log/force_stop` 分支翻译：
+      - `inline_success`
+      - `managed_rebuffer`
+      - `force_stop_rebuffer`
+      - `request_log`
+      现在都先通过 typed follow-up 收口，再统一执行 managed rebuffer
+    - 这一步把：
+      - split inline-result follow-up branching
+      收口成：
+      - single typed write-failed follow-up
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 playback raw projection 与派生 truth 解耦
     - 删除 `playback projection` 对已派生 truth 的反向依赖：
