@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.471
+- `dialog runtime` 继续把 publish side 的 snapshot 导出边界收口成显式
+  export view：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 publish snapshot export carrier：
+  - `river_dialog_runtime_publish_export_view_t`
+  - `river_dialog_runtime_capture_publish_export_view_locked(...)`
+  - `river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(...)`
+- `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+  不再直接从 `publish_state` 抄字段到 snapshot，而是统一走：
+  - `capture + apply`
+- 这样当前 `dialog runtime` 的 runtime-state snapshot 导出已经两侧对齐：
+  - playback/error -> explicit export view
+  - publish state -> explicit export view
+- 这一步继续把：
+  - publish snapshot field copy from runtime truth
+  收口成：
+  - typed publish export view
+
 ## Step 5.470
 - `dialog runtime` 继续把 playback/error 的 snapshot 导出边界收口成显式
   export view：

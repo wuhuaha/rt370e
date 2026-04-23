@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.471
+Validate that dialog runtime now exports publish-state snapshot fields through a
+typed export view instead of directly copying `publish_state` into `snapshot`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '110,118p' components/river_core/river_dialog_runtime.c
+sed -n '197,204p' components/river_core/river_dialog_runtime.c
+sed -n '499,533p' components/river_core/river_dialog_runtime.c
+rg -n 'publish_export_view|capture_publish_export_view|apply_publish_export_view|export_publish_state_to_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_publish_export_view_t`
+  - `river_dialog_runtime_capture_publish_export_view_locked(...)`
+  - `river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(...)`
+- `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)` now
+  routes through the shared export view instead of directly mutating:
+  - `snapshot.interaction_state`
+  - `snapshot.transition_count`
+  - `snapshot.reason`
+- playback/error and publish-state snapshot export paths now both use the same
+  `capture + apply` export-view pattern
+
 ## Step 5.470
 Validate that dialog runtime now exports playback/error snapshot state through a
 typed export view instead of directly copying runtime truth fields into

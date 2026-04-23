@@ -111,6 +111,12 @@ typedef struct {
 } river_dialog_runtime_playback_error_export_view_t;
 
 typedef struct {
+    river_interaction_state_t interaction_state;
+    uint32_t transition_count;
+    char reason[48];
+} river_dialog_runtime_publish_export_view_t;
+
+typedef struct {
     bool initialized;
     bool cloud_runtime_available;
     bool local_playback_stream_owned;
@@ -191,6 +197,10 @@ static void river_dialog_runtime_capture_playback_error_export_view_locked(
 static void river_dialog_runtime_apply_playback_error_export_view_to_snapshot_locked(
     const river_dialog_runtime_playback_error_export_view_t *view);
 static void river_dialog_runtime_export_playback_error_state_to_snapshot_locked(void);
+static void river_dialog_runtime_capture_publish_export_view_locked(
+    river_dialog_runtime_publish_export_view_t *view);
+static void river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(
+    const river_dialog_runtime_publish_export_view_t *view);
 static void river_dialog_runtime_export_publish_state_to_snapshot_locked(void);
 static void river_dialog_runtime_export_runtime_state_to_snapshot_locked(void);
 static void river_dialog_runtime_import_cloud_snapshot_locked(
@@ -486,15 +496,41 @@ static void river_dialog_runtime_export_playback_error_state_to_snapshot_locked(
     river_dialog_runtime_apply_playback_error_export_view_to_snapshot_locked(&view);
 }
 
-static void river_dialog_runtime_export_publish_state_to_snapshot_locked(void)
+static void river_dialog_runtime_capture_publish_export_view_locked(
+    river_dialog_runtime_publish_export_view_t *view)
 {
-    g_river_dialog_runtime.snapshot.interaction_state =
-        g_river_dialog_runtime.publish_state.interaction_state;
-    g_river_dialog_runtime.snapshot.transition_count =
-        g_river_dialog_runtime.publish_state.transition_count;
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    view->interaction_state = g_river_dialog_runtime.publish_state.interaction_state;
+    view->transition_count = g_river_dialog_runtime.publish_state.transition_count;
+    river_dialog_runtime_copy_text(view->reason,
+                                   sizeof(view->reason),
+                                   g_river_dialog_runtime.publish_state.reason);
+}
+
+static void river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(
+    const river_dialog_runtime_publish_export_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    g_river_dialog_runtime.snapshot.interaction_state = view->interaction_state;
+    g_river_dialog_runtime.snapshot.transition_count = view->transition_count;
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
                                    sizeof(g_river_dialog_runtime.snapshot.reason),
-                                   g_river_dialog_runtime.publish_state.reason);
+                                   view->reason);
+}
+
+static void river_dialog_runtime_export_publish_state_to_snapshot_locked(void)
+{
+    river_dialog_runtime_publish_export_view_t view;
+
+    river_dialog_runtime_capture_publish_export_view_locked(&view);
+    river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(&view);
 }
 
 static void river_dialog_runtime_export_runtime_state_to_snapshot_locked(void)

@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.470 收口 playback/error export view`
+  - `5.471 收口 publish export view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 publish side 的 snapshot 导出边界收口成显式
+      export view
+    - 新增：
+      - `river_dialog_runtime_publish_export_view_t`
+      - `river_dialog_runtime_capture_publish_export_view_locked(...)`
+      - `river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(...)`
+    - `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+      不再直接从 `publish_state` 抄字段到 snapshot，而是统一走：
+      - `capture + apply`
+    - 当前 runtime-state snapshot 导出已两侧对齐：
+      - playback/error -> explicit export view
+      - publish state -> explicit export view
+    - 这一步把：
+      - publish snapshot field copy from runtime truth
+      收口成：
+      - typed publish export view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 playback/error 的 snapshot 导出边界收口成显式
       export view

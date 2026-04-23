@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.471`
+  - `dialog runtime` 继续把 publish side 的 snapshot 导出边界收口成显式
+    export view
+  - 新增 publish snapshot export carrier：
+    - `river_dialog_runtime_publish_export_view_t`
+    - `river_dialog_runtime_capture_publish_export_view_locked(...)`
+    - `river_dialog_runtime_apply_publish_export_view_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+    不再直接从 `publish_state` 抄字段到 snapshot，而是统一走：
+    - `capture + apply`
+  - 当前 runtime-state snapshot 导出已两侧对齐：
+    - playback/error -> explicit export view
+    - publish state -> explicit export view
+  - 这一步继续把 `dialog runtime` 从：
+    - publish snapshot field copy from runtime truth
+    推进到：
+    - typed publish export view
+  - 下一步继续聚焦：
+    - 继续检查 `control_facts` / `round/io/session` 这几组 snapshot export 是否也要
+      继续引入 typed export carrier，最终让 snapshot 导出 helper 统一成 apply-only
+      语义
 - `Step 5.470`
   - `dialog runtime` 继续把 playback/error 的 snapshot 导出边界收口成显式
     export view
