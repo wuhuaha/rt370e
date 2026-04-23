@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.436
+Validate that the `write_failed` recovery executor is now extracted from the
+downlink task into typed inline-result helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '610,635p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1440,1598p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3890,3960p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'inline_recover_result|try_write_failed_inline_recover|handle_write_failed_managed_rebuffer|log_write_failed_rebuffer_request' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_inline_recover_result_t`
+  - `river_cloud_xiaozhi_try_write_failed_inline_recover(...)`
+  - `river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(...)`
+- `write_failed` 主分支现在主要只做：
+  - recovery plan capture
+  - recover reason selection
+  - inline result dispatch
+- inline recover success、recover failure、replay failure 与 non-inline rebuffer
+  仍然走原有语义，但执行链已经从主循环中抽离
+
 ## Step 5.435
 Validate that managed rebuffer entry/execution now goes through shared helper
 boundaries instead of being mutated inline in multiple branches:

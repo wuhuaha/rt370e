@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.436
+- `downlink/playback` 继续把 `write_failed` 的恢复执行从 downlink task 主循环中抽成专用 helper：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增本地 typed result：
+  - `river_cloud_xiaozhi_inline_recover_result_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_try_write_failed_inline_recover(...)`
+  - `river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(...)`
+  - `river_cloud_xiaozhi_log_write_failed_rebuffer_request(...)`
+- `write_failed` 主分支现在只保留：
+  - capture `recovery_plan`
+  - choose `recover_reason`
+  - switch inline recover result
+  - dispatch managed rebuffer fallback executor
+- 这一步把：
+  - nested inline recover / replay / fallback branches
+  收口成：
+  - typed inline result + dedicated recovery executors
+
 ## Step 5.435
 - `downlink/playback` 继续把 managed rebuffer 的进入与恢复执行从分散分支中收口成统一 helper：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

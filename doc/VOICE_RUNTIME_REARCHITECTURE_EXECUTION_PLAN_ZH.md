@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.436`
+  - `downlink/playback` 继续把 `write_failed` 的恢复执行从 downlink task
+    主循环里抽成专用 helper
+  - 新增本地 typed result：
+    - `river_cloud_xiaozhi_inline_recover_result_t`
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_try_write_failed_inline_recover(...)`
+    - `river_cloud_xiaozhi_handle_write_failed_managed_rebuffer(...)`
+    - `river_cloud_xiaozhi_log_write_failed_rebuffer_request(...)`
+  - `write_failed` 主分支现在只保留：
+    - capture `recovery_plan`
+    - choose `recover_reason`
+    - dispatch inline result / fallback executor
+  - 这一步继续把 downlink/playback 从：
+    - nested write_failed recovery control flow
+    推进到：
+    - typed inline result + dedicated executors
 - `Step 5.435`
   - `downlink/playback` 继续把 managed rebuffer 的进入与执行边界从多个
     局部分支里收口成共享 helper
