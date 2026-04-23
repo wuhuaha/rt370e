@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.446 将 prepare downlink cycle 提升成单一 cycle plan`
+  - `5.447 收口 prepare downlink playback 的 ready 判定`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 `prepare_downlink_playback(...)`
+      的 ready 判定从二值枚举收口成布尔返回
+    - 删除中间 typed result：
+      - `river_cloud_xiaozhi_downlink_prepare_result_t`
+    - `river_cloud_xiaozhi_prepare_downlink_playback(...)` 现在直接返回：
+      - `bool`
+    - `river_cloud_xiaozhi_prepare_downlink_cycle_plan(...)` 不再负责：
+      - `prepare_result` -> ready boolean 的翻译
+    - 这一步把：
+      - binary prepare-result contract
+      收口成：
+      - direct ready predicate
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 prepare 阶段从 `result + out param`
       收口成单一 cycle plan

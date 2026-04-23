@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.447`
+  - `downlink/playback` 继续把 `prepare_downlink_playback(...)`
+    的 ready 判定从二值枚举收口成布尔返回
+  - 删除中间 typed result：
+    - `river_cloud_xiaozhi_downlink_prepare_result_t`
+  - `river_cloud_xiaozhi_prepare_downlink_playback(...)` 现在直接返回：
+    - `bool`
+  - `river_cloud_xiaozhi_prepare_downlink_cycle_plan(...)` 不再负责：
+    - `prepare_result` -> ready boolean 的翻译
+  - 这一步继续把 downlink/playback 从：
+    - binary prepare-result contract
+    推进到：
+    - direct ready predicate
 - `Step 5.446`
   - `downlink/playback` 继续把 prepare 阶段从 `result + out param`
     收口成单一 cycle plan

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.447
+Validate that prepare-downlink-playback readiness is now expressed as a direct
+boolean predicate instead of a two-state enum:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '624,644p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3755,3835p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_prepare_result|prepare_downlink_playback\\(|prepare_downlink_cycle_plan\\(' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime no longer defines:
+  - `river_cloud_xiaozhi_downlink_prepare_result_t`
+- `river_cloud_xiaozhi_prepare_downlink_playback(...)` now returns:
+  - `bool`
+- cycle-plan preparation no longer compares against:
+  - `RIVER_CLOUD_XIAOZHI_DOWNLINK_PREPARE_READY`
+- prepare gating now directly expresses:
+  - ready / not ready
+
 ## Step 5.446
 Validate that prepare downlink cycle now returns a single cycle plan instead of
 splitting readiness and queued-frame state across an enum plus out param:
