@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.457 收口 rebuffer recovery 的 typed attempt/result`
+  - `5.458 收口 managed rebuffer 的 typed result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 managed rebuffer 执行结果收口成 typed result
+    - 新增统一 managed rebuffer recovery result：
+      - `river_cloud_xiaozhi_managed_rebuffer_recovery_result_t`
+    - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+      不再返回：
+      - `river_status_t + recover_path_out`
+      的松散组合，而是统一返回 typed result
+    - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(...)`
+      现在也直接返回 typed result，并统一使用：
+      - `result.status`
+      - `result.recover_path`
+      处理 fresh-start fallback 日志
+    - `write_failed` 与 `upstream starved` 调用侧不再把 managed execute 结果拆成：
+      - return status
+      - mutable recover_path out-param
+    - 这一步把：
+      - split managed-rebuffer status/path result handling
+      收口成：
+      - single typed managed-rebuffer result
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 rebuffer recovery path 的 preferred/fallback 执行收口成 typed attempt/result
     - 新增统一 recovery attempt/result：

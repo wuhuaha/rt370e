@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.458`
+  - `downlink/playback runtime` 继续把 managed rebuffer 执行结果收口成 typed result
+  - 新增统一 managed rebuffer recovery result：
+    - `river_cloud_xiaozhi_managed_rebuffer_recovery_result_t`
+  - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+    不再返回：
+    - `river_status_t + recover_path_out`
+    的松散组合，而是统一返回 typed result
+  - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(...)`
+    现在也直接返回 typed result，并统一使用：
+    - `result.status`
+    - `result.recover_path`
+    处理 fresh-start fallback 日志
+  - `write_failed` 与 `upstream starved` 调用侧不再把 managed execute 结果拆成：
+    - return status
+    - mutable recover_path out-param
+  - 这一步继续把 `downlink/playback runtime` 从：
+    - split managed-rebuffer status/path result handling
+    推进到：
+    - single typed managed-rebuffer result
 - `Step 5.457`
   - `downlink/playback runtime` 继续把 rebuffer recovery path 的 preferred/fallback 执行收口成 typed attempt/result
   - 新增统一 recovery attempt/result：

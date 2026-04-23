@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.458
+Validate that managed playback rebuffer execution now returns a typed result
+instead of mixing `river_status_t` with a mutable recover-path out parameter:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '652,666p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1520,1608p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1796,1818p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2806,2829p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'managed_rebuffer_recovery_result_t|execute_managed_playback_rebuffer_recovery|execute_managed_playback_rebuffer_request|recover_path_io' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_managed_rebuffer_recovery_result_t`
+- `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)` now returns:
+  - `river_cloud_xiaozhi_managed_rebuffer_recovery_result_t`
+  instead of `river_status_t + recover_path_out`
+- `river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(...)` now also returns
+  the typed result and uses:
+  - `result.status`
+  - `result.recover_path`
+  for fresh-start fallback logging
+- `write_failed` and `upstream starved` callers no longer pass a mutable
+  recover-path out parameter into managed execute
+
 ## Step 5.457
 Validate that playback rebuffer recovery path orchestration now uses typed
 attempt/result helpers instead of hand-written preferred/fallback branching:
