@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.427
+Validate that dialog runtime cloud ingress now mirrors internal fact groupings
+instead of maintaining a separate flat import field bag:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '120,180p' components/river_core/river_dialog_runtime.c
+sed -n '265,355p' components/river_core/river_dialog_runtime.c
+sed -n '1245,1295p' components/river_core/river_dialog_runtime.c
+rg -n 'river_dialog_runtime_cloud_import_t|round_facts|io_facts|session_facts|playback_facts|capture_cloud_snapshot|import_cloud_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_import_t` no longer declares a large flat field bag
+- it now groups cloud ingress data as:
+  - `round_facts`
+  - `io_facts`
+  - `session_facts`
+  - `playback_facts`
+- `river_dialog_runtime_capture_cloud_snapshot(...)` fills those grouped facts
+  directly from `river_cloud_runtime_snapshot_t`
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` imports those grouped
+  facts by structure, instead of reassigning dozens of flat fields one by one
+
 ## Step 5.426
 Validate that dialog runtime imports cloud playback phase observability through
 a dedicated observe ingress instead of mixing it into cloud semantic import:

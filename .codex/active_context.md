@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.426 拆分 dialog runtime cloud import 的 playback phase observe 载荷`
+  - `5.427 让 dialog runtime 的 cloud import 改用分层 facts 载荷`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 cloud snapshot ingress 从扁平字段包收口成与内部事实一致的分层载荷
+    - `river_dialog_runtime_cloud_import_t` 不再平铺 round/io/session/playback
+      相关字段
+    - 现在直接按内部真相结构分成：
+      - `round_facts`
+      - `io_facts`
+      - `session_facts`
+      - `playback_facts`
+    - `river_dialog_runtime_capture_cloud_snapshot(...)` 现在直接把 cloud runtime
+      snapshot 填充进这些 typed facts
+    - `river_dialog_runtime_import_cloud_snapshot_locked(...)` 也改为整块吸收这些
+      facts，不再逐字段搬运
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 cloud snapshot 输入层里的 playback 观测与语义事实拆开
     - `river_dialog_runtime_cloud_import_t` 不再承载：

@@ -26,6 +26,30 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.427`
+  - `dialog runtime` 继续把 cloud snapshot ingress 从扁平字段包收口成与内部事实一致的分层载荷
+  - `river_dialog_runtime_cloud_import_t` 不再平铺：
+    - round/window/listening 字段
+    - input/output io 字段
+    - session/turn/meta 字段
+    - playback semantic 字段
+  - 现在它直接按内部真相结构分成：
+    - `round_facts`
+    - `io_facts`
+    - `session_facts`
+    - `playback_facts`
+  - `river_dialog_runtime_capture_cloud_snapshot(...)` 现在直接把 cloud runtime
+    snapshot 填充到这些 typed facts 载荷里
+  - `river_dialog_runtime_import_cloud_snapshot_locked(...)` 也改为整块吸收：
+    - `cloud_round_facts`
+    - `cloud_io_facts`
+    - `cloud_session_facts`
+    - `cloud_playback_facts`
+    不再逐字段搬运
+  - 这一步继续把：
+    - dialog runtime ingress/import 结构
+    - runtime 内部 facts 结构
+    两层收口到同一模型，减少 reducer/import 边界继续维护第二套扁平协议
 - `Step 5.426`
   - `dialog runtime` 继续把 cloud snapshot 输入层里的 playback 观测与语义事实拆开
   - `river_dialog_runtime_cloud_import_t` 不再承载：

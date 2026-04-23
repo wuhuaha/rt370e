@@ -125,41 +125,10 @@ typedef struct {
 
 typedef struct {
     bool runtime_available;
-    bool conversation_window_active;
-    uint32_t conversation_window_remaining_ms;
-    bool cloud_listening;
-    bool cloud_stream_active;
-    bool cloud_listen_stop_pending;
-    bool cloud_local_close_pending;
-    uint32_t local_close_remaining_ms;
-    bool playback_cloud_active;
-    bool playback_lane_engaged;
-    bool playback_turn_active;
-    bool playback_rebuffer_pending;
-    river_cloud_playback_backend_state_t playback_backend_state_kind;
-    river_cloud_playback_supply_kind_t playback_supply_kind;
-    river_cloud_playback_hold_kind_t playback_hold_kind;
-    bool playback_terminal_closed;
-    bool tts_stop_pending;
-    bool playback_terminal_waiting;
-    river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
-    river_cloud_playback_terminal_state_t playback_terminal_state_kind;
-    river_cloud_playback_rebuffer_cause_t playback_rebuffer_cause_kind;
-    river_cloud_playback_start_policy_t playback_start_policy_kind;
-    bool turn_accepted;
-    bool barge_in_enabled_known;
-    bool barge_in_enabled;
-    char provider_name[RIVER_CLOUD_RUNTIME_PROVIDER_MAX];
-    char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
-    char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
-    char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-    char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-    char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-    char input_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
-    char output_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
-    uint32_t playback_start_frames;
-    uint32_t playback_prefetch_frames;
-    bool playback_start_cautious_history;
+    river_dialog_runtime_cloud_round_facts_t round_facts;
+    river_dialog_runtime_cloud_io_facts_t io_facts;
+    river_dialog_runtime_cloud_session_facts_t session_facts;
+    river_dialog_runtime_cloud_playback_facts_t playback_facts;
 } river_dialog_runtime_cloud_import_t;
 
 typedef struct {
@@ -197,6 +166,10 @@ static void river_dialog_runtime_set_wake_admission_pending_locked(bool pending)
 static void river_dialog_runtime_refresh_error_recovering_locked(void);
 static void river_dialog_runtime_reconcile_facts_locked(void);
 static bool river_dialog_runtime_cloud_runtime_available_locked(void);
+static river_dialog_input_lane_t river_dialog_runtime_parse_input_lane(
+    const char *state);
+static river_dialog_output_lane_t river_dialog_runtime_parse_output_lane(
+    const char *state);
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void);
 static void river_dialog_runtime_finalize_commit_locked(
     const river_dialog_runtime_commit_checkpoint_t *before,
@@ -296,60 +269,77 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
     }
 
     cloud_import->runtime_available = snapshot.available;
-    cloud_import->conversation_window_active = snapshot.conversation_window_active;
-    cloud_import->conversation_window_remaining_ms =
+    cloud_import->round_facts.conversation_window_active =
+        snapshot.conversation_window_active;
+    cloud_import->round_facts.conversation_window_remaining_ms =
         snapshot.conversation_window_remaining_ms;
-    cloud_import->cloud_listening = snapshot.listening;
-    cloud_import->cloud_stream_active = snapshot.stream_active;
-    cloud_import->cloud_listen_stop_pending = snapshot.listen_stop_pending;
-    cloud_import->cloud_local_close_pending = snapshot.local_close_pending;
-    cloud_import->local_close_remaining_ms = snapshot.local_close_remaining_ms;
-    cloud_import->playback_cloud_active = snapshot.playback_active;
-    cloud_import->playback_lane_engaged = snapshot.playback_lane_engaged;
-    cloud_import->playback_turn_active = snapshot.playback_turn_active;
-    cloud_import->playback_rebuffer_pending = snapshot.playback_rebuffer_pending;
-    cloud_import->playback_backend_state_kind = snapshot.playback_backend_state_kind;
-    cloud_import->playback_supply_kind = snapshot.playback_supply_kind;
-    cloud_import->playback_hold_kind = snapshot.playback_hold_kind;
-    cloud_import->playback_terminal_closed = snapshot.playback_terminal_closed;
-    cloud_import->tts_stop_pending = snapshot.tts_stop_pending;
-    cloud_import->playback_terminal_waiting = snapshot.playback_terminal_waiting;
-    cloud_import->playback_terminal_wait_kind = snapshot.playback_terminal_wait_kind;
-    cloud_import->playback_terminal_state_kind = snapshot.playback_terminal_state_kind;
-    cloud_import->playback_rebuffer_cause_kind =
+    cloud_import->round_facts.cloud_listening = snapshot.listening;
+    cloud_import->round_facts.cloud_stream_active = snapshot.stream_active;
+    cloud_import->round_facts.cloud_listen_stop_pending =
+        snapshot.listen_stop_pending;
+    cloud_import->round_facts.cloud_local_close_pending =
+        snapshot.local_close_pending;
+    cloud_import->round_facts.local_close_remaining_ms =
+        snapshot.local_close_remaining_ms;
+    cloud_import->playback_facts.cloud_playback_active = snapshot.playback_active;
+    cloud_import->playback_facts.lane_engaged = snapshot.playback_lane_engaged;
+    cloud_import->playback_facts.turn_active = snapshot.playback_turn_active;
+    cloud_import->playback_facts.rebuffer_pending =
+        snapshot.playback_rebuffer_pending;
+    cloud_import->playback_facts.backend_state_kind =
+        snapshot.playback_backend_state_kind;
+    cloud_import->playback_facts.supply_kind = snapshot.playback_supply_kind;
+    cloud_import->playback_facts.hold_kind = snapshot.playback_hold_kind;
+    cloud_import->playback_facts.terminal_closed =
+        snapshot.playback_terminal_closed;
+    cloud_import->playback_facts.tts_stop_pending = snapshot.tts_stop_pending;
+    cloud_import->playback_facts.terminal_waiting =
+        snapshot.playback_terminal_waiting;
+    cloud_import->playback_facts.terminal_wait_kind =
+        snapshot.playback_terminal_wait_kind;
+    cloud_import->playback_facts.terminal_state_kind =
+        snapshot.playback_terminal_state_kind;
+    cloud_import->playback_facts.rebuffer_cause_kind =
         snapshot.playback_rebuffer_cause_kind;
-    cloud_import->playback_start_policy_kind = snapshot.playback_start_policy_kind;
-    cloud_import->turn_accepted = snapshot.turn_accepted;
-    cloud_import->barge_in_enabled_known = snapshot.barge_in_enabled_known;
-    cloud_import->barge_in_enabled = snapshot.barge_in_enabled;
-    river_dialog_runtime_copy_text(cloud_import->provider_name,
-                                   sizeof(cloud_import->provider_name),
+    cloud_import->playback_facts.start_policy_kind =
+        snapshot.playback_start_policy_kind;
+    cloud_import->session_facts.turn_accepted = snapshot.turn_accepted;
+    cloud_import->session_facts.barge_in_enabled_known =
+        snapshot.barge_in_enabled_known;
+    cloud_import->session_facts.barge_in_enabled = snapshot.barge_in_enabled;
+    river_dialog_runtime_copy_text(cloud_import->session_facts.provider_name,
+                                   sizeof(cloud_import->session_facts.provider_name),
                                    snapshot.provider_name);
-    river_dialog_runtime_copy_text(cloud_import->session_id,
-                                   sizeof(cloud_import->session_id),
+    river_dialog_runtime_copy_text(cloud_import->session_facts.session_id,
+                                   sizeof(cloud_import->session_facts.session_id),
                                    snapshot.session_id);
-    river_dialog_runtime_copy_text(cloud_import->turn_id,
-                                   sizeof(cloud_import->turn_id),
+    river_dialog_runtime_copy_text(cloud_import->session_facts.turn_id,
+                                   sizeof(cloud_import->session_facts.turn_id),
                                    snapshot.turn_id);
-    river_dialog_runtime_copy_text(cloud_import->accept_reason,
-                                   sizeof(cloud_import->accept_reason),
+    river_dialog_runtime_copy_text(cloud_import->session_facts.accept_reason,
+                                   sizeof(cloud_import->session_facts.accept_reason),
                                    snapshot.accept_reason);
-    river_dialog_runtime_copy_text(cloud_import->playback_terminal_reason,
-                                   sizeof(cloud_import->playback_terminal_reason),
+    river_dialog_runtime_copy_text(
+        cloud_import->session_facts.playback_terminal_reason,
+        sizeof(cloud_import->session_facts.playback_terminal_reason),
                                    snapshot.playback_terminal_reason);
     river_dialog_runtime_copy_text(
-        cloud_import->playback_terminal_wait_reason,
-        sizeof(cloud_import->playback_terminal_wait_reason),
+        cloud_import->session_facts.playback_terminal_wait_reason,
+        sizeof(cloud_import->session_facts.playback_terminal_wait_reason),
         snapshot.playback_terminal_wait_reason);
-    river_dialog_runtime_copy_text(cloud_import->input_state_text,
-                                   sizeof(cloud_import->input_state_text),
+    river_dialog_runtime_copy_text(cloud_import->io_facts.input_state_text,
+                                   sizeof(cloud_import->io_facts.input_state_text),
                                    snapshot.input_state);
-    river_dialog_runtime_copy_text(cloud_import->output_state_text,
-                                   sizeof(cloud_import->output_state_text),
+    river_dialog_runtime_copy_text(cloud_import->io_facts.output_state_text,
+                                   sizeof(cloud_import->io_facts.output_state_text),
                                    snapshot.output_state);
-    cloud_import->playback_start_frames = snapshot.playback_start_frames;
-    cloud_import->playback_prefetch_frames = snapshot.playback_prefetch_frames;
-    cloud_import->playback_start_cautious_history =
+    cloud_import->io_facts.input_lane =
+        river_dialog_runtime_parse_input_lane(snapshot.input_state);
+    cloud_import->io_facts.output_lane =
+        river_dialog_runtime_parse_output_lane(snapshot.output_state);
+    cloud_import->playback_facts.start_frames = snapshot.playback_start_frames;
+    cloud_import->playback_facts.prefetch_frames = snapshot.playback_prefetch_frames;
+    cloud_import->playback_facts.start_cautious_history =
         snapshot.playback_start_cautious_history;
     cloud_playback_observe->phase_known = snapshot.playback_phase_known;
     cloud_playback_observe->phase_kind = snapshot.playback_phase_kind;
@@ -1255,90 +1245,10 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
     }
 
     g_river_dialog_runtime.cloud_runtime_available = cloud_import->runtime_available;
-    g_river_dialog_runtime.cloud_round_facts.conversation_window_active =
-        cloud_import->conversation_window_active;
-    g_river_dialog_runtime.cloud_round_facts.conversation_window_remaining_ms =
-        cloud_import->conversation_window_remaining_ms;
-    g_river_dialog_runtime.cloud_round_facts.cloud_listening =
-        cloud_import->cloud_listening;
-    g_river_dialog_runtime.cloud_round_facts.cloud_stream_active =
-        cloud_import->cloud_stream_active;
-    g_river_dialog_runtime.cloud_round_facts.cloud_listen_stop_pending =
-        cloud_import->cloud_listen_stop_pending;
-    g_river_dialog_runtime.cloud_round_facts.cloud_local_close_pending =
-        cloud_import->cloud_local_close_pending;
-    g_river_dialog_runtime.cloud_round_facts.local_close_remaining_ms =
-        cloud_import->local_close_remaining_ms;
-    g_river_dialog_runtime.cloud_playback_facts.cloud_playback_active =
-        cloud_import->playback_cloud_active;
-    g_river_dialog_runtime.cloud_playback_facts.lane_engaged =
-        cloud_import->playback_lane_engaged;
-    g_river_dialog_runtime.cloud_playback_facts.turn_active =
-        cloud_import->playback_turn_active;
-    g_river_dialog_runtime.cloud_playback_facts.rebuffer_pending =
-        cloud_import->playback_rebuffer_pending;
-    g_river_dialog_runtime.cloud_playback_facts.backend_state_kind =
-        cloud_import->playback_backend_state_kind;
-    g_river_dialog_runtime.cloud_playback_facts.supply_kind =
-        cloud_import->playback_supply_kind;
-    g_river_dialog_runtime.cloud_playback_facts.hold_kind =
-        cloud_import->playback_hold_kind;
-    g_river_dialog_runtime.cloud_playback_facts.terminal_closed =
-        cloud_import->playback_terminal_closed;
-    g_river_dialog_runtime.cloud_playback_facts.tts_stop_pending =
-        cloud_import->tts_stop_pending;
-    g_river_dialog_runtime.cloud_playback_facts.terminal_waiting =
-        cloud_import->playback_terminal_waiting;
-    g_river_dialog_runtime.cloud_playback_facts.terminal_wait_kind =
-        cloud_import->playback_terminal_wait_kind;
-    g_river_dialog_runtime.cloud_playback_facts.terminal_state_kind =
-        cloud_import->playback_terminal_state_kind;
-    g_river_dialog_runtime.cloud_playback_facts.rebuffer_cause_kind =
-        cloud_import->playback_rebuffer_cause_kind;
-    g_river_dialog_runtime.cloud_playback_facts.start_policy_kind =
-        cloud_import->playback_start_policy_kind;
-    g_river_dialog_runtime.cloud_session_facts.turn_accepted =
-        cloud_import->turn_accepted;
-    g_river_dialog_runtime.cloud_session_facts.barge_in_enabled_known =
-        cloud_import->barge_in_enabled_known;
-    g_river_dialog_runtime.cloud_session_facts.barge_in_enabled =
-        cloud_import->barge_in_enabled;
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.provider_name,
-                                   sizeof(g_river_dialog_runtime.cloud_session_facts.provider_name),
-                                   cloud_import->provider_name);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.session_id,
-                                   sizeof(g_river_dialog_runtime.cloud_session_facts.session_id),
-                                   cloud_import->session_id);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.turn_id,
-                                   sizeof(g_river_dialog_runtime.cloud_session_facts.turn_id),
-                                   cloud_import->turn_id);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.accept_reason,
-                                   sizeof(g_river_dialog_runtime.cloud_session_facts.accept_reason),
-                                   cloud_import->accept_reason);
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason,
-        sizeof(g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason),
-        cloud_import->playback_terminal_reason);
-    river_dialog_runtime_copy_text(
-        g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason,
-        sizeof(g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason),
-        cloud_import->playback_terminal_wait_reason);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_io_facts.input_state_text,
-                                   sizeof(g_river_dialog_runtime.cloud_io_facts.input_state_text),
-                                   cloud_import->input_state_text);
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_io_facts.output_state_text,
-                                   sizeof(g_river_dialog_runtime.cloud_io_facts.output_state_text),
-                                   cloud_import->output_state_text);
-    g_river_dialog_runtime.cloud_playback_facts.start_frames =
-        cloud_import->playback_start_frames;
-    g_river_dialog_runtime.cloud_playback_facts.prefetch_frames =
-        cloud_import->playback_prefetch_frames;
-    g_river_dialog_runtime.cloud_playback_facts.start_cautious_history =
-        cloud_import->playback_start_cautious_history;
-    g_river_dialog_runtime.cloud_io_facts.input_lane =
-        river_dialog_runtime_parse_input_lane(cloud_import->input_state_text);
-    g_river_dialog_runtime.cloud_io_facts.output_lane =
-        river_dialog_runtime_parse_output_lane(cloud_import->output_state_text);
+    g_river_dialog_runtime.cloud_round_facts = cloud_import->round_facts;
+    g_river_dialog_runtime.cloud_io_facts = cloud_import->io_facts;
+    g_river_dialog_runtime.cloud_session_facts = cloud_import->session_facts;
+    g_river_dialog_runtime.cloud_playback_facts = cloud_import->playback_facts;
     river_dialog_runtime_export_round_facts_to_snapshot_locked();
     river_dialog_runtime_export_io_facts_to_snapshot_locked();
     river_dialog_runtime_export_session_facts_to_snapshot_locked();
