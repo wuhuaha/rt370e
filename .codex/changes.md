@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.439
+- `downlink/playback` 继续把 playback 准备阶段从 downlink task 主循环中收口成统一 helper：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增本地 typed result：
+  - `river_cloud_xiaozhi_downlink_prepare_result_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_prepare_downlink_playback(...)`
+- 该 helper 现在统一接管：
+  - rebuffer resume readiness gating
+  - pending-stop before-active gating
+  - paused backend resume path
+  - recovering backend stall
+  - start-threshold / start-playback gating
+- `downlink task` 在读 ring / 写 frame 前现在只保留：
+  - call `prepare_downlink_playback(...)`
+  - delay + continue on non-ready result
+- 这一步把：
+  - scattered start/resume gating
+  收口成：
+  - single playback-prepare entrypoint
+
 ## Step 5.438
 - `downlink/playback` 继续把单帧写入执行从 downlink task 主循环中收口成统一 helper：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

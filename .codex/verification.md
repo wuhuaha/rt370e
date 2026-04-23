@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.439
+Validate that downlink playback prepare/start-resume gating now goes through a
+single typed helper instead of being inlined in the task loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '620,640p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3735,3795p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3930,3978p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_prepare_result|prepare_downlink_playback|maybe_resume_paused_playback|start_playback_if_needed' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_downlink_prepare_result_t`
+  - `river_cloud_xiaozhi_prepare_downlink_playback(...)`
+- downlink task no longer inlines:
+  - rebuffer resume gating
+  - stop-pending before-active gating
+  - paused backend resume path
+  - recovering-backend stall
+  - start-threshold / start-playback gating
+- downlink task now only branches on typed prepare result before ring read/write
+
 ## Step 5.438
 Validate that one-frame downlink write execution is now routed through a typed
 helper result instead of being inlined in the task loop:
