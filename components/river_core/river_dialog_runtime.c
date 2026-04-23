@@ -22,17 +22,17 @@ typedef struct {
     bool tts_stop_pending;
     bool terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t terminal_wait_kind;
+} river_dialog_runtime_cloud_playback_facts_t;
+
+typedef struct {
+    bool phase_known;
+    river_cloud_playback_phase_t phase_kind;
     river_cloud_playback_terminal_state_t terminal_state_kind;
     river_cloud_playback_rebuffer_cause_t rebuffer_cause_kind;
     river_cloud_playback_start_policy_t start_policy_kind;
     uint32_t start_frames;
     uint32_t prefetch_frames;
     bool start_cautious_history;
-} river_dialog_runtime_cloud_playback_facts_t;
-
-typedef struct {
-    bool phase_known;
-    river_cloud_playback_phase_t phase_kind;
 } river_dialog_runtime_cloud_playback_observe_t;
 
 typedef struct {
@@ -307,12 +307,6 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         snapshot.playback_terminal_waiting;
     cloud_import->playback_facts.terminal_wait_kind =
         snapshot.playback_terminal_wait_kind;
-    cloud_import->playback_facts.terminal_state_kind =
-        snapshot.playback_terminal_state_kind;
-    cloud_import->playback_facts.rebuffer_cause_kind =
-        snapshot.playback_rebuffer_cause_kind;
-    cloud_import->playback_facts.start_policy_kind =
-        snapshot.playback_start_policy_kind;
     cloud_import->session_facts.turn_accepted = snapshot.turn_accepted;
     cloud_import->session_facts.barge_in_enabled_known =
         snapshot.barge_in_enabled_known;
@@ -347,12 +341,18 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
         river_dialog_runtime_parse_input_lane(snapshot.input_state);
     cloud_import->io_facts.output_lane =
         river_dialog_runtime_parse_output_lane(snapshot.output_state);
-    cloud_import->playback_facts.start_frames = snapshot.playback_start_frames;
-    cloud_import->playback_facts.prefetch_frames = snapshot.playback_prefetch_frames;
-    cloud_import->playback_facts.start_cautious_history =
-        snapshot.playback_start_cautious_history;
     cloud_playback_observe->phase_known = snapshot.playback_phase_known;
     cloud_playback_observe->phase_kind = snapshot.playback_phase_kind;
+    cloud_playback_observe->terminal_state_kind =
+        snapshot.playback_terminal_state_kind;
+    cloud_playback_observe->rebuffer_cause_kind =
+        snapshot.playback_rebuffer_cause_kind;
+    cloud_playback_observe->start_policy_kind =
+        snapshot.playback_start_policy_kind;
+    cloud_playback_observe->start_frames = snapshot.playback_start_frames;
+    cloud_playback_observe->prefetch_frames = snapshot.playback_prefetch_frames;
+    cloud_playback_observe->start_cautious_history =
+        snapshot.playback_start_cautious_history;
     return true;
 }
 
@@ -482,17 +482,17 @@ static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
     g_river_dialog_runtime.snapshot.playback_terminal_wait_kind =
         g_river_dialog_runtime.cloud_playback_facts.terminal_wait_kind;
     g_river_dialog_runtime.snapshot.playback_terminal_state_kind =
-        g_river_dialog_runtime.cloud_playback_facts.terminal_state_kind;
+        g_river_dialog_runtime.cloud_playback_observe.terminal_state_kind;
     g_river_dialog_runtime.snapshot.playback_rebuffer_cause_kind =
-        g_river_dialog_runtime.cloud_playback_facts.rebuffer_cause_kind;
+        g_river_dialog_runtime.cloud_playback_observe.rebuffer_cause_kind;
     g_river_dialog_runtime.snapshot.playback_start_policy_kind =
-        g_river_dialog_runtime.cloud_playback_facts.start_policy_kind;
+        g_river_dialog_runtime.cloud_playback_observe.start_policy_kind;
     g_river_dialog_runtime.snapshot.playback_start_frames =
-        g_river_dialog_runtime.cloud_playback_facts.start_frames;
+        g_river_dialog_runtime.cloud_playback_observe.start_frames;
     g_river_dialog_runtime.snapshot.playback_prefetch_frames =
-        g_river_dialog_runtime.cloud_playback_facts.prefetch_frames;
+        g_river_dialog_runtime.cloud_playback_observe.prefetch_frames;
     g_river_dialog_runtime.snapshot.playback_start_cautious_history =
-        g_river_dialog_runtime.cloud_playback_facts.start_cautious_history;
+        g_river_dialog_runtime.cloud_playback_observe.start_cautious_history;
 }
 
 static void river_dialog_runtime_capture_local_playback_import(

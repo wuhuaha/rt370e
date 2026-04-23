@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.429
+- `dialog runtime` 继续把 playback 里的 observe-only 字段从 typed facts 中拆出去：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_cloud_playback_facts_t` 不再承载：
+  - `terminal_state_kind`
+  - `rebuffer_cause_kind`
+  - `start_policy_kind`
+  - `start_frames`
+  - `prefetch_frames`
+  - `start_cautious_history`
+- 上述字段现在统一并入：
+  - `river_dialog_runtime_cloud_playback_observe_t`
+- `capture_cloud_snapshot(...)` 现在把这些字段直接写入
+  `cloud_playback_observe`
+- `export_playback_facts_to_snapshot_locked()` 现在也改为从
+  `cloud_playback_observe` 导出：
+  - terminal state
+  - rebuffer cause
+  - start gate/prefetch/cautious
+- 这一步继续把 `dialog runtime` 的 playback 结构压实成：
+  - `cloud_playback_facts` 只保留参与交互/恢复判断的 typed truth
+  - `cloud_playback_observe` 统一承载 phase、terminal/rebuffer、start-gate 观测
+
 ## Step 5.428
 - `dialog runtime` 继续把 `io/session` 里的纯观测字段从 typed facts 中拆出去：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

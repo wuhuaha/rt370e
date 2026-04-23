@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.429
+Validate that dialog runtime playback semantic facts no longer carry playback
+terminal/rebuffer/start-gate observability:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '10,40p' components/river_core/river_dialog_runtime.c
+sed -n '330,360p' components/river_core/river_dialog_runtime.c
+sed -n '476,496p' components/river_core/river_dialog_runtime.c
+rg -n 'terminal_state_kind|rebuffer_cause_kind|start_policy_kind|start_frames|prefetch_frames|start_cautious_history|cloud_playback_observe' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_playback_facts_t` no longer contains playback
+  terminal/rebuffer/start-gate observe-only fields
+- `river_dialog_runtime_cloud_playback_observe_t` now owns:
+  - `phase_kind`
+  - `terminal_state_kind`
+  - `rebuffer_cause_kind`
+  - `start_policy_kind`
+  - `start_frames`
+  - `prefetch_frames`
+  - `start_cautious_history`
+- playback snapshot export now reads those observe-only fields from
+  `cloud_playback_observe`
+
 ## Step 5.428
 Validate that dialog runtime `io/session` textual metadata now travels through
 observe structures instead of semantic fact structures:
