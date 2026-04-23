@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.456
+Validate that playback rebuffer logging now reads shared fields from a typed
+observe view instead of reassembling them independently in each path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '606,652p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '700,734p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1584,1652p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2770,2798p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_rebuffer_observe_view|capture_playback_rebuffer_observe_view|service recover requested|upstream gap rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_playback_rebuffer_observe_view_t`
+  - `river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(...)`
+- these log paths now read shared fields from the observe view:
+  - `river_cloud_xiaozhi_log_write_failed_rebuffer_request(...)`
+  - `river_cloud_xiaozhi_try_write_failed_inline_recover(...)`
+  - `river_cloud_xiaozhi_maybe_rebuffer_starved(...)`
+- rebuffer log assembly no longer independently mixes:
+  - plan fields
+  - phase/global fields
+  - counter globals
+  across each caller
+
 ## Step 5.455
 Validate that playback managed-rebuffer recovery now uses a shared typed request
 executor across write-failed and upstream-starved paths:

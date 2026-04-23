@@ -15,11 +15,32 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.455 收口 managed rebuffer 的 typed request executor`
+  - `5.456 收口 rebuffer 日志的 typed observe view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 rebuffer 请求日志的公共观测字段收口成 typed observe view
+    - 新增统一 rebuffer observe view：
+      - `river_cloud_xiaozhi_playback_rebuffer_observe_view_t`
+      - `river_cloud_xiaozhi_capture_playback_rebuffer_observe_view(...)`
+    - `write_failed rebuffer request`、`inline service recover request`、`upstream gap rebuffer`
+      日志现在统一从 observe view 读取：
+      - `cause`
+      - `supply`
+      - `phase`
+      - `backend`
+      - `start_gate`
+      - `queued/low_water`
+      - `prefetch_target_ms`
+      - `rebuffer_count/streak`
+      - `recover_path`
+    - `rebuffer` 相关日志不再分散从全局和 plan 混合拉取同一组字段
+    - 这一步把：
+      - duplicated rebuffer log field assembly
+      收口成：
+      - single typed rebuffer observe view
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 managed rebuffer 执行收口成 typed request executor
     - 新增统一 managed request 描述与执行入口：
