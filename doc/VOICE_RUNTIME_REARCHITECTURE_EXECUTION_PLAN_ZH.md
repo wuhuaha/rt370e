@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.451`
+  - `dialog runtime` 继续收口 local playback shadow 的分散判定 helper
+  - 删除分散 helper：
+    - `local_playback_state_active_locked(...)`
+    - `local_playback_state_recovering_locked(...)`
+    - `local_playback_shadow_drives_truth_locked(...)`
+    - `local_playback_shadow_active_fallback_locked(...)`
+    - `local_playback_shadow_recovering_fallback_locked(...)`
+  - 新增统一 shadow view：
+    - `river_dialog_runtime_local_playback_shadow_view_t`
+    - `river_dialog_runtime_capture_local_playback_shadow_view_locked(...)`
+  - `dialog runtime` 现在统一通过 shadow view 驱动：
+    - playback projection 的 local fallback 注入
+    - local playback import 的 truth-drive gating
+    - runtime dump 的 local playback 观测
+  - 这一步继续把 `dialog runtime` 从：
+    - scattered local playback shadow predicates
+    推进到：
+    - single local shadow view
 - `Step 5.450`
   - `downlink/playback` 继续收口 ready-cycle 的单层 executor 壳
   - 删除中间 helper：

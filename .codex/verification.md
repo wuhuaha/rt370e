@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.451
+Validate that dialog runtime now captures local playback shadow through a single
+view helper instead of scattered active/recovering/drives-truth predicates:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '706,845p' components/river_core/river_dialog_runtime.c
+sed -n '1320,1355p' components/river_core/river_dialog_runtime.c
+sed -n '1736,1762p' components/river_core/river_dialog_runtime.c
+rg -n 'local_playback_state_active_locked|local_playback_state_recovering_locked|local_playback_shadow_drives_truth_locked|local_playback_shadow_active_fallback_locked|local_playback_shadow_recovering_fallback_locked|capture_local_playback_shadow_view_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime no longer defines:
+  - `river_dialog_runtime_local_playback_state_active_locked(...)`
+  - `river_dialog_runtime_local_playback_state_recovering_locked(...)`
+  - `river_dialog_runtime_local_playback_shadow_drives_truth_locked(...)`
+  - `river_dialog_runtime_local_playback_shadow_active_fallback_locked(...)`
+  - `river_dialog_runtime_local_playback_shadow_recovering_fallback_locked(...)`
+- dialog runtime now defines:
+  - `river_dialog_runtime_local_playback_shadow_view_t`
+  - `river_dialog_runtime_capture_local_playback_shadow_view_locked(...)`
+- playback projection / local playback import / runtime dump now all reuse:
+  - the same local shadow view
+
 ## Step 5.450
 Validate that the ready-cycle executor shell is removed and the cycle processor
 now directly owns frame acquire plus write-step dispatch:
