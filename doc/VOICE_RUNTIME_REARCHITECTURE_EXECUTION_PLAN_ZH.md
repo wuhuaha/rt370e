@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.465`
+  - `dialog runtime` 继续把 interaction publish 的 `previous -> next`
+    transition 收口成 typed publish view
+  - 新增统一 publish capture：
+    - `river_dialog_runtime_interaction_publish_view_t`
+    - `river_dialog_runtime_capture_interaction_publish_view_locked(...)`
+  - 删除单用途 helper：
+    - `river_dialog_runtime_compute_interaction_state_locked(...)`
+  - `river_dialog_runtime_publish_locked(...)` 不再手工做：
+    - next-state 计算
+    - state-changed 判定
+    - transition_count 递增
+    而是统一从 publish view 读取：
+    - `previous_state`
+    - `next_state`
+    - `state_changed`
+  - 这一步继续把 `dialog runtime` 从：
+    - interaction publish transition branching
+    推进到：
+    - single publish view
 - `Step 5.464`
   - `dialog runtime` 继续把 commit checkpoint 的 `before/after` 判定收口到
     raw interaction evaluation

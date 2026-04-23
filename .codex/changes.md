@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.465
+- `dialog runtime` 继续把 interaction publish 的 `previous -> next`
+  transition 收口成 typed publish view：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增统一 publish capture：
+  - `river_dialog_runtime_interaction_publish_view_t`
+  - `river_dialog_runtime_capture_interaction_publish_view_locked(...)`
+- 删除单用途 helper：
+  - `river_dialog_runtime_compute_interaction_state_locked(...)`
+- `river_dialog_runtime_publish_locked(...)` 不再手工做：
+  - `compute next_state`
+  - `previous != next`
+  - `transition_count++`
+  而是统一从 typed publish view 读取：
+  - `previous_state`
+  - `next_state`
+  - `state_changed`
+- 这一步把：
+  - interaction publish transition branching
+  收口成：
+  - single publish view
+
 ## Step 5.464
 - `dialog runtime` 继续把 commit checkpoint 的 `before/after` 判定收口到 raw
   interaction evaluation：

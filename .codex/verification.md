@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.465
+Validate that dialog runtime now publishes interaction-state transitions through
+a typed publish view instead of hand-written next-state comparison logic:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '800,825p' components/river_core/river_dialog_runtime.c
+sed -n '1188,1310p' components/river_core/river_dialog_runtime.c
+rg -n 'interaction_publish_view_t|capture_interaction_publish_view_locked|compute_interaction_state_locked\\(' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_interaction_publish_view_t`
+  - `river_dialog_runtime_capture_interaction_publish_view_locked(...)`
+- `river_dialog_runtime_compute_interaction_state_locked(...)` no longer exists
+- `river_dialog_runtime_publish_locked(...)` now reads:
+  - `previous_state`
+  - `next_state`
+  - `state_changed`
+  from the shared publish view instead of manually recomputing and comparing the
+  interaction state
+
 ## Step 5.464
 Validate that dialog runtime now captures commit checkpoints from raw interaction
 evaluation instead of reading cached derived facts:

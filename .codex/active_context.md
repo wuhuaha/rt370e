@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.464 收口 raw commit checkpoint view`
+  - `5.465 收口 interaction publish view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 interaction publish 的 `previous -> next`
+      transition 收口成 typed publish view
+    - 新增统一 publish capture：
+      - `river_dialog_runtime_interaction_publish_view_t`
+      - `river_dialog_runtime_capture_interaction_publish_view_locked(...)`
+    - 删除单用途 helper：
+      - `river_dialog_runtime_compute_interaction_state_locked(...)`
+    - `river_dialog_runtime_publish_locked(...)` 不再手工做：
+      - next-state 计算
+      - state-changed 判定
+      - transition_count 递增
+      而是统一从 publish view 读取：
+      - `previous_state`
+      - `next_state`
+      - `state_changed`
+    - 这一步把：
+      - interaction publish transition branching
+      收口成：
+      - single publish view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 commit checkpoint 的 `before/after` 判定收口到
       raw interaction evaluation

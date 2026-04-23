@@ -183,7 +183,6 @@ static river_dialog_input_lane_t river_dialog_runtime_parse_input_lane(
     const char *state);
 static river_dialog_output_lane_t river_dialog_runtime_parse_output_lane(
     const char *state);
-static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void);
 static void river_dialog_runtime_finalize_commit_locked(
     const river_dialog_runtime_commit_checkpoint_t *before,
     river_dialog_runtime_commit_policy_t policy,
@@ -807,6 +806,13 @@ typedef struct {
     bool allows_barge_in_interrupt;
 } river_dialog_runtime_interaction_eval_t;
 
+typedef struct {
+    river_dialog_runtime_interaction_eval_t interaction;
+    river_interaction_state_t previous_state;
+    river_interaction_state_t next_state;
+    bool state_changed;
+} river_dialog_runtime_interaction_publish_view_t;
+
 static void river_dialog_runtime_capture_playback_projection_locked(
     river_dialog_runtime_playback_projection_t *projection)
 {
@@ -1185,12 +1191,18 @@ static bool river_dialog_runtime_cloud_round_active_locked(void)
     return eval.cloud_round_active;
 }
 
-static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
+static void river_dialog_runtime_capture_interaction_publish_view_locked(
+    river_dialog_runtime_interaction_publish_view_t *view)
 {
-    river_dialog_runtime_interaction_eval_t eval;
+    if (view == NULL) {
+        return;
+    }
 
-    river_dialog_runtime_capture_interaction_eval_locked(&eval);
-    return eval.state;
+    memset(view, 0, sizeof(*view));
+    river_dialog_runtime_capture_interaction_eval_locked(&view->interaction);
+    view->previous_state = g_river_dialog_runtime.derived_facts.interaction_state;
+    view->next_state = view->interaction.state;
+    view->state_changed = view->previous_state != view->next_state;
 }
 
 static void river_dialog_runtime_capture_commit_checkpoint_from_interaction_eval(
@@ -1287,20 +1299,20 @@ static const char *river_dialog_runtime_ingress_default_reason(
 
 static void river_dialog_runtime_publish_locked(const char *reason)
 {
-    river_interaction_state_t next_state;
+    river_dialog_runtime_interaction_publish_view_t view;
 
-    next_state = river_dialog_runtime_compute_interaction_state_locked();
-    if (g_river_dialog_runtime.derived_facts.interaction_state != next_state) {
+    river_dialog_runtime_capture_interaction_publish_view_locked(&view);
+    if (view.state_changed) {
         g_river_dialog_runtime.derived_facts.transition_count++;
     }
-    g_river_dialog_runtime.derived_facts.interaction_state = next_state;
+    g_river_dialog_runtime.derived_facts.interaction_state = view.next_state;
     if (reason != NULL && reason[0] != '\0') {
         river_dialog_runtime_copy_text(g_river_dialog_runtime.derived_facts.reason,
                                        sizeof(g_river_dialog_runtime.derived_facts.reason),
                                        reason);
     }
     river_dialog_runtime_export_derived_facts_to_snapshot_locked();
-    (void)river_interaction_state_set(next_state,
+    (void)river_interaction_state_set(view.next_state,
                                       g_river_dialog_runtime.derived_facts.reason[0] != '\0' ?
                                           g_river_dialog_runtime.derived_facts.reason :
                                           reason);
