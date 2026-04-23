@@ -314,6 +314,8 @@ static void river_dialog_runtime_finalize_commit_locked(
     const char *reason);
 static void river_dialog_runtime_commit_ingress(
     const river_dialog_runtime_ingress_t *ingress);
+static void river_dialog_runtime_capture_voice_policy_view_locked(
+    river_dialog_runtime_voice_policy_view_t *view);
 
 static bool river_dialog_runtime_lock(void)
 {
@@ -2201,6 +2203,50 @@ bool river_dialog_runtime_allows_barge_in_interrupt(void)
 river_interaction_state_t river_dialog_runtime_interaction_state(void)
 {
     return g_river_dialog_runtime.snapshot.interaction_state;
+}
+
+static void river_dialog_runtime_capture_voice_policy_view_locked(
+    river_dialog_runtime_voice_policy_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    view->available = true;
+    view->playback_owner_kind = g_river_dialog_runtime.playback_truth.owner_kind;
+    view->error_kind = g_river_dialog_runtime.error_truth.kind;
+    view->playback_active = g_river_dialog_runtime.playback_truth.active;
+    view->playback_recovering = g_river_dialog_runtime.playback_truth.recovering;
+    view->playback_lane_engaged = g_river_dialog_runtime.cloud_playback_facts.lane_engaged;
+    view->playback_turn_active = g_river_dialog_runtime.cloud_playback_facts.turn_active;
+    view->tts_stop_pending = g_river_dialog_runtime.cloud_playback_facts.tts_stop_pending;
+    view->playback_terminal_waiting =
+        g_river_dialog_runtime.cloud_playback_facts.terminal_waiting;
+    view->playback_terminal_wait_kind =
+        g_river_dialog_runtime.cloud_playback_facts.terminal_wait_kind;
+    view->playback_backend_state_kind =
+        g_river_dialog_runtime.cloud_playback_facts.backend_state_kind;
+    view->playback_supply_kind = g_river_dialog_runtime.cloud_playback_facts.supply_kind;
+    view->playback_hold_kind = g_river_dialog_runtime.cloud_playback_facts.hold_kind;
+}
+
+river_status_t river_dialog_runtime_get_voice_policy_view(
+    river_dialog_runtime_voice_policy_view_t *view)
+{
+    if (view == NULL) {
+        return RIVER_ERR_ARG;
+    }
+    if (!g_river_dialog_runtime.initialized) {
+        return RIVER_ERR_NOT_FOUND;
+    }
+    if (!river_dialog_runtime_lock()) {
+        return RIVER_ERR_BUSY;
+    }
+
+    river_dialog_runtime_capture_voice_policy_view_locked(view);
+    river_dialog_runtime_unlock();
+    return RIVER_OK;
 }
 
 river_status_t river_dialog_runtime_get_snapshot(river_dialog_runtime_snapshot_t *snapshot)

@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.473 收口 control export view`
+  - `5.474 导出 voice policy view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
+      `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释
+    - 新增窄化对外真相：
+      - `river_dialog_runtime_voice_policy_view_t`
+      - `river_dialog_runtime_get_voice_policy_view(...)`
+      - `river_dialog_runtime_capture_voice_policy_view_locked(...)`
+    - `river_voice_runtime_policy.c` 不再获取整份：
+      - `river_dialog_runtime_snapshot_t`
+      - `river_dialog_runtime_get_snapshot(...)`
+      来判断 cloud playback engaged / quiet window /
+      restart pending block
+    - AEC / duplex policy 现在只消费 voice-policy 相关最小字段，而不是继续耦合
+      dialog snapshot 的宽字段集合
+    - 这一步把：
+      - external snapshot-shaped policy dependency
+      收口成：
+      - typed dialog voice-policy view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把剩余 `control_facts -> snapshot` 导出边界收口成
       typed control export view，并把命名拉齐到

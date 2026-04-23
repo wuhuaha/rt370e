@@ -52,69 +52,69 @@ static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t
            state == RIVER_INTERACTION_ASR_STREAMING;
 }
 
-static bool river_voice_runtime_dialog_snapshot_capture(
-    river_dialog_runtime_snapshot_t *snapshot)
+static bool river_voice_runtime_dialog_policy_view_capture(
+    river_dialog_runtime_voice_policy_view_t *view)
 {
-    return snapshot != NULL && river_dialog_runtime_get_snapshot(snapshot) == RIVER_OK;
+    return view != NULL && river_dialog_runtime_get_voice_policy_view(view) == RIVER_OK;
 }
 
 static bool river_voice_runtime_dialog_cloud_playback_engaged(
-    const river_dialog_runtime_snapshot_t *snapshot)
+    const river_dialog_runtime_voice_policy_view_t *view)
 {
-    return snapshot != NULL &&
-           snapshot->playback_owner_kind == RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD &&
-           (snapshot->playback_lane_engaged || snapshot->playback_recovering ||
-            snapshot->playback_turn_active);
+    return view != NULL &&
+           view->playback_owner_kind == RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD &&
+           (view->playback_lane_engaged || view->playback_recovering ||
+            view->playback_turn_active);
 }
 
 static bool river_voice_runtime_dialog_playback_quiet_window(
-    const river_dialog_runtime_snapshot_t *snapshot)
+    const river_dialog_runtime_voice_policy_view_t *view)
 {
-    if (snapshot == NULL || snapshot->playback_active) {
+    if (view == NULL || view->playback_active) {
         return false;
     }
 
-    if (snapshot->tts_stop_pending) {
+    if (view->tts_stop_pending) {
         return true;
     }
-    if (snapshot->playback_terminal_waiting &&
-        snapshot->playback_terminal_wait_kind !=
+    if (view->playback_terminal_waiting &&
+        view->playback_terminal_wait_kind !=
             RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE) {
         return true;
     }
-    if (snapshot->playback_hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE) {
+    if (view->playback_hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE) {
         return true;
     }
 
-    switch (snapshot->playback_backend_state_kind) {
+    switch (view->playback_backend_state_kind) {
     case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING:
     case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
         return true;
     case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
-        return snapshot->playback_supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_NONE;
+        return view->playback_supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_NONE;
     default:
         return false;
     }
 }
 
 static bool river_voice_runtime_restart_pending_requires_block(
-    const river_dialog_runtime_snapshot_t *snapshot,
+    const river_dialog_runtime_voice_policy_view_t *view,
     river_playback_state_t playback_state)
 {
-    if (snapshot == NULL) {
+    if (view == NULL || !view->available) {
         return playback_state == RIVER_PLAYBACK_RESTART_PENDING;
     }
 
-    if (!river_voice_runtime_dialog_cloud_playback_engaged(snapshot)) {
+    if (!river_voice_runtime_dialog_cloud_playback_engaged(view)) {
         return false;
     }
 
-    if (snapshot->playback_backend_state_kind !=
+    if (view->playback_backend_state_kind !=
         RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING) {
         return false;
     }
 
-    return !river_voice_runtime_dialog_playback_quiet_window(snapshot);
+    return !river_voice_runtime_dialog_playback_quiet_window(view);
 }
 
 static bool river_voice_runtime_profile_supports_playback_reference(
@@ -297,8 +297,8 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
                                             river_voice_aec_gate_eval_t *eval)
 {
     const river_voice_profile_config_t *profile_config;
-    river_dialog_runtime_snapshot_t dialog_snapshot;
-    const river_dialog_runtime_snapshot_t *dialog_snapshot_ptr = NULL;
+    river_dialog_runtime_voice_policy_view_t dialog_view;
+    const river_dialog_runtime_voice_policy_view_t *dialog_view_ptr = NULL;
     bool playback_active;
 
     if (eval == 0) {
@@ -317,10 +317,10 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
     eval->system_ready = false;
     eval->active = false;
 
-    if (river_voice_runtime_dialog_snapshot_capture(&dialog_snapshot)) {
-        dialog_snapshot_ptr = &dialog_snapshot;
-        eval->dialog_playback_owner_kind = dialog_snapshot.playback_owner_kind;
-        eval->dialog_error_kind = dialog_snapshot.error_kind;
+    if (river_voice_runtime_dialog_policy_view_capture(&dialog_view)) {
+        dialog_view_ptr = &dialog_view;
+        eval->dialog_playback_owner_kind = dialog_view.playback_owner_kind;
+        eval->dialog_error_kind = dialog_view.error_kind;
     }
 
     if (!profile_config->experimental) {
@@ -328,7 +328,7 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
         return;
     }
 
-    if (river_voice_runtime_restart_pending_requires_block(dialog_snapshot_ptr,
+    if (river_voice_runtime_restart_pending_requires_block(dialog_view_ptr,
                                                            eval->playback_state)) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
         return;
@@ -336,7 +336,7 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
 
     playback_active = river_playback_service_state_active(eval->playback_state);
     if (!playback_active &&
-        river_voice_runtime_dialog_cloud_playback_engaged(dialog_snapshot_ptr)) {
+        river_voice_runtime_dialog_cloud_playback_engaged(dialog_view_ptr)) {
         playback_active = true;
     }
 

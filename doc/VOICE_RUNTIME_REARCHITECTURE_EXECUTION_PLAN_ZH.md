@@ -26,6 +26,29 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.474`
+  - `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
+    `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释
+  - 新增窄化对外真相：
+    - `river_dialog_runtime_voice_policy_view_t`
+    - `river_dialog_runtime_get_voice_policy_view(...)`
+    - `river_dialog_runtime_capture_voice_policy_view_locked(...)`
+  - `river_voice_runtime_policy.c` 不再获取整份：
+    - `river_dialog_runtime_snapshot_t`
+    - `river_dialog_runtime_get_snapshot(...)`
+    来判断：
+    - cloud playback engaged
+    - quiet window
+    - restart pending block
+  - AEC / duplex policy 现在只消费 voice-policy 相关最小字段，而不是继续耦合
+    dialog snapshot 的宽字段集合
+  - 这一步继续把 `dialog runtime` 从：
+    - external snapshot-shaped policy dependency
+    推进到：
+    - typed dialog voice-policy view
+  - 下一步继续聚焦：
+    - 继续检查其他外部 snapshot 消费点，优先把真正参与策略判断的调用点继续替换为
+      typed view / typed query，而把 snapshot 留给状态转储和兼容诊断
 - `Step 5.473`
   - `dialog runtime` 继续把剩余 `control_facts -> snapshot` 导出边界收口成
     typed control export view，并把命名拉齐到

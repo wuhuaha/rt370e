@@ -94,6 +94,22 @@ typedef struct {
     bool playback_start_cautious_history;
 } river_dialog_runtime_snapshot_t;
 
+typedef struct {
+    bool available;
+    river_dialog_playback_owner_kind_t playback_owner_kind;
+    river_dialog_error_kind_t error_kind;
+    bool playback_active;
+    bool playback_recovering;
+    bool playback_lane_engaged;
+    bool playback_turn_active;
+    bool tts_stop_pending;
+    bool playback_terminal_waiting;
+    river_cloud_playback_terminal_wait_kind_t playback_terminal_wait_kind;
+    river_cloud_playback_backend_state_t playback_backend_state_kind;
+    river_cloud_playback_supply_kind_t playback_supply_kind;
+    river_cloud_playback_hold_kind_t playback_hold_kind;
+} river_dialog_runtime_voice_policy_view_t;
+
 river_status_t river_dialog_runtime_init(void);
 void river_dialog_runtime_mark_boot_ready_with_cloud_state(const char *reason);
 void river_dialog_runtime_note_wake_confirmed_with_cloud_state(const char *reason);
@@ -117,6 +133,8 @@ bool river_dialog_runtime_allows_wakeword_detection(void);
 const char *river_dialog_runtime_wakeword_admission_block_reason(void);
 bool river_dialog_runtime_allows_barge_in_interrupt(void);
 river_interaction_state_t river_dialog_runtime_interaction_state(void);
+river_status_t river_dialog_runtime_get_voice_policy_view(
+    river_dialog_runtime_voice_policy_view_t *view);
 river_status_t river_dialog_runtime_get_snapshot(river_dialog_runtime_snapshot_t *snapshot);
 void river_dialog_runtime_dump_status(void);
 const char *river_dialog_input_lane_name(river_dialog_input_lane_t state);

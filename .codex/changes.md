@@ -1,5 +1,40 @@
 # Change Log
 
+## Step 5.474
+- `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
+  `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释：
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+  - [components/river_voice/river_voice_runtime_policy.c](/root/ameba-river/components/river_voice/river_voice_runtime_policy.c)
+- 新增窄化对外真相：
+  - `river_dialog_runtime_voice_policy_view_t`
+  - `river_dialog_runtime_get_voice_policy_view(...)`
+  - `river_dialog_runtime_capture_voice_policy_view_locked(...)`
+- `river_voice_runtime_policy.c` 不再获取整份：
+  - `river_dialog_runtime_snapshot_t`
+  - `river_dialog_runtime_get_snapshot(...)`
+  来判断：
+  - cloud playback engaged
+  - quiet window
+  - restart pending block
+- AEC / duplex policy 现在只消费 voice-policy 相关最小字段：
+  - `playback_owner_kind`
+  - `error_kind`
+  - `playback_active`
+  - `playback_recovering`
+  - `playback_lane_engaged`
+  - `playback_turn_active`
+  - `tts_stop_pending`
+  - `playback_terminal_waiting`
+  - `playback_terminal_wait_kind`
+  - `playback_backend_state_kind`
+  - `playback_supply_kind`
+  - `playback_hold_kind`
+- 这一步继续把：
+  - external snapshot-shaped policy dependency
+  收口成：
+  - typed dialog voice-policy view
+
 ## Step 5.473
 - `dialog runtime` 继续把剩余 `control_facts -> snapshot` 导出边界收口成 typed
   control export view，并把命名拉齐到 `*_state_to_snapshot_locked(...)`：

@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.474
+Validate that `river_voice_runtime_policy.c` now consumes a narrow typed dialog
+voice-policy view instead of pulling the full dialog snapshot:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '96,138p' include/river/river_dialog_runtime.h
+sed -n '2200,2249p' components/river_core/river_dialog_runtime.c
+sed -n '48,120p' components/river_voice/river_voice_runtime_policy.c
+sed -n '296,342p' components/river_voice/river_voice_runtime_policy.c
+rg -n 'voice_policy_view|get_voice_policy_view|capture_voice_policy_view' \
+  include/river/river_dialog_runtime.h \
+  components/river_core/river_dialog_runtime.c \
+  components/river_voice/river_voice_runtime_policy.c
+rg -n 'river_dialog_runtime_get_snapshot|river_dialog_runtime_snapshot_t|dialog_snapshot' \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_voice_policy_view_t`
+  - `river_dialog_runtime_get_voice_policy_view(...)`
+  - `river_dialog_runtime_capture_voice_policy_view_locked(...)`
+- `river_voice_runtime_policy.c` now captures:
+  - `river_dialog_runtime_voice_policy_view_t`
+  instead of:
+  - `river_dialog_runtime_snapshot_t`
+- `river_voice_runtime_policy.c` no longer references:
+  - `river_dialog_runtime_get_snapshot(...)`
+  - `dialog_snapshot`
+
 ## Step 5.473
 Validate that dialog runtime now exports control-owned snapshot fields through a
 typed control export view instead of directly copying `control_facts` into
