@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.449
+- `downlink/playback` 继续把当前帧写入执行收口成单一 write-step helper：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 删除中间 typed result：
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+- `river_cloud_xiaozhi_write_current_downlink_frame_step(...)` 现在直接返回：
+  - `river_cloud_xiaozhi_downlink_task_step_result_t`
+- `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)` 不再负责：
+  - write-result -> task-step 的翻译
+  - post-write completion dispatch
+- 单帧写入 helper 现在统一接管：
+  - frame oversize abort -> continue
+  - playback service write failure -> continue / sleep poll
+  - write success 后的 segment start / ack progress / pending-stop 收尾
+- 这一步把：
+  - split write-result + post-write completion contract
+  收口成：
+  - single write-step outcome
+
 ## Step 5.448
 - `downlink/playback` 继续把 `acquire_current_downlink_frame(...)` 的 ready 判定从二值枚举收口成布尔返回：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

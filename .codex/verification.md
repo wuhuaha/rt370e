@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.449
+Validate that current-frame writing now returns the final worker task-step and
+owns post-write completion instead of translating through a write-result enum:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '620,640p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1685,1735p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3845,3865p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_frame_write_result|write_current_downlink_frame_step|complete_written_downlink_frame|execute_ready_downlink_cycle' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime no longer defines:
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+  - `river_cloud_xiaozhi_complete_written_downlink_frame(...)`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_write_current_downlink_frame_step(...)`
+- `river_cloud_xiaozhi_write_current_downlink_frame_step(...)` now returns:
+  - `river_cloud_xiaozhi_downlink_task_step_result_t`
+- ready-cycle execution no longer translates:
+  - write-result -> task-step
+  - post-write completion after write-progress
+
 ## Step 5.448
 Validate that current-frame acquisition now returns a direct boolean predicate
 instead of translating through a two-state acquire-result enum:
