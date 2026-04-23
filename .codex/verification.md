@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.435
+Validate that managed rebuffer entry/execution now goes through shared helper
+boundaries instead of being mutated inline in multiple branches:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1380,1455p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2320,2398p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3788,3910p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'begin_managed_playback_rebuffer|execute_managed_playback_rebuffer_recovery|note_playback_rebuffer|request_playback_rebuffer_recovery' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_begin_managed_playback_rebuffer(...)`
+  - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+- `maybe_rebuffer_starved(...)` and `write_failed` fallback branches now share
+  the same managed-rebuffer transition helpers
+- rebuffer state enter still preserves:
+  - `rebuffer_pending`
+  - `managed_rebuffer` outcome
+  - retry frame retention on write-failed branches
+- actual rebuffer recovery execution still preserves:
+  - forced `stop_rebuffer` after failed inline path
+  - normal `request_playback_rebuffer_recovery(...)` path selection elsewhere
+
 ## Step 5.434
 Validate that playback recovery now exports typed outcome observability in
 addition to recovery path:

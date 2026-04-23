@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.435
+- `downlink/playback` 继续把 managed rebuffer 的进入与恢复执行从分散分支中收口成统一 helper：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_begin_managed_playback_rebuffer(...)`
+  - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+- `maybe_rebuffer_starved(...)` 现在不再自己拼装：
+  - `note_playback_rebuffer`
+  - `refresh_playback_recovery_plan_after_rebuffer_note`
+  - `request_playback_rebuffer_recovery`
+  这条链改为统一经过上述 helper
+- `write_failed` 分支里这三类 managed rebuffer 升级路径现在也共用同一条 helper 链：
+  - inline replay fallback
+  - inline recover fallback
+  - non-inline direct rebuffer
+- 这一步把：
+  - rebuffer pending / recovery outcome / retry frame / actual recovery execute
+  从多个局部分支里的重复状态变更
+  收口成：
+  - shared managed-rebuffer transition boundary
+
 ## Step 5.434
 - `downlink/playback` 继续把恢复链从“只知道走了哪条 path”推进到“还能知道这次恢复最终是 inline 自愈还是升级成 managed rebuffer”：
   - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)

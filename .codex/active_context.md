@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.434 为 playback recovery 导出 typed outcome 真相`
+  - `5.435 收口 playback managed rebuffer 的进入与执行`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 managed rebuffer 的状态迁移与恢复执行
+      从分散分支里收口成统一 helper
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_begin_managed_playback_rebuffer(...)`
+      - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+    - `maybe_rebuffer_starved(...)` 与 `write_failed` 的三条 managed rebuffer
+      入口现在共用同一条：
+      - rebuffer state enter
+      - retry frame retain
+      - actual recovery execute
+    - 这一步把 downlink/playback 从：
+      - scattered rebuffer transition mutations
+      推进到：
+      - shared managed-rebuffer transition helpers
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 recovery observability 从 `path only` 推进到
       `path + outcome`

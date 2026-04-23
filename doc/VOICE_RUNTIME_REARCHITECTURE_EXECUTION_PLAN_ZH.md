@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.435`
+  - `downlink/playback` 继续把 managed rebuffer 的进入与执行边界从多个
+    局部分支里收口成共享 helper
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_begin_managed_playback_rebuffer(...)`
+    - `river_cloud_xiaozhi_execute_managed_playback_rebuffer_recovery(...)`
+  - `maybe_rebuffer_starved(...)` 现在与 `write_failed` 的 managed rebuffer
+    升级路径共用同一条：
+    - rebuffer state enter
+    - retry frame retain
+    - actual recovery execute
+  - `write_failed` 的以下三条路径不再各自手写状态变更：
+    - inline replay fallback
+    - inline recover fallback
+    - non-inline direct rebuffer
+  - 这一步继续把 downlink/playback 从：
+    - scattered managed-rebuffer transition mutations
+    推进到：
+    - shared transition helpers
 - `Step 5.434`
   - `downlink/playback` 继续把 recovery observability 从 `path only` 推进到
     `path + outcome`
