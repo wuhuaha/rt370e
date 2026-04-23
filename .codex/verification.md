@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.462
+Validate that dialog runtime now evaluates playback projection, truth, and
+output-turn engagement through a single typed playback evaluation view:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '744,1095p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_eval_t|capture_playback_eval_locked|output_turn_quiesced_from_playback_eval|playback_error_is_managed_recovery_locked|capture_interaction_projection_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_playback_eval_t`
+  - `river_dialog_runtime_capture_playback_eval_locked(...)`
+  - `river_dialog_runtime_output_turn_quiesced_from_playback_eval(...)`
+- `river_dialog_runtime_capture_interaction_projection_locked(...)` no longer
+  reads `derived_facts.playback_active` / `derived_facts.playback_recovering`
+  as the source of playback truth
+- playback refresh, quiesce, and managed-recovery checks now all route through
+  the shared playback evaluation
+
 ## Step 5.461
 Validate that dialog runtime now transports cloud playback facts and observe
 state as a single typed playback import during cloud snapshot ingress:

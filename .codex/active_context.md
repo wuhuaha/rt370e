@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.461 收口 cloud playback import`
+  - `5.462 收口 playback evaluation view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 playback 的 `projection -> truth -> output_turn`
+      评估链收口成单一 typed evaluation
+    - 新增统一 playback evaluation：
+      - `river_dialog_runtime_playback_eval_t`
+      - `river_dialog_runtime_capture_playback_eval_locked(...)`
+      - `river_dialog_runtime_output_turn_quiesced_from_playback_eval(...)`
+    - `river_dialog_runtime_capture_interaction_projection_locked(...)`
+      不再从 `derived_facts` 反向读取：
+      - `playback_active`
+      - `playback_recovering`
+      而是从同一次 playback evaluation 的 truth 直接派生
+    - `river_dialog_runtime_refresh_playback_locked(...)`、
+      `river_dialog_runtime_output_turn_quiesced_locked(...)`、
+      `river_dialog_runtime_playback_error_is_managed_recovery_locked(...)`
+      现在都统一读取 shared playback evaluation
+    - 这一步把：
+      - split playback projection/truth/output-turn evaluation
+      收口成：
+      - single playback evaluation view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 cloud snapshot 的 playback 导入收口成单一
       typed import

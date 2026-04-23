@@ -750,6 +750,17 @@ typedef struct {
     river_dialog_playback_owner_kind_t owner_kind;
 } river_dialog_runtime_playback_truth_t;
 
+typedef struct {
+    river_dialog_runtime_playback_projection_t projection;
+    river_dialog_runtime_playback_truth_t truth;
+    bool output_turn_engaged;
+} river_dialog_runtime_playback_eval_t;
+
+static void river_dialog_runtime_capture_playback_eval_locked(
+    river_dialog_runtime_playback_eval_t *eval);
+static bool river_dialog_runtime_output_turn_quiesced_from_playback_eval(
+    const river_dialog_runtime_playback_eval_t *eval);
+
 static void river_dialog_runtime_capture_local_playback_shadow_view_locked(
     river_dialog_runtime_local_playback_shadow_view_t *view)
 {
@@ -898,19 +909,14 @@ static void river_dialog_runtime_capture_playback_truth_from_projection(
 
 static bool river_dialog_runtime_playback_error_is_managed_recovery_locked(void)
 {
-    river_dialog_runtime_playback_projection_t projection;
+    river_dialog_runtime_playback_eval_t eval;
 
-    river_dialog_runtime_capture_playback_projection_locked(&projection);
-    if (!projection.cloud_runtime_available) {
+    river_dialog_runtime_capture_playback_eval_locked(&eval);
+    if (!eval.projection.cloud_runtime_available) {
         return false;
     }
 
-    return projection.rebuffer_pending ||
-           projection.backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING ||
-           projection.backend_state_kind ==
-               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING ||
-           projection.cloud_playback_active;
+    return eval.truth.recovering || eval.projection.cloud_playback_active;
 }
 
 static bool river_dialog_runtime_playback_turn_recovering_from_projection(
@@ -990,6 +996,37 @@ static bool river_dialog_runtime_output_turn_engaged_from_projection(
                playback_recovering);
 }
 
+static void river_dialog_runtime_capture_playback_eval_locked(
+    river_dialog_runtime_playback_eval_t *eval)
+{
+    if (eval == NULL) {
+        return;
+    }
+
+    memset(eval, 0, sizeof(*eval));
+    river_dialog_runtime_capture_playback_projection_locked(&eval->projection);
+    river_dialog_runtime_capture_playback_truth_from_projection(&eval->projection,
+                                                                &eval->truth);
+    eval->output_turn_engaged =
+        river_dialog_runtime_output_turn_engaged_from_projection(
+            &eval->projection,
+            eval->truth.active,
+            eval->truth.recovering);
+}
+
+static bool river_dialog_runtime_output_turn_quiesced_from_playback_eval(
+    const river_dialog_runtime_playback_eval_t *eval)
+{
+    return eval != NULL &&
+           !eval->output_turn_engaged &&
+           !eval->projection.turn_active &&
+           !eval->truth.recovering &&
+           !eval->projection.tts_stop_pending &&
+           eval->projection.backend_state_kind !=
+               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING &&
+           !eval->projection.terminal_waiting;
+}
+
 static void river_dialog_runtime_capture_interaction_projection_locked(
     river_dialog_runtime_interaction_projection_t *projection)
 {
@@ -1001,13 +1038,15 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
         &g_river_dialog_runtime.cloud_round_facts;
     const river_dialog_runtime_cloud_io_facts_t *io_facts =
         &g_river_dialog_runtime.cloud_io_facts;
+    river_dialog_runtime_playback_eval_t playback_eval;
 
     if (projection == NULL) {
         return;
     }
 
     memset(projection, 0, sizeof(*projection));
-    river_dialog_runtime_capture_playback_projection_locked(&projection->playback);
+    river_dialog_runtime_capture_playback_eval_locked(&playback_eval);
+    projection->playback = playback_eval.projection;
     projection->boot_ready = control_facts->boot_ready;
     projection->error_recovering = derived_facts->error_recovering;
     projection->asr_session_active = control_facts->asr_session_active;
@@ -1018,18 +1057,14 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
     projection->cloud_stream_active = round_facts->cloud_stream_active;
     projection->cloud_listen_stop_pending = round_facts->cloud_listen_stop_pending;
     projection->cloud_local_close_pending = round_facts->cloud_local_close_pending;
-    projection->playback_active = derived_facts->playback_active;
-    projection->playback_recovering = derived_facts->playback_recovering;
+    projection->playback_active = playback_eval.truth.active;
+    projection->playback_recovering = playback_eval.truth.recovering;
     projection->playback_terminal_closed = projection->playback.terminal_closed;
     projection->tts_interrupt_requested = control_facts->tts_interrupt_requested;
     projection->input_lane = io_facts->input_lane;
     projection->output_lane = io_facts->output_lane;
     projection->interaction_state = derived_facts->interaction_state;
-    projection->output_turn_engaged =
-        river_dialog_runtime_output_turn_engaged_from_projection(
-            &projection->playback,
-            projection->playback_active,
-            projection->playback_recovering);
+    projection->output_turn_engaged = playback_eval.output_turn_engaged;
 }
 
 static bool river_dialog_runtime_tts_interrupt_inflight_from_projection(
@@ -1042,34 +1077,21 @@ static bool river_dialog_runtime_tts_interrupt_inflight_from_projection(
 
 static void river_dialog_runtime_refresh_playback_locked(void)
 {
-    river_dialog_runtime_playback_projection_t projection;
-    river_dialog_runtime_playback_truth_t truth;
+    river_dialog_runtime_playback_eval_t eval;
 
-    river_dialog_runtime_capture_playback_projection_locked(&projection);
-    river_dialog_runtime_capture_playback_truth_from_projection(&projection, &truth);
-    g_river_dialog_runtime.derived_facts.playback_recovering = truth.recovering;
-    g_river_dialog_runtime.derived_facts.playback_active = truth.active;
-    g_river_dialog_runtime.derived_facts.playback_owner_kind = truth.owner_kind;
+    river_dialog_runtime_capture_playback_eval_locked(&eval);
+    g_river_dialog_runtime.derived_facts.playback_recovering = eval.truth.recovering;
+    g_river_dialog_runtime.derived_facts.playback_active = eval.truth.active;
+    g_river_dialog_runtime.derived_facts.playback_owner_kind = eval.truth.owner_kind;
     river_dialog_runtime_export_derived_facts_to_snapshot_locked();
 }
 
 static bool river_dialog_runtime_output_turn_quiesced_locked(void)
 {
-    river_dialog_runtime_playback_projection_t projection;
-    river_dialog_runtime_playback_truth_t truth;
+    river_dialog_runtime_playback_eval_t eval;
 
-    river_dialog_runtime_capture_playback_projection_locked(&projection);
-    river_dialog_runtime_capture_playback_truth_from_projection(&projection, &truth);
-    return !river_dialog_runtime_output_turn_engaged_from_projection(
-               &projection,
-               g_river_dialog_runtime.derived_facts.playback_active,
-               truth.recovering) &&
-           !projection.turn_active &&
-           !truth.recovering &&
-           !projection.tts_stop_pending &&
-           projection.backend_state_kind !=
-               RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING &&
-           !projection.terminal_waiting;
+    river_dialog_runtime_capture_playback_eval_locked(&eval);
+    return river_dialog_runtime_output_turn_quiesced_from_playback_eval(&eval);
 }
 
 static bool river_dialog_runtime_cloud_round_active_locked(void)

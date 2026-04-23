@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.462
+- `dialog runtime` 继续把 playback 的 `projection -> truth -> output_turn`
+  评估链收口成单一 typed evaluation：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增统一 playback evaluation：
+  - `river_dialog_runtime_playback_eval_t`
+  - `river_dialog_runtime_capture_playback_eval_locked(...)`
+  - `river_dialog_runtime_output_turn_quiesced_from_playback_eval(...)`
+- `river_dialog_runtime_capture_interaction_projection_locked(...)`
+  不再从 `derived_facts` 反向读取：
+  - `playback_active`
+  - `playback_recovering`
+  而是从同一次 playback evaluation 的 truth 直接派生
+- `river_dialog_runtime_refresh_playback_locked(...)`、
+  `river_dialog_runtime_output_turn_quiesced_locked(...)`、
+  `river_dialog_runtime_playback_error_is_managed_recovery_locked(...)`
+  现在都统一读取 shared playback evaluation
+- 这一步把：
+  - split playback projection/truth/output-turn evaluation
+  收口成：
+  - single playback evaluation view
+
 ## Step 5.461
 - `dialog runtime` 继续把 cloud snapshot 的 playback 导入收口成单一 typed import：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
