@@ -26,6 +26,31 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.469`
+  - `dialog runtime` 继续把剩余 `derived_facts` 混合状态拆成显式
+    `error_truth` / `playback_truth`
+  - 删除：
+    - `river_dialog_runtime_derived_facts_t`
+    - `g_river_dialog_runtime.derived_facts`
+  - 新增显式 runtime-owned truth：
+    - `river_dialog_runtime_error_truth_t`
+    - `river_dialog_runtime_playback_truth_t`
+    - `g_river_dialog_runtime.error_truth`
+    - `g_river_dialog_runtime.playback_truth`
+  - 错误与播放刷新路径现在分别只维护对应 truth：
+    - `refresh_error_recovering_locked(...)` 只更新 `error_truth`
+    - `refresh_playback_locked(...)` 只更新 `playback_truth`
+    - `export_playback_error_facts_to_snapshot_locked(...)` 再统一把两组 truth
+      投影到 snapshot
+  - 这一步继续把 `dialog runtime` 从：
+    - residual derived state bag
+    推进到：
+    - explicit error truth
+    - explicit playback truth
+  - 下一步继续聚焦：
+    - 继续检查 `snapshot.playback_*` / `snapshot.error_*` 导出 helper 是否还要继续
+      从“snapshot field copy”推进到更明确的 typed export carrier，减少 snapshot
+      本身被长期当成内部桥接缓存
 - `Step 5.468`
   - `dialog runtime` 继续把 `snapshot export` 的 publish/runtime 边界收口成
     更明确的 typed helper

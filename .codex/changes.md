@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.469
+- `dialog runtime` 继续把剩余 `derived_facts` 混合状态拆成显式
+  `error_truth` / `playback_truth`：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 删除旧的混合状态包：
+  - `river_dialog_runtime_derived_facts_t`
+  - `g_river_dialog_runtime.derived_facts`
+- 新增显式 runtime-owned truth：
+  - `river_dialog_runtime_error_truth_t`
+  - `river_dialog_runtime_playback_truth_t`
+  - `g_river_dialog_runtime.error_truth`
+  - `g_river_dialog_runtime.playback_truth`
+- 错误与播放刷新路径现在分别直写对应 truth：
+  - `refresh_error_recovering_locked(...)` 只更新 `error_truth`
+  - `refresh_playback_locked(...)` 只更新 `playback_truth`
+  - `export_playback_error_facts_to_snapshot_locked(...)` 再统一把两组 truth
+    投影到 snapshot
+- 这一步继续把：
+  - residual derived state bag
+  收口成：
+  - explicit error truth
+  - explicit playback truth
+
 ## Step 5.468
 - `dialog runtime` 继续把 `snapshot export` 边界从混合 helper 收口成更明确
   的 publish/runtime 两层导出：

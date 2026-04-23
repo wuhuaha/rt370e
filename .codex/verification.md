@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.469
+Validate that dialog runtime no longer stores playback/error runtime state in a
+single `derived_facts` bag and now keeps explicit `error_truth` plus
+`playback_truth`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '86,123p' components/river_core/river_dialog_runtime.c
+sed -n '228,246p' components/river_core/river_dialog_runtime.c
+sed -n '440,452p' components/river_core/river_dialog_runtime.c
+sed -n '1192,1202p' components/river_core/river_dialog_runtime.c
+rg -n 'derived_facts|error_truth|playback_truth' components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_error_truth_t`
+  - `river_dialog_runtime_playback_truth_t`
+- `river_dialog_runtime_derived_facts_t` and `g_river_dialog_runtime.derived_facts`
+  no longer appear in `components/river_core/river_dialog_runtime.c`
+- `refresh_error_recovering_locked(...)` now updates `error_truth`
+- `refresh_playback_locked(...)` now updates `playback_truth`
+- `export_playback_error_facts_to_snapshot_locked(...)` now exports from the
+  explicit `error_truth` / `playback_truth` state instead of a mixed cache bag
+
 ## Step 5.468
 Validate that dialog runtime now exports publish state and playback/error state
 through separate snapshot helpers instead of one mixed `derived_facts` export

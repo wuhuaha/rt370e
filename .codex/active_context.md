@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.468 收口 snapshot export boundary`
+  - `5.469 收口 explicit playback/error truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把剩余 `derived_facts` 混合状态拆成显式
+      `error_truth` / `playback_truth`
+    - 删除：
+      - `river_dialog_runtime_derived_facts_t`
+      - `g_river_dialog_runtime.derived_facts`
+    - 新增显式 runtime-owned truth：
+      - `river_dialog_runtime_error_truth_t`
+      - `river_dialog_runtime_playback_truth_t`
+      - `g_river_dialog_runtime.error_truth`
+      - `g_river_dialog_runtime.playback_truth`
+    - `refresh_error_recovering_locked(...)` 现在只更新 `error_truth`
+    - `refresh_playback_locked(...)` 现在只更新 `playback_truth`
+    - `export_playback_error_facts_to_snapshot_locked(...)` 再统一把这两组 truth
+      投影到 snapshot
+    - 这一步把：
+      - residual derived state bag
+      收口成：
+      - explicit error truth
+      - explicit playback truth
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 `snapshot export` 的 publish/runtime 边界收口成
       更小的 typed helper

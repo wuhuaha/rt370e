@@ -86,12 +86,15 @@ typedef struct {
 } river_dialog_runtime_control_facts_t;
 
 typedef struct {
-    bool error_recovering;
-    river_dialog_error_kind_t error_kind;
-    river_dialog_playback_owner_kind_t playback_owner_kind;
-    bool playback_active;
-    bool playback_recovering;
-} river_dialog_runtime_derived_facts_t;
+    bool recovering;
+    river_dialog_error_kind_t kind;
+} river_dialog_runtime_error_truth_t;
+
+typedef struct {
+    bool active;
+    bool recovering;
+    river_dialog_playback_owner_kind_t owner_kind;
+} river_dialog_runtime_playback_truth_t;
 
 typedef struct {
     river_interaction_state_t interaction_state;
@@ -115,7 +118,8 @@ typedef struct {
     river_dialog_runtime_cloud_playback_facts_t cloud_playback_facts;
     river_dialog_runtime_cloud_playback_observe_t cloud_playback_observe;
     river_dialog_runtime_control_facts_t control_facts;
-    river_dialog_runtime_derived_facts_t derived_facts;
+    river_dialog_runtime_error_truth_t error_truth;
+    river_dialog_runtime_playback_truth_t playback_truth;
     river_dialog_runtime_publish_state_t publish_state;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
@@ -229,17 +233,16 @@ static void river_dialog_runtime_refresh_error_recovering_locked(void)
     bool asr_error = g_river_dialog_runtime.asr_error_recovering;
     bool local_playback_error = g_river_dialog_runtime.local_playback_error_recovering;
 
-    g_river_dialog_runtime.derived_facts.error_recovering =
-        asr_error || local_playback_error;
+    g_river_dialog_runtime.error_truth.recovering = asr_error || local_playback_error;
     if (asr_error && local_playback_error) {
-        g_river_dialog_runtime.derived_facts.error_kind = RIVER_DIALOG_ERROR_KIND_MIXED;
+        g_river_dialog_runtime.error_truth.kind = RIVER_DIALOG_ERROR_KIND_MIXED;
     } else if (asr_error) {
-        g_river_dialog_runtime.derived_facts.error_kind = RIVER_DIALOG_ERROR_KIND_ASR;
+        g_river_dialog_runtime.error_truth.kind = RIVER_DIALOG_ERROR_KIND_ASR;
     } else if (local_playback_error) {
-        g_river_dialog_runtime.derived_facts.error_kind =
+        g_river_dialog_runtime.error_truth.kind =
             RIVER_DIALOG_ERROR_KIND_LOCAL_PLAYBACK;
     } else {
-        g_river_dialog_runtime.derived_facts.error_kind = RIVER_DIALOG_ERROR_KIND_NONE;
+        g_river_dialog_runtime.error_truth.kind = RIVER_DIALOG_ERROR_KIND_NONE;
     }
     river_dialog_runtime_export_playback_error_facts_to_snapshot_locked();
 }
@@ -437,15 +440,15 @@ static void river_dialog_runtime_export_control_facts_to_snapshot_locked(void)
 static void river_dialog_runtime_export_playback_error_facts_to_snapshot_locked(void)
 {
     g_river_dialog_runtime.snapshot.error_recovering =
-        g_river_dialog_runtime.derived_facts.error_recovering;
+        g_river_dialog_runtime.error_truth.recovering;
     g_river_dialog_runtime.snapshot.error_kind =
-        g_river_dialog_runtime.derived_facts.error_kind;
+        g_river_dialog_runtime.error_truth.kind;
     g_river_dialog_runtime.snapshot.playback_owner_kind =
-        g_river_dialog_runtime.derived_facts.playback_owner_kind;
+        g_river_dialog_runtime.playback_truth.owner_kind;
     g_river_dialog_runtime.snapshot.playback_active =
-        g_river_dialog_runtime.derived_facts.playback_active;
+        g_river_dialog_runtime.playback_truth.active;
     g_river_dialog_runtime.snapshot.playback_recovering =
-        g_river_dialog_runtime.derived_facts.playback_recovering;
+        g_river_dialog_runtime.playback_truth.recovering;
 }
 
 static void river_dialog_runtime_export_publish_state_to_snapshot_locked(void)
@@ -758,12 +761,6 @@ typedef struct {
     river_playback_state_t state;
     char stream_name[32];
 } river_dialog_runtime_local_playback_import_plan_t;
-
-typedef struct {
-    bool active;
-    bool recovering;
-    river_dialog_playback_owner_kind_t owner_kind;
-} river_dialog_runtime_playback_truth_t;
 
 typedef struct {
     river_dialog_runtime_playback_projection_t projection;
@@ -1195,9 +1192,9 @@ static void river_dialog_runtime_refresh_playback_locked(void)
     river_dialog_runtime_playback_eval_t eval;
 
     river_dialog_runtime_capture_playback_eval_locked(&eval);
-    g_river_dialog_runtime.derived_facts.playback_recovering = eval.truth.recovering;
-    g_river_dialog_runtime.derived_facts.playback_active = eval.truth.active;
-    g_river_dialog_runtime.derived_facts.playback_owner_kind = eval.truth.owner_kind;
+    g_river_dialog_runtime.playback_truth.recovering = eval.truth.recovering;
+    g_river_dialog_runtime.playback_truth.active = eval.truth.active;
+    g_river_dialog_runtime.playback_truth.owner_kind = eval.truth.owner_kind;
     river_dialog_runtime_export_playback_error_facts_to_snapshot_locked();
 }
 
