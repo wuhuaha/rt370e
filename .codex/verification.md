@@ -1,5 +1,32 @@
 # Verification
 
+## Step 5.450
+Validate that the ready-cycle executor shell is removed and the cycle processor
+now directly owns frame acquire plus write-step dispatch:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '3835,3875p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'execute_ready_downlink_cycle|process_downlink_task_cycle|acquire_current_downlink_frame|write_current_downlink_frame_step' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime no longer defines:
+  - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+- `river_cloud_xiaozhi_process_downlink_task_cycle(...)` now directly owns:
+  - current-frame acquire gating
+  - write-step dispatch
+- ready-cycle processing no longer routes through:
+  - a separate executor shell
+
 ## Step 5.449
 Validate that current-frame writing now returns the final worker task-step and
 owns post-write completion instead of translating through a write-result enum:

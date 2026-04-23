@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.449 收口 current downlink frame 的 write-step 结果归一`
+  - `5.450 收口 ready downlink cycle 的单层 executor 壳`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续收口 ready-cycle 的单层 executor 壳
+    - 删除中间 helper：
+      - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+    - `river_cloud_xiaozhi_process_downlink_task_cycle(...)` 现在直接接管：
+      - ready cycle 下的 current-frame acquire
+      - write-step dispatch
+    - 这一步把：
+      - single-layer ready-cycle executor shell
+      收口成：
+      - direct cycle-processor ownership
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把当前帧写入执行收口成单一 write-step helper
     - 删除中间 typed result：

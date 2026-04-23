@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.450`
+  - `downlink/playback` 继续收口 ready-cycle 的单层 executor 壳
+  - 删除中间 helper：
+    - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+  - `river_cloud_xiaozhi_process_downlink_task_cycle(...)` 现在直接接管：
+    - ready cycle 下的 current-frame acquire
+    - write-step dispatch
+  - `downlink cycle processor` 现在直接按：
+    - `cycle_plan.ready`
+    - frame acquired / not acquired
+    - `write_current_downlink_frame_step(...)`
+    决定后续 task-step
+  - 这一步继续把 downlink/playback 从：
+    - single-layer ready-cycle executor shell
+    推进到：
+    - direct cycle-processor ownership
 - `Step 5.449`
   - `downlink/playback` 继续把当前帧写入执行收口成单一 write-step helper
   - 删除中间 typed result：

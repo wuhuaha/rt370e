@@ -3848,16 +3848,6 @@ river_cloud_xiaozhi_acquire_current_downlink_frame(void)
 }
 
 static river_cloud_xiaozhi_downlink_task_step_result_t
-river_cloud_xiaozhi_execute_ready_downlink_cycle(uint32_t queued_frames)
-{
-    if (!river_cloud_xiaozhi_acquire_current_downlink_frame()) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
-    }
-
-    return river_cloud_xiaozhi_write_current_downlink_frame_step(queued_frames);
-}
-
-static river_cloud_xiaozhi_downlink_task_step_result_t
 river_cloud_xiaozhi_process_downlink_task_cycle(void)
 {
     river_cloud_xiaozhi_downlink_cycle_plan_t cycle_plan;
@@ -3867,7 +3857,12 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
         return cycle_plan.step_result;
     }
 
-    return river_cloud_xiaozhi_execute_ready_downlink_cycle(cycle_plan.queued_frames);
+    if (!river_cloud_xiaozhi_acquire_current_downlink_frame()) {
+        return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
+    }
+
+    return river_cloud_xiaozhi_write_current_downlink_frame_step(
+        cycle_plan.queued_frames);
 }
 
 static void river_cloud_xiaozhi_finish_downlink_task_cycle(
