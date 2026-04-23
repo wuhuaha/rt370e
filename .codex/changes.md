@@ -1,5 +1,35 @@
 # Change Log
 
+## Step 5.467
+- `dialog runtime` 继续把 interaction publish 的 `state/count/reason`
+  收口成统一 `publish_state`：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_publish_observe_t` 已提升为：
+  - `river_dialog_runtime_publish_state_t`
+  并统一持有：
+  - `interaction_state`
+  - `transition_count`
+  - `reason`
+- `derived_facts` 已不再承载 interaction publish 状态：
+  - 删除：
+    - `derived_facts.interaction_state`
+    - `derived_facts.transition_count`
+  - `snapshot.interaction_state` / `snapshot.transition_count` /
+    `snapshot.reason` 现在统一从 `publish_state` 导出
+- interaction publish view 继续收口：
+  - 新增：
+    - `previous_transition_count`
+    - `next_transition_count`
+    - `river_dialog_runtime_apply_interaction_publish_view_locked(...)`
+  - `publish_locked(...)` 不再手工做：
+    - `transition_count++`
+    - `interaction_state = next_state`
+    而是统一应用 typed publish view
+- 这一步把：
+  - interaction publish state <- derived cache
+  收口成：
+  - explicit publish state
+
 ## Step 5.466
 - `dialog runtime` 继续把 interaction publish 的 `reason` 边界收口成 typed
   publish reason view：

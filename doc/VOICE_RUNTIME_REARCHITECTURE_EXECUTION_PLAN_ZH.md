@@ -26,6 +26,33 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.467`
+  - `dialog runtime` 继续把 interaction publish 的 `state/count/reason`
+    收口成统一 `publish_state`
+  - `river_dialog_runtime_publish_observe_t` 已提升为：
+    - `river_dialog_runtime_publish_state_t`
+    并统一持有：
+    - `interaction_state`
+    - `transition_count`
+    - `reason`
+  - `derived_facts` 已不再承载 interaction publish 状态：
+    - 删除：
+      - `derived_facts.interaction_state`
+      - `derived_facts.transition_count`
+    - `snapshot.interaction_state` / `snapshot.transition_count` /
+      `snapshot.reason` 现在统一从 `publish_state` 导出
+  - `publish_locked(...)` 不再手工做：
+    - `transition_count++`
+    - `interaction_state = next_state`
+    而是统一应用 typed publish view
+  - 这一步继续把 `dialog runtime` 从：
+    - interaction publish state <- derived cache
+    推进到：
+    - explicit publish state
+  - 下一步继续聚焦：
+    - 继续把 `export_derived_facts_to_snapshot_locked(...)` 收窄成纯
+      playback/error export，评估是否要把剩余 derived/export 路径再拆成更明确
+      的 typed snapshot export helper
 - `Step 5.466`
   - `dialog runtime` 继续把 interaction publish 的 `reason` 边界收口成 typed
     publish reason view

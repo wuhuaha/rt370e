@@ -91,13 +91,13 @@ typedef struct {
     river_dialog_playback_owner_kind_t playback_owner_kind;
     bool playback_active;
     bool playback_recovering;
-    river_interaction_state_t interaction_state;
-    uint32_t transition_count;
 } river_dialog_runtime_derived_facts_t;
 
 typedef struct {
+    river_interaction_state_t interaction_state;
+    uint32_t transition_count;
     char reason[48];
-} river_dialog_runtime_publish_observe_t;
+} river_dialog_runtime_publish_state_t;
 
 typedef struct {
     bool initialized;
@@ -116,7 +116,7 @@ typedef struct {
     river_dialog_runtime_cloud_playback_observe_t cloud_playback_observe;
     river_dialog_runtime_control_facts_t control_facts;
     river_dialog_runtime_derived_facts_t derived_facts;
-    river_dialog_runtime_publish_observe_t publish_observe;
+    river_dialog_runtime_publish_state_t publish_state;
     rtos_mutex_t lock;
     river_dialog_runtime_snapshot_t snapshot;
 } river_dialog_runtime_context_t;
@@ -445,12 +445,12 @@ static void river_dialog_runtime_export_derived_facts_to_snapshot_locked(void)
     g_river_dialog_runtime.snapshot.playback_recovering =
         g_river_dialog_runtime.derived_facts.playback_recovering;
     g_river_dialog_runtime.snapshot.interaction_state =
-        g_river_dialog_runtime.derived_facts.interaction_state;
+        g_river_dialog_runtime.publish_state.interaction_state;
     g_river_dialog_runtime.snapshot.transition_count =
-        g_river_dialog_runtime.derived_facts.transition_count;
+        g_river_dialog_runtime.publish_state.transition_count;
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.reason,
                                    sizeof(g_river_dialog_runtime.snapshot.reason),
-                                   g_river_dialog_runtime.publish_observe.reason);
+                                   g_river_dialog_runtime.publish_state.reason);
 }
 
 static void river_dialog_runtime_export_playback_facts_to_snapshot_locked(void)
@@ -821,6 +821,8 @@ typedef struct {
     river_dialog_runtime_interaction_eval_t interaction;
     river_interaction_state_t previous_state;
     river_interaction_state_t next_state;
+    uint32_t previous_transition_count;
+    uint32_t next_transition_count;
     bool state_changed;
     river_dialog_runtime_publish_reason_view_t reason;
 } river_dialog_runtime_interaction_publish_view_t;
@@ -1214,7 +1216,7 @@ static void river_dialog_runtime_capture_publish_reason_view_locked(
     memset(view, 0, sizeof(*view));
     river_dialog_runtime_copy_text(view->previous_reason,
                                    sizeof(view->previous_reason),
-                                   g_river_dialog_runtime.publish_observe.reason);
+                                   g_river_dialog_runtime.publish_state.reason);
     if (reason != NULL && reason[0] != '\0') {
         river_dialog_runtime_copy_text(view->stored_reason,
                                        sizeof(view->stored_reason),
@@ -1222,7 +1224,7 @@ static void river_dialog_runtime_capture_publish_reason_view_locked(
     } else {
         river_dialog_runtime_copy_text(view->stored_reason,
                                        sizeof(view->stored_reason),
-                                       g_river_dialog_runtime.publish_observe.reason);
+                                       g_river_dialog_runtime.publish_state.reason);
     }
     view->publish_reason =
         view->stored_reason[0] != '\0' ? view->stored_reason : NULL;
@@ -1236,9 +1238,21 @@ static void river_dialog_runtime_apply_publish_reason_view_locked(
         return;
     }
 
-    river_dialog_runtime_copy_text(g_river_dialog_runtime.publish_observe.reason,
-                                   sizeof(g_river_dialog_runtime.publish_observe.reason),
+    river_dialog_runtime_copy_text(g_river_dialog_runtime.publish_state.reason,
+                                   sizeof(g_river_dialog_runtime.publish_state.reason),
                                    view->stored_reason);
+}
+
+static void river_dialog_runtime_apply_interaction_publish_view_locked(
+    const river_dialog_runtime_interaction_publish_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    g_river_dialog_runtime.publish_state.interaction_state = view->next_state;
+    g_river_dialog_runtime.publish_state.transition_count =
+        view->next_transition_count;
 }
 
 static void river_dialog_runtime_capture_interaction_publish_view_locked(
@@ -1251,9 +1265,13 @@ static void river_dialog_runtime_capture_interaction_publish_view_locked(
 
     memset(view, 0, sizeof(*view));
     river_dialog_runtime_capture_interaction_eval_locked(&view->interaction);
-    view->previous_state = g_river_dialog_runtime.derived_facts.interaction_state;
+    view->previous_state = g_river_dialog_runtime.publish_state.interaction_state;
     view->next_state = view->interaction.state;
+    view->previous_transition_count =
+        g_river_dialog_runtime.publish_state.transition_count;
     view->state_changed = view->previous_state != view->next_state;
+    view->next_transition_count =
+        view->previous_transition_count + (view->state_changed ? 1U : 0U);
     river_dialog_runtime_capture_publish_reason_view_locked(reason, &view->reason);
 }
 
@@ -1355,10 +1373,7 @@ static void river_dialog_runtime_publish_locked(const char *reason)
     river_dialog_runtime_interaction_publish_view_t view;
 
     river_dialog_runtime_capture_interaction_publish_view_locked(reason, &view);
-    if (view.state_changed) {
-        g_river_dialog_runtime.derived_facts.transition_count++;
-    }
-    g_river_dialog_runtime.derived_facts.interaction_state = view.next_state;
+    river_dialog_runtime_apply_interaction_publish_view_locked(&view);
     river_dialog_runtime_apply_publish_reason_view_locked(&view.reason);
     river_dialog_runtime_export_derived_facts_to_snapshot_locked();
     (void)river_interaction_state_set(view.next_state, view.reason.publish_reason);
@@ -1579,7 +1594,7 @@ river_status_t river_dialog_runtime_init(void)
 
     g_river_dialog_runtime.initialized = true;
     g_river_dialog_runtime.playback_state = RIVER_PLAYBACK_IDLE;
-    g_river_dialog_runtime.derived_facts.interaction_state = RIVER_INTERACTION_BOOTING;
+    g_river_dialog_runtime.publish_state.interaction_state = RIVER_INTERACTION_BOOTING;
     river_dialog_runtime_capture_publish_reason_view_locked("boot_begin", &reason_view);
     river_dialog_runtime_apply_publish_reason_view_locked(&reason_view);
     river_dialog_runtime_export_control_facts_to_snapshot_locked();
