@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.473
+Validate that dialog runtime now exports control-owned snapshot fields through a
+typed control export view instead of directly copying `control_facts` into
+`snapshot`:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '96,125p' components/river_core/river_dialog_runtime.c
+sed -n '258,270p' components/river_core/river_dialog_runtime.c
+sed -n '616,656p' components/river_core/river_dialog_runtime.c
+rg -n 'control_export_view|capture_control_export_view|apply_control_export_view|export_control_(facts|state)_to_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_control_export_view_t`
+  - `river_dialog_runtime_capture_control_export_view_locked(...)`
+  - `river_dialog_runtime_apply_control_export_view_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_control_state_to_snapshot_locked(...)`
+- `river_dialog_runtime_export_control_facts_to_snapshot_locked(...)` no longer
+  appears in `components/river_core/river_dialog_runtime.c`
+- control refresh paths now all route through the shared control export view
+  instead of open-coding `snapshot.boot_ready` / `snapshot.wake_confirmed` /
+  `snapshot.asr_session_active` / `snapshot.wake_admission_pending` /
+  `snapshot.tts_interrupt_requested`
+
 ## Step 5.472
 Validate that dialog runtime now exports all cloud-owned round/io/session/playback
 snapshot fields through a typed cloud export view instead of four separate

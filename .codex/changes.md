@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.473
+- `dialog runtime` 继续把剩余 `control_facts -> snapshot` 导出边界收口成 typed
+  control export view，并把命名拉齐到 `*_state_to_snapshot_locked(...)`：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 control snapshot export carrier：
+  - `river_dialog_runtime_control_export_view_t`
+  - `river_dialog_runtime_capture_control_export_view_locked(...)`
+  - `river_dialog_runtime_apply_control_export_view_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_control_state_to_snapshot_locked(...)`
+- 原先直接从 `control_facts` 抄字段到 snapshot 的：
+  - `river_dialog_runtime_export_control_facts_to_snapshot_locked(...)`
+  已退出
+- `wake_admission`、`tts_interrupt_requested`、cloud-event 控制刷新、local
+  playback fallback 控制刷新、`reconcile_facts_locked(...)` 初始化路径现在都统一
+  走 shared control export view
+- 这一步继续把：
+  - control snapshot field copy
+  收口成：
+  - typed control export projection
+
 ## Step 5.472
 - `dialog runtime` 继续把 cloud-owned 的 `round/io/session/playback`
   snapshot 导出边界收口成 typed `cloud export view`：

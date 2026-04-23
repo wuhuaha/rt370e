@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.472 收口 cloud export view`
+  - `5.473 收口 control export view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把剩余 `control_facts -> snapshot` 导出边界收口成
+      typed control export view，并把命名拉齐到
+      `*_state_to_snapshot_locked(...)`
+    - 新增：
+      - `river_dialog_runtime_control_export_view_t`
+      - `river_dialog_runtime_capture_control_export_view_locked(...)`
+      - `river_dialog_runtime_apply_control_export_view_to_snapshot_locked(...)`
+      - `river_dialog_runtime_export_control_state_to_snapshot_locked(...)`
+    - 原先直接从 `control_facts` 抄字段到 snapshot 的：
+      - `export_control_facts_to_snapshot_locked(...)`
+      已退出
+    - `wake_admission`、`tts_interrupt_requested`、cloud-event 控制刷新、
+      local playback fallback 控制刷新、`reconcile_facts_locked(...)`
+      初始化路径现在都统一走 shared control export view
+    - 这一步把：
+      - control snapshot field copy
+      收口成：
+      - typed control export projection
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 cloud-owned 的 `round/io/session/playback`
       snapshot 导出边界收口成 typed `cloud export view`
