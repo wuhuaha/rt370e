@@ -15,11 +15,35 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.471 收口 publish export view`
+  - `5.472 收口 cloud export view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 cloud-owned 的 `round/io/session/playback`
+      snapshot 导出边界收口成 typed `cloud export view`
+    - 新增：
+      - `river_dialog_runtime_round_export_view_t`
+      - `river_dialog_runtime_io_export_view_t`
+      - `river_dialog_runtime_session_export_view_t`
+      - `river_dialog_runtime_cloud_playback_export_view_t`
+      - `river_dialog_runtime_cloud_export_view_t`
+      - `river_dialog_runtime_capture_cloud_export_view_locked(...)`
+      - `river_dialog_runtime_apply_cloud_export_view_to_snapshot_locked(...)`
+      - `river_dialog_runtime_export_cloud_state_to_snapshot_locked(...)`
+    - 原先分别直写 snapshot 的：
+      - `export_round_facts_to_snapshot_locked(...)`
+      - `export_io_facts_to_snapshot_locked(...)`
+      - `export_session_facts_to_snapshot_locked(...)`
+      - `export_playback_facts_to_snapshot_locked(...)`
+      已退出
+    - `import_cloud_snapshot_locked(...)` 与 cloud-event 的 `session_id`
+      刷新路径现在统一复用 shared cloud export view
+    - 这一步把：
+      - split cloud snapshot field-copy helpers
+      收口成：
+      - typed cloud export projection
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 publish side 的 snapshot 导出边界收口成显式
       export view

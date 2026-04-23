@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.472
+- `dialog runtime` 继续把 cloud-owned 的 `round/io/session/playback`
+  snapshot 导出边界收口成 typed `cloud export view`：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 cloud export carrier：
+  - `river_dialog_runtime_round_export_view_t`
+  - `river_dialog_runtime_io_export_view_t`
+  - `river_dialog_runtime_session_export_view_t`
+  - `river_dialog_runtime_cloud_playback_export_view_t`
+  - `river_dialog_runtime_cloud_export_view_t`
+  - `river_dialog_runtime_capture_cloud_export_view_locked(...)`
+  - `river_dialog_runtime_apply_cloud_export_view_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_cloud_state_to_snapshot_locked(...)`
+- 原先分别直写 snapshot 的四组 helper 已收口为 shared `capture + apply`：
+  - `river_dialog_runtime_export_round_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_io_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_session_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_playback_facts_to_snapshot_locked(...)`
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` 现在只通过：
+  - `river_dialog_runtime_export_cloud_state_to_snapshot_locked(...)`
+  导出 cloud-owned snapshot 区域
+- cloud event 的 `session_id` 更新路径也不再单独直写 session snapshot，而是统一
+  复用 shared cloud export view
+- 这一步继续把：
+  - split cloud snapshot field-copy helpers
+  收口成：
+  - typed cloud export projection
+
 ## Step 5.471
 - `dialog runtime` 继续把 publish side 的 snapshot 导出边界收口成显式
   export view：

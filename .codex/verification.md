@@ -1,5 +1,45 @@
 # Verification
 
+## Step 5.472
+Validate that dialog runtime now exports all cloud-owned round/io/session/playback
+snapshot fields through a typed cloud export view instead of four separate
+field-copy helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '120,177p' components/river_core/river_dialog_runtime.c
+sed -n '255,275p' components/river_core/river_dialog_runtime.c
+sed -n '475,751p' components/river_core/river_dialog_runtime.c
+sed -n '912,920p' components/river_core/river_dialog_runtime.c
+sed -n '1728,1738p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_export_view|capture_cloud_export_view|apply_cloud_export_view|export_cloud_state_to_snapshot_locked|round_export_view|io_export_view|session_export_view|cloud_playback_export_view' \
+  components/river_core/river_dialog_runtime.c
+rg -n 'export_(round|io|session|playback)_facts_to_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_round_export_view_t`
+  - `river_dialog_runtime_io_export_view_t`
+  - `river_dialog_runtime_session_export_view_t`
+  - `river_dialog_runtime_cloud_playback_export_view_t`
+  - `river_dialog_runtime_cloud_export_view_t`
+  - `river_dialog_runtime_capture_cloud_export_view_locked(...)`
+  - `river_dialog_runtime_apply_cloud_export_view_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_cloud_state_to_snapshot_locked(...)`
+- `river_dialog_runtime_import_cloud_snapshot_locked(...)` and the cloud-event
+  `session_id` refresh path now both route through the shared cloud export view
+- `export_round/io/session/playback_facts_to_snapshot_locked(...)` no longer
+  appear in `components/river_core/river_dialog_runtime.c`
+
 ## Step 5.471
 Validate that dialog runtime now exports publish-state snapshot fields through a
 typed export view instead of directly copying `publish_state` into `snapshot`:
