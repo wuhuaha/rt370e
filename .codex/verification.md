@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.431
+Validate that XiaoZhi downlink/playback recovery now flows through a unified
+recovery plan and that fallback returns the actual recovery path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '1,120p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1320,1405p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2200,2375p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3590,3795p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_recovery_plan|recovery_path|capture_playback_recovery_plan|request_playback_rebuffer_recovery|write_failed_prefers_starved_rebuffer' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_playback_recovery_plan_t`
+  - `river_cloud_xiaozhi_playback_recovery_path_t`
+- `maybe_rebuffer_starved(...)` and `write_failed` recovery both use
+  `river_cloud_xiaozhi_capture_playback_recovery_plan(...)`
+- `request_playback_rebuffer_recovery(...)` only writes `recover_path_out`
+  after fallback resolution, so returned path matches the actual attempted
+  recovery branch
+
 ## Step 5.430
 Validate that dialog runtime playback terminal text observability no longer
 travels through `session_observe`:

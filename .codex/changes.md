@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.431
+- `downlink/playback` 继续把 `write_failed` / `starved` 恢复决策收口成统一 typed
+  recovery plan：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增内部结构：
+  - `river_cloud_xiaozhi_playback_recovery_plan_t`
+  - `river_cloud_xiaozhi_playback_recovery_path_t`
+- `river_cloud_xiaozhi_capture_playback_recovery_plan(...)` 现在会一次性锁存：
+  - `cause`
+  - `supply_kind`
+  - `start_gate`
+  - `low_water_frames`
+  - `supply_gap_ms`
+  - `recovery_path`
+  - `inline_recover_allowed`
+- `maybe_rebuffer_starved(...)` 与 `write_failed` 分支现在统一消费这份 recovery
+  plan，不再各自散读一组局部变量重建恢复决策
+- `request_playback_rebuffer_recovery(...)` 现在会在 fallback 后返回实际采用的
+  recovery path，不再把：
+  - `service_recover -> stop_rebuffer`
+  - 或 `stop_rebuffer -> service_recover`
+  的回退仍错误打印成初始偏好路径
+- 这一步继续把 downlink/playback 恢复链从“多处分支各自重猜恢复策略”推进到
+  “single recovery plan -> execute/fallback/log”
+
 ## Step 5.430
 - `dialog runtime` 继续把 playback 文本观测从 `session_observe` 中拆出去：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)

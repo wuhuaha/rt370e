@@ -26,6 +26,33 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.431`
+  - `downlink/playback` 继续把 `write_failed` / `starved` 恢复决策收口成统一
+    typed recovery plan
+  - 新增内部结构：
+    - `river_cloud_xiaozhi_playback_recovery_plan_t`
+    - `river_cloud_xiaozhi_playback_recovery_path_t`
+  - `river_cloud_xiaozhi_capture_playback_recovery_plan(...)` 现在会一次性锁存：
+    - `cause`
+    - `supply_kind`
+    - `start_gate`
+    - `low_water_frames`
+    - `supply_gap_ms`
+    - `recovery_path`
+    - `inline_recover_allowed`
+  - `maybe_rebuffer_starved(...)` 与 `write_failed` 分支现在统一消费这份
+    recovery plan，不再各自散读一组局部变量重建恢复决策
+  - `request_playback_rebuffer_recovery(...)` 现在会在 fallback 后返回实际采用的
+    recovery path，不再把：
+    - `service_recover -> stop_rebuffer`
+    - `stop_rebuffer -> service_recover`
+    这种回退链错误打印成初始偏好路径
+  - 这一步继续把 downlink/playback 恢复链从：
+    - scattered local decisions
+    - stale fallback diagnostics
+    推进到：
+    - single recovery plan
+    - actual-path logging
 - `Step 5.430`
   - `dialog runtime` 继续把 playback terminal 文本观测从 `session_observe`
     中拆出去
