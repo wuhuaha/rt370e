@@ -15,11 +15,32 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.459 收口 rebuffer recovery path 的 typed truth`
+  - `5.460 收口 playback diagnostics capture view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 playback 对外观测导出收口成 typed
+      diagnostics view
+    - 新增统一 diagnostics capture：
+      - `river_cloud_xiaozhi_playback_diag_view_t`
+      - `river_cloud_xiaozhi_capture_playback_diag_view(...)`
+    - `river_cloud_xiaozhi_dump_playback_status(...)` 与
+      `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)`
+      现在共享同一份 playback 采样结果，而不是分别再去拼：
+      - truth view
+      - observe view
+      - start gate
+      - queue/rebuffer counters
+    - 新增统一 recovery outcome 文本边界 helper：
+      - `river_cloud_xiaozhi_playback_recovery_outcome_label(...)`
+    - `downlink queue` 日志与 runtime snapshot 的 recovery path/outcome、
+      start gate、rebuffer cause、queue counters 现在都从 diagnostics view 读取
+    - 这一步把：
+      - duplicated playback export sampling
+      收口成：
+      - single playback diagnostics capture view
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 rebuffer recovery path 的本地真相源收口成 typed path
     - `river_cloud_xiaozhi_playback_rebuffer_observe_view_t` 不再保存

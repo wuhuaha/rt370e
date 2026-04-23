@@ -1,5 +1,41 @@
 # Verification
 
+## Step 5.460
+Validate that playback status dump and runtime snapshot now share a single typed
+diagnostics capture instead of sampling playback state independently:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '580,640p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '844,880p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1478,1548p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1970,2220p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_diag_view_t|capture_playback_diag_view|playback_recovery_outcome_label|dump_playback_status|fill_playback_runtime_snapshot' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_playback_diag_view_t`
+  - `river_cloud_xiaozhi_capture_playback_diag_view(...)`
+  - `river_cloud_xiaozhi_playback_recovery_outcome_label(...)`
+- `river_cloud_xiaozhi_dump_playback_status(...)` and
+  `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)` now both read:
+  - truth/observe
+  - start gate
+  - recovery path/outcome
+  - rebuffer counters
+  from the shared diagnostics view
+- `fill_playback_runtime_snapshot(...)` no longer independently captures
+  `truth_view` and `observe_view`
+
 ## Step 5.459
 Validate that playback recovery path now stays typed inside the local rebuffer
 execution chain and is only converted to text at logging boundaries:

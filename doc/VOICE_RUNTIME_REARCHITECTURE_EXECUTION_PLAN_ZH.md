@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.460`
+  - `downlink/playback runtime` 继续把 playback 对外观测导出收口成 typed
+    diagnostics view
+  - 新增统一 diagnostics capture：
+    - `river_cloud_xiaozhi_playback_diag_view_t`
+    - `river_cloud_xiaozhi_capture_playback_diag_view(...)`
+  - `river_cloud_xiaozhi_dump_playback_status(...)` 与
+    `river_cloud_xiaozhi_fill_playback_runtime_snapshot(...)`
+    现在共享同一份 playback 采样结果，而不是分别再去拼：
+    - truth view
+    - observe view
+    - start gate
+    - queue/rebuffer counters
+  - 新增统一 recovery outcome 文本边界 helper：
+    - `river_cloud_xiaozhi_playback_recovery_outcome_label(...)`
+  - `downlink queue` 日志与 runtime snapshot 的 recovery path/outcome、
+    start gate、rebuffer cause、queue counters 现在都从 diagnostics view 读取
+  - 这一步继续把 `downlink/playback runtime` 从：
+    - duplicated playback export sampling
+    推进到：
+    - single playback diagnostics capture view
 - `Step 5.459`
   - `downlink/playback runtime` 继续把 rebuffer recovery path 的本地真相源收口成 typed path
   - `river_cloud_xiaozhi_playback_rebuffer_observe_view_t` 不再保存
