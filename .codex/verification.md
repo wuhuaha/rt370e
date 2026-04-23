@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.443
+Validate that ready downlink cycle execution now goes through a single typed
+executor instead of branching inline in the task loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '634,652p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3810,3865p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '4005,4040p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_execute_result|execute_ready_downlink_cycle|acquire_current_downlink_frame|write_current_downlink_frame|complete_written_downlink_frame' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_downlink_execute_result_t`
+  - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+- downlink task no longer inlines:
+  - current-frame acquire dispatch
+  - frame write dispatch
+  - write-aborted continue path
+  - write-retry poll path
+  - post-write completion dispatch
+- downlink task now only branches on typed execute result after prepare-ready
+
 ## Step 5.442
 Validate that downlink worker cycle preparation now goes through a single typed
 helper instead of being scattered across the task loop:

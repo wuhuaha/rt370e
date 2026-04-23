@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.443
+- `downlink/playback` 继续把 ready 状态下的 downlink cycle 执行从 downlink task 主循环中收口成统一 executor：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增本地 typed result：
+  - `river_cloud_xiaozhi_downlink_execute_result_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+- 该 helper 现在统一接管：
+  - current-frame acquire dispatch
+  - frame write dispatch
+  - write-aborted immediate continue
+  - write-retry poll gating
+  - post-write completion dispatch
+- `downlink task` 在 prepare-ready 之后现在只保留：
+  - call `execute_ready_downlink_cycle(...)`
+  - poll delay on execute sleep result
+- 这一步把：
+  - scattered ready-cycle execute branching
+  收口成：
+  - single typed ready-cycle executor
+
 ## Step 5.442
 - `downlink/playback` 继续把 downlink worker 的前置调度执行从 downlink task 主循环中收口成统一 cycle helper：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

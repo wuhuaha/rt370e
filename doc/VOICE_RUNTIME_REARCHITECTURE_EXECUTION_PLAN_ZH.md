@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.443`
+  - `downlink/playback` 继续把 ready 状态下的 downlink cycle 执行从主循环中
+    收口成统一 executor
+  - 新增本地 typed result：
+    - `river_cloud_xiaozhi_downlink_execute_result_t`
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)`
+  - 该 helper 现在统一接管：
+    - current-frame acquire dispatch
+    - frame write dispatch
+    - write-aborted immediate continue
+    - write-retry poll gating
+    - post-write completion dispatch
+  - `downlink task` 在 prepare-ready 之后现在只按 typed execute result 决定：
+    - poll delay
+    - continue
 - `Step 5.442`
   - `downlink/playback` 继续把 downlink worker 的前置调度执行从主循环中
     收口成统一 cycle helper
