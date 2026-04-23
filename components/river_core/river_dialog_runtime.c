@@ -46,23 +46,29 @@ typedef struct {
 } river_dialog_runtime_cloud_round_facts_t;
 
 typedef struct {
-    char input_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
-    char output_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
     river_dialog_input_lane_t input_lane;
     river_dialog_output_lane_t output_lane;
 } river_dialog_runtime_cloud_io_facts_t;
 
 typedef struct {
+    char input_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
+    char output_state_text[RIVER_CLOUD_RUNTIME_STATE_MAX];
+} river_dialog_runtime_cloud_io_observe_t;
+
+typedef struct {
     bool turn_accepted;
     bool barge_in_enabled_known;
     bool barge_in_enabled;
+} river_dialog_runtime_cloud_session_facts_t;
+
+typedef struct {
     char provider_name[RIVER_CLOUD_RUNTIME_PROVIDER_MAX];
     char session_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char turn_id[RIVER_CLOUD_RUNTIME_ID_MAX];
     char accept_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
-} river_dialog_runtime_cloud_session_facts_t;
+} river_dialog_runtime_cloud_session_observe_t;
 
 typedef struct {
     bool boot_ready;
@@ -93,7 +99,9 @@ typedef struct {
     river_playback_state_t playback_state;
     river_dialog_runtime_cloud_round_facts_t cloud_round_facts;
     river_dialog_runtime_cloud_io_facts_t cloud_io_facts;
+    river_dialog_runtime_cloud_io_observe_t cloud_io_observe;
     river_dialog_runtime_cloud_session_facts_t cloud_session_facts;
+    river_dialog_runtime_cloud_session_observe_t cloud_session_observe;
     river_dialog_runtime_cloud_playback_facts_t cloud_playback_facts;
     river_dialog_runtime_cloud_playback_observe_t cloud_playback_observe;
     river_dialog_runtime_control_facts_t control_facts;
@@ -127,7 +135,9 @@ typedef struct {
     bool runtime_available;
     river_dialog_runtime_cloud_round_facts_t round_facts;
     river_dialog_runtime_cloud_io_facts_t io_facts;
+    river_dialog_runtime_cloud_io_observe_t io_observe;
     river_dialog_runtime_cloud_session_facts_t session_facts;
+    river_dialog_runtime_cloud_session_observe_t session_observe;
     river_dialog_runtime_cloud_playback_facts_t playback_facts;
 } river_dialog_runtime_cloud_import_t;
 
@@ -307,31 +317,31 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
     cloud_import->session_facts.barge_in_enabled_known =
         snapshot.barge_in_enabled_known;
     cloud_import->session_facts.barge_in_enabled = snapshot.barge_in_enabled;
-    river_dialog_runtime_copy_text(cloud_import->session_facts.provider_name,
-                                   sizeof(cloud_import->session_facts.provider_name),
+    river_dialog_runtime_copy_text(cloud_import->session_observe.provider_name,
+                                   sizeof(cloud_import->session_observe.provider_name),
                                    snapshot.provider_name);
-    river_dialog_runtime_copy_text(cloud_import->session_facts.session_id,
-                                   sizeof(cloud_import->session_facts.session_id),
+    river_dialog_runtime_copy_text(cloud_import->session_observe.session_id,
+                                   sizeof(cloud_import->session_observe.session_id),
                                    snapshot.session_id);
-    river_dialog_runtime_copy_text(cloud_import->session_facts.turn_id,
-                                   sizeof(cloud_import->session_facts.turn_id),
+    river_dialog_runtime_copy_text(cloud_import->session_observe.turn_id,
+                                   sizeof(cloud_import->session_observe.turn_id),
                                    snapshot.turn_id);
-    river_dialog_runtime_copy_text(cloud_import->session_facts.accept_reason,
-                                   sizeof(cloud_import->session_facts.accept_reason),
+    river_dialog_runtime_copy_text(cloud_import->session_observe.accept_reason,
+                                   sizeof(cloud_import->session_observe.accept_reason),
                                    snapshot.accept_reason);
     river_dialog_runtime_copy_text(
-        cloud_import->session_facts.playback_terminal_reason,
-        sizeof(cloud_import->session_facts.playback_terminal_reason),
+        cloud_import->session_observe.playback_terminal_reason,
+        sizeof(cloud_import->session_observe.playback_terminal_reason),
                                    snapshot.playback_terminal_reason);
     river_dialog_runtime_copy_text(
-        cloud_import->session_facts.playback_terminal_wait_reason,
-        sizeof(cloud_import->session_facts.playback_terminal_wait_reason),
+        cloud_import->session_observe.playback_terminal_wait_reason,
+        sizeof(cloud_import->session_observe.playback_terminal_wait_reason),
         snapshot.playback_terminal_wait_reason);
-    river_dialog_runtime_copy_text(cloud_import->io_facts.input_state_text,
-                                   sizeof(cloud_import->io_facts.input_state_text),
+    river_dialog_runtime_copy_text(cloud_import->io_observe.input_state_text,
+                                   sizeof(cloud_import->io_observe.input_state_text),
                                    snapshot.input_state);
-    river_dialog_runtime_copy_text(cloud_import->io_facts.output_state_text,
-                                   sizeof(cloud_import->io_facts.output_state_text),
+    river_dialog_runtime_copy_text(cloud_import->io_observe.output_state_text,
+                                   sizeof(cloud_import->io_observe.output_state_text),
                                    snapshot.output_state);
     cloud_import->io_facts.input_lane =
         river_dialog_runtime_parse_input_lane(snapshot.input_state);
@@ -368,10 +378,10 @@ static void river_dialog_runtime_export_io_facts_to_snapshot_locked(void)
 {
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.input_state_text,
                                    sizeof(g_river_dialog_runtime.snapshot.input_state_text),
-                                   g_river_dialog_runtime.cloud_io_facts.input_state_text);
+                                   g_river_dialog_runtime.cloud_io_observe.input_state_text);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.output_state_text,
                                    sizeof(g_river_dialog_runtime.snapshot.output_state_text),
-                                   g_river_dialog_runtime.cloud_io_facts.output_state_text);
+                                   g_river_dialog_runtime.cloud_io_observe.output_state_text);
     g_river_dialog_runtime.snapshot.input_lane =
         g_river_dialog_runtime.cloud_io_facts.input_lane;
     g_river_dialog_runtime.snapshot.output_lane =
@@ -388,24 +398,24 @@ static void river_dialog_runtime_export_session_facts_to_snapshot_locked(void)
         g_river_dialog_runtime.cloud_session_facts.barge_in_enabled;
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.provider_name,
                                    sizeof(g_river_dialog_runtime.snapshot.provider_name),
-                                   g_river_dialog_runtime.cloud_session_facts.provider_name);
+                                   g_river_dialog_runtime.cloud_session_observe.provider_name);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.session_id,
                                    sizeof(g_river_dialog_runtime.snapshot.session_id),
-                                   g_river_dialog_runtime.cloud_session_facts.session_id);
+                                   g_river_dialog_runtime.cloud_session_observe.session_id);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.turn_id,
                                    sizeof(g_river_dialog_runtime.snapshot.turn_id),
-                                   g_river_dialog_runtime.cloud_session_facts.turn_id);
+                                   g_river_dialog_runtime.cloud_session_observe.turn_id);
     river_dialog_runtime_copy_text(g_river_dialog_runtime.snapshot.accept_reason,
                                    sizeof(g_river_dialog_runtime.snapshot.accept_reason),
-                                   g_river_dialog_runtime.cloud_session_facts.accept_reason);
+                                   g_river_dialog_runtime.cloud_session_observe.accept_reason);
     river_dialog_runtime_copy_text(
         g_river_dialog_runtime.snapshot.playback_terminal_reason,
         sizeof(g_river_dialog_runtime.snapshot.playback_terminal_reason),
-        g_river_dialog_runtime.cloud_session_facts.playback_terminal_reason);
+        g_river_dialog_runtime.cloud_session_observe.playback_terminal_reason);
     river_dialog_runtime_copy_text(
         g_river_dialog_runtime.snapshot.playback_terminal_wait_reason,
         sizeof(g_river_dialog_runtime.snapshot.playback_terminal_wait_reason),
-        g_river_dialog_runtime.cloud_session_facts.playback_terminal_wait_reason);
+        g_river_dialog_runtime.cloud_session_observe.playback_terminal_wait_reason);
 }
 
 static void river_dialog_runtime_export_control_facts_to_snapshot_locked(void)
@@ -566,8 +576,8 @@ static void river_dialog_runtime_apply_cloud_event_locked(
     river_dialog_runtime_refresh_error_recovering_locked();
 
     if (sid != NULL && sid[0] != '\0') {
-        river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_facts.session_id,
-                                       sizeof(g_river_dialog_runtime.cloud_session_facts.session_id),
+        river_dialog_runtime_copy_text(g_river_dialog_runtime.cloud_session_observe.session_id,
+                                       sizeof(g_river_dialog_runtime.cloud_session_observe.session_id),
                                        sid);
         river_dialog_runtime_export_session_facts_to_snapshot_locked();
     }
@@ -1247,7 +1257,9 @@ static void river_dialog_runtime_import_cloud_snapshot_locked(
     g_river_dialog_runtime.cloud_runtime_available = cloud_import->runtime_available;
     g_river_dialog_runtime.cloud_round_facts = cloud_import->round_facts;
     g_river_dialog_runtime.cloud_io_facts = cloud_import->io_facts;
+    g_river_dialog_runtime.cloud_io_observe = cloud_import->io_observe;
     g_river_dialog_runtime.cloud_session_facts = cloud_import->session_facts;
+    g_river_dialog_runtime.cloud_session_observe = cloud_import->session_observe;
     g_river_dialog_runtime.cloud_playback_facts = cloud_import->playback_facts;
     river_dialog_runtime_export_round_facts_to_snapshot_locked();
     river_dialog_runtime_export_io_facts_to_snapshot_locked();

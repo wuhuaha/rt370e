@@ -26,6 +26,34 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.428`
+  - `dialog runtime` 继续把 `io/session` 里的纯观测字段从 typed facts 中拆出去
+  - `river_dialog_runtime_cloud_io_facts_t` 现在只承载：
+    - `input_lane`
+    - `output_lane`
+  - 新增 `river_dialog_runtime_cloud_io_observe_t`，独立承载：
+    - `input_state_text`
+    - `output_state_text`
+  - `river_dialog_runtime_cloud_session_facts_t` 现在只承载：
+    - `turn_accepted`
+    - `barge_in_enabled_known`
+    - `barge_in_enabled`
+  - 新增 `river_dialog_runtime_cloud_session_observe_t`，独立承载：
+    - `provider_name`
+    - `session_id`
+    - `turn_id`
+    - `accept_reason`
+    - `playback_terminal_reason`
+    - `playback_terminal_wait_reason`
+  - `capture_cloud_snapshot(...)` / `import_cloud_snapshot_locked(...)` /
+    snapshot export 现在都按 `facts` / `observe` 两条链分别搬运 `io/session`
+    数据
+  - `apply_cloud_event_locked(...)` 更新 sid 时也改写到
+    `cloud_session_observe.session_id`
+  - 这一步继续把：
+    - dialog runtime 可驱动行为的 typed truth
+    - 用于日志/调试/镜像的文本元数据
+    从 `io/session` 结构里拆开，减少内部 facts 再次夹带 observe-only 文本字段
 - `Step 5.427`
   - `dialog runtime` 继续把 cloud snapshot ingress 从扁平字段包收口成与内部事实一致的分层载荷
   - `river_dialog_runtime_cloud_import_t` 不再平铺：

@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.428
+Validate that dialog runtime `io/session` textual metadata now travels through
+observe structures instead of semantic fact structures:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '40,85p' components/river_core/river_dialog_runtime.c
+sed -n '375,420p' components/river_core/river_dialog_runtime.c
+sed -n '1248,1268p' components/river_core/river_dialog_runtime.c
+rg -n 'cloud_io_observe|cloud_session_observe|input_state_text|output_state_text|provider_name|session_id|accept_reason|playback_terminal_reason' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_dialog_runtime_cloud_io_facts_t` only carries typed lane semantics
+- `river_dialog_runtime_cloud_io_observe_t` owns input/output state text
+- `river_dialog_runtime_cloud_session_facts_t` only carries session semantics
+- `river_dialog_runtime_cloud_session_observe_t` owns provider/session/turn/reason
+  textual metadata
+- snapshot export and cloud import paths read/write those observe structures
+  separately from semantic facts
+
 ## Step 5.427
 Validate that dialog runtime cloud ingress now mirrors internal fact groupings
 instead of maintaining a separate flat import field bag:

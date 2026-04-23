@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.427 让 dialog runtime 的 cloud import 改用分层 facts 载荷`
+  - `5.428 拆分 dialog runtime 的 io/session observe 字段`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 `io/session` 里的纯观测字段从 typed facts 中拆出去
+    - `river_dialog_runtime_cloud_io_facts_t` 现在只承载：
+      - `input_lane`
+      - `output_lane`
+    - 新增：
+      - `river_dialog_runtime_cloud_io_observe_t`
+    - `river_dialog_runtime_cloud_session_facts_t` 现在只承载：
+      - `turn_accepted`
+      - `barge_in_enabled_known`
+      - `barge_in_enabled`
+    - 新增：
+      - `river_dialog_runtime_cloud_session_observe_t`
+    - `capture_cloud_snapshot(...)` / `import_cloud_snapshot_locked(...)` /
+      snapshot export 现在都按 `facts` / `observe` 两条链分别搬运 `io/session`
+      数据
+    - `apply_cloud_event_locked(...)` 更新 sid 时也改写到
+      `cloud_session_observe.session_id`
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 cloud snapshot ingress 从扁平字段包收口成与内部事实一致的分层载荷
     - `river_dialog_runtime_cloud_import_t` 不再平铺 round/io/session/playback

@@ -1,5 +1,37 @@
 # Change Log
 
+## Step 5.428
+- `dialog runtime` 继续把 `io/session` 里的纯观测字段从 typed facts 中拆出去：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- `river_dialog_runtime_cloud_io_facts_t` 现在只承载：
+  - `input_lane`
+  - `output_lane`
+- 新增 `river_dialog_runtime_cloud_io_observe_t`，独立承载：
+  - `input_state_text`
+  - `output_state_text`
+- `river_dialog_runtime_cloud_session_facts_t` 现在只承载：
+  - `turn_accepted`
+  - `barge_in_enabled_known`
+  - `barge_in_enabled`
+- 新增 `river_dialog_runtime_cloud_session_observe_t`，独立承载：
+  - `provider_name`
+  - `session_id`
+  - `turn_id`
+  - `accept_reason`
+  - `playback_terminal_reason`
+  - `playback_terminal_wait_reason`
+- `capture_cloud_snapshot(...)` / `import_cloud_snapshot_locked(...)` / snapshot export
+  现在都按：
+  - facts
+  - observe
+  两条链分别搬运 `io/session` 数据
+- `apply_cloud_event_locked(...)` 更新 sid 时也改写到
+  `cloud_session_observe.session_id`
+- 这一步继续把 `dialog runtime` 内部可驱动行为的 typed truth 与纯日志/调试/镜像元数据拆开，避免：
+  - `io` 文本状态
+  - `session/turn/reason` 文本
+  再混进内部 facts 结构
+
 ## Step 5.427
 - `dialog runtime` 继续把 cloud snapshot ingress 从扁平字段包收口成与内部事实一致的分层载荷：
   - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
