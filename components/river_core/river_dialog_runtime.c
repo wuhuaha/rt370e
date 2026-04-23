@@ -798,8 +798,14 @@ typedef struct {
     bool output_turn_engaged;
     river_dialog_input_lane_t input_lane;
     river_dialog_output_lane_t output_lane;
-    river_interaction_state_t interaction_state;
 } river_dialog_runtime_interaction_projection_t;
+
+typedef struct {
+    river_dialog_runtime_interaction_projection_t projection;
+    river_interaction_state_t state;
+    bool cloud_round_active;
+    bool allows_barge_in_interrupt;
+} river_dialog_runtime_interaction_eval_t;
 
 static void river_dialog_runtime_capture_playback_projection_locked(
     river_dialog_runtime_playback_projection_t *projection)
@@ -1032,8 +1038,6 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
 {
     const river_dialog_runtime_control_facts_t *control_facts =
         &g_river_dialog_runtime.control_facts;
-    const river_dialog_runtime_derived_facts_t *derived_facts =
-        &g_river_dialog_runtime.derived_facts;
     const river_dialog_runtime_cloud_round_facts_t *round_facts =
         &g_river_dialog_runtime.cloud_round_facts;
     const river_dialog_runtime_cloud_io_facts_t *io_facts =
@@ -1048,7 +1052,9 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
     river_dialog_runtime_capture_playback_eval_locked(&playback_eval);
     projection->playback = playback_eval.projection;
     projection->boot_ready = control_facts->boot_ready;
-    projection->error_recovering = derived_facts->error_recovering;
+    projection->error_recovering =
+        g_river_dialog_runtime.asr_error_recovering ||
+        g_river_dialog_runtime.local_playback_error_recovering;
     projection->asr_session_active = control_facts->asr_session_active;
     projection->wake_confirmed = control_facts->wake_confirmed;
     projection->wake_admission_pending = control_facts->wake_admission_pending;
@@ -1063,7 +1069,6 @@ static void river_dialog_runtime_capture_interaction_projection_locked(
     projection->tts_interrupt_requested = control_facts->tts_interrupt_requested;
     projection->input_lane = io_facts->input_lane;
     projection->output_lane = io_facts->output_lane;
-    projection->interaction_state = derived_facts->interaction_state;
     projection->output_turn_engaged = playback_eval.output_turn_engaged;
 }
 
@@ -1073,6 +1078,84 @@ static bool river_dialog_runtime_tts_interrupt_inflight_from_projection(
     return projection != NULL &&
            (projection->playback.tts_stop_pending ||
             projection->tts_interrupt_requested);
+}
+
+static river_interaction_state_t
+river_dialog_runtime_interaction_state_from_projection(
+    const river_dialog_runtime_interaction_projection_t *projection)
+{
+    if (projection == NULL) {
+        return RIVER_INTERACTION_BOOTING;
+    }
+    if (!projection->boot_ready) {
+        return RIVER_INTERACTION_BOOTING;
+    }
+    if (projection->error_recovering) {
+        return RIVER_INTERACTION_ERROR_RECOVERING;
+    }
+    if (projection->output_turn_engaged) {
+        if (projection->asr_session_active ||
+            projection->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
+            return RIVER_INTERACTION_BARGE_IN_LISTENING;
+        }
+        return RIVER_INTERACTION_SPEAKING;
+    }
+    if (projection->output_lane == RIVER_DIALOG_OUTPUT_LANE_THINKING) {
+        return RIVER_INTERACTION_THINKING;
+    }
+    if (projection->asr_session_active ||
+        projection->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
+        return RIVER_INTERACTION_ASR_STREAMING;
+    }
+    if (projection->wake_confirmed) {
+        return RIVER_INTERACTION_WAKE_CONFIRMED;
+    }
+    if (projection->conversation_window_active) {
+        return RIVER_INTERACTION_FOLLOW_UP;
+    }
+    return RIVER_INTERACTION_WAKE_MONITORING;
+}
+
+static bool river_dialog_runtime_cloud_round_active_from_projection(
+    const river_dialog_runtime_interaction_projection_t *projection)
+{
+    return projection != NULL &&
+           (projection->cloud_listening ||
+            projection->cloud_stream_active ||
+            projection->cloud_listen_stop_pending ||
+            projection->cloud_local_close_pending ||
+            projection->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
+            projection->input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED);
+}
+
+static bool river_dialog_runtime_allows_barge_in_interrupt_from_interaction_eval(
+    const river_dialog_runtime_interaction_eval_t *eval)
+{
+    return eval != NULL &&
+           eval->projection.asr_session_active &&
+           eval->projection.output_turn_engaged &&
+           !river_dialog_runtime_tts_interrupt_inflight_from_projection(
+               &eval->projection) &&
+           !eval->projection.playback_terminal_closed &&
+           (eval->state == RIVER_INTERACTION_SPEAKING ||
+            eval->state == RIVER_INTERACTION_BARGE_IN_LISTENING);
+}
+
+static void river_dialog_runtime_capture_interaction_eval_locked(
+    river_dialog_runtime_interaction_eval_t *eval)
+{
+    if (eval == NULL) {
+        return;
+    }
+
+    memset(eval, 0, sizeof(*eval));
+    river_dialog_runtime_capture_interaction_projection_locked(&eval->projection);
+    eval->state =
+        river_dialog_runtime_interaction_state_from_projection(&eval->projection);
+    eval->cloud_round_active =
+        river_dialog_runtime_cloud_round_active_from_projection(&eval->projection);
+    eval->allows_barge_in_interrupt =
+        river_dialog_runtime_allows_barge_in_interrupt_from_interaction_eval(eval);
 }
 
 static void river_dialog_runtime_refresh_playback_locked(void)
@@ -1096,49 +1179,18 @@ static bool river_dialog_runtime_output_turn_quiesced_locked(void)
 
 static bool river_dialog_runtime_cloud_round_active_locked(void)
 {
-    river_dialog_runtime_interaction_projection_t projection;
+    river_dialog_runtime_interaction_eval_t eval;
 
-    river_dialog_runtime_capture_interaction_projection_locked(&projection);
-    return projection.cloud_listening ||
-           projection.cloud_stream_active ||
-           projection.cloud_listen_stop_pending ||
-           projection.cloud_local_close_pending ||
-           projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
-           projection.input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED;
+    river_dialog_runtime_capture_interaction_eval_locked(&eval);
+    return eval.cloud_round_active;
 }
 
 static river_interaction_state_t river_dialog_runtime_compute_interaction_state_locked(void)
 {
-    river_dialog_runtime_interaction_projection_t projection;
+    river_dialog_runtime_interaction_eval_t eval;
 
-    river_dialog_runtime_capture_interaction_projection_locked(&projection);
-    if (!projection.boot_ready) {
-        return RIVER_INTERACTION_BOOTING;
-    }
-    if (projection.error_recovering) {
-        return RIVER_INTERACTION_ERROR_RECOVERING;
-    }
-    if (projection.output_turn_engaged) {
-        if (projection.asr_session_active ||
-            projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
-            return RIVER_INTERACTION_BARGE_IN_LISTENING;
-        }
-        return RIVER_INTERACTION_SPEAKING;
-    }
-    if (projection.output_lane == RIVER_DIALOG_OUTPUT_LANE_THINKING) {
-        return RIVER_INTERACTION_THINKING;
-    }
-    if (projection.asr_session_active ||
-        projection.input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE) {
-        return RIVER_INTERACTION_ASR_STREAMING;
-    }
-    if (projection.wake_confirmed) {
-        return RIVER_INTERACTION_WAKE_CONFIRMED;
-    }
-    if (projection.conversation_window_active) {
-        return RIVER_INTERACTION_FOLLOW_UP;
-    }
-    return RIVER_INTERACTION_WAKE_MONITORING;
+    river_dialog_runtime_capture_interaction_eval_locked(&eval);
+    return eval.state;
 }
 
 static void river_dialog_runtime_capture_commit_checkpoint_locked(
@@ -1640,23 +1692,23 @@ void river_dialog_runtime_sync_cloud_state(const char *reason)
 
 static const char *river_dialog_runtime_wakeword_block_reason_locked(void)
 {
-    river_dialog_runtime_interaction_projection_t projection;
+    river_dialog_runtime_interaction_eval_t eval;
 
-    river_dialog_runtime_capture_interaction_projection_locked(&projection);
-    if (projection.wake_admission_pending) {
+    river_dialog_runtime_capture_interaction_eval_locked(&eval);
+    if (eval.projection.wake_admission_pending) {
         return "wake_admission_pending";
     }
-    if (projection.conversation_window_active) {
+    if (eval.projection.conversation_window_active) {
         return "conversation_window_active";
     }
-    if (projection.cloud_local_close_pending) {
+    if (eval.projection.cloud_local_close_pending) {
         return "cloud_local_close_pending";
     }
-    if (projection.cloud_listen_stop_pending) {
+    if (eval.projection.cloud_listen_stop_pending) {
         return "cloud_listen_stop_pending";
     }
-    if (projection.interaction_state != RIVER_INTERACTION_WAKE_MONITORING) {
-        return river_interaction_state_name(projection.interaction_state);
+    if (eval.state != RIVER_INTERACTION_WAKE_MONITORING) {
+        return river_interaction_state_name(eval.state);
     }
     return NULL;
 }
@@ -1689,8 +1741,7 @@ const char *river_dialog_runtime_wakeword_admission_block_reason(void)
 
 bool river_dialog_runtime_allows_barge_in_interrupt(void)
 {
-    bool allowed = false;
-    river_dialog_runtime_interaction_projection_t projection;
+    river_dialog_runtime_interaction_eval_t eval;
 
     if (!g_river_dialog_runtime.initialized) {
         return false;
@@ -1699,19 +1750,10 @@ bool river_dialog_runtime_allows_barge_in_interrupt(void)
         return false;
     }
 
-    river_dialog_runtime_capture_interaction_projection_locked(&projection);
-    allowed = projection.asr_session_active &&
-              projection.output_turn_engaged &&
-              !river_dialog_runtime_tts_interrupt_inflight_from_projection(
-                  &projection) &&
-              !projection.playback_terminal_closed &&
-              (projection.interaction_state ==
-                   RIVER_INTERACTION_SPEAKING ||
-               projection.interaction_state ==
-                   RIVER_INTERACTION_BARGE_IN_LISTENING);
+    river_dialog_runtime_capture_interaction_eval_locked(&eval);
 
     river_dialog_runtime_unlock();
-    return allowed;
+    return eval.allows_barge_in_interrupt;
 }
 
 river_interaction_state_t river_dialog_runtime_interaction_state(void)

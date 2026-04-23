@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.463
+Validate that dialog runtime now evaluates interaction state and interaction
+policies through a single typed interaction evaluation view:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '790,1210p' components/river_core/river_dialog_runtime.c
+sed -n '1688,1755p' components/river_core/river_dialog_runtime.c
+rg -n 'interaction_eval_t|capture_interaction_eval_locked|interaction_state_from_projection|cloud_round_active_from_projection|allows_barge_in_interrupt_from_interaction_eval|projection\\.interaction_state' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_interaction_eval_t`
+  - `river_dialog_runtime_capture_interaction_eval_locked(...)`
+- `river_dialog_runtime_interaction_projection_t` no longer carries
+  `interaction_state`
+- `river_dialog_runtime_capture_interaction_projection_locked(...)` no longer
+  reads `derived_facts.interaction_state` and no longer uses
+  `derived_facts.error_recovering` as the source of interaction truth
+- interaction state computation, cloud-round-active checks, wakeword block
+  reasoning, and barge-in interrupt admission now all route through the shared
+  interaction evaluation
+
 ## Step 5.462
 Validate that dialog runtime now evaluates playback projection, truth, and
 output-turn engagement through a single typed playback evaluation view:

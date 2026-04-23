@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.462 收口 playback evaluation view`
+  - `5.463 收口 interaction evaluation view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 interaction 的 `projection -> state/policy`
+      评估链收口成单一 typed evaluation
+    - 新增统一 interaction evaluation：
+      - `river_dialog_runtime_interaction_eval_t`
+      - `river_dialog_runtime_capture_interaction_eval_locked(...)`
+    - `river_dialog_runtime_interaction_projection_t` 不再反向读取：
+      - `derived_facts.interaction_state`
+      并且 `error_recovering` 也不再从：
+      - `derived_facts.error_recovering`
+      回填，而是直接从 runtime raw error flags 派生
+    - `river_dialog_runtime_compute_interaction_state_locked(...)`、
+      `river_dialog_runtime_cloud_round_active_locked(...)`、
+      `river_dialog_runtime_wakeword_block_reason_locked(...)`、
+      `river_dialog_runtime_allows_barge_in_interrupt(...)`
+      现在统一读取 shared interaction evaluation
+    - 这一步把：
+      - split interaction-state / policy checks
+      收口成：
+      - single interaction evaluation view
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续把 playback 的 `projection -> truth -> output_turn`
       评估链收口成单一 typed evaluation

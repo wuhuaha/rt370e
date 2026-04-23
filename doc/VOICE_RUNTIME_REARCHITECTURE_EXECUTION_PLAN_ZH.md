@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.463`
+  - `dialog runtime` 继续把 interaction 的 `projection -> state/policy`
+    评估链收口成单一 typed evaluation
+  - 新增统一 interaction evaluation：
+    - `river_dialog_runtime_interaction_eval_t`
+    - `river_dialog_runtime_capture_interaction_eval_locked(...)`
+  - `river_dialog_runtime_interaction_projection_t` 不再回填：
+    - `interaction_state`
+    并且 `error_recovering` 也不再从：
+    - `derived_facts.error_recovering`
+    反向读取，而是直接从 runtime raw error flags 派生
+  - `river_dialog_runtime_compute_interaction_state_locked(...)`、
+    `river_dialog_runtime_cloud_round_active_locked(...)`、
+    `river_dialog_runtime_wakeword_block_reason_locked(...)`、
+    `river_dialog_runtime_allows_barge_in_interrupt(...)`
+    现在统一复用 shared interaction evaluation
+  - 这一步继续把 `dialog runtime` 从：
+    - split interaction-state / policy checks
+    推进到：
+    - single interaction evaluation view
 - `Step 5.462`
   - `dialog runtime` 继续把 playback 的 `projection -> truth -> output_turn`
     评估链收口成单一 typed evaluation
