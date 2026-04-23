@@ -26,6 +26,28 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.470`
+  - `dialog runtime` 继续把 playback/error 的 snapshot 导出边界收口成显式
+    export view
+  - 新增 playback/error snapshot export carrier：
+    - `river_dialog_runtime_playback_error_export_view_t`
+    - `river_dialog_runtime_capture_playback_error_export_view_locked(...)`
+    - `river_dialog_runtime_apply_playback_error_export_view_to_snapshot_locked(...)`
+  - 原先直接从 `error_truth` / `playback_truth` 抄字段到 snapshot 的 helper 已收口为：
+    - `river_dialog_runtime_export_playback_error_state_to_snapshot_locked(...)`
+    并统一走：
+    - `capture + apply`
+  - `refresh_error_recovering_locked(...)`、
+    `refresh_playback_locked(...)`、
+    `export_runtime_state_to_snapshot_locked(...)`
+    现在都通过 shared export view 刷新 snapshot
+  - 这一步继续把 `dialog runtime` 从：
+    - snapshot field-by-field copy from runtime truth
+    推进到：
+    - typed playback/error export view
+  - 下一步继续聚焦：
+    - 继续检查 publish/export 侧是否也要采用同样的 export-view 模式，进一步让
+      snapshot 导出 helper 只保留 apply 语义
 - `Step 5.469`
   - `dialog runtime` 继续把剩余 `derived_facts` 混合状态拆成显式
     `error_truth` / `playback_truth`

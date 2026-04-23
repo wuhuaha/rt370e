@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.470
+- `dialog runtime` 继续把 playback/error 的 snapshot 导出边界收口成显式
+  export view：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增 playback/error snapshot export carrier：
+  - `river_dialog_runtime_playback_error_export_view_t`
+  - `river_dialog_runtime_capture_playback_error_export_view_locked(...)`
+  - `river_dialog_runtime_apply_playback_error_export_view_to_snapshot_locked(...)`
+- 原先直接从 `error_truth` / `playback_truth` 抄字段到 snapshot 的：
+  - `river_dialog_runtime_export_playback_error_facts_to_snapshot_locked(...)`
+  已收口为：
+  - `river_dialog_runtime_export_playback_error_state_to_snapshot_locked(...)`
+  并统一走 `capture + apply`
+- `refresh_error_recovering_locked(...)`、
+  `refresh_playback_locked(...)`、
+  `export_runtime_state_to_snapshot_locked(...)`
+  现在都只通过 shared export view 刷新 snapshot
+- 这一步继续把：
+  - snapshot field-by-field copy from runtime truth
+  收口成：
+  - typed playback/error export view
+
 ## Step 5.469
 - `dialog runtime` 继续把剩余 `derived_facts` 混合状态拆成显式
   `error_truth` / `playback_truth`：
