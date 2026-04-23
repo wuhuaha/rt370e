@@ -26,6 +26,36 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.468`
+  - `dialog runtime` 继续把 `snapshot export` 的 publish/runtime 边界收口成
+    更明确的 typed helper
+  - 原先混合导出 `publish_state + derived_facts` 的：
+    - `river_dialog_runtime_export_derived_facts_to_snapshot_locked(...)`
+    已拆成：
+    - `river_dialog_runtime_export_playback_error_facts_to_snapshot_locked(...)`
+    - `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+    - `river_dialog_runtime_export_runtime_state_to_snapshot_locked(...)`
+  - 各调用点现在按真实 ownership 只刷新需要的 snapshot 区域：
+    - playback/error 变更路径只导出：
+      - `error_recovering`
+      - `error_kind`
+      - `playback_owner_kind`
+      - `playback_active`
+      - `playback_recovering`
+    - publish/reason 变更路径只导出：
+      - `interaction_state`
+      - `transition_count`
+      - `reason`
+    - boot / cloud-event 这类同时影响两边的路径才走：
+      - `river_dialog_runtime_export_runtime_state_to_snapshot_locked(...)`
+  - 这一步继续把 `dialog runtime` 从：
+    - mixed snapshot export helper
+    推进到：
+    - explicit publish export boundary
+    - explicit playback/error export boundary
+  - 下一步继续聚焦：
+    - 继续检查 `derived_facts` 剩余字段是否也要继续从“混合缓存包”推进到更明确
+      的 typed runtime state / export carrier，减少名称与职责错位
 - `Step 5.467`
   - `dialog runtime` 继续把 interaction publish 的 `state/count/reason`
     收口成统一 `publish_state`

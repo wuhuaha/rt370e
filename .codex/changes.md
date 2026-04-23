@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.468
+- `dialog runtime` 继续把 `snapshot export` 边界从混合 helper 收口成更明确
+  的 publish/runtime 两层导出：
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 原先混合导出 `publish_state + derived_facts` 的：
+  - `river_dialog_runtime_export_derived_facts_to_snapshot_locked(...)`
+  已拆成：
+  - `river_dialog_runtime_export_playback_error_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_runtime_state_to_snapshot_locked(...)`
+- 各调用点现在按真实 ownership 刷新更窄的 snapshot 区域：
+  - playback/error 刷新路径只导出：
+    - `error_recovering`
+    - `error_kind`
+    - `playback_owner_kind`
+    - `playback_active`
+    - `playback_recovering`
+  - publish/reason 刷新路径只导出：
+    - `interaction_state`
+    - `transition_count`
+    - `reason`
+  - 只有 boot / cloud-event 这类确实同时影响两边的路径才走
+    `export_runtime_state_to_snapshot_locked(...)`
+- 这一步继续把：
+  - mixed snapshot export helper
+  收口成：
+  - explicit publish export boundary
+  - explicit playback/error export boundary
+
 ## Step 5.467
 - `dialog runtime` 继续把 interaction publish 的 `state/count/reason`
   收口成统一 `publish_state`：

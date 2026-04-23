@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.468
+Validate that dialog runtime now exports publish state and playback/error state
+through separate snapshot helpers instead of one mixed `derived_facts` export
+path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '170,182p' components/river_core/river_dialog_runtime.c
+sed -n '432,468p' components/river_core/river_dialog_runtime.c
+sed -n '1188,1392p' components/river_core/river_dialog_runtime.c
+sed -n '1604,1728p' components/river_core/river_dialog_runtime.c
+rg -n 'export_derived_facts_to_snapshot_locked|export_playback_error_facts_to_snapshot_locked|export_publish_state_to_snapshot_locked|export_runtime_state_to_snapshot_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `components/river_core/river_dialog_runtime.c` now defines:
+  - `river_dialog_runtime_export_playback_error_facts_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_publish_state_to_snapshot_locked(...)`
+  - `river_dialog_runtime_export_runtime_state_to_snapshot_locked(...)`
+- `river_dialog_runtime_export_derived_facts_to_snapshot_locked(...)` no longer
+  appears in the file
+- `refresh_error_recovering_locked(...)` and `refresh_playback_locked(...)` now
+  only refresh the playback/error snapshot export path
+- `publish_locked(...)` and the stable-commit reason refresh path now only
+  refresh the publish snapshot export path
+
 ## Step 5.467
 Validate that dialog runtime now stores all interaction publish state in a
 single explicit `publish_state` instead of splitting `interaction_state` and
