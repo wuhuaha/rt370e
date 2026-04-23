@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.442`
+  - `downlink/playback` 继续把 downlink worker 的前置调度执行从主循环中
+    收口成统一 cycle helper
+  - 新增本地 typed result：
+    - `river_cloud_xiaozhi_downlink_cycle_result_t`
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_prepare_downlink_cycle(...)`
+  - 该 helper 现在统一接管：
+    - downlink active gating
+    - playback ACK progress refresh before cycle
+    - rebuffer-starved gating
+    - segment-gap pause gating
+    - empty-queue pending-stop check
+    - playback prepare dispatch
+  - `downlink task` 在 acquire/write 之前现在只按 typed cycle result 决定：
+    - idle delay + continue
+    - poll delay + continue
+    - ready
 - `Step 5.441`
   - `downlink/playback` 继续把单帧写成功后的收尾执行从 downlink task 主循环中
     收口成统一 helper
