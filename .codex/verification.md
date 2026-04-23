@@ -1,5 +1,42 @@
 # Verification
 
+## Step 5.453
+Validate that dialog runtime now derives playback truth from a raw playback
+projection instead of backfilling projection state from derived facts:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '712,935p' components/river_core/river_dialog_runtime.c
+sed -n '1040,1068p' components/river_core/river_dialog_runtime.c
+rg -n 'playback_truth_t|capture_playback_truth_from_projection|compute_playback_recovering_from_projection|compute_playback_active_from_projection|compute_playback_owner_kind_from_projection' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime now defines:
+  - `river_dialog_runtime_playback_truth_t`
+  - `river_dialog_runtime_capture_playback_truth_from_projection(...)`
+- `river_dialog_runtime_playback_projection_t` no longer carries:
+  - `playback_recovering`
+- `river_dialog_runtime_capture_playback_projection_locked(...)` no longer
+  backfills:
+  - `derived_facts->playback_recovering`
+- dialog runtime no longer defines:
+  - `river_dialog_runtime_compute_playback_recovering_from_projection(...)`
+  - `river_dialog_runtime_compute_playback_active_from_projection(...)`
+  - `river_dialog_runtime_compute_playback_owner_kind_from_projection(...)`
+- `river_dialog_runtime_refresh_playback_locked(...)` and
+  `river_dialog_runtime_output_turn_quiesced_locked(...)` now both consume:
+  - raw projection
+  - unified playback truth helper
+
 ## Step 5.452
 Validate that dialog runtime now materializes a typed local playback import plan
 before applying ownership/state/error mutations:

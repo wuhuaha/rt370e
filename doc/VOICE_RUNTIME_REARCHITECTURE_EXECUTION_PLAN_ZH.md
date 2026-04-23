@@ -26,6 +26,29 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.453`
+  - `dialog runtime` 继续把 playback raw projection 与派生 truth 解耦
+  - 删除 `playback projection` 对已派生 truth 的反向依赖：
+    - `river_dialog_runtime_playback_projection_t` 不再携带
+      `playback_recovering`
+    - `river_dialog_runtime_capture_playback_projection_locked(...)`
+      不再回填 `derived_facts->playback_recovering`
+  - 新增统一 playback truth helper：
+    - `river_dialog_runtime_playback_truth_t`
+    - `river_dialog_runtime_capture_playback_truth_from_projection(...)`
+  - `dialog runtime` 现在统一通过 raw projection -> playback truth 链路派生：
+    - `playback_active`
+    - `playback_recovering`
+    - `playback_owner_kind`
+    - `output_turn_quiesced` 的 recovering 判定
+  - 删除旧的分散 truth helper：
+    - `river_dialog_runtime_compute_playback_recovering_from_projection(...)`
+    - `river_dialog_runtime_compute_playback_active_from_projection(...)`
+    - `river_dialog_runtime_compute_playback_owner_kind_from_projection(...)`
+  - 这一步继续把 `dialog runtime` 从：
+    - playback projection <- derived truth backfill
+    推进到：
+    - raw playback projection + single playback truth helper
 - `Step 5.452`
   - `dialog runtime` 继续把 local playback import 从分散 prepare/apply 收口成显式 plan
   - 删除旧的两段式 helper：
