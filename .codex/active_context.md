@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.437 让 downlink task 改用单入口 write_failed handler`
+  - `5.438 收口 downlink frame 的写入执行`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把单帧写入执行从 downlink task 主循环里
+      收口成统一 helper
+    - 新增本地 typed result：
+      - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_write_current_downlink_frame(...)`
+    - 该 helper 现在统一接管：
+      - frame oversize abort
+      - stereo expand
+      - playback service write
+      - write_failed handler dispatch
+      - retry-valid clear on success
+    - `downlink task` 现在只按 typed result 决定：
+      - continue
+      - delay + continue
+      - progress
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 `write_failed` 从 downlink task 主循环里
       收口成单入口 handler

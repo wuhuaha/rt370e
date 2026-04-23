@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.438
+- `downlink/playback` 继续把单帧写入执行从 downlink task 主循环中收口成统一 helper：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增本地 typed result：
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+- 新增统一 helper：
+  - `river_cloud_xiaozhi_write_current_downlink_frame(...)`
+- 该 helper 现在统一接管：
+  - frame oversize abort
+  - stereo expand
+  - playback service write
+  - write_failed handler dispatch
+  - retry-valid clear on success
+- `downlink task` 现在只按单帧写入结果决定：
+  - continue
+  - delay + continue
+  - progress
+
 ## Step 5.437
 - `downlink/playback` 继续把 `write_failed` 从 downlink task 主循环里收口成单入口 handler：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

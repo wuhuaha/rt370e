@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.438
+Validate that one-frame downlink write execution is now routed through a typed
+helper result instead of being inlined in the task loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '620,635p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1678,1725p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3970,3995p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_frame_write_result|write_current_downlink_frame|handle_playback_write_failed' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+  - `river_cloud_xiaozhi_write_current_downlink_frame(...)`
+- downlink task no longer inlines:
+  - oversize abort
+  - stereo expand
+  - service write
+  - write_failed dispatch
+- downlink task now only branches on typed frame-write result
+
 ## Step 5.437
 Validate that `write_failed` now goes through a single downlink-side handler
 entrypoint:
