@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.434
+Validate that playback recovery now exports typed outcome observability in
+addition to recovery path:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '90,145p' include/river/river_cloud.h
+sed -n '55,75p' include/river/river_dialog_runtime.h
+sed -n '20,40p' components/river_core/river_dialog_runtime.c
+sed -n '1598,1665p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2160,2215p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3660,3718p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '858,878p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1749,1790p' components/river_core/river_dialog_runtime.c
+rg -n 'recovery_outcome|set_playback_recovery_outcome|managed_rebuffer|inline_replay' \
+  include/river components/river_cloud components/river_core
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- public headers now define/export:
+  - `river_cloud_playback_recovery_outcome_t`
+  - `playback_recovery_outcome_kind`
+- XiaoZhi playback runtime now records:
+  - inline replay success as `inline_replay`
+  - managed rebuffer entry as `managed_rebuffer`
+- cloud/dialog runtime dumps now include `recovery_outcome=...`
+- cloud/dialog snapshots can now distinguish:
+  - `service_recover` that stayed inline
+  - `service_recover/stop_rebuffer` that already escalated into managed
+    rebuffer
+
 ## Step 5.433
 Validate that playback recovery path now covers inline recover/direct fallback
 branches and remains observable for the current response window:

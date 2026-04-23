@@ -15,11 +15,24 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.433 让 playback recovery path 覆盖 inline recover 真相`
+  - `5.434 为 playback recovery 导出 typed outcome 真相`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把 recovery observability 从 `path only` 推进到
+      `path + outcome`
+    - 新增公共枚举：
+      - `river_cloud_playback_recovery_outcome_t`
+    - `cloud runtime snapshot` / `dialog runtime snapshot` 现在都会镜像：
+      - `playback_recovery_outcome_kind`
+    - XiaoZhi playback runtime 现在会把：
+      - inline replay success
+        记为 `inline_replay`
+      - managed rebuffer enter
+        记为 `managed_rebuffer`
+    - cloud/dialog runtime dump 现在也开始直接打印 `recovery_outcome`
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把 `playback_recovery_path` 推进成当前 response 内
       稳定可见的最近恢复动作观测

@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.434
+- `downlink/playback` 继续把恢复链从“只知道走了哪条 path”推进到“还能知道这次恢复最终是 inline 自愈还是升级成 managed rebuffer”：
+  - [include/river/river_cloud.h](/root/ameba-river/include/river/river_cloud.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [include/river/river_dialog_runtime.h](/root/ameba-river/include/river/river_dialog_runtime.h)
+  - [components/river_core/river_dialog_runtime.c](/root/ameba-river/components/river_core/river_dialog_runtime.c)
+- 新增公共 typed 枚举：
+  - `river_cloud_playback_recovery_outcome_t`
+- `cloud runtime snapshot` 现在额外导出：
+  - `playback_recovery_outcome_kind`
+  - `playback_recovery_outcome`
+- XiaoZhi playback runtime 现在会把：
+  - inline `service_recover + replay` 成功
+    记为 `inline_replay`
+  - 任意 `note_playback_rebuffer(...)`
+    记为 `managed_rebuffer`
+- `cloud runtime dump` 与 `dialog runtime dump` 也开始打印：
+  - `recovery_outcome=...`
+- 这一步继续把恢复真相从：
+  - `path only`
+  推进到：
+  - `path + outcome`
+  让上层直接区分“这次故障已经被本轮自愈吸收”还是“已经升级成 managed rebuffer”
+
 ## Step 5.433
 - `downlink/playback` 继续把 `playback_recovery_path` 从“只在 managed rebuffer
   分支里偶尔可见”的状态推进成当前 response 内稳定可见的最近恢复动作观测：

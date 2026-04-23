@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.434`
+  - `downlink/playback` 继续把 recovery observability 从 `path only` 推进到
+    `path + outcome`
+  - 新增公共枚举：
+    - `river_cloud_playback_recovery_outcome_t`
+  - `cloud runtime snapshot` 现在额外导出：
+    - `playback_recovery_outcome_kind`
+    - `playback_recovery_outcome`
+  - XiaoZhi playback runtime 现在会把：
+    - inline `service_recover + replay` 成功
+      记为 `inline_replay`
+    - 任意 `note_playback_rebuffer(...)`
+      记为 `managed_rebuffer`
+  - `dialog runtime` 也同步镜像：
+    - `playback_recovery_outcome_kind`
+  - XiaoZhi / dialog runtime dump 现在都会直接打印：
+    - `recovery_outcome=...`
+  - 这一步继续把恢复真相从：
+    - 只能知道走了哪条 path
+    推进到：
+    - 还能知道这次恢复最终是 inline 自愈还是已经升级成 managed rebuffer
 - `Step 5.433`
   - `downlink/playback` 继续把 `playback_recovery_path` 推进成当前 response 内
     稳定可见的最近恢复动作观测

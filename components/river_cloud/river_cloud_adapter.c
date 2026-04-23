@@ -59,6 +59,20 @@ const char *river_cloud_playback_recovery_path_name(
     }
 }
 
+const char *river_cloud_playback_recovery_outcome_name(
+    river_cloud_playback_recovery_outcome_t outcome)
+{
+    switch (outcome) {
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_OUTCOME_INLINE_REPLAY:
+        return "inline_replay";
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_OUTCOME_MANAGED_REBUFFER:
+        return "managed_rebuffer";
+    case RIVER_CLOUD_PLAYBACK_RECOVERY_OUTCOME_NONE:
+    default:
+        return NULL;
+    }
+}
+
 const char *river_cloud_playback_phase_name(river_cloud_playback_phase_t phase)
 {
     switch (phase) {
