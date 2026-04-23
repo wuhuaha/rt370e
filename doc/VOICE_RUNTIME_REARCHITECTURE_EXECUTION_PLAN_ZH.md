@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.448`
+  - `downlink/playback` 继续把 `acquire_current_downlink_frame(...)`
+    的 ready 判定从二值枚举收口成布尔返回
+  - 删除中间 typed result：
+    - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+  - `river_cloud_xiaozhi_acquire_current_downlink_frame(...)` 现在直接返回：
+    - `bool`
+  - `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)` 不再负责：
+    - acquire-result -> sleep/continue 的枚举翻译
+  - 这一步继续把 downlink/playback 从：
+    - binary frame-acquire contract
+    推进到：
+    - direct acquire predicate
 - `Step 5.447`
   - `downlink/playback` 继续把 `prepare_downlink_playback(...)`
     的 ready 判定从二值枚举收口成布尔返回

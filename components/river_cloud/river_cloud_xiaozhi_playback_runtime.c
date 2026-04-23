@@ -626,11 +626,6 @@ typedef enum {
 } river_cloud_xiaozhi_downlink_frame_write_result_t;
 
 typedef enum {
-    RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_RETRY_LATER = 0,
-    RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY
-} river_cloud_xiaozhi_downlink_frame_acquire_result_t;
-
-typedef enum {
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE = 0,
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
     RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE
@@ -3832,23 +3827,23 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
     return plan;
 }
 
-static river_cloud_xiaozhi_downlink_frame_acquire_result_t
+static bool
 river_cloud_xiaozhi_acquire_current_downlink_frame(void)
 {
     river_status_t status;
 
     if (g_river_cloud.xiaozhi_downlink_retry_valid) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY;
+        return true;
     }
 
     status = river_audio_frame_ring_read(&g_river_cloud.xiaozhi_downlink_ring,
                                          g_river_cloud.xiaozhi_downlink_task_frame);
     if (status != RIVER_OK) {
         river_cloud_xiaozhi_playback_check_pending_stop();
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_RETRY_LATER;
+        return false;
     }
 
-    return RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY;
+    return true;
 }
 
 static void river_cloud_xiaozhi_complete_written_downlink_frame(void)
@@ -3863,11 +3858,9 @@ static void river_cloud_xiaozhi_complete_written_downlink_frame(void)
 static river_cloud_xiaozhi_downlink_task_step_result_t
 river_cloud_xiaozhi_execute_ready_downlink_cycle(uint32_t queued_frames)
 {
-    river_cloud_xiaozhi_downlink_frame_acquire_result_t acquire_result;
     river_cloud_xiaozhi_downlink_frame_write_result_t write_result;
 
-    acquire_result = river_cloud_xiaozhi_acquire_current_downlink_frame();
-    if (acquire_result != RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY) {
+    if (!river_cloud_xiaozhi_acquire_current_downlink_frame()) {
         return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
     }
 

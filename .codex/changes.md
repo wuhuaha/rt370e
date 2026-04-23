@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.448
+- `downlink/playback` 继续把 `acquire_current_downlink_frame(...)` 的 ready 判定从二值枚举收口成布尔返回：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 删除中间 typed result：
+  - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+- `river_cloud_xiaozhi_acquire_current_downlink_frame(...)` 现在直接返回：
+  - `bool`
+- `river_cloud_xiaozhi_execute_ready_downlink_cycle(...)` 不再负责：
+  - acquire-result -> sleep/continue 的枚举翻译
+- 这一步把：
+  - binary frame-acquire contract
+  收口成：
+  - direct acquire predicate
+
 ## Step 5.447
 - `downlink/playback` 继续把 `prepare_downlink_playback(...)` 的 ready 判定从二值枚举收口成布尔返回：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

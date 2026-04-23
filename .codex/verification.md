@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.448
+Validate that current-frame acquisition now returns a direct boolean predicate
+instead of translating through a two-state acquire-result enum:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '620,640p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3825,3875p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_frame_acquire_result|acquire_current_downlink_frame\\(|execute_ready_downlink_cycle\\(' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime no longer defines:
+  - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+- `river_cloud_xiaozhi_acquire_current_downlink_frame(...)` now returns:
+  - `bool`
+- ready-cycle execution no longer compares against:
+  - `RIVER_CLOUD_XIAOZHI_DOWNLINK_FRAME_ACQUIRE_READY`
+- frame acquire now directly expresses:
+  - acquired / not acquired
+
 ## Step 5.447
 Validate that prepare-downlink-playback readiness is now expressed as a direct
 boolean predicate instead of a two-state enum:
