@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.441`
+  - `downlink/playback` 继续把单帧写成功后的收尾执行从 downlink task 主循环中
+    收口成统一 helper
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_complete_written_downlink_frame(...)`
+  - 该 helper 现在统一接管：
+    - segment start latch on progress
+    - playback ACK progress refresh
+    - pending-stop check after progress
+  - `downlink task` 在 frame write 成功后现在只保留：
+    - call `complete_written_downlink_frame(...)`
 - `Step 5.440`
   - `downlink/playback` 继续把当前帧获取执行从 downlink task 主循环中
     收口成统一 helper

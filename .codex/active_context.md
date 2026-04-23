@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.440 收口 downlink frame 的获取执行`
+  - `5.441 收口 downlink frame 的写后收尾执行`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback` 继续把单帧写成功后的收尾执行从 downlink task 主循环里
+      收口成统一 helper
+    - 新增统一 helper：
+      - `river_cloud_xiaozhi_complete_written_downlink_frame(...)`
+    - 该 helper 现在统一接管：
+      - segment start latch on progress
+      - playback ACK progress refresh
+      - pending-stop check after progress
+    - `downlink task` 在 frame write 成功后现在只保留：
+      - call `complete_written_downlink_frame(...)`
   - newest landed runtime-ownership slice:
     - `downlink/playback` 继续把当前帧获取执行从 downlink task 主循环里
       收口成统一 helper

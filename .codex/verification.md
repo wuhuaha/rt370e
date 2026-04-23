@@ -1,5 +1,34 @@
 # Verification
 
+## Step 5.441
+Validate that post-write downlink frame completion now goes through a single
+helper instead of being inlined in the task loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '3804,3822p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3998,4016p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'complete_written_downlink_frame|try_start_current_playback_segment|update_playback_ack_progress|playback_check_pending_stop' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_complete_written_downlink_frame(...)`
+- downlink task no longer inlines:
+  - `try_start_current_playback_segment(...)`
+  - `update_playback_ack_progress()`
+  - `playback_check_pending_stop()`
+  on frame-write success
+- downlink task now delegates post-write completion through the shared helper
+
 ## Step 5.440
 Validate that downlink current-frame acquire execution now goes through a
 single typed helper instead of being inlined in the task loop:
