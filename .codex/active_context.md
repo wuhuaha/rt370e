@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.456 收口 rebuffer 日志的 typed observe view`
+  - `5.457 收口 rebuffer recovery 的 typed attempt/result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `downlink/playback runtime` 继续把 rebuffer recovery path 的 preferred/fallback 执行收口成 typed attempt/result
+    - 新增统一 recovery attempt/result：
+      - `river_cloud_xiaozhi_rebuffer_recovery_attempt_t`
+      - `river_cloud_xiaozhi_rebuffer_recovery_result_t`
+      - `river_cloud_xiaozhi_capture_rebuffer_recovery_attempt(...)`
+      - `river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(...)`
+    - 新增统一 path executor：
+      - `river_cloud_xiaozhi_execute_rebuffer_recovery_path(...)`
+    - `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)` 不再手写：
+      - `prefer_service_recover`
+      - `service_recover -> stop_rebuffer fallback`
+      - `stop_rebuffer -> service_recover fallback`
+      三段变量翻译和执行分支
+    - recovery fallback 日志现在统一归一成：
+      - `xiaozhi playback recovery fallback: from=... to=...`
+    - 这一步把：
+      - split preferred/fallback recovery path orchestration
+      收口成：
+      - typed rebuffer recovery attempt/result
   - newest landed runtime-ownership slice:
     - `downlink/playback runtime` 继续把 rebuffer 请求日志的公共观测字段收口成 typed observe view
     - 新增统一 rebuffer observe view：

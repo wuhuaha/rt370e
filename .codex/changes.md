@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.457
+- `downlink/playback runtime` 继续把 rebuffer recovery path 的 preferred/fallback 执行收口成 typed attempt/result：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增统一 recovery attempt/result：
+  - `river_cloud_xiaozhi_rebuffer_recovery_attempt_t`
+  - `river_cloud_xiaozhi_rebuffer_recovery_result_t`
+  - `river_cloud_xiaozhi_capture_rebuffer_recovery_attempt(...)`
+  - `river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(...)`
+- 新增统一 path executor：
+  - `river_cloud_xiaozhi_execute_rebuffer_recovery_path(...)`
+- `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)` 不再手写：
+  - `prefer_service_recover`
+  - `service_recover -> stop_rebuffer fallback`
+  - `stop_rebuffer -> service_recover fallback`
+  三段变量翻译和执行分支
+- recovery fallback 日志现在统一归一成：
+  - `xiaozhi playback recovery fallback: from=... to=...`
+- 这一步把：
+  - split preferred/fallback recovery path orchestration
+  收口成：
+  - typed rebuffer recovery attempt/result
+
 ## Step 5.456
 - `downlink/playback runtime` 继续把 rebuffer 请求日志的公共观测字段收口成 typed observe view：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

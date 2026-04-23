@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.457
+Validate that playback rebuffer recovery path orchestration now uses typed
+attempt/result helpers instead of hand-written preferred/fallback branching:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '638,658p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2850,2966p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'rebuffer_recovery_attempt_t|rebuffer_recovery_result_t|capture_rebuffer_recovery_attempt|execute_rebuffer_recovery_attempt|execute_rebuffer_recovery_path|recovery fallback: from=' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_rebuffer_recovery_attempt_t`
+  - `river_cloud_xiaozhi_rebuffer_recovery_result_t`
+  - `river_cloud_xiaozhi_capture_rebuffer_recovery_attempt(...)`
+  - `river_cloud_xiaozhi_execute_rebuffer_recovery_attempt(...)`
+  - `river_cloud_xiaozhi_execute_rebuffer_recovery_path(...)`
+- `river_cloud_xiaozhi_request_playback_rebuffer_recovery(...)` no longer hand-expands:
+  - service-recover preferred branch
+  - stop-rebuffer preferred branch
+  - two distinct fallback log/execute branches
+- recovery fallback log is now unified as:
+  - `xiaozhi playback recovery fallback: from=... to=...`
+
 ## Step 5.456
 Validate that playback rebuffer logging now reads shared fields from a typed
 observe view instead of reassembling them independently in each path:
