@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.440`
+  - `downlink/playback` 继续把当前帧获取执行从 downlink task 主循环中
+    收口成统一 helper
+  - 新增本地 typed result：
+    - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+  - 新增统一 helper：
+    - `river_cloud_xiaozhi_acquire_current_downlink_frame(...)`
+  - 该 helper 现在统一接管：
+    - retry-valid fast path
+    - downlink ring read
+    - ring read failure后的 pending-stop check
+  - `downlink task` 在 prepare 之后、write 之前现在只按 typed frame-acquire result
+    决定：
+    - delay + continue
+    - ready
 - `Step 5.439`
   - `downlink/playback` 继续把 playback 准备阶段从 downlink task 主循环中
     收口成统一 helper

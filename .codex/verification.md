@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.440
+Validate that downlink current-frame acquire execution now goes through a
+single typed helper instead of being inlined in the task loop:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '628,636p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3785,3810p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3955,3998p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_frame_acquire_result|acquire_current_downlink_frame|downlink_retry_valid|downlink_task_frame' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- playback runtime now defines:
+  - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+  - `river_cloud_xiaozhi_acquire_current_downlink_frame(...)`
+- downlink task no longer inlines:
+  - retry-valid fast path
+  - ring read
+  - ring read failure后的 pending-stop check
+- downlink task now only branches on typed frame-acquire result before frame write
+
 ## Step 5.439
 Validate that downlink playback prepare/start-resume gating now goes through a
 single typed helper instead of being inlined in the task loop:
