@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.451 收口 dialog runtime 的 local playback shadow view`
+  - `5.452 收口 dialog runtime 的 local playback import plan`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `dialog runtime` 继续把 local playback import 从分散 prepare/apply 收口成显式 plan
+    - 删除旧的两段式 helper：
+      - `river_dialog_runtime_prepare_local_playback_import_locked(...)`
+      - `river_dialog_runtime_apply_local_playback_import_locked(...)`
+      - `river_dialog_runtime_apply_local_playback_state_locked(...)`
+    - 新增统一 import plan：
+      - `river_dialog_runtime_local_playback_import_plan_t`
+      - `river_dialog_runtime_prepare_local_playback_import_plan_locked(...)`
+      - `river_dialog_runtime_apply_local_playback_import_plan_locked(...)`
+    - `dialog runtime` 现在先生成 local playback import plan，再在 cloud import
+      落地后统一应用：
+      - stream ownership claim/release
+      - playback state 写入
+      - error recovery / interrupt clear
+    - 这一步把：
+      - split local-playback prepare/apply mutation boundary
+      收口成：
+      - single typed local-playback import plan
   - newest landed runtime-ownership slice:
     - `dialog runtime` 继续收口 local playback shadow 的分散判定 helper
     - 删除分散 helper：

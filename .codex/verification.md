@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.452
+Validate that dialog runtime now materializes a typed local playback import plan
+before applying ownership/state/error mutations:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '736,780p' components/river_core/river_dialog_runtime.c
+sed -n '1283,1368p' components/river_core/river_dialog_runtime.c
+sed -n '1384,1428p' components/river_core/river_dialog_runtime.c
+rg -n 'local_playback_import_plan|prepare_local_playback_import_locked|apply_local_playback_import_locked|apply_local_playback_state_locked' \
+  components/river_core/river_dialog_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- dialog runtime no longer defines:
+  - `river_dialog_runtime_prepare_local_playback_import_locked(...)`
+  - `river_dialog_runtime_apply_local_playback_import_locked(...)`
+  - `river_dialog_runtime_apply_local_playback_state_locked(...)`
+- dialog runtime now defines:
+  - `river_dialog_runtime_local_playback_import_plan_t`
+  - `river_dialog_runtime_prepare_local_playback_import_plan_locked(...)`
+  - `river_dialog_runtime_apply_local_playback_import_plan_locked(...)`
+- `river_dialog_runtime_commit_ingress(...)` now routes local playback import through:
+  - typed plan capture
+  - cloud import / observe application
+  - final plan application
+
 ## Step 5.451
 Validate that dialog runtime now captures local playback shadow through a single
 view helper instead of scattered active/recovering/drives-truth predicates:

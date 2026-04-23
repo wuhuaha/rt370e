@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.452`
+  - `dialog runtime` 继续把 local playback import 从分散 prepare/apply 收口成显式 plan
+  - 删除旧的两段式 helper：
+    - `river_dialog_runtime_prepare_local_playback_import_locked(...)`
+    - `river_dialog_runtime_apply_local_playback_import_locked(...)`
+    - `river_dialog_runtime_apply_local_playback_state_locked(...)`
+  - 新增统一 import plan：
+    - `river_dialog_runtime_local_playback_import_plan_t`
+    - `river_dialog_runtime_prepare_local_playback_import_plan_locked(...)`
+    - `river_dialog_runtime_apply_local_playback_import_plan_locked(...)`
+  - `dialog runtime` 现在先生成 local playback import plan，再在 cloud import
+    落地后统一应用：
+    - stream ownership claim/release
+    - playback state 写入
+    - error recovery / interrupt clear
+  - 这一步继续把 `dialog runtime` 从：
+    - split local-playback prepare/apply mutation boundary
+    推进到：
+    - single typed local-playback import plan
 - `Step 5.451`
   - `dialog runtime` 继续收口 local playback shadow 的分散判定 helper
   - 删除分散 helper：
