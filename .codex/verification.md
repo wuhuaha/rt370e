@@ -1,5 +1,26 @@
 # Verification
 
+## Step 5.497
+Validate that successful downlink frame writes now finish through a single
+post-write helper:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'finish_successful_downlink_frame_write|write_current_downlink_frame_step|consume_current_downlink_frame|try_start_current_playback_segment' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- successful downlink write post-effects are centralized in
+  `river_cloud_xiaozhi_finish_successful_downlink_frame_write()`
+
 ## Step 5.496
 Validate that downlink current-frame acquire now returns a typed result instead
 of a naked boolean:

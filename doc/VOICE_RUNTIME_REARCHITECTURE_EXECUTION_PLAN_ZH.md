@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.497`
+  - `river_cloud` 继续收口 XiaoZhi downlink write step 的成功路径，把成功写入后的
+    frame consume / segment start / ACK progress / pending-stop check 封装为单一 helper
+  - 新增：
+    - `river_cloud_xiaozhi_finish_successful_downlink_frame_write()`
+  - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 现在只保留：
+    - 捕获 write view
+    - oversize abort
+    - write effect
+    - write-failed recovery 委托
+    - successful-write finish 委托
+  - 这一步继续把 `river_cloud` 从：
+    - write step 内散落 consume/current segment/ACK/pending-stop 副作用
+    推进到：
+    - successful-write finish helper owns post-write effects
+  - 下一步继续聚焦：
+    - downlink write abort / write-failed branch 的 step-result 继续显式化，逐步让
+      `process_downlink_task_cycle()` 只组合 typed plan/result
 - `Step 5.496`
   - `river_cloud` 继续拆分 XiaoZhi downlink worker cycle，把 current-frame acquire
     从裸 `bool` 结果升级为 typed result
