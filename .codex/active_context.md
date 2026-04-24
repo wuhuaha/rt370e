@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.491 收口 downlink retry-frame helpers`
+  - `5.492 拆分 downlink current-frame write view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续重建 XiaoZhi downlink/playback 写入边界，把 current-frame
+      写入前的派生视图和实际 playback write 副作用拆开
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_write_view_t`
+      - `river_cloud_xiaozhi_capture_current_downlink_write_view()`
+      - `river_cloud_xiaozhi_write_current_downlink_frame_audio()`
+    - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 现在先捕获
+      `mono_bytes/stereo_bytes/frame_too_large` typed write view，再执行单一
+      playback write effect helper
+    - 这一步把：
+      - acquire/write/rebuffer 巨函数内混合 query、validation、format expansion
+        和 playback-service write
+      收口成：
+      - typed write view plus isolated playback write effect
+    - 下一步继续聚焦：
+      - 进一步拆分 `river_cloud_xiaozhi_handle_playback_write_failed(...)` 的
+        query/plan/effect 边界
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink retry-frame
       的 pending/keep/consume 生命周期收口到 owner helper

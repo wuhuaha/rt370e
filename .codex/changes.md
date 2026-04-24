@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.492
+- `river_cloud` 继续重建 XiaoZhi downlink/playback 写入边界，把 current-frame
+  写入前的派生视图和实际 playback write 副作用拆开：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 current-frame write view / effect helper：
+  - `river_cloud_xiaozhi_downlink_write_view_t`
+  - `river_cloud_xiaozhi_capture_current_downlink_write_view()`
+  - `river_cloud_xiaozhi_write_current_downlink_frame_audio()`
+- `river_cloud_xiaozhi_write_current_downlink_frame_step()` 不再内联计算
+  `mono_bytes/stereo_bytes`、frame-oversize 判定、stereo expansion 和
+  `river_playback_service_write(...)` 调用，改为先捕获 typed write view，再执行
+  单一写入副作用 helper
+- 这一步把 downlink current-frame write 从：
+  - acquire/write/rebuffer 巨函数内混合 query、validation、format expansion 和
+    playback-service write
+  推进到：
+  - typed write view plus isolated playback write effect
+
 ## Step 5.491
 - `river_cloud` 继续收口 XiaoZhi downlink retry-frame 真相访问，把 `retry_valid` 的查询、保留和消费封装成 helper：
   - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)

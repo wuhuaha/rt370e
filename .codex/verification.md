@@ -1,5 +1,28 @@
 # Verification
 
+## Step 5.492
+Validate that XiaoZhi downlink current-frame write now separates the derived
+write view from the playback-service write effect:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'downlink_write_view|capture_current_downlink_write_view|write_current_downlink_frame_audio|write_current_downlink_frame_step' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- current-frame write path captures `mono_bytes/stereo_bytes/frame_too_large`
+  into a typed write view before issuing playback output
+- actual stereo expansion and `river_playback_service_write(...)` call are
+  confined to `river_cloud_xiaozhi_write_current_downlink_frame_audio()`
+
 ## Step 5.491
 Validate that XiaoZhi downlink retry-frame lifecycle transitions now route
 through owner helpers:

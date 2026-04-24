@@ -52,6 +52,12 @@ typedef struct {
     uint32_t segment_count;
 } river_cloud_xiaozhi_playback_supply_source_t;
 
+typedef struct {
+    size_t mono_bytes;
+    size_t stereo_bytes;
+    bool frame_too_large;
+} river_cloud_xiaozhi_downlink_write_view_t;
+
 static int16_t river_cloud_xiaozhi_playback_sat16(int32_t value)
 {
     if (value > 32767) {
@@ -2017,6 +2023,37 @@ static void river_cloud_xiaozhi_capture_write_failed_followup(
     }
 }
 
+static void river_cloud_xiaozhi_capture_current_downlink_write_view(
+    river_cloud_xiaozhi_downlink_write_view_t *view)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    view->mono_bytes = g_river_cloud.xiaozhi_downlink_ring.frame_bytes;
+    view->stereo_bytes = view->mono_bytes * 2U;
+    view->frame_too_large = view->stereo_bytes >
+                            sizeof(g_river_cloud.xiaozhi_downlink_stereo);
+}
+
+static river_status_t river_cloud_xiaozhi_write_current_downlink_frame_audio(
+    const river_cloud_xiaozhi_downlink_write_view_t *view)
+{
+    if (view == NULL || view->mono_bytes == 0U || view->frame_too_large) {
+        return RIVER_ERR_ARG;
+    }
+
+    river_cloud_xiaozhi_downlink_expand_stereo(g_river_cloud.xiaozhi_downlink_task_frame,
+                                               view->mono_bytes);
+    return river_playback_service_write(
+        (const uint8_t *)g_river_cloud.xiaozhi_downlink_stereo,
+        view->stereo_bytes,
+        g_river_cloud.xiaozhi_downlink_task_frame,
+        view->mono_bytes,
+        true);
+}
+
 static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_frames,
                                                              size_t mono_bytes,
                                                              size_t stereo_bytes)
@@ -2091,27 +2128,22 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(uint32_t queued_fra
 static river_cloud_xiaozhi_downlink_task_step_result_t
 river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
 {
-    size_t mono_bytes = g_river_cloud.xiaozhi_downlink_ring.frame_bytes;
-    size_t stereo_bytes = mono_bytes * 2U;
+    river_cloud_xiaozhi_downlink_write_view_t write_view;
     uint64_t now_ms;
 
-    if (stereo_bytes > sizeof(g_river_cloud.xiaozhi_downlink_stereo)) {
+    river_cloud_xiaozhi_capture_current_downlink_write_view(&write_view);
+    if (write_view.frame_too_large) {
         (void)river_cloud_xiaozhi_playback_abort_for_cause(
             RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE,
             NULL);
         return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE;
     }
 
-    river_cloud_xiaozhi_downlink_expand_stereo(g_river_cloud.xiaozhi_downlink_task_frame,
-                                               mono_bytes);
-    if (river_playback_service_write((const uint8_t *)g_river_cloud.xiaozhi_downlink_stereo,
-                                     stereo_bytes,
-                                     g_river_cloud.xiaozhi_downlink_task_frame,
-                                     mono_bytes,
-                                     true) != RIVER_OK) {
-        return river_cloud_xiaozhi_handle_playback_write_failed(queued_frames,
-                                                                mono_bytes,
-                                                                stereo_bytes) ?
+    if (river_cloud_xiaozhi_write_current_downlink_frame_audio(&write_view) != RIVER_OK) {
+        return river_cloud_xiaozhi_handle_playback_write_failed(
+                   queued_frames,
+                   write_view.mono_bytes,
+                   write_view.stereo_bytes) ?
                    RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE :
                    RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
     }
