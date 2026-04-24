@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.489 收口 playback tail/no-ref reopen truth`
+  - `5.490 收口 downlink ring owner helpers`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink ring 的初始化、
+      reset、latest-frame write/drop 和 supply timestamp 更新收口到 owner helper
+    - 新增：
+      - `river_cloud_xiaozhi_note_downlink_supply()`
+      - `river_cloud_xiaozhi_reset_downlink_ring_runtime()`
+      - `river_cloud_xiaozhi_ensure_downlink_ring()`
+      - `river_cloud_xiaozhi_write_downlink_frame_latest()`
+    - audio-event 主流程不再内联 downlink ring overflow 丢帧与 last-supply 更新策略
+    - reset-downlink 和 pending-stop drop 路径复用统一 reset helper
+    - 这一步把：
+      - direct downlink ring/storage/drop/supply mutation in playback main flow
+      收口成：
+      - downlink ring owner helpers
+    - 下一步继续聚焦：
+      - 把 downlink task acquire/write/rebuffer decision 继续拆成 query/view 与 effect
+        两层，减少 playback runtime 巨函数中的隐式副作用
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi playback tail / no-ref reopen 真相从散落裸字段收口到
       既有 playback runtime/gate truth

@@ -1,5 +1,30 @@
 # Verification
 
+## Step 5.490
+Validate that XiaoZhi downlink ring lifecycle, latest-frame write/drop policy,
+and supply timestamp updates are now routed through owner helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'note_downlink_supply|reset_downlink_ring_runtime|ensure_downlink_ring|write_downlink_frame_latest' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'river_audio_frame_ring_(init_with_storage_ex|write|read|reset|deinit)\(&g_river_cloud\.xiaozhi_downlink_ring' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- downlink ring init/write/drop/reset/supply timestamp handling is centralized in
+  the new owner helpers
+- remaining direct ring operations are confined to owner/helper routines rather
+  than the audio-event main flow
+
 ## Step 5.489
 Validate that XiaoZhi playback tail stop deadline and no-ref reopen gate state
 now live in playback runtime/gate truth instead of scattered raw context fields:

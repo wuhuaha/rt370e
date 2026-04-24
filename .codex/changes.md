@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.490
+- `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink ring 的底层操作收口到 owner helper 内：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增 downlink ring owner helper：
+  - `river_cloud_xiaozhi_note_downlink_supply()`
+  - `river_cloud_xiaozhi_reset_downlink_ring_runtime()`
+  - `river_cloud_xiaozhi_ensure_downlink_ring()`
+  - `river_cloud_xiaozhi_write_downlink_frame_latest()`
+- downlink audio event path 不再内联 ring 初始化、overflow 丢旧帧、drop counter 递增和 last-supply 更新时间戳逻辑，改为统一调用 owner helper
+- reset-downlink 和 pending-stop drop 路径复用统一 reset helper，避免多个路径分别维护 retry-valid、last-supply 和 starvation watch
+- 这一步把 downlink/playback 从：
+  - playback main flow directly mutates ring/storage/drop/supply internals
+  推进到：
+  - owner helpers encapsulate downlink ring lifecycle and latest-frame write policy
+
 ## Step 5.489
 - `river_cloud` 继续收口 XiaoZhi playback tail / no-ref reopen 真相源，消除
   playback runtime 对 TTS stop deadline、no-ref reopen guard、rearm 和 silence counter

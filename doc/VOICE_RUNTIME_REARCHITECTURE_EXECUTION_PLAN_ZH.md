@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.490`
+  - `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink ring 的初始化、
+    reset、latest-frame write/drop 和 supply timestamp 更新收口到 owner helper
+  - 新增 downlink ring owner helper：
+    - `river_cloud_xiaozhi_note_downlink_supply()`
+    - `river_cloud_xiaozhi_reset_downlink_ring_runtime()`
+    - `river_cloud_xiaozhi_ensure_downlink_ring()`
+    - `river_cloud_xiaozhi_write_downlink_frame_latest()`
+  - downlink audio-event 主流程不再内联 overflow 丢旧帧、drop counter 和
+    last-supply 更新时间戳策略
+  - reset-downlink 和 pending-stop drop 路径复用统一 reset helper
+  - 这一步继续把 `river_cloud` 从：
+    - direct downlink ring/storage/drop/supply mutation in playback main flow
+    推进到：
+    - downlink ring owner helpers
+  - 下一步继续聚焦：
+    - downlink task acquire/write/rebuffer decision 的 query/effect 拆分
 - `Step 5.489`
   - `river_cloud` 继续把 XiaoZhi playback tail / no-ref reopen 状态从散落的
     `g_river_cloud.xiaozhi_*` 裸字段收口到既有 playback runtime/gate truth
