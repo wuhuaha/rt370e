@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.494
+- `river_cloud` 继续收口 XiaoZhi playback inline recover replay 写入路径，让恢复重放
+  复用 current-frame write view/effect：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `river_cloud_xiaozhi_try_write_failed_inline_recover()` 现在接收
+  `river_cloud_xiaozhi_downlink_write_view_t`，不再单独传递 `mono_bytes` /
+  `stereo_bytes`
+- inline recover replay 的二次写入不再直接调用
+  `river_playback_service_write(...)`，而是复用：
+  - `river_cloud_xiaozhi_write_current_downlink_frame_audio()`
+- 这一步把 playback write 从：
+  - normal write 与 inline recover replay 各自维护一份 service-write 调用
+  推进到：
+  - current-frame playback write has a single effect helper
+
 ## Step 5.493
 - `river_cloud` 继续拆分 XiaoZhi playback `write_failed` 恢复链，把故障恢复视图
   从 handler 的副作用编排中抽出：

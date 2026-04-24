@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.494`
+  - `river_cloud` 继续收口 XiaoZhi playback inline recover replay 写入路径，让恢复重放
+    复用 current-frame write view/effect
+  - `river_cloud_xiaozhi_try_write_failed_inline_recover()` 现在接收
+    `river_cloud_xiaozhi_downlink_write_view_t`，不再单独传递
+    `mono_bytes/stereo_bytes`
+  - inline recover replay 的二次写入不再直接调用
+    `river_playback_service_write(...)`，而是复用：
+    - `river_cloud_xiaozhi_write_current_downlink_frame_audio()`
+  - 这一步继续把 `river_cloud` 从：
+    - normal write 与 inline recover replay 各自维护一份 service-write 调用
+    推进到：
+    - current-frame playback write has a single effect helper
+  - 下一步继续聚焦：
+    - 把 managed rebuffer follow-up 的 request/execute 进一步拆成 typed plan/result，
+      并继续缩小 `handle_playback_write_failed()` 的编排体积
 - `Step 5.493`
   - `river_cloud` 继续拆分 XiaoZhi playback `write_failed` 恢复链，把故障恢复视图
     从 handler 的副作用编排中抽出

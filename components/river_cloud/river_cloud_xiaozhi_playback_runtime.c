@@ -76,6 +76,8 @@ static uint32_t river_cloud_xiaozhi_downlink_segment_gap_hold_frames(void);
 static uint32_t river_cloud_xiaozhi_downlink_starved_low_water_frames(void);
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
     river_cloud_playback_backend_state_t backend_state);
+static river_status_t river_cloud_xiaozhi_write_current_downlink_frame_audio(
+    const river_cloud_xiaozhi_downlink_write_view_t *view);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
 static bool river_cloud_xiaozhi_playback_last_segment_observed(void);
 static void river_cloud_xiaozhi_capture_playback_supply_source(
@@ -1921,13 +1923,13 @@ static river_cloud_xiaozhi_inline_recover_result_t
 river_cloud_xiaozhi_try_write_failed_inline_recover(
     const char *recover_reason,
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
-    size_t mono_bytes,
-    size_t stereo_bytes,
+    const river_cloud_xiaozhi_downlink_write_view_t *write_view,
     river_cloud_playback_recovery_path_t recovery_path)
 {
     river_cloud_xiaozhi_playback_rebuffer_observe_view_t observe;
 
-    if (recovery_plan == NULL || !recovery_plan->inline_recover_allowed) {
+    if (recovery_plan == NULL || write_view == NULL ||
+        !recovery_plan->inline_recover_allowed) {
         return RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_NOT_ATTEMPTED;
     }
 
@@ -1957,12 +1959,7 @@ river_cloud_xiaozhi_try_write_failed_inline_recover(
     river_cloud_xiaozhi_set_playback_recovery_path(
         RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_SERVICE_RECOVER,
         "playback_recovery_path");
-    if (river_playback_service_write(
-            (const uint8_t *)g_river_cloud.xiaozhi_downlink_stereo,
-            stereo_bytes,
-            g_river_cloud.xiaozhi_downlink_task_frame,
-            mono_bytes,
-            true) != RIVER_OK) {
+    if (river_cloud_xiaozhi_write_current_downlink_frame_audio(write_view) != RIVER_OK) {
         return RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED;
     }
 
@@ -2136,8 +2133,7 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(
     inline_result = river_cloud_xiaozhi_try_write_failed_inline_recover(
         recovery_view.recover_reason,
         &recovery_view.recovery_plan,
-        recovery_view.mono_bytes,
-        recovery_view.stereo_bytes,
+        write_view,
         recovery_view.recovery_path);
     river_cloud_xiaozhi_capture_write_failed_followup(inline_result,
                                                       recovery_view.recover_reason,

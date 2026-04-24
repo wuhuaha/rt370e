@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.494
+Validate that inline recover replay now reuses the same current-frame write
+view/effect path as normal playback writes:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'try_write_failed_inline_recover|write_current_downlink_frame_audio|river_playback_service_write' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- inline recover replay calls
+  `river_cloud_xiaozhi_write_current_downlink_frame_audio()` instead of directly
+  calling `river_playback_service_write(...)`
+- `river_playback_service_write(...)` for current-frame audio remains confined
+  to the unified write-effect helper
+
 ## Step 5.493
 Validate that XiaoZhi playback write-failed handling now captures a typed
 recovery view before executing inline recover or managed rebuffer effects:
