@@ -293,6 +293,15 @@ typedef struct {
 } river_cloud_xiaozhi_preview_transcript_truth_t;
 
 typedef struct {
+    bool listening;
+    bool window_active;
+    bool listen_stop_pending;
+    bool local_close_pending;
+    uint64_t window_deadline_ms;
+    uint64_t local_close_deadline_ms;
+} river_cloud_xiaozhi_session_window_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -360,8 +369,7 @@ typedef struct {
     uint64_t seeded_utc_rtos_ms;
     uint32_t stream_started_ms;
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
-    bool xiaozhi_listening;
-    bool xiaozhi_window_active;
+    river_cloud_xiaozhi_session_window_truth_t xiaozhi_session_window_truth;
     river_cloud_xiaozhi_turn_semantics_state_t xiaozhi_turn_semantics;
     river_cloud_xiaozhi_playback_meta_truth_t xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
@@ -382,8 +390,6 @@ typedef struct {
     river_cloud_xiaozhi_preview_transcript_truth_t
         xiaozhi_preview_transcript_truth;
     river_cloud_xiaozhi_control_queue_truth_t xiaozhi_control_queue_truth;
-    bool xiaozhi_listen_stop_pending;
-    bool xiaozhi_local_close_pending;
     rtos_mutex_t xiaozhi_control_lock;
     rtos_sema_t xiaozhi_control_ready;
     rtos_sema_t xiaozhi_control_space;
@@ -394,8 +400,6 @@ typedef struct {
     river_opus_encoder_t xiaozhi_encoder;
     river_opus_decoder_t xiaozhi_decoder;
     uint64_t xiaozhi_tts_stop_deadline_ms;
-    uint64_t xiaozhi_window_deadline_ms;
-    uint64_t xiaozhi_local_close_deadline_ms;
     uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];

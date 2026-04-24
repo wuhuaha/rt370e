@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.488
+- `river_cloud` 继续收口 XiaoZhi session/window/local-close 真相源，消除
+  `round_runtime` / `playback_runtime` 对 listening、conversation window、
+  listen-stop pending、local-close pending 和对应 deadline 的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 session-window-owned truth：
+  - `river_cloud_xiaozhi_session_window_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_listening`
+  - `xiaozhi_window_active`
+  - `xiaozhi_listen_stop_pending`
+  - `xiaozhi_local_close_pending`
+  - `xiaozhi_window_deadline_ms`
+  - `xiaozhi_local_close_deadline_ms`
+- listen-start / listen-stop completion、conversation window touch/close/abort、
+  local-close defer/timeout、follow-up reopen gate 和 playback-side close/rebuffer
+  guard 现在统一消费：
+  - `g_river_cloud.xiaozhi_session_window_truth`
+- 这一步把 XiaoZhi session/window/local-close 从：
+  - scattered dialog/session window flags and deadlines
+  收口成：
+  - explicit session window truth
+
 ## Step 5.487
 - `river_cloud` 继续收口 XiaoZhi preview transcript / endpoint candidate 真相源，
   消除 `session` / `playback_runtime` 对 preview id、text、stable-prefix、source、

@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.488
+Validate that XiaoZhi listening/window/listen-stop/local-close state now lives
+behind an explicit session-window-owned truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_*` context fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '286,304p' components/river_cloud/river_cloud_internal.h
+sed -n '360,392p' components/river_cloud/river_cloud_internal.h
+rg -n 'session_window_truth_t|xiaozhi_session_window_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'g_river_cloud\.xiaozhi_(listening|window_active|listen_stop_pending|local_close_pending|window_deadline_ms|local_close_deadline_ms)|bool xiaozhi_(listening|window_active|listen_stop_pending|local_close_pending)|uint64_t xiaozhi_(window_deadline_ms|local_close_deadline_ms)' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_session_window_truth_t`
+- listen-start/listen-stop, conversation window, local-close defer, follow-up
+  reopen, and playback-side close/rebuffer guards now route dialog session/window
+  state through the new typed truth
+- the repo no longer contains direct raw-field references to the removed
+  listening/window/local-close context fields
+
 ## Step 5.487
 Validate that XiaoZhi preview transcript / endpoint candidate state now lives
 behind an explicit preview-transcript-owned truth struct instead of scattered

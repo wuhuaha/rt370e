@@ -26,6 +26,28 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.488`
+  - `river_cloud` 继续把 XiaoZhi session/window/local-close 状态从散落的
+    `g_river_cloud.xiaozhi_*` 裸字段收口成显式 truth
+  - 新增 session-window-owned truth：
+    - `river_cloud_xiaozhi_session_window_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_listening`
+    - `xiaozhi_window_active`
+    - `xiaozhi_listen_stop_pending`
+    - `xiaozhi_local_close_pending`
+    - `xiaozhi_window_deadline_ms`
+    - `xiaozhi_local_close_deadline_ms`
+  - listen-start / listen-stop completion、conversation window touch/close/abort、
+    local-close defer/timeout、follow-up reopen gate 和 playback-side close/rebuffer
+    guard 现在统一走 typed session window truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered dialog/session window flags and deadlines
+    推进到：
+    - explicit session window truth
+  - 下一步继续聚焦：
+    - no-ref reopen / TTS tail deadline 这些仍与 playback 卡顿、follow-up reopen
+      稳定性直接相关的剩余运行态
 - `Step 5.487`
   - `river_cloud` 继续把 XiaoZhi preview transcript / endpoint candidate 状态从散落的
     `g_river_cloud.xiaozhi_preview_*` 裸字段收口成显式 truth
