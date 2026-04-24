@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.495 收口 write-failed managed rebuffer follow-up`
+  - `5.496 类型化 downlink current-frame acquire result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续拆分 XiaoZhi downlink worker cycle，把 current-frame acquire
+      从裸 `bool` 结果升级为 typed result
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+    - `river_cloud_xiaozhi_acquire_current_downlink_frame()` 现在显式返回
+      `acquired` 和 `step_result`
+    - `river_cloud_xiaozhi_process_downlink_task_cycle()` 现在消费 acquire result
+      内的下一步动作，不再在调用方硬编码 acquire 失败为 `SLEEP_POLL`
+    - 这一步把：
+      - ready plan typed，但 acquire 仍是裸 bool + 调用方补 sleep policy
+      收口成：
+      - ready/acquire/write 三段都具备 typed step-result 边界
+    - 下一步继续聚焦：
+      - downlink write step result 的成功/失败/abort 分支进一步类型化，为后续
+        worker loop 简化和 rebuffer 策略回收做准备
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续收缩 XiaoZhi playback `write_failed` managed rebuffer
       follow-up，把 handler 尾部的 start/log/execute 三段副作用封装成单一 executor

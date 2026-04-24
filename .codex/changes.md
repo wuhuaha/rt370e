@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.496
+- `river_cloud` 继续拆分 XiaoZhi downlink worker cycle，把 current-frame acquire
+  从裸 `bool` 结果升级为 typed result：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_downlink_frame_acquire_result_t`
+- `river_cloud_xiaozhi_acquire_current_downlink_frame()` 现在显式返回：
+  - `acquired`
+  - `step_result`
+- `river_cloud_xiaozhi_process_downlink_task_cycle()` 不再把 acquire 失败硬编码成
+  `SLEEP_POLL`，而是消费 acquire result 内的下一步动作
+- 这一步把 downlink worker 从：
+  - ready plan typed，但 acquire 仍是裸 bool + 调用方补 sleep policy
+  推进到：
+  - ready/acquire/write 三段都具备 typed step-result 边界
+
 ## Step 5.495
 - `river_cloud` 继续收缩 XiaoZhi playback `write_failed` managed rebuffer
   follow-up，把 handler 尾部的 start/log/execute 三段副作用封装成单一 executor：

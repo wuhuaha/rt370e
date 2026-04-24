@@ -755,6 +755,11 @@ typedef struct {
     bool ready;
 } river_cloud_xiaozhi_downlink_cycle_plan_t;
 
+typedef struct {
+    river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    bool acquired;
+} river_cloud_xiaozhi_downlink_frame_acquire_result_t;
+
 static void river_cloud_xiaozhi_capture_playback_truth_view(
     river_cloud_xiaozhi_playback_truth_view_t *view)
 {
@@ -4364,37 +4369,47 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
     return plan;
 }
 
-static bool
+static river_cloud_xiaozhi_downlink_frame_acquire_result_t
 river_cloud_xiaozhi_acquire_current_downlink_frame(void)
 {
+    river_cloud_xiaozhi_downlink_frame_acquire_result_t result = {
+        .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
+        .acquired = false,
+    };
     river_status_t status;
 
     if (river_cloud_xiaozhi_downlink_retry_frame_pending()) {
-        return true;
+        result.acquired = true;
+        result.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE;
+        return result;
     }
 
     status = river_audio_frame_ring_read(&g_river_cloud.xiaozhi_downlink_ring,
                                          g_river_cloud.xiaozhi_downlink_task_frame);
     if (status != RIVER_OK) {
         river_cloud_xiaozhi_playback_check_pending_stop();
-        return false;
+        return result;
     }
 
-    return true;
+    result.acquired = true;
+    result.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE;
+    return result;
 }
 
 static river_cloud_xiaozhi_downlink_task_step_result_t
 river_cloud_xiaozhi_process_downlink_task_cycle(void)
 {
     river_cloud_xiaozhi_downlink_cycle_plan_t cycle_plan;
+    river_cloud_xiaozhi_downlink_frame_acquire_result_t acquire_result;
 
     cycle_plan = river_cloud_xiaozhi_prepare_downlink_cycle_plan();
     if (!cycle_plan.ready) {
         return cycle_plan.step_result;
     }
 
-    if (!river_cloud_xiaozhi_acquire_current_downlink_frame()) {
-        return RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
+    acquire_result = river_cloud_xiaozhi_acquire_current_downlink_frame();
+    if (!acquire_result.acquired) {
+        return acquire_result.step_result;
     }
 
     return river_cloud_xiaozhi_write_current_downlink_frame_step(
