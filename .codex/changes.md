@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.477
+- `river_cloud` 继续收口 XiaoZhi downlink/playback 的 execution / recovery
+  真相源，消除 `playback_runtime` 对 phase / rebuffer / stop / recovery
+  这批散落运行态裸字段的混用：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 playback-owned runtime truth：
+  - `river_cloud_xiaozhi_playback_runtime_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_playback_active`
+  - `xiaozhi_playback_phase`
+  - `xiaozhi_playback_rebuffer_cause`
+  - `xiaozhi_playback_recovery_path`
+  - `xiaozhi_playback_recovery_outcome`
+  - `xiaozhi_playback_rebuffer_pending`
+  - `xiaozhi_tts_stop_pending`
+  - `xiaozhi_playback_rebuffer_count`
+  - `xiaozhi_playback_rebuffer_streak`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接读写旧 execution/recovery
+  裸字段的关键路径，现在统一改走 typed runtime truth：
+  - playback physical-active / phase / rebuffer-cause / recovery-path /
+    recovery-outcome accessors
+  - start-gate / prefetch / segment-gap hold / diag / rebuffer-observe capture
+  - reset / started / stop / rebuffer / resume / pending-stop 生命周期
+  - playback-start / prefetch / rebuffer / pending-stop / ack-progress 日志与判断
+- 这一步把 XiaoZhi playback runtime 从：
+  - scattered playback execution/recovery bag
+  收口成：
+  - explicit playback runtime truth
+  - shared typed execution/recovery access boundary
+
 ## Step 5.476
 - `river_cloud` 继续收口 XiaoZhi downlink/playback 的 meta / terminal /
   context 真相源，消除 `playback_runtime` 内部对散落 playback 裸字段的混用：

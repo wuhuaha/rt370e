@@ -184,6 +184,18 @@ typedef struct {
 } river_cloud_xiaozhi_playback_terminal_truth_t;
 
 typedef struct {
+    river_cloud_playback_phase_t phase;
+    river_cloud_playback_rebuffer_cause_t rebuffer_cause;
+    river_cloud_playback_recovery_path_t recovery_path;
+    river_cloud_playback_recovery_outcome_t recovery_outcome;
+    uint32_t rebuffer_count;
+    uint32_t rebuffer_streak;
+    bool active;
+    bool rebuffer_pending;
+    bool stop_pending;
+} river_cloud_xiaozhi_playback_runtime_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -261,13 +273,7 @@ typedef struct {
     river_cloud_xiaozhi_turn_semantics_state_t xiaozhi_turn_semantics;
     river_cloud_xiaozhi_playback_meta_truth_t xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
-    bool xiaozhi_playback_active;
-    river_cloud_playback_phase_t xiaozhi_playback_phase;
-    river_cloud_playback_rebuffer_cause_t xiaozhi_playback_rebuffer_cause;
-    river_cloud_playback_recovery_path_t xiaozhi_playback_recovery_path;
-    river_cloud_playback_recovery_outcome_t xiaozhi_playback_recovery_outcome;
-    bool xiaozhi_playback_rebuffer_pending;
-    bool xiaozhi_tts_stop_pending;
+    river_cloud_xiaozhi_playback_runtime_truth_t xiaozhi_playback_runtime_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
     bool xiaozhi_endpoint_soft_close_pending;
@@ -307,8 +313,6 @@ typedef struct {
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
-    uint32_t xiaozhi_playback_rebuffer_count;
-    uint32_t xiaozhi_playback_rebuffer_streak;
     river_cloud_playback_start_policy_t xiaozhi_playback_start_policy;
     uint32_t xiaozhi_playback_start_frames;
     uint32_t xiaozhi_playback_prefetch_frames;

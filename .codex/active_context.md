@@ -15,11 +15,42 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.476 收口 playback terminal/meta truth`
+  - `5.477 收口 playback execution truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi downlink/playback 的 execution / recovery
+      真相从散落裸字段收口成显式 typed runtime truth
+    - 新增：
+      - `river_cloud_xiaozhi_playback_runtime_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_playback_active`
+      - `xiaozhi_playback_phase`
+      - `xiaozhi_playback_rebuffer_cause`
+      - `xiaozhi_playback_recovery_path`
+      - `xiaozhi_playback_recovery_outcome`
+      - `xiaozhi_playback_rebuffer_pending`
+      - `xiaozhi_tts_stop_pending`
+      - `xiaozhi_playback_rebuffer_count`
+      - `xiaozhi_playback_rebuffer_streak`
+    - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+      - phase/rebuffer/recovery accessors
+      - start-gate / prefetch / diag / segment-gap hold capture
+      - reset / started / stop / rebuffer / resume / pending-stop 生命周期
+      - playback-start / prefetch / rebuffer / pending-stop / ack-progress 日志与判断
+      不再混读写散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段，而是统一消费
+      playback-owned runtime truth
+    - 这一步把：
+      - scattered playback execution/recovery bag
+      收口成：
+      - explicit playback runtime truth
+      - shared typed execution/recovery access boundary
+    - 下一步继续聚焦：
+      - 把 playback start-gate / starvation watch / retry / buffer-threshold
+        这批剩余 coarse ownership 继续往 typed truth / typed view 推进，减少
+        session/dialog/adapter 回读 downlink 细节
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi downlink/playback 的 meta / terminal /
       context 真相从散落裸字段收口成显式 typed truth

@@ -26,6 +26,37 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.477`
+  - `river_cloud` 继续把 XiaoZhi playback 的 execution / recovery
+    状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 runtime truth
+  - 新增 playback-owned runtime truth：
+    - `river_cloud_xiaozhi_playback_runtime_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_playback_active`
+    - `xiaozhi_playback_phase`
+    - `xiaozhi_playback_rebuffer_cause`
+    - `xiaozhi_playback_recovery_path`
+    - `xiaozhi_playback_recovery_outcome`
+    - `xiaozhi_playback_rebuffer_pending`
+    - `xiaozhi_tts_stop_pending`
+    - `xiaozhi_playback_rebuffer_count`
+    - `xiaozhi_playback_rebuffer_streak`
+  - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+    - playback physical-active / phase / rebuffer-cause / recovery-path /
+      recovery-outcome accessors
+    - start-gate / prefetch / segment-gap hold / diag / rebuffer-observe capture
+    - reset / started / stop / rebuffer / resume / pending-stop 生命周期
+    - playback-start / prefetch / rebuffer / pending-stop / ack-progress 日志与判断
+    现在都统一走 typed playback runtime truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered playback execution/recovery bag
+    推进到：
+    - explicit playback runtime truth
+    - shared typed execution/recovery access boundary
+  - 下一步继续聚焦：
+    - 把 start-gate / starvation watch / retry / buffer threshold
+      这批剩余 coarse ownership 继续收口成更明确的 playback/downlink truth，
+      让 session/runtime/policy 不再回读 downlink 恢复细节和阈值拼装结果
 - `Step 5.476`
   - `river_cloud` 继续把 XiaoZhi playback 的 meta / terminal / context
     状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 truth
