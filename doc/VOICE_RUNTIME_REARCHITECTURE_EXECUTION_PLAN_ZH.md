@@ -26,6 +26,27 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.493`
+  - `river_cloud` 继续拆分 XiaoZhi playback `write_failed` 恢复链，把故障恢复视图
+    从 handler 的副作用编排中抽出
+  - 新增 typed write-failed recovery view：
+    - `river_cloud_xiaozhi_write_failed_recovery_view_t`
+    - `river_cloud_xiaozhi_capture_write_failed_recovery_view()`
+    - `river_cloud_xiaozhi_log_write_failed_recovery_view()`
+  - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在接收上一阶段的
+    `river_cloud_xiaozhi_downlink_write_view_t`，并通过 recovery view 统一持有：
+    - recovery plan
+    - recover reason
+    - recovery path
+    - failure timestamp
+    - mono/stereo frame size
+  - 这一步继续把 `river_cloud` 从：
+    - handler 内直接推导 recover reason、拼首条 failure log、保存 recovery path
+    推进到：
+    - typed recovery view owns write-failed query/log projection before effects
+  - 下一步继续聚焦：
+    - 把 inline recover replay 的再次 write 也改为消费统一 write view/effect，
+      减少重复 `river_playback_service_write(...)` 入口
 - `Step 5.492`
   - `river_cloud` 继续重建 XiaoZhi downlink/playback 写入边界，把 current-frame
     写入前的派生视图和实际 playback write 副作用拆开

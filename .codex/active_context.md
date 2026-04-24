@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.492 拆分 downlink current-frame write view`
+  - `5.493 拆分 playback write-failed recovery view`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续拆分 XiaoZhi playback `write_failed` 恢复链，把故障恢复视图
+      从 handler 的副作用编排中抽出
+    - 新增：
+      - `river_cloud_xiaozhi_write_failed_recovery_view_t`
+      - `river_cloud_xiaozhi_capture_write_failed_recovery_view()`
+      - `river_cloud_xiaozhi_log_write_failed_recovery_view()`
+    - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在接收上一阶段的
+      `river_cloud_xiaozhi_downlink_write_view_t`，并通过 typed recovery view
+      统一持有 recovery plan / recover reason / recovery path / timestamp / frame size
+    - 这一步把：
+      - handler 内直接推导 recover reason、拼首条 failure log、保存 recovery path
+      收口成：
+      - typed recovery view owns write-failed query/log projection before effects
+    - 下一步继续聚焦：
+      - 把 inline recover replay 的再次 write 也改为消费统一 write view/effect，
+        减少重复 `river_playback_service_write(...)` 入口
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续重建 XiaoZhi downlink/playback 写入边界，把 current-frame
       写入前的派生视图和实际 playback write 副作用拆开

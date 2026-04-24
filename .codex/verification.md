@@ -1,5 +1,28 @@
 # Verification
 
+## Step 5.493
+Validate that XiaoZhi playback write-failed handling now captures a typed
+recovery view before executing inline recover or managed rebuffer effects:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'write_failed_recovery_view|capture_write_failed_recovery_view|log_write_failed_recovery_view|handle_playback_write_failed' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- write-failed handler receives the current downlink write view and captures a
+  typed recovery view before clearing starvation watch or attempting recovery
+- the first write-failed log is emitted through
+  `river_cloud_xiaozhi_log_write_failed_recovery_view()`
+
 ## Step 5.492
 Validate that XiaoZhi downlink current-frame write now separates the derived
 write view from the playback-service write effect:
