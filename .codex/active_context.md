@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.497 收口 downlink successful-write finish`
+  - `5.498 类型化 write-failed recovery result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
+      `bool` 返回升级为 step-result view
+    - 新增：
+      - `river_cloud_xiaozhi_write_failed_recovery_result_t`
+    - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在显式返回
+      `frame_consumed` 和 `step_result`
+    - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 直接消费 recovery result，
+      不再用 bool + 三元表达式推导下一步动作
+    - 这一步把：
+      - bool 表达“inline replay 是否成功并已消费帧”
+      收口成：
+      - typed recovery result owns frame consumption and worker step policy
+    - 下一步继续聚焦：
+      - write step 自身的结果结构化，以及 pending-stop / ACK / segment-start
+        后效应继续向 downlink runtime owner helper 聚合
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续收口 XiaoZhi downlink write step 的成功路径，把成功写入后的
       frame consume / segment start / ACK progress / pending-stop check 封装为单一 helper

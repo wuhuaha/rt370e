@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.498
+- `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
+  `bool` 返回升级为 step-result view：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_write_failed_recovery_result_t`
+- `river_cloud_xiaozhi_handle_playback_write_failed()` 现在显式返回：
+  - `frame_consumed`
+  - `step_result`
+- `river_cloud_xiaozhi_write_current_downlink_frame_step()` 不再用 bool + 三元表达式
+  推导 inline replay / managed rebuffer 后的下一步动作，而是直接消费 recovery result
+- 这一步把 write-failed 分支从：
+  - bool 表达“inline replay 是否成功并已消费帧”
+  推进到：
+  - typed recovery result owns frame consumption and worker step policy
+
 ## Step 5.497
 - `river_cloud` 继续收口 XiaoZhi downlink write step 的成功路径，把成功写入后的
   frame consume / segment start / ACK progress / pending-stop check 封装为单一 helper：

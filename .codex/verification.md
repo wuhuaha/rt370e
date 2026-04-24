@@ -1,5 +1,26 @@
 # Verification
 
+## Step 5.498
+Validate that write-failed recovery now returns a typed worker-step result:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'write_failed_recovery_result|handle_playback_write_failed|write_current_downlink_frame_step' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- write-failed handler returns `frame_consumed` and `step_result`
+- write step consumes the typed recovery result instead of deriving the next
+  worker action from a boolean
+
 ## Step 5.497
 Validate that successful downlink frame writes now finish through a single
 post-write helper:

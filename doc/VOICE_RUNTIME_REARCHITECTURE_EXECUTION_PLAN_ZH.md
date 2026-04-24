@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.498`
+  - `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
+    `bool` 返回升级为 step-result view
+  - 新增：
+    - `river_cloud_xiaozhi_write_failed_recovery_result_t`
+  - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在显式返回：
+    - `frame_consumed`
+    - `step_result`
+  - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 不再用 bool + 三元表达式
+    推导 inline replay / managed rebuffer 后的下一步动作，而是直接消费 recovery result
+  - 这一步继续把 `river_cloud` 从：
+    - bool 表达“inline replay 是否成功并已消费帧”
+    推进到：
+    - typed recovery result owns frame consumption and worker step policy
+  - 下一步继续聚焦：
+    - write step 自身的结果结构化，以及 pending-stop / ACK / segment-start
+      后效应继续向 downlink runtime owner helper 聚合
 - `Step 5.497`
   - `river_cloud` 继续收口 XiaoZhi downlink write step 的成功路径，把成功写入后的
     frame consume / segment start / ACK progress / pending-stop check 封装为单一 helper
