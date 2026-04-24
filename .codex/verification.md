@@ -1,5 +1,35 @@
 # Verification
 
+## Step 5.489
+Validate that XiaoZhi playback tail stop deadline and no-ref reopen gate state
+now live in playback runtime/gate truth instead of scattered raw context fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '202,224p' components/river_cloud/river_cloud_internal.h
+sed -n '392,422p' components/river_cloud/river_cloud_internal.h
+rg -n 'tts_stop_deadline_ms|no_ref_reopen_(guard_deadline_ms|silence_frames|rearm)' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_tts_stop_deadline_ms|xiaozhi_no_ref_reopen_(guard_deadline_ms|silence_frames|rearm)' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` keeps TTS stop deadline under:
+  - `river_cloud_xiaozhi_playback_runtime_truth_t`
+- `river_cloud_internal.h` keeps no-ref reopen guard/rearm/silence state under:
+  - `river_cloud_xiaozhi_playback_gate_truth_t`
+- the repo no longer contains direct raw-field references to the removed
+  playback tail / no-ref reopen context fields
+
 ## Step 5.488
 Validate that XiaoZhi listening/window/listen-stop/local-close state now lives
 behind an explicit session-window-owned truth struct instead of scattered raw

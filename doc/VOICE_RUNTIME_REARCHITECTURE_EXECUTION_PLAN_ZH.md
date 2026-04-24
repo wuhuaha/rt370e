@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.489`
+  - `river_cloud` 继续把 XiaoZhi playback tail / no-ref reopen 状态从散落的
+    `g_river_cloud.xiaozhi_*` 裸字段收口到既有 playback runtime/gate truth
+  - `tts_stop_deadline_ms` 归入：
+    - `river_cloud_xiaozhi_playback_runtime_truth_t`
+  - no-ref reopen guard/rearm/silence 状态归入：
+    - `river_cloud_xiaozhi_playback_gate_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_tts_stop_deadline_ms`
+    - `xiaozhi_no_ref_reopen_guard_deadline_ms`
+    - `xiaozhi_no_ref_reopen_silence_frames`
+    - `xiaozhi_no_ref_reopen_rearm`
+  - playback stop arm/cancel/poll、playback reset、no-ref reopen readiness 和
+    runtime status dump 现在统一走 typed playback runtime/gate truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered playback tail and no-ref reopen fields
+    推进到：
+    - playback runtime truth + playback gate truth
+  - 下一步继续聚焦：
+    - downlink/playback 内部 query/view/export 边界，把直接读写进一步压到 owner 函数内
 - `Step 5.488`
   - `river_cloud` 继续把 XiaoZhi session/window/local-close 状态从散落的
     `g_river_cloud.xiaozhi_*` 裸字段收口成显式 truth

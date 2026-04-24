@@ -15,11 +15,33 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.488 收口 session window truth`
+  - `5.489 收口 playback tail/no-ref reopen truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi playback tail / no-ref reopen 真相从散落裸字段收口到
+      既有 playback runtime/gate truth
+    - 新增到 playback runtime truth：
+      - `tts_stop_deadline_ms`
+    - 新增到 playback gate truth：
+      - `no_ref_reopen_guard_deadline_ms`
+      - `no_ref_reopen_silence_frames`
+      - `no_ref_reopen_rearm`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_tts_stop_deadline_ms`
+      - `xiaozhi_no_ref_reopen_guard_deadline_ms`
+      - `xiaozhi_no_ref_reopen_silence_frames`
+      - `xiaozhi_no_ref_reopen_rearm`
+    - playback stop arm/cancel/poll、playback reset、no-ref reopen readiness 和
+      runtime status dump 现在统一消费 playback runtime/gate truth
+    - 这一步把：
+      - scattered playback tail and no-ref reopen fields
+      收口成：
+      - playback runtime truth + playback gate truth
+    - 下一步继续聚焦：
+      - 清理 downlink/playback 内部直接访问，建立更清晰的 query/view/export 边界
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi session/window/local-close 真相从散落裸字段收口成显式
       typed truth

@@ -207,6 +207,7 @@ typedef struct {
     bool active;
     bool rebuffer_pending;
     bool stop_pending;
+    uint64_t tts_stop_deadline_ms;
 } river_cloud_xiaozhi_playback_runtime_truth_t;
 
 typedef struct {
@@ -215,6 +216,9 @@ typedef struct {
     uint32_t prefetch_frames;
     uint32_t buffer_frames;
     bool cautious_history;
+    uint64_t no_ref_reopen_guard_deadline_ms;
+    uint32_t no_ref_reopen_silence_frames;
+    bool no_ref_reopen_rearm;
 } river_cloud_xiaozhi_playback_gate_truth_t;
 
 typedef struct {
@@ -399,9 +403,6 @@ typedef struct {
     river_audio_frame_ring_t xiaozhi_uplink_ring;
     river_opus_encoder_t xiaozhi_encoder;
     river_opus_decoder_t xiaozhi_decoder;
-    uint64_t xiaozhi_tts_stop_deadline_ms;
-    uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
-    uint32_t xiaozhi_no_ref_reopen_silence_frames;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
     uint8_t xiaozhi_uplink_ring_storage[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX *
                                         RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES];
@@ -416,7 +417,6 @@ typedef struct {
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
     river_cloud_xiaozhi_control_request_t
         xiaozhi_control_queue[RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH];
-    bool xiaozhi_no_ref_reopen_rearm;
 #endif
     char last_text[192];
     char last_error[128];

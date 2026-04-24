@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.489
+- `river_cloud` 继续收口 XiaoZhi playback tail / no-ref reopen 真相源，消除
+  playback runtime 对 TTS stop deadline、no-ref reopen guard、rearm 和 silence counter
+  的散落上下文字段读写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- `tts_stop_deadline_ms` 现在归入已有 playback runtime truth：
+  - `g_river_cloud.xiaozhi_playback_runtime_truth.tts_stop_deadline_ms`
+- no-ref follow-up reopen gate 状态现在归入已有 playback gate truth：
+  - `g_river_cloud.xiaozhi_playback_gate_truth.no_ref_reopen_guard_deadline_ms`
+  - `g_river_cloud.xiaozhi_playback_gate_truth.no_ref_reopen_silence_frames`
+  - `g_river_cloud.xiaozhi_playback_gate_truth.no_ref_reopen_rearm`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_tts_stop_deadline_ms`
+  - `xiaozhi_no_ref_reopen_guard_deadline_ms`
+  - `xiaozhi_no_ref_reopen_silence_frames`
+  - `xiaozhi_no_ref_reopen_rearm`
+- playback stop arm/cancel/poll、playback reset、no-ref reopen readiness 和
+  runtime status dump 现在统一消费 playback runtime/gate truth
+- 这一步把 XiaoZhi playback tail / no-ref reopen 从：
+  - scattered playback tail and no-ref reopen fields
+  收口成：
+  - playback runtime truth + playback gate truth
+
 ## Step 5.488
 - `river_cloud` 继续收口 XiaoZhi session/window/local-close 真相源，消除
   `round_runtime` / `playback_runtime` 对 listening、conversation window、
