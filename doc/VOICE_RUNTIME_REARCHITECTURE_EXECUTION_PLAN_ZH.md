@@ -26,6 +26,40 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.478`
+  - `river_cloud` 继续把 XiaoZhi playback/downlink 的 start-gate /
+    starvation-watch / retry / ring-overflow
+    状态从散落的 `g_river_cloud.xiaozhi_*` 裸字段收口成显式 truth
+  - 新增 playback/downlink truth：
+    - `river_cloud_xiaozhi_playback_gate_truth_t`
+    - `river_cloud_xiaozhi_downlink_runtime_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_playback_start_policy`
+    - `xiaozhi_playback_start_frames`
+    - `xiaozhi_playback_prefetch_frames`
+    - `xiaozhi_playback_buffer_frames`
+    - `xiaozhi_playback_start_cautious_history`
+    - `xiaozhi_downlink_ring_dropped`
+    - `xiaozhi_downlink_retry_valid`
+    - `xiaozhi_downlink_starved_since_ms`
+    - `xiaozhi_downlink_last_supply_ms`
+  - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+    - start-gate store / refresh / current-gate / diag capture
+    - playback queued-frames / has-work / buffer-budget 计算
+    - rebuffer keep-retry / inline-recover / write-success 生命周期
+    - reset-downlink / pending-stop drop / starvation-watch 维护
+    - upstream-starved 判定 / write-failed starved 推断
+    - downlink ring overflow / last-supply 时间戳更新
+    现在都统一走 typed playback-gate / downlink-runtime truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered gate/watch/retry thresholds bag
+    推进到：
+    - explicit playback gate truth
+    - explicit downlink runtime truth
+  - 下一步继续聚焦：
+    - 把 downlink format / segment queue / worker lifecycle
+      这批剩余 coarse ownership 继续收口成更明确的 playback/downlink truth，
+      让 session/runtime/policy 不再回读云端播放供给细节和 worker 态拼装结果
 - `Step 5.477`
   - `river_cloud` 继续把 XiaoZhi playback 的 execution / recovery
     状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 runtime truth

@@ -15,11 +15,43 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.477 收口 playback execution truth`
+  - `5.478 收口 playback gate/downlink truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi downlink/playback 的 start-gate /
+      starvation-watch / retry / ring-overflow 真相从散落裸字段收口成显式 typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_playback_gate_truth_t`
+      - `river_cloud_xiaozhi_downlink_runtime_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_playback_start_policy`
+      - `xiaozhi_playback_start_frames`
+      - `xiaozhi_playback_prefetch_frames`
+      - `xiaozhi_playback_buffer_frames`
+      - `xiaozhi_playback_start_cautious_history`
+      - `xiaozhi_downlink_ring_dropped`
+      - `xiaozhi_downlink_retry_valid`
+      - `xiaozhi_downlink_starved_since_ms`
+      - `xiaozhi_downlink_last_supply_ms`
+    - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+      - start-gate store / refresh / current-gate / diag capture
+      - queued-frames / has-work / buffer-budget 计算
+      - rebuffer keep-retry / inline-recover / write-success 生命周期
+      - reset-downlink / pending-stop drop / starvation-watch / ring-overflow
+        路径
+      现在都统一消费 playback-gate / downlink-runtime truth
+    - 这一步把：
+      - scattered gate/watch/retry thresholds bag
+      收口成：
+      - explicit playback gate truth
+      - explicit downlink runtime truth
+    - 下一步继续聚焦：
+      - 把 downlink format / segment queue / worker lifecycle
+        这批剩余 coarse ownership 继续推进成 typed truth / typed view，减少
+        session/dialog 对云端播放供给细节的散读
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi downlink/playback 的 execution / recovery
       真相从散落裸字段收口成显式 typed runtime truth

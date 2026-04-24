@@ -196,6 +196,21 @@ typedef struct {
 } river_cloud_xiaozhi_playback_runtime_truth_t;
 
 typedef struct {
+    river_cloud_playback_start_policy_t policy;
+    uint32_t start_frames;
+    uint32_t prefetch_frames;
+    uint32_t buffer_frames;
+    bool cautious_history;
+} river_cloud_xiaozhi_playback_gate_truth_t;
+
+typedef struct {
+    uint32_t ring_dropped;
+    uint64_t starved_since_ms;
+    uint64_t last_supply_ms;
+    bool retry_valid;
+} river_cloud_xiaozhi_downlink_runtime_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -274,6 +289,8 @@ typedef struct {
     river_cloud_xiaozhi_playback_meta_truth_t xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
     river_cloud_xiaozhi_playback_runtime_truth_t xiaozhi_playback_runtime_truth;
+    river_cloud_xiaozhi_playback_gate_truth_t xiaozhi_playback_gate_truth;
+    river_cloud_xiaozhi_downlink_runtime_truth_t xiaozhi_downlink_runtime_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
     bool xiaozhi_endpoint_soft_close_pending;
@@ -292,7 +309,6 @@ typedef struct {
     uint32_t xiaozhi_server_frame_duration_ms;
     uint32_t xiaozhi_downlink_sample_rate;
     uint32_t xiaozhi_downlink_frame_duration_ms;
-    uint32_t xiaozhi_downlink_ring_dropped;
     uint32_t xiaozhi_open_speech_frames;
     uint32_t xiaozhi_uplink_timestamp_ms;
     uint32_t xiaozhi_uplink_ring_dropped;
@@ -302,8 +318,6 @@ typedef struct {
     uint32_t xiaozhi_uplink_busy_streak;
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
-    uint64_t xiaozhi_downlink_starved_since_ms;
-    uint64_t xiaozhi_downlink_last_supply_ms;
     uint64_t xiaozhi_uplink_next_send_ms;
     uint64_t xiaozhi_uplink_last_busy_log_ms;
     uint64_t xiaozhi_local_close_deadline_ms;
@@ -313,11 +327,6 @@ typedef struct {
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
-    river_cloud_playback_start_policy_t xiaozhi_playback_start_policy;
-    uint32_t xiaozhi_playback_start_frames;
-    uint32_t xiaozhi_playback_prefetch_frames;
-    uint32_t xiaozhi_playback_buffer_frames;
-    bool xiaozhi_playback_start_cautious_history;
     uint32_t xiaozhi_playback_segment_head;
     uint32_t xiaozhi_playback_segment_count;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
@@ -333,7 +342,6 @@ typedef struct {
                                           RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES];
     uint8_t xiaozhi_downlink_task_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
     uint8_t xiaozhi_downlink_drop_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
-    bool xiaozhi_downlink_retry_valid;
     int16_t xiaozhi_downlink_mono[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX];
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
     river_cloud_xiaozhi_control_request_t

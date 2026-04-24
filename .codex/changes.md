@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.478
+- `river_cloud` 继续收口 XiaoZhi downlink/playback 的 start-gate /
+  starvation-watch / retry / ring-overflow 真相源，消除 `playback_runtime`
+  对这批阈值与恢复观测裸字段的混用：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 playback/downlink truth：
+  - `river_cloud_xiaozhi_playback_gate_truth_t`
+  - `river_cloud_xiaozhi_downlink_runtime_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_playback_start_policy`
+  - `xiaozhi_playback_start_frames`
+  - `xiaozhi_playback_prefetch_frames`
+  - `xiaozhi_playback_buffer_frames`
+  - `xiaozhi_playback_start_cautious_history`
+  - `xiaozhi_downlink_ring_dropped`
+  - `xiaozhi_downlink_retry_valid`
+  - `xiaozhi_downlink_starved_since_ms`
+  - `xiaozhi_downlink_last_supply_ms`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接读写上述裸字段的关键路径，
+  现在统一改走 typed truth：
+  - start-gate store / refresh / current-gate / diag capture
+  - playback queued-frames / has-work / buffer-budget 计算
+  - rebuffer keep-retry / inline-recover / write-success 生命周期
+  - reset-downlink / pending-stop drop / starvation-watch 维护
+  - upstream-starved 判定 / write-failed starved 推断
+  - downlink ring overflow / last-supply 时间戳更新
+- 这一步把 XiaoZhi downlink/playback 从：
+  - scattered gate/watch/retry thresholds bag
+  收口成：
+  - explicit playback gate truth
+  - explicit downlink runtime truth
+
 ## Step 5.477
 - `river_cloud` 继续收口 XiaoZhi downlink/playback 的 execution / recovery
   真相源，消除 `playback_runtime` 对 phase / rebuffer / stop / recovery

@@ -1,5 +1,53 @@
 # Verification
 
+## Step 5.478
+Validate that XiaoZhi playback start-gate and downlink watch/runtime state now
+live behind explicit typed truths instead of scattered raw
+`g_river_cloud.xiaozhi_*` fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '183,220p' components/river_cloud/river_cloud_internal.h
+sed -n '286,344p' components/river_cloud/river_cloud_internal.h
+sed -n '949,990p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1374,1590p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1940,2002p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2353,2642p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2899,2993p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '4052,4342p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_gate_truth_t|downlink_runtime_truth_t|xiaozhi_(playback_gate_truth|downlink_runtime_truth)' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_playback_start_policy|xiaozhi_playback_start_frames|xiaozhi_playback_prefetch_frames|xiaozhi_playback_buffer_frames|xiaozhi_playback_start_cautious_history|xiaozhi_downlink_ring_dropped|xiaozhi_downlink_retry_valid|xiaozhi_downlink_starved_since_ms|xiaozhi_downlink_last_supply_ms' \
+  components include/river
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_playback_gate_truth_t`
+  - `river_cloud_xiaozhi_downlink_runtime_truth_t`
+- `river_cloud_xiaozhi_playback_runtime.c` now routes playback start-gate /
+  starvation watch / retry / ring-overflow bookkeeping through the new typed
+  truths
+- the repo no longer contains direct raw-field references to the removed
+  gate/watch fields:
+  - `xiaozhi_playback_start_policy`
+  - `xiaozhi_playback_start_frames`
+  - `xiaozhi_playback_prefetch_frames`
+  - `xiaozhi_playback_buffer_frames`
+  - `xiaozhi_playback_start_cautious_history`
+  - `xiaozhi_downlink_ring_dropped`
+  - `xiaozhi_downlink_retry_valid`
+  - `xiaozhi_downlink_starved_since_ms`
+  - `xiaozhi_downlink_last_supply_ms`
+
 ## Step 5.477
 Validate that XiaoZhi playback execution / recovery state now live behind an
 explicit playback-owned runtime truth struct instead of scattered raw
