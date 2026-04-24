@@ -275,6 +275,12 @@ typedef struct {
 } river_cloud_xiaozhi_endpoint_soft_close_truth_t;
 
 typedef struct {
+    bool valid;
+    bool finalized;
+    char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+} river_cloud_xiaozhi_pending_transcript_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -344,8 +350,6 @@ typedef struct {
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     bool xiaozhi_listening;
     bool xiaozhi_window_active;
-    bool xiaozhi_pending_text_valid;
-    bool xiaozhi_pending_text_finalized;
     bool xiaozhi_preview_speech_started;
     bool xiaozhi_preview_endpoint_candidate;
     bool xiaozhi_preview_final;
@@ -364,6 +368,8 @@ typedef struct {
     river_cloud_xiaozhi_asr_round_truth_t xiaozhi_asr_round_truth;
     river_cloud_xiaozhi_endpoint_soft_close_truth_t
         xiaozhi_endpoint_soft_close_truth;
+    river_cloud_xiaozhi_pending_transcript_truth_t
+        xiaozhi_pending_transcript_truth;
     river_cloud_xiaozhi_control_queue_truth_t xiaozhi_control_queue_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
@@ -396,7 +402,6 @@ typedef struct {
     river_cloud_xiaozhi_control_request_t
         xiaozhi_control_queue[RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH];
     bool xiaozhi_no_ref_reopen_rearm;
-    char xiaozhi_pending_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char xiaozhi_preview_id[RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX];
     char xiaozhi_preview_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char xiaozhi_preview_stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];

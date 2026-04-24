@@ -15,11 +15,29 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.485 收口 endpoint soft-close truth`
+  - `5.486 收口 pending transcript truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi pending transcript 真相从散落裸字段收口成显式
+      typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_pending_transcript_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_pending_text_valid`
+      - `xiaozhi_pending_text_finalized`
+      - `xiaozhi_pending_text`
+    - STT observation、pending clear、finalize readiness、accepted-turn final emit、
+      post-stop result policy、local-close defer 和 runtime dump 现在统一消费：
+      - `g_river_cloud.xiaozhi_pending_transcript_truth`
+    - 这一步把：
+      - scattered pending text validity/finalization/text bag
+      收口成：
+      - explicit pending transcript truth
+    - 下一步继续聚焦：
+      - preview transcript / endpoint candidate 这批服务端预览与端点观测状态
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi endpoint soft-close 真相从散落裸字段收口成显式
       typed truth

@@ -115,7 +115,7 @@ bool river_cloud_xiaozhi_should_defer_local_close(void)
     return g_river_cloud.xiaozhi_asr_round_truth.active &&
            !g_river_cloud.xiaozhi_asr_round_truth.partial_seen &&
            !g_river_cloud.xiaozhi_asr_round_truth.final_seen &&
-           !g_river_cloud.xiaozhi_pending_text_valid;
+           !g_river_cloud.xiaozhi_pending_transcript_truth.valid;
 }
 
 void river_cloud_xiaozhi_clear_local_close_defer(void)

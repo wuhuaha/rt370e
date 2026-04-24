@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.486
+- `river_cloud` 继续收口 XiaoZhi pending transcript 真相源，消除
+  `session` / `round_runtime` 对 pending text valid / finalized / text 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+- 新增显式 pending-transcript-owned truth：
+  - `river_cloud_xiaozhi_pending_transcript_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_pending_text_valid`
+  - `xiaozhi_pending_text_finalized`
+  - `xiaozhi_pending_text`
+- STT observation、pending clear、finalize readiness、accepted-turn final emit、
+  post-stop result policy、local-close defer 和 runtime dump 现在统一消费：
+  - `g_river_cloud.xiaozhi_pending_transcript_truth`
+- 这一步把 XiaoZhi pending transcript 从：
+  - scattered pending text validity/finalization/text bag
+  收口成：
+  - explicit pending transcript truth
+
 ## Step 5.485
 - `river_cloud` 继续收口 XiaoZhi endpoint soft-close 真相源，消除
   `playback_runtime` 对 endpoint soft-close pending / deadline / reason 这批裸字段的散读散写：

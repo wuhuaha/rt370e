@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.486`
+  - `river_cloud` 继续把 XiaoZhi pending transcript 状态从散落的
+    `g_river_cloud.xiaozhi_pending_text*` 裸字段收口成显式 truth
+  - 新增 pending-transcript-owned truth：
+    - `river_cloud_xiaozhi_pending_transcript_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_pending_text_valid`
+    - `xiaozhi_pending_text_finalized`
+    - `xiaozhi_pending_text`
+  - STT observation、pending clear、finalize readiness、accepted-turn final emit、
+    post-stop result policy、local-close defer 和 runtime dump 现在统一走 typed
+    pending transcript truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered pending text validity/finalization/text bag
+    推进到：
+    - explicit pending transcript truth
+  - 下一步继续聚焦：
+    - preview transcript / endpoint candidate 这批服务端预览与端点观测状态
 - `Step 5.485`
   - `river_cloud` 继续把 XiaoZhi endpoint soft-close 状态从散落的
     `g_river_cloud.xiaozhi_endpoint_soft_close_*` 裸字段收口成显式 truth

@@ -890,7 +890,9 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                (unsigned long)snapshot.local_close_remaining_ms,
                river_cloud_xiaozhi_idle_requires_wakeword() ? "wakeword" : "legacy_vad",
                snapshot.session_id[0] != '\0' ? snapshot.session_id : "-",
-               g_river_cloud.xiaozhi_pending_text_valid ? g_river_cloud.xiaozhi_pending_text : "-");
+               g_river_cloud.xiaozhi_pending_transcript_truth.valid ?
+                   g_river_cloud.xiaozhi_pending_transcript_truth.text :
+                   "-");
     RIVER_LOGI("xiaozhi preview preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s endpoint_candidate=%s reason=%s source=%s audio_offset_ms=%lu",
                g_river_cloud.xiaozhi_preview_id[0] != '\0' ? g_river_cloud.xiaozhi_preview_id :
                                                              "-",
@@ -968,18 +970,19 @@ void river_cloud_xiaozhi_note_stt_observation(const river_xiaozhi_event_t *event
     if (next_text[0] == '\0') {
         return;
     }
-    if (g_river_cloud.xiaozhi_pending_text_valid &&
-        strcmp(g_river_cloud.xiaozhi_pending_text, next_text) == 0) {
+    if (g_river_cloud.xiaozhi_pending_transcript_truth.valid &&
+        strcmp(g_river_cloud.xiaozhi_pending_transcript_truth.text, next_text) == 0) {
         return;
     }
 
-    river_cloud_xiaozhi_copy_optional_text(g_river_cloud.xiaozhi_pending_text,
-                                           sizeof(g_river_cloud.xiaozhi_pending_text),
-                                           next_text);
-    g_river_cloud.xiaozhi_pending_text_valid = true;
-    g_river_cloud.xiaozhi_pending_text_finalized = false;
+    river_cloud_xiaozhi_copy_optional_text(
+        g_river_cloud.xiaozhi_pending_transcript_truth.text,
+        sizeof(g_river_cloud.xiaozhi_pending_transcript_truth.text),
+        next_text);
+    g_river_cloud.xiaozhi_pending_transcript_truth.valid = true;
+    g_river_cloud.xiaozhi_pending_transcript_truth.finalized = false;
     river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_PARTIAL,
-                                g_river_cloud.xiaozhi_pending_text,
+                                g_river_cloud.xiaozhi_pending_transcript_truth.text,
                                 river_cloud_xiaozhi_current_sid(),
                                 NULL,
                                 0,
@@ -1208,7 +1211,7 @@ void river_cloud_xiaozhi_apply_llm_round_policy(void)
 
 void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void)
 {
-    if (g_river_cloud.xiaozhi_pending_text_finalized ||
+    if (g_river_cloud.xiaozhi_pending_transcript_truth.finalized ||
         g_river_cloud.xiaozhi_asr_round_truth.final_seen) {
         river_cloud_xiaozhi_close_local_round_for_cause(
             RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_LOCAL_RESOLVED,
@@ -1642,9 +1645,9 @@ static const char *river_cloud_xiaozhi_optional_bool_text(bool known, bool enabl
 
 void river_cloud_xiaozhi_clear_pending_text(void)
 {
-    g_river_cloud.xiaozhi_pending_text_valid = false;
-    g_river_cloud.xiaozhi_pending_text_finalized = false;
-    g_river_cloud.xiaozhi_pending_text[0] = '\0';
+    g_river_cloud.xiaozhi_pending_transcript_truth.valid = false;
+    g_river_cloud.xiaozhi_pending_transcript_truth.finalized = false;
+    g_river_cloud.xiaozhi_pending_transcript_truth.text[0] = '\0';
 }
 
 void river_cloud_xiaozhi_clear_preview_state(void)
@@ -1834,24 +1837,24 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
 
 static bool river_cloud_xiaozhi_pending_text_ready_for_finalize(void)
 {
-    return g_river_cloud.xiaozhi_pending_text_valid &&
-           !g_river_cloud.xiaozhi_pending_text_finalized &&
-           g_river_cloud.xiaozhi_pending_text[0] != '\0';
+    return g_river_cloud.xiaozhi_pending_transcript_truth.valid &&
+           !g_river_cloud.xiaozhi_pending_transcript_truth.finalized &&
+           g_river_cloud.xiaozhi_pending_transcript_truth.text[0] != '\0';
 }
 
 static void river_cloud_xiaozhi_commit_pending_text_finalization(const char *trigger)
 {
     river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
 
-    g_river_cloud.xiaozhi_pending_text_finalized = true;
+    g_river_cloud.xiaozhi_pending_transcript_truth.finalized = true;
     river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
     RIVER_LOGI("xiaozhi accepted turn final text: trigger=%s accept_reason=%s turn_id=%s text=%s",
                trigger != NULL ? trigger : "-",
                semantics_view.accept_reason != NULL ? semantics_view.accept_reason : "-",
                semantics_view.turn_id != NULL ? semantics_view.turn_id : "-",
-               g_river_cloud.xiaozhi_pending_text);
+               g_river_cloud.xiaozhi_pending_transcript_truth.text);
     river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_FINAL,
-                                g_river_cloud.xiaozhi_pending_text,
+                                g_river_cloud.xiaozhi_pending_transcript_truth.text,
                                 river_cloud_xiaozhi_current_sid(),
                                 NULL,
                                 0,
@@ -1903,7 +1906,7 @@ void river_cloud_xiaozhi_finalize_pending_text(const char *trigger)
         river_cloud_xiaozhi_note_semantic_fallback("await_accept_reason");
         RIVER_LOGI("xiaozhi pending text waits for accepted turn: trigger=%s text=%s",
                    trigger != NULL ? trigger : "-",
-                   g_river_cloud.xiaozhi_pending_text);
+                   g_river_cloud.xiaozhi_pending_transcript_truth.text);
         return;
     }
 

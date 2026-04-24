@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.486
+Validate that XiaoZhi pending transcript state now lives behind an explicit
+pending-transcript-owned truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_pending_text*` context fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '274,284p' components/river_cloud/river_cloud_internal.h
+sed -n '342,370p' components/river_cloud/river_cloud_internal.h
+rg -n 'pending_transcript_truth_t|xiaozhi_pending_transcript_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+rg -n 'xiaozhi_pending_text_valid|xiaozhi_pending_text_finalized|xiaozhi_pending_text\[|g_river_cloud\.xiaozhi_pending_text' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_pending_transcript_truth_t`
+- STT observation, pending clear, finalize readiness, accepted-turn final emit,
+  post-stop result policy, local-close defer, and runtime dump now route pending
+  transcript valid/finalized/text through the new typed truth
+- the repo no longer contains direct raw-field references to the removed pending
+  transcript context fields
+
 ## Step 5.485
 Validate that XiaoZhi endpoint soft-close state now lives behind an explicit
 endpoint-soft-close-owned truth struct instead of scattered raw
