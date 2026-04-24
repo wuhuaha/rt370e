@@ -1,5 +1,43 @@
 # Verification
 
+## Step 5.476
+Validate that XiaoZhi playback meta / terminal / context state now live behind
+explicit playback-owned truth structs instead of scattered raw
+`g_river_cloud.xiaozhi_playback_*` fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '154,184p' components/river_cloud/river_cloud_internal.h
+sed -n '425,551p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1538,1580p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2101,2175p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2331,2367p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3326,3830p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_(context_truth|meta_truth|terminal_truth)' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_playback_(started_reported|cleared_reported|completed_reported|terminal_waiting|terminal_wait_kind|duplex_ready_seen|response_id|playback_id|segment_id|wait_response_id|wait_playback_id|wait_segment_id|last_segment_response_id|last_segment_playback_id|last_segment_segment_id|last_fully_heard_response_id|last_fully_heard_playback_id|last_started_segment_id|last_fully_heard_segment_id|terminal_ack|terminal_state_kind|clear_reason|terminal_wait_reason|text|expected_duration_ms|last_meta_gap_ms|prefetch_target_ms|last_meta_ms)' \
+  components -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_playback_context_truth_t`
+  - `river_cloud_xiaozhi_playback_meta_truth_t`
+  - `river_cloud_xiaozhi_playback_terminal_truth_t`
+- `river_cloud_xiaozhi_playback_runtime.c` now routes playback meta / terminal /
+  wait / last-segment / fully-heard / ack bookkeeping through the new truth
+  structs
+- the repo no longer contains direct raw-field references to the removed
+  `g_river_cloud.xiaozhi_playback_*` playback meta/terminal/context fields
+
 ## Step 5.475
 Validate that XiaoZhi turn semantics now live behind an explicit cloud-owned
 sub-state and typed view instead of scattered `g_river_cloud.xiaozhi_*`

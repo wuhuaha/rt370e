@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.476
+- `river_cloud` 继续收口 XiaoZhi downlink/playback 的 meta / terminal /
+  context 真相源，消除 `playback_runtime` 内部对散落 playback 裸字段的混用：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 playback-owned truth：
+  - `river_cloud_xiaozhi_playback_context_truth_t`
+  - `river_cloud_xiaozhi_playback_meta_truth_t`
+  - `river_cloud_xiaozhi_playback_terminal_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_playback_response_id/playback_id/segment_id`
+  - `xiaozhi_playback_text/expected_duration_ms/last_meta_gap_ms/prefetch_target_ms/last_meta_ms`
+  - `xiaozhi_playback_started_reported/cleared_reported/completed_reported`
+  - `xiaozhi_playback_last_started_segment_id`
+  - `xiaozhi_playback_last_segment_*`
+  - `xiaozhi_playback_last_fully_heard_*`
+  - `xiaozhi_playback_terminal_*`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接拼接/更新旧 playback 裸字段的
+  关键路径，现在统一改走 typed truth：
+  - `river_cloud_xiaozhi_playback_note_meta(...)`
+  - `river_cloud_xiaozhi_try_queue_playback_started_ack(...)`
+  - `river_cloud_xiaozhi_try_queue_playback_cleared_ack(...)`
+  - `river_cloud_xiaozhi_try_queue_playback_completed_ack(...)`
+  - `river_cloud_xiaozhi_playback_finalize_cleared(...)`
+  - segment-gap hold / prefetch / playback-start 等日志路径
+- 这一步把 XiaoZhi playback runtime 从：
+  - scattered playback terminal/meta/context bag
+  收口成：
+  - explicit playback-owned truth
+  - shared typed context/meta/terminal access boundary
+
 ## Step 5.475
 - `river_cloud` 先把 XiaoZhi `turn semantics` 从散落的 `g_river_cloud.xiaozhi_*`
   裸字段收口成显式子状态与窄视图：

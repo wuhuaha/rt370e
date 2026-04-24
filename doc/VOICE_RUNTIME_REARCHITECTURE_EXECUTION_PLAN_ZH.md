@@ -26,6 +26,34 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.476`
+  - `river_cloud` 继续把 XiaoZhi playback 的 meta / terminal / context
+    状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 truth
+  - 新增 playback-owned truth：
+    - `river_cloud_xiaozhi_playback_context_truth_t`
+    - `river_cloud_xiaozhi_playback_meta_truth_t`
+    - `river_cloud_xiaozhi_playback_terminal_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - response/playback/segment id
+    - text / expected_duration_ms / meta_gap / prefetch_target / last_meta_ms
+    - started/cleared/completed reported
+    - wait / last-segment / last-fully-heard / terminal ack/state 相关裸字段
+  - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+    - `river_cloud_xiaozhi_playback_note_meta(...)`
+    - `river_cloud_xiaozhi_try_queue_playback_started_ack(...)`
+    - `river_cloud_xiaozhi_try_queue_playback_cleared_ack(...)`
+    - `river_cloud_xiaozhi_try_queue_playback_completed_ack(...)`
+    - `river_cloud_xiaozhi_playback_finalize_cleared(...)`
+    - segment-gap hold / prefetch / playback-start 日志路径
+    现在都统一走 typed playback truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered playback terminal/meta/context bag
+    推进到：
+    - explicit playback-owned truth
+    - shared typed context/meta/terminal access boundary
+  - 下一步继续聚焦：
+    - 把 `rebuffer/phase/recovery` 这批剩余 coarse state 也收口成 playback/downlink
+      truth，让 adapter / session / dialog 不再回读恢复细节和粗粒度 backend 状态
 - `Step 5.475`
   - `river_cloud` 先把 XiaoZhi `turn semantics` 从散落的
     `g_river_cloud.xiaozhi_*` 裸字段收口成显式子状态与窄视图
