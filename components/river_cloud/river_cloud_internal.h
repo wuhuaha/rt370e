@@ -141,6 +141,13 @@ typedef struct {
 } river_cloud_xiaozhi_playback_segment_t;
 
 typedef struct {
+    uint32_t head;
+    uint32_t count;
+    river_cloud_xiaozhi_playback_segment_t
+        segments[RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX];
+} river_cloud_xiaozhi_playback_segment_queue_truth_t;
+
+typedef struct {
     river_cloud_xiaozhi_control_op_t op;
     char arg[RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX];
     char response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
@@ -290,6 +297,8 @@ typedef struct {
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
     river_cloud_xiaozhi_playback_runtime_truth_t xiaozhi_playback_runtime_truth;
     river_cloud_xiaozhi_playback_gate_truth_t xiaozhi_playback_gate_truth;
+    river_cloud_xiaozhi_playback_segment_queue_truth_t
+        xiaozhi_playback_segment_queue_truth;
     river_cloud_xiaozhi_downlink_runtime_truth_t xiaozhi_downlink_runtime_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
@@ -327,8 +336,6 @@ typedef struct {
     uint32_t xiaozhi_control_write_index;
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
-    uint32_t xiaozhi_playback_segment_head;
-    uint32_t xiaozhi_playback_segment_count;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
     size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
@@ -370,8 +377,6 @@ typedef struct {
     char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     char xiaozhi_endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     uint32_t xiaozhi_preview_audio_offset_ms;
-    river_cloud_xiaozhi_playback_segment_t
-        xiaozhi_playback_segments[RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX];
 #endif
     char last_text[192];
     char last_error[128];

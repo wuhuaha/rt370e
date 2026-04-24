@@ -26,6 +26,31 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.479`
+  - `river_cloud` 继续把 XiaoZhi playback segment queue
+    状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 truth
+  - 新增 playback-owned queue truth：
+    - `river_cloud_xiaozhi_playback_segment_queue_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_playback_segment_head`
+    - `xiaozhi_playback_segment_count`
+    - `xiaozhi_playback_segments[...]`
+  - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+    - playback supply source queued-segment capture
+    - current segment lookup / queue pop
+    - playback status dump queued count
+    - clear-meta reset / queue memset
+    - `playback_note_meta(...)` 的 existing-slot scan / tail append /
+      queue-full 判定
+    现在都统一走 typed playback segment-queue truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered playback segment queue bag
+    推进到：
+    - explicit playback segment queue truth
+  - 下一步继续聚焦：
+    - 把 downlink format / worker lifecycle / start-stop
+      这批剩余 coarse ownership 继续收口成更明确的 playback/downlink truth，
+      让 session/runtime/policy 不再回读播放供给格式和 worker 执行态拼装结果
 - `Step 5.478`
   - `river_cloud` 继续把 XiaoZhi playback/downlink 的 start-gate /
     starvation-watch / retry / ring-overflow

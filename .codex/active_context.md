@@ -15,11 +15,35 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.478 收口 playback gate/downlink truth`
+  - `5.479 收口 playback segment queue truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi playback segment queue
+      真相从散落裸字段收口成显式 typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_playback_segment_queue_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_playback_segment_head`
+      - `xiaozhi_playback_segment_count`
+      - `xiaozhi_playback_segments[...]`
+    - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+      - supply-source queued segment capture
+      - current-segment lookup / queue pop
+      - playback status dump queued count
+      - clear-meta reset / queue memset
+      - note-meta existing-slot scan / tail append / queue-full 判定
+      现在都统一消费 playback-owned segment-queue truth
+    - 这一步把：
+      - scattered playback segment queue bag
+      收口成：
+      - explicit playback segment queue truth
+    - 下一步继续聚焦：
+      - 把 downlink format / worker lifecycle / start-stop 运行态
+        这批剩余 coarse ownership 继续推进成 typed truth / typed query，减少
+        session/dialog/adapter 对播放供给细节和恢复执行细节的散读
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi downlink/playback 的 start-gate /
       starvation-watch / retry / ring-overflow 真相从散落裸字段收口成显式 typed truth

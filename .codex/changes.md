@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.479
+- `river_cloud` 继续收口 XiaoZhi playback segment queue 真相源，消除
+  `playback_runtime` 对 segment 环形队列头指针、数量和槽位数组这批裸字段的混用：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 playback-owned queue truth：
+  - `river_cloud_xiaozhi_playback_segment_queue_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_playback_segment_head`
+  - `xiaozhi_playback_segment_count`
+  - `xiaozhi_playback_segments[...]`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接读写旧 segment queue
+  裸字段的关键路径，现在统一改走 typed queue truth：
+  - playback supply source capture 的 queued segment 观测
+  - current segment lookup / queue pop
+  - playback status dump 的 queued count 展示
+  - clear-meta reset / memset 清理
+  - `playback_note_meta(...)` 里的 existing-slot scan / tail append / queue-full
+    判定
+- 这一步把 XiaoZhi playback segment queue 从：
+  - scattered ring-head/count/segment-slots bag
+  收口成：
+  - explicit playback segment queue truth
+
 ## Step 5.478
 - `river_cloud` 继续收口 XiaoZhi downlink/playback 的 start-gate /
   starvation-watch / retry / ring-overflow 真相源，消除 `playback_runtime`

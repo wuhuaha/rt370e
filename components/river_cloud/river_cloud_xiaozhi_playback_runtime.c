@@ -326,7 +326,8 @@ static void river_cloud_xiaozhi_capture_playback_supply_source(
     source->wait_context_valid = river_cloud_xiaozhi_playback_wait_context_valid();
     source->last_segment_observed =
         river_cloud_xiaozhi_playback_last_segment_observed();
-    source->segment_count = g_river_cloud.xiaozhi_playback_segment_count;
+    source->segment_count =
+        g_river_cloud.xiaozhi_playback_segment_queue_truth.count;
 }
 
 static bool river_cloud_xiaozhi_compute_playback_waiting_next_segment_from_source(
@@ -555,13 +556,13 @@ static void river_cloud_xiaozhi_store_playback_last_segment_context(void)
 
 static river_cloud_xiaozhi_playback_segment_t *river_cloud_xiaozhi_current_playback_segment(void)
 {
-    if (g_river_cloud.xiaozhi_playback_segment_count == 0U) {
+    if (g_river_cloud.xiaozhi_playback_segment_queue_truth.count == 0U) {
         return NULL;
     }
 
-    return &g_river_cloud.xiaozhi_playback_segments
-                [g_river_cloud.xiaozhi_playback_segment_head %
-                 RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX];
+    return &g_river_cloud.xiaozhi_playback_segment_queue_truth
+                .segments[g_river_cloud.xiaozhi_playback_segment_queue_truth.head %
+                          RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX];
 }
 
 static const char *river_cloud_xiaozhi_playback_supply_kind_name(
@@ -2152,7 +2153,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                terminal_truth->wait_reason[0] != '\0' ?
                    terminal_truth->wait_reason :
                    "-",
-               (unsigned long)g_river_cloud.xiaozhi_playback_segment_count,
+               (unsigned long)g_river_cloud.xiaozhi_playback_segment_queue_truth.count,
                terminal_truth->last_started_segment_id[0] != '\0' ?
                    terminal_truth->last_started_segment_id :
                    "-",
@@ -2353,8 +2354,8 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_pending = false;
     g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_count = 0U;
     g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_streak = 0U;
-    g_river_cloud.xiaozhi_playback_segment_head = 0U;
-    g_river_cloud.xiaozhi_playback_segment_count = 0U;
+    g_river_cloud.xiaozhi_playback_segment_queue_truth.head = 0U;
+    g_river_cloud.xiaozhi_playback_segment_queue_truth.count = 0U;
     g_river_cloud.xiaozhi_playback_meta_truth.expected_duration_ms = 0U;
     g_river_cloud.xiaozhi_playback_meta_truth.last_meta_gap_ms = 0U;
     g_river_cloud.xiaozhi_playback_meta_truth.prefetch_target_ms = 0U;
@@ -2376,9 +2377,9 @@ void river_cloud_xiaozhi_clear_playback_meta_state(void)
     river_cloud_xiaozhi_clear_playback_terminal_wait();
     g_river_cloud.xiaozhi_playback_meta_truth.text[0] = '\0';
     (void)river_cloud_xiaozhi_refresh_start_gate();
-    memset(g_river_cloud.xiaozhi_playback_segments,
+    memset(g_river_cloud.xiaozhi_playback_segment_queue_truth.segments,
            0,
-           sizeof(g_river_cloud.xiaozhi_playback_segments));
+           sizeof(g_river_cloud.xiaozhi_playback_segment_queue_truth.segments));
     river_cloud_xiaozhi_refresh_playback_phase("clear_meta");
 }
 
@@ -2770,11 +2771,11 @@ static void river_cloud_xiaozhi_pop_playback_segment(void)
     }
 
     memset(segment, 0, sizeof(*segment));
-    g_river_cloud.xiaozhi_playback_segment_head =
-        (g_river_cloud.xiaozhi_playback_segment_head + 1U) %
+    g_river_cloud.xiaozhi_playback_segment_queue_truth.head =
+        (g_river_cloud.xiaozhi_playback_segment_queue_truth.head + 1U) %
         RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX;
-    if (g_river_cloud.xiaozhi_playback_segment_count > 0U) {
-        g_river_cloud.xiaozhi_playback_segment_count--;
+    if (g_river_cloud.xiaozhi_playback_segment_queue_truth.count > 0U) {
+        g_river_cloud.xiaozhi_playback_segment_queue_truth.count--;
     }
 }
 
@@ -3442,12 +3443,14 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         terminal_truth->state_kind ==
         RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_COMPLETED;
 
-    for (index = 0U; index < g_river_cloud.xiaozhi_playback_segment_count; ++index) {
+    for (index = 0U;
+         index < g_river_cloud.xiaozhi_playback_segment_queue_truth.count;
+         ++index) {
         uint32_t slot =
-            (g_river_cloud.xiaozhi_playback_segment_head + index) %
+            (g_river_cloud.xiaozhi_playback_segment_queue_truth.head + index) %
             RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX;
         river_cloud_xiaozhi_playback_segment_t *candidate =
-            &g_river_cloud.xiaozhi_playback_segments[slot];
+            &g_river_cloud.xiaozhi_playback_segment_queue_truth.segments[slot];
 
         if (candidate->valid &&
             strcmp(candidate->segment_id, meta_truth->current_context.segment_id) == 0) {
@@ -3457,7 +3460,7 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
 
     if (segment == NULL) {
-        if (g_river_cloud.xiaozhi_playback_segment_count >=
+        if (g_river_cloud.xiaozhi_playback_segment_queue_truth.count >=
             RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX) {
             RIVER_LOGW("xiaozhi playback segment queue full: playback_id=%s segment_id=%s queued=%lu",
                        meta_truth->current_context.playback_id[0] != '\0' ?
@@ -3466,17 +3469,19 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                        meta_truth->current_context.segment_id[0] != '\0' ?
                            meta_truth->current_context.segment_id :
                            "-",
-                       (unsigned long)g_river_cloud.xiaozhi_playback_segment_count);
+                       (unsigned long)g_river_cloud.xiaozhi_playback_segment_queue_truth
+                           .count);
             return;
         }
         tail_index =
-            (g_river_cloud.xiaozhi_playback_segment_head +
-             g_river_cloud.xiaozhi_playback_segment_count) %
+            (g_river_cloud.xiaozhi_playback_segment_queue_truth.head +
+             g_river_cloud.xiaozhi_playback_segment_queue_truth.count) %
             RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX;
-        segment = &g_river_cloud.xiaozhi_playback_segments[tail_index];
+        segment =
+            &g_river_cloud.xiaozhi_playback_segment_queue_truth.segments[tail_index];
         memset(segment, 0, sizeof(*segment));
         segment->valid = true;
-        g_river_cloud.xiaozhi_playback_segment_count++;
+        g_river_cloud.xiaozhi_playback_segment_queue_truth.count++;
     }
 
     river_cloud_xiaozhi_copy_optional_text(segment->response_id,

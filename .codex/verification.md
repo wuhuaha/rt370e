@@ -1,5 +1,44 @@
 # Verification
 
+## Step 5.479
+Validate that XiaoZhi playback segment queue state now lives behind an
+explicit playback-owned queue truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_playback_*` queue fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '136,152p' components/river_cloud/river_cloud_internal.h
+sed -n '292,304p' components/river_cloud/river_cloud_internal.h
+sed -n '320,334p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '555,567p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2348,2384p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '2768,2782p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '3440,3487p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'playback_segment_queue_truth_t|xiaozhi_playback_segment_queue_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_playback_segment_head|xiaozhi_playback_segment_count|xiaozhi_playback_segments' \
+  components include/river
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_playback_segment_queue_truth_t`
+- `river_cloud_xiaozhi_playback_runtime.c` now routes playback segment queue
+  ownership through the new typed queue truth
+- the repo no longer contains direct raw-field references to the removed
+  segment-queue fields:
+  - `xiaozhi_playback_segment_head`
+  - `xiaozhi_playback_segment_count`
+  - `xiaozhi_playback_segments[...]`
+
 ## Step 5.478
 Validate that XiaoZhi playback start-gate and downlink watch/runtime state now
 live behind explicit typed truths instead of scattered raw
