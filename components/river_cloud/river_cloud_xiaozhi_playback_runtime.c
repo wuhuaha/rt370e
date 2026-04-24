@@ -1919,6 +1919,28 @@ static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
                    "stop_rebuffer"));
 }
 
+static void river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
+    const river_cloud_xiaozhi_write_failed_followup_t *followup,
+    river_cloud_xiaozhi_write_failed_recovery_view_t *recovery_view)
+{
+    if (followup == NULL || recovery_view == NULL || !followup->managed_rebuffer) {
+        return;
+    }
+
+    river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
+        &followup->rebuffer_request,
+        &recovery_view->recovery_plan,
+        recovery_view->now_ms,
+        &recovery_view->recovery_path);
+    river_cloud_xiaozhi_log_write_failed_rebuffer_request(
+        followup->request_log,
+        &recovery_view->recovery_plan,
+        recovery_view->recovery_path);
+    (void)river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
+        &followup->rebuffer_request,
+        &recovery_view->recovery_plan);
+}
+
 static river_cloud_xiaozhi_inline_recover_result_t
 river_cloud_xiaozhi_try_write_failed_inline_recover(
     const char *recover_reason,
@@ -2142,20 +2164,9 @@ static bool river_cloud_xiaozhi_handle_playback_write_failed(
         river_cloud_xiaozhi_consume_current_downlink_frame();
         return true;
     }
-    if (followup.managed_rebuffer) {
-        river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
-            &followup.rebuffer_request,
-            &recovery_view.recovery_plan,
-            recovery_view.now_ms,
-            &recovery_view.recovery_path);
-        river_cloud_xiaozhi_log_write_failed_rebuffer_request(
-            followup.request_log,
-            &recovery_view.recovery_plan,
-            recovery_view.recovery_path);
-        (void)river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
-            &followup.rebuffer_request,
-            &recovery_view.recovery_plan);
-    }
+    river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
+        &followup,
+        &recovery_view);
     return false;
 }
 

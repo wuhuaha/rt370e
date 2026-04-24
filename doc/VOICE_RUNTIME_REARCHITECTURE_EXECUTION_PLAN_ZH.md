@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.495`
+  - `river_cloud` 继续收缩 XiaoZhi playback `write_failed` managed rebuffer
+    follow-up，把 handler 尾部的 start/log/execute 三段副作用封装成单一 executor
+  - 新增：
+    - `river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup()`
+  - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在只保留：
+    - 捕获 recovery view
+    - 清 starvation watch
+    - 记录首条 write-failed log
+    - 尝试 inline recover
+    - inline 成功则 consume current frame
+    - 否则委托 managed rebuffer follow-up executor
+  - 这一步继续把 `river_cloud` 从：
+    - handler 内直接串联 start request、log request、execute request
+    推进到：
+    - follow-up executor owns managed rebuffer effects
+  - 下一步继续聚焦：
+    - downlink task ready/acquire/write cycle 的 plan/result 拆分，继续压缩 worker loop
+      中的隐式副作用
 - `Step 5.494`
   - `river_cloud` 继续收口 XiaoZhi playback inline recover replay 写入路径，让恢复重放
     复用 current-frame write view/effect

@@ -15,11 +15,25 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.494 复用 playback write effect 于 inline recover replay`
+  - `5.495 收口 write-failed managed rebuffer follow-up`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续收缩 XiaoZhi playback `write_failed` managed rebuffer
+      follow-up，把 handler 尾部的 start/log/execute 三段副作用封装成单一 executor
+    - 新增：
+      - `river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup()`
+    - `river_cloud_xiaozhi_handle_playback_write_failed()` 现在只编排 recovery view、
+      starvation watch clear、首条 failure log、inline recover 和 managed follow-up 委托
+    - 这一步把：
+      - handler 内直接串联 start request、log request、execute request
+      收口成：
+      - follow-up executor owns managed rebuffer effects
+    - 下一步继续聚焦：
+      - downlink task ready/acquire/write cycle 的 plan/result 拆分，继续压缩 worker loop
+        中的隐式副作用
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续收口 XiaoZhi playback inline recover replay 写入路径，让恢复重放
       复用 current-frame write view/effect

@@ -1,5 +1,27 @@
 # Verification
 
+## Step 5.495
+Validate that write-failed managed rebuffer effects are now owned by a single
+follow-up executor:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'execute_write_failed_managed_rebuffer_followup|handle_playback_write_failed|start_managed_playback_rebuffer_request|execute_managed_playback_rebuffer_request' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_xiaozhi_handle_playback_write_failed()` delegates managed
+  rebuffer start/log/execute effects to
+  `river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup()`
+
 ## Step 5.494
 Validate that inline recover replay now reuses the same current-frame write
 view/effect path as normal playback writes:

@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.495
+- `river_cloud` 继续收缩 XiaoZhi playback `write_failed` managed rebuffer
+  follow-up，把 handler 尾部的 start/log/execute 三段副作用封装成单一 executor：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup()`
+- `river_cloud_xiaozhi_handle_playback_write_failed()` 现在只保留：
+  - 捕获 recovery view
+  - 清 starvation watch
+  - 记录首条 write-failed log
+  - 尝试 inline recover
+  - inline 成功则 consume current frame
+  - 否则委托 managed rebuffer follow-up executor
+- 这一步把 write-failed managed 恢复从：
+  - handler 内直接串联 start request、log request、execute request
+  推进到：
+  - follow-up executor owns managed rebuffer effects
+
 ## Step 5.494
 - `river_cloud` 继续收口 XiaoZhi playback inline recover replay 写入路径，让恢复重放
   复用 current-frame write view/effect：
