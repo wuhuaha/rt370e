@@ -15,11 +15,28 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.498 类型化 write-failed recovery result`
+  - `5.499 类型化 downlink frame write result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续类型化 XiaoZhi downlink current-frame write step，把
+      `river_cloud_xiaozhi_write_current_downlink_frame_step()` 的裸 step-result
+      返回升级为 typed frame-write result
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+    - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 现在显式返回
+      `step_result`、`frame_consumed`、`write_failed` 和 `aborted`
+    - `river_cloud_xiaozhi_process_downlink_task_cycle()` 先消费 typed write result，
+      再只在 worker cycle 边界投影 step result
+    - 这一步把：
+      - success / write-failed / abort 分支直接折叠成裸 worker step result
+      收口成：
+      - typed frame-write result owns branch outcome, frame consumption and worker step policy
+    - 下一步继续聚焦：
+      - 把 ready/acquire/write 三段组合成 cycle-level typed result，继续压缩
+        `process_downlink_task_cycle()` 中的隐式控制流
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
       `bool` 返回升级为 step-result view

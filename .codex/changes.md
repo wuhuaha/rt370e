@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.499
+- `river_cloud` 继续类型化 XiaoZhi downlink current-frame write step，把
+  `river_cloud_xiaozhi_write_current_downlink_frame_step()` 的裸 step-result 返回
+  升级为 typed frame-write result：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+- `river_cloud_xiaozhi_write_current_downlink_frame_step()` 现在显式返回：
+  - `step_result`
+  - `frame_consumed`
+  - `write_failed`
+  - `aborted`
+- `river_cloud_xiaozhi_process_downlink_task_cycle()` 现在先接收 typed write result，
+  再投影 worker step result
+- 这一步把 write step 从：
+  - success / write-failed / abort 分支直接折叠成裸 worker step result
+  推进到：
+  - typed frame-write result owns branch outcome, frame consumption and worker step policy
+
 ## Step 5.498
 - `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
   `bool` 返回升级为 step-result view：

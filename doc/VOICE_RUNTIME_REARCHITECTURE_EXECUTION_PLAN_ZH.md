@@ -26,6 +26,26 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.499`
+  - `river_cloud` 继续类型化 XiaoZhi downlink current-frame write step，把
+    `river_cloud_xiaozhi_write_current_downlink_frame_step()` 的裸 step-result
+    返回升级为 typed frame-write result
+  - 新增：
+    - `river_cloud_xiaozhi_downlink_frame_write_result_t`
+  - `river_cloud_xiaozhi_write_current_downlink_frame_step()` 现在显式返回：
+    - `step_result`
+    - `frame_consumed`
+    - `write_failed`
+    - `aborted`
+  - `river_cloud_xiaozhi_process_downlink_task_cycle()` 现在先接收 typed write result，
+    再投影 worker step result
+  - 这一步继续把 `river_cloud` 从：
+    - success / write-failed / abort 分支直接折叠成裸 worker step result
+    推进到：
+    - typed frame-write result owns branch outcome, frame consumption and worker step policy
+  - 下一步继续聚焦：
+    - 把 ready/acquire/write 三段组合成 cycle-level typed result，继续压缩
+      `process_downlink_task_cycle()` 中的隐式控制流
 - `Step 5.498`
   - `river_cloud` 继续类型化 XiaoZhi downlink write-failed 恢复结果，把 handler 的
     `bool` 返回升级为 step-result view
