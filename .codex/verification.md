@@ -1,5 +1,44 @@
 # Verification
 
+## Step 5.480
+Validate that XiaoZhi downlink worker / stream-format state now lives behind an
+explicit downlink-owned stream truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_downlink_*` fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '212,226p' components/river_cloud/river_cloud_internal.h
+sed -n '300,320p' components/river_cloud/river_cloud_internal.h
+sed -n '1440,1466p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '1580,1602p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '4144,4156p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '4336,4425p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'downlink_stream_truth_t|xiaozhi_downlink_stream_truth|downlink_worker_started|note_downlink_stream_format' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'g_river_cloud\.xiaozhi_downlink_started|g_river_cloud\.xiaozhi_downlink_sample_rate|g_river_cloud\.xiaozhi_downlink_frame_duration_ms|bool xiaozhi_downlink_started;|uint32_t xiaozhi_downlink_sample_rate;|uint32_t xiaozhi_downlink_frame_duration_ms;' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_downlink_stream_truth_t`
+- `river_cloud_xiaozhi_playback_runtime.c` now routes downlink worker-started /
+  stream format ownership through the new typed stream truth
+- the repo no longer contains direct raw-field references to the removed
+  downlink stream fields:
+  - `xiaozhi_downlink_started`
+  - `xiaozhi_downlink_sample_rate`
+  - `xiaozhi_downlink_frame_duration_ms`
+
 ## Step 5.479
 Validate that XiaoZhi playback segment queue state now lives behind an
 explicit playback-owned queue truth struct instead of scattered raw

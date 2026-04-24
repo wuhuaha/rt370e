@@ -1441,10 +1441,28 @@ static bool river_cloud_xiaozhi_segment_prefetch_target_needed(uint32_t frame_ms
 
 static uint32_t river_cloud_xiaozhi_downlink_frame_duration_ms(void)
 {
-    if (g_river_cloud.xiaozhi_downlink_frame_duration_ms != 0U) {
-        return g_river_cloud.xiaozhi_downlink_frame_duration_ms;
+    if (g_river_cloud.xiaozhi_downlink_stream_truth.frame_duration_ms != 0U) {
+        return g_river_cloud.xiaozhi_downlink_stream_truth.frame_duration_ms;
     }
     return RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
+}
+
+static uint32_t river_cloud_xiaozhi_downlink_sample_rate(void)
+{
+    return g_river_cloud.xiaozhi_downlink_stream_truth.sample_rate;
+}
+
+static bool river_cloud_xiaozhi_downlink_worker_started(void)
+{
+    return g_river_cloud.xiaozhi_downlink_stream_truth.worker_started;
+}
+
+static void river_cloud_xiaozhi_note_downlink_stream_format(uint32_t sample_rate,
+                                                            uint32_t frame_duration_ms)
+{
+    g_river_cloud.xiaozhi_downlink_stream_truth.sample_rate = sample_rate;
+    g_river_cloud.xiaozhi_downlink_stream_truth.frame_duration_ms =
+        frame_duration_ms;
 }
 
 static uint32_t river_cloud_xiaozhi_downlink_max_start_frames(void)
@@ -1568,8 +1586,8 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->resume_frames = river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
     view->buffer_budget_frames = river_cloud_xiaozhi_playback_buffer_frame_budget();
     view->open_hold_frames = river_cloud_xiaozhi_open_hold_frames_required();
-    view->sample_rate = g_river_cloud.xiaozhi_downlink_sample_rate;
-    view->frame_duration_ms = g_river_cloud.xiaozhi_downlink_frame_duration_ms;
+    view->sample_rate = river_cloud_xiaozhi_downlink_sample_rate();
+    view->frame_duration_ms = river_cloud_xiaozhi_downlink_frame_duration_ms();
     view->prefetch_target_ms = meta_truth->prefetch_target_ms;
     view->start_frames = g_river_cloud.xiaozhi_playback_gate_truth.start_frames;
     view->prefetch_frames =
@@ -1579,7 +1597,7 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->rebuffer_count = g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_count;
     view->rebuffer_streak =
         g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_streak;
-    view->downlink_started = g_river_cloud.xiaozhi_downlink_started;
+    view->downlink_started = river_cloud_xiaozhi_downlink_worker_started();
     view->terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
     view->terminal_waiting = terminal_truth->waiting;
     view->start_cautious_history =
@@ -4130,8 +4148,8 @@ river_cloud_xiaozhi_prepare_downlink_playback(uint32_t queued_frames, uint64_t n
     }
 
     return river_cloud_xiaozhi_start_playback_if_needed(
-               g_river_cloud.xiaozhi_downlink_sample_rate,
-               g_river_cloud.xiaozhi_downlink_frame_duration_ms,
+               river_cloud_xiaozhi_downlink_sample_rate(),
+               river_cloud_xiaozhi_downlink_frame_duration_ms(),
                g_river_cloud.xiaozhi_downlink_ring.frame_bytes) == RIVER_OK ?
                true :
                false;
@@ -4320,8 +4338,8 @@ river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
         }
     }
 
-    g_river_cloud.xiaozhi_downlink_sample_rate = sample_rate;
-    g_river_cloud.xiaozhi_downlink_frame_duration_ms = frame_duration_ms;
+    river_cloud_xiaozhi_note_downlink_stream_format(sample_rate,
+                                                    frame_duration_ms);
     (void)river_cloud_xiaozhi_refresh_start_gate();
 
     status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_downlink_ring, mono_frame);
@@ -4388,7 +4406,8 @@ static void river_cloud_xiaozhi_downlink_task(void *arg)
 
 void river_cloud_xiaozhi_playback_start_downlink_if_needed(void)
 {
-    if (!g_river_cloud.xiaozhi_enabled || g_river_cloud.xiaozhi_downlink_started) {
+    if (!g_river_cloud.xiaozhi_enabled ||
+        river_cloud_xiaozhi_downlink_worker_started()) {
         return;
     }
 
@@ -4402,7 +4421,7 @@ void river_cloud_xiaozhi_playback_start_downlink_if_needed(void)
         return;
     }
 
-    g_river_cloud.xiaozhi_downlink_started = true;
+    g_river_cloud.xiaozhi_downlink_stream_truth.worker_started = true;
     RIVER_LOGI("xiaozhi downlink worker started");
 }
 #endif

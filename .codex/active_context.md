@@ -15,11 +15,35 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.479 收口 playback segment queue truth`
+  - `5.480 收口 downlink stream truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi downlink worker / stream-format
+      真相从散落裸字段收口成显式 typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_stream_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_downlink_started`
+      - `xiaozhi_downlink_sample_rate`
+      - `xiaozhi_downlink_frame_duration_ms`
+    - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+      - frame-duration fallback
+      - diag export 的 sample-rate / frame-duration / worker-started
+      - backend playback start 参数拼装
+      - audio-event format note
+      - downlink worker start gate / started 标记
+      现在都统一消费 downlink-owned stream truth
+    - 这一步把：
+      - scattered downlink worker/format bag
+      收口成：
+      - explicit downlink stream truth
+    - 下一步继续聚焦：
+      - 评估 `server_sample_rate/frame_duration_ms` 以及 decode-format fallback
+        是否继续收口成 typed codec truth；如果不是，就把剩余 playback/downlink
+        范围转向资源边界和更高层 dialog/playback query 收敛
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi playback segment queue
       真相从散落裸字段收口成显式 typed truth

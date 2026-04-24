@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.480
+- `river_cloud` 继续收口 XiaoZhi downlink worker / stream format 真相源，消除
+  `playback_runtime` 对 worker-started、sample-rate、frame-duration
+  这批粗粒度执行前提裸字段的混用：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 downlink-owned stream truth：
+  - `river_cloud_xiaozhi_downlink_stream_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_downlink_started`
+  - `xiaozhi_downlink_sample_rate`
+  - `xiaozhi_downlink_frame_duration_ms`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接读写旧 downlink
+  lifecycle / format 裸字段的关键路径，现在统一改走 typed stream truth：
+  - frame-duration fallback
+  - diag view 的 sample-rate / frame-duration / worker-started 导出
+  - backend start-playback 参数拼装
+  - audio event format note
+  - downlink worker start gate / started 标记
+- 这一步把 XiaoZhi downlink stream precondition 从：
+  - scattered worker-started/format bag
+  收口成：
+  - explicit downlink stream truth
+
 ## Step 5.479
 - `river_cloud` 继续收口 XiaoZhi playback segment queue 真相源，消除
   `playback_runtime` 对 segment 环形队列头指针、数量和槽位数组这批裸字段的混用：

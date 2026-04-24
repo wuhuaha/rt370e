@@ -26,6 +26,30 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.480`
+  - `river_cloud` 继续把 XiaoZhi downlink worker / stream-format
+    状态从散落的 `g_river_cloud.xiaozhi_downlink_*` 裸字段收口成显式 truth
+  - 新增 downlink-owned stream truth：
+    - `river_cloud_xiaozhi_downlink_stream_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_downlink_started`
+    - `xiaozhi_downlink_sample_rate`
+    - `xiaozhi_downlink_frame_duration_ms`
+  - `river_cloud_xiaozhi_playback_runtime.c` 里的：
+    - frame-duration fallback
+    - diag export 的 sample-rate / frame-duration / worker-started
+    - backend start-playback 参数拼装
+    - audio-event format note
+    - downlink worker start gate / started 标记
+    现在都统一走 typed downlink stream truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered downlink worker/format bag
+    推进到：
+    - explicit downlink stream truth
+  - 下一步继续聚焦：
+    - 评估 `server_sample_rate/frame_duration_ms` 与 decode-format fallback
+      是否继续收口成 typed codec truth；否则就把剩余重构重点转向资源边界和更高层
+      dialog/playback query 收敛
 - `Step 5.479`
   - `river_cloud` 继续把 XiaoZhi playback segment queue
     状态从散落的 `g_river_cloud.xiaozhi_playback_*` 裸字段收口成显式 truth
