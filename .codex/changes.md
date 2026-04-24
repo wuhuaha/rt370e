@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.483
+- `river_cloud` 继续收口 XiaoZhi control queue 真相源，消除
+  `session` 对 control queue read/write/count/high-watermark 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+- 新增显式 control-queue-owned truth：
+  - `river_cloud_xiaozhi_control_queue_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_control_read_index`
+  - `xiaozhi_control_write_index`
+  - `xiaozhi_control_count`
+  - `xiaozhi_control_high_watermark`
+- control queue 入队、出队和诊断日志现在统一消费：
+  - `g_river_cloud.xiaozhi_control_queue_truth`
+- 这一步把 XiaoZhi control queue 从：
+  - scattered read/write/count/high-watermark bag
+  收口成：
+  - explicit control queue truth
+
 ## Step 5.482
 - `river_cloud` 继续收口 XiaoZhi io/uplink runtime 真相源，消除
   `adapter`、`session`、`round_runtime`、`playback_runtime` 对 uplink

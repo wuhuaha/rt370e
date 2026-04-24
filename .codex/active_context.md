@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.482 收口 io/uplink runtime truth`
+  - `5.483 收口 control queue truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi control queue 真相从散落裸字段收口成显式
+      typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_control_queue_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_control_read_index`
+      - `xiaozhi_control_write_index`
+      - `xiaozhi_control_count`
+      - `xiaozhi_control_high_watermark`
+    - control queue 入队、出队和 IO 诊断现在统一消费：
+      - `g_river_cloud.xiaozhi_control_queue_truth`
+    - 这一步把：
+      - scattered control queue counters bag
+      收口成：
+      - explicit control queue truth
+    - 下一步继续聚焦：
+      - ASR round stats / preview text / endpoint soft-close 这些仍与响应慢、
+        端点延迟和可观测性直接相关的 cloud-owned 状态
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi io/uplink runtime 真相从散落裸字段收口成显式
       typed truth

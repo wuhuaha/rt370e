@@ -1,5 +1,36 @@
 # Verification
 
+## Step 5.483
+Validate that XiaoZhi control queue state now lives behind an explicit
+control-queue-owned truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_control_*` queue fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '154,166p' components/river_cloud/river_cloud_internal.h
+sed -n '332,360p' components/river_cloud/river_cloud_internal.h
+rg -n 'control_queue_truth_t|xiaozhi_control_queue_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+rg -n 'xiaozhi_control_read_index|xiaozhi_control_write_index|xiaozhi_control_count|xiaozhi_control_high_watermark' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_control_queue_truth_t`
+- enqueue, drain, and IO status paths now route queue indices, count, and
+  high-watermark through the new typed truth
+- the repo no longer contains direct raw-field references to the removed
+  control queue fields
+
 ## Step 5.482
 Validate that XiaoZhi io/uplink runtime state now lives behind an explicit
 uplink-owned truth struct instead of scattered raw `g_river_cloud.xiaozhi_*`

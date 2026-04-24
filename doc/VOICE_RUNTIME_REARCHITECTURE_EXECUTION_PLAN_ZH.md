@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.483`
+  - `river_cloud` 继续把 XiaoZhi control queue 状态从散落的
+    `g_river_cloud.xiaozhi_control_*` 裸字段收口成显式 truth
+  - 新增 control-queue-owned truth：
+    - `river_cloud_xiaozhi_control_queue_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_control_read_index`
+    - `xiaozhi_control_write_index`
+    - `xiaozhi_control_count`
+    - `xiaozhi_control_high_watermark`
+  - control queue 的入队、出队和 IO 诊断现在统一走 typed queue truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered control queue counters bag
+    推进到：
+    - explicit control queue truth
+  - 下一步继续聚焦：
+    - ASR round stats / preview text / endpoint soft-close 这些仍与响应慢、
+      端点延迟和可观测性直接相关的 cloud-owned 状态
 - `Step 5.482`
   - `river_cloud` 继续把 XiaoZhi io/uplink runtime 状态从散落的
     `g_river_cloud.xiaozhi_*` 裸字段收口成显式 truth

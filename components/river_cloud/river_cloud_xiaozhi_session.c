@@ -146,17 +146,20 @@ static river_status_t river_cloud_xiaozhi_queue_control_request(
         return RIVER_ERR_BUSY;
     }
 
-    g_river_cloud.xiaozhi_control_queue[g_river_cloud.xiaozhi_control_write_index] = *request;
-    g_river_cloud.xiaozhi_control_write_index++;
-    if (g_river_cloud.xiaozhi_control_write_index >=
+    g_river_cloud.xiaozhi_control_queue
+        [g_river_cloud.xiaozhi_control_queue_truth.write_index] = *request;
+    g_river_cloud.xiaozhi_control_queue_truth.write_index++;
+    if (g_river_cloud.xiaozhi_control_queue_truth.write_index >=
         RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH) {
-        g_river_cloud.xiaozhi_control_write_index = 0U;
+        g_river_cloud.xiaozhi_control_queue_truth.write_index = 0U;
     }
-    if (g_river_cloud.xiaozhi_control_count < UINT32_MAX) {
-        g_river_cloud.xiaozhi_control_count++;
+    if (g_river_cloud.xiaozhi_control_queue_truth.count < UINT32_MAX) {
+        g_river_cloud.xiaozhi_control_queue_truth.count++;
     }
-    if (g_river_cloud.xiaozhi_control_count > g_river_cloud.xiaozhi_control_high_watermark) {
-        g_river_cloud.xiaozhi_control_high_watermark = g_river_cloud.xiaozhi_control_count;
+    if (g_river_cloud.xiaozhi_control_queue_truth.count >
+        g_river_cloud.xiaozhi_control_queue_truth.high_watermark) {
+        g_river_cloud.xiaozhi_control_queue_truth.high_watermark =
+            g_river_cloud.xiaozhi_control_queue_truth.count;
     }
     river_cloud_xiaozhi_control_unlock();
 
@@ -403,14 +406,15 @@ void river_cloud_xiaozhi_process_control_queue(void)
             return;
         }
 
-        request = g_river_cloud.xiaozhi_control_queue[g_river_cloud.xiaozhi_control_read_index];
-        g_river_cloud.xiaozhi_control_read_index++;
-        if (g_river_cloud.xiaozhi_control_read_index >=
+        request = g_river_cloud.xiaozhi_control_queue
+                      [g_river_cloud.xiaozhi_control_queue_truth.read_index];
+        g_river_cloud.xiaozhi_control_queue_truth.read_index++;
+        if (g_river_cloud.xiaozhi_control_queue_truth.read_index >=
             RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH) {
-            g_river_cloud.xiaozhi_control_read_index = 0U;
+            g_river_cloud.xiaozhi_control_queue_truth.read_index = 0U;
         }
-        if (g_river_cloud.xiaozhi_control_count > 0U) {
-            g_river_cloud.xiaozhi_control_count--;
+        if (g_river_cloud.xiaozhi_control_queue_truth.count > 0U) {
+            g_river_cloud.xiaozhi_control_queue_truth.count--;
         }
         river_cloud_xiaozhi_control_unlock();
 
@@ -925,9 +929,9 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
 void river_cloud_xiaozhi_dump_io_status(void)
 {
     RIVER_LOGI("xiaozhi control queue=%lu/%u peak=%lu owner=%s",
-               (unsigned long)g_river_cloud.xiaozhi_control_count,
+               (unsigned long)g_river_cloud.xiaozhi_control_queue_truth.count,
                (unsigned int)RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH,
-               (unsigned long)g_river_cloud.xiaozhi_control_high_watermark,
+               (unsigned long)g_river_cloud.xiaozhi_control_queue_truth.high_watermark,
                g_river_cloud.xiaozhi_uplink_runtime_truth.io_started ? "running" : "off");
     RIVER_LOGI("xiaozhi uplink queue=%lu/%u dropped=%lu stale_drop=%lu busy=%lu fail=%lu stop_pending=%s owner=%s",
                (unsigned long)river_cloud_xiaozhi_uplink_ready_frames(),
