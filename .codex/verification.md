@@ -1,5 +1,40 @@
 # Verification
 
+## Step 5.482
+Validate that XiaoZhi io/uplink runtime state now lives behind an explicit
+uplink-owned truth struct instead of scattered raw `g_river_cloud.xiaozhi_*`
+uplink fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '228,246p' components/river_cloud/river_cloud_internal.h
+sed -n '326,356p' components/river_cloud/river_cloud_internal.h
+rg -n 'uplink_runtime_truth_t|xiaozhi_uplink_runtime_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_io_started|xiaozhi_open_speech_frames|xiaozhi_uplink_timestamp_ms|xiaozhi_uplink_ring_dropped|xiaozhi_uplink_busy_count|xiaozhi_uplink_fail_count|xiaozhi_uplink_stale_dropped|xiaozhi_uplink_busy_streak|xiaozhi_uplink_next_send_ms|xiaozhi_uplink_last_busy_log_ms|xiaozhi_uplink_accum_bytes|xiaozhi_uplink_retry_valid' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_uplink_runtime_truth_t`
+- `adapter` / `session` / `round_runtime` / `playback_runtime` now route
+  io-owner, retry, backpressure, drop counters, timestamp, open-hold, and
+  accumulator state through the new typed truth
+- the repo no longer contains direct raw-field references to the removed
+  uplink runtime fields
+
 ## Step 5.481
 Validate that XiaoZhi transport/server audio format state now lives behind an
 explicit typed truth struct instead of scattered raw

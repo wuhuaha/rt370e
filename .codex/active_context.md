@@ -15,11 +15,36 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.481 收口 server audio format truth`
+  - `5.482 收口 io/uplink runtime truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi io/uplink runtime 真相从散落裸字段收口成显式
+      typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_uplink_runtime_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_io_started`
+      - `xiaozhi_open_speech_frames`
+      - `xiaozhi_uplink_timestamp_ms`
+      - `xiaozhi_uplink_ring_dropped`
+      - `xiaozhi_uplink_busy_count`
+      - `xiaozhi_uplink_fail_count`
+      - `xiaozhi_uplink_stale_dropped`
+      - `xiaozhi_uplink_busy_streak`
+      - `xiaozhi_uplink_next_send_ms`
+      - `xiaozhi_uplink_last_busy_log_ms`
+      - `xiaozhi_uplink_accum_bytes`
+      - `xiaozhi_uplink_retry_valid`
+    - 这一步把：
+      - scattered io/uplink backpressure bag
+      收口成：
+      - explicit uplink runtime truth
+    - 下一步继续聚焦：
+      - 评估 control queue / ASR round stats / preview text 这些剩余 cloud-owned
+        状态是否继续收口成 typed truth，或者转向 typed query/export 边界
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi transport/server audio format
       真相从散落裸字段收口成显式 typed truth

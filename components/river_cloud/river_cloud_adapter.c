@@ -205,8 +205,8 @@ static void river_cloud_xiaozhi_io_task(void *arg)
             continue;
         }
 
-        g_river_cloud.xiaozhi_uplink_next_send_ms = 0U;
-        g_river_cloud.xiaozhi_uplink_busy_streak = 0U;
+        g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = 0U;
+        g_river_cloud.xiaozhi_uplink_runtime_truth.busy_streak = 0U;
         rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_IO_IDLE_MS);
     }
 }
@@ -247,7 +247,7 @@ static bool river_cloud_xiaozhi_prepare_control_queue(void)
 
 static void river_cloud_xiaozhi_start_io_if_needed(void)
 {
-    if (!g_river_cloud.xiaozhi_enabled || g_river_cloud.xiaozhi_io_started) {
+    if (!g_river_cloud.xiaozhi_enabled || g_river_cloud.xiaozhi_uplink_runtime_truth.io_started) {
         return;
     }
 
@@ -266,7 +266,7 @@ static void river_cloud_xiaozhi_start_io_if_needed(void)
         return;
     }
 
-    g_river_cloud.xiaozhi_io_started = true;
+    g_river_cloud.xiaozhi_uplink_runtime_truth.io_started = true;
     RIVER_LOGI("xiaozhi io owner started");
 }
 #endif

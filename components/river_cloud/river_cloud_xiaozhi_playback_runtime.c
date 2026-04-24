@@ -2450,7 +2450,7 @@ bool river_cloud_xiaozhi_apply_capture_entry_playback_policy(void)
                river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                (unsigned int)duplex_eval.native_reference_peak,
                (unsigned int)duplex_eval.native_reference_ratio_q15);
-    g_river_cloud.xiaozhi_open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_uplink_runtime_truth.open_speech_frames = 0U;
     river_cloud_pre_roll_reset();
     return true;
 }

@@ -26,6 +26,31 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.482`
+  - `river_cloud` 继续把 XiaoZhi io/uplink runtime 状态从散落的
+    `g_river_cloud.xiaozhi_*` 裸字段收口成显式 truth
+  - 新增 uplink-owned runtime truth：
+    - `river_cloud_xiaozhi_uplink_runtime_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_io_started`
+    - `xiaozhi_open_speech_frames`
+    - `xiaozhi_uplink_timestamp_ms`
+    - `xiaozhi_uplink_ring_dropped`
+    - `xiaozhi_uplink_busy_count`
+    - `xiaozhi_uplink_fail_count`
+    - `xiaozhi_uplink_stale_dropped`
+    - `xiaozhi_uplink_busy_streak`
+    - `xiaozhi_uplink_next_send_ms`
+    - `xiaozhi_uplink_last_busy_log_ms`
+    - `xiaozhi_uplink_accum_bytes`
+    - `xiaozhi_uplink_retry_valid`
+  - 这一步继续把 `river_cloud` 从：
+    - scattered io/uplink backpressure bag
+    推进到：
+    - explicit uplink runtime truth
+  - 下一步继续聚焦：
+    - 评估 control queue / ASR round stats / preview text 这些剩余 cloud-owned
+      状态是否继续收口成 typed truth，或者转向 typed query/export 边界
 - `Step 5.481`
   - `river_cloud` 继续把 XiaoZhi transport/server audio format
     状态从散落的 `g_river_cloud.xiaozhi_server_*` 裸字段收口成显式 truth

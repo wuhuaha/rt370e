@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.482
+- `river_cloud` 继续收口 XiaoZhi io/uplink runtime 真相源，消除
+  `adapter`、`session`、`round_runtime`、`playback_runtime` 对 uplink
+  背压 / retry / drop / accumulator / io-owner 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 uplink-owned runtime truth：
+  - `river_cloud_xiaozhi_uplink_runtime_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_io_started`
+  - `xiaozhi_open_speech_frames`
+  - `xiaozhi_uplink_timestamp_ms`
+  - `xiaozhi_uplink_ring_dropped`
+  - `xiaozhi_uplink_busy_count`
+  - `xiaozhi_uplink_fail_count`
+  - `xiaozhi_uplink_stale_dropped`
+  - `xiaozhi_uplink_busy_streak`
+  - `xiaozhi_uplink_next_send_ms`
+  - `xiaozhi_uplink_last_busy_log_ms`
+  - `xiaozhi_uplink_accum_bytes`
+  - `xiaozhi_uplink_retry_valid`
+- 这一步把 XiaoZhi uplink runtime 从：
+  - scattered io/uplink backpressure bag
+  收口成：
+  - explicit uplink runtime truth
+
 ## Step 5.481
 - `river_cloud` 继续收口 XiaoZhi transport/server audio format 真相源，消除
   `adapter`、`session`、`playback_runtime` 对 server sample-rate /

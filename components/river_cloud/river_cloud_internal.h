@@ -229,6 +229,21 @@ typedef struct {
 } river_cloud_xiaozhi_server_audio_format_truth_t;
 
 typedef struct {
+    uint32_t open_speech_frames;
+    uint32_t timestamp_ms;
+    uint32_t ring_dropped;
+    uint32_t busy_count;
+    uint32_t fail_count;
+    uint32_t stale_dropped;
+    uint32_t busy_streak;
+    uint64_t next_send_ms;
+    uint64_t last_busy_log_ms;
+    size_t accum_bytes;
+    bool retry_valid;
+    bool io_started;
+} river_cloud_xiaozhi_uplink_runtime_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -314,10 +329,10 @@ typedef struct {
     river_cloud_xiaozhi_downlink_stream_truth_t xiaozhi_downlink_stream_truth;
     river_cloud_xiaozhi_server_audio_format_truth_t
         xiaozhi_server_audio_format_truth;
+    river_cloud_xiaozhi_uplink_runtime_truth_t xiaozhi_uplink_runtime_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
     bool xiaozhi_endpoint_soft_close_pending;
-    bool xiaozhi_io_started;
     rtos_mutex_t xiaozhi_control_lock;
     rtos_sema_t xiaozhi_control_ready;
     rtos_sema_t xiaozhi_control_space;
@@ -327,17 +342,8 @@ typedef struct {
     river_audio_frame_ring_t xiaozhi_uplink_ring;
     river_opus_encoder_t xiaozhi_encoder;
     river_opus_decoder_t xiaozhi_decoder;
-    uint32_t xiaozhi_open_speech_frames;
-    uint32_t xiaozhi_uplink_timestamp_ms;
-    uint32_t xiaozhi_uplink_ring_dropped;
-    uint32_t xiaozhi_uplink_busy_count;
-    uint32_t xiaozhi_uplink_fail_count;
-    uint32_t xiaozhi_uplink_stale_dropped;
-    uint32_t xiaozhi_uplink_busy_streak;
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
-    uint64_t xiaozhi_uplink_next_send_ms;
-    uint64_t xiaozhi_uplink_last_busy_log_ms;
     uint64_t xiaozhi_local_close_deadline_ms;
     uint64_t xiaozhi_endpoint_soft_close_deadline_ms;
     uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
@@ -346,13 +352,11 @@ typedef struct {
     uint32_t xiaozhi_control_count;
     uint32_t xiaozhi_control_high_watermark;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
-    size_t xiaozhi_uplink_accum_bytes;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
     uint8_t xiaozhi_uplink_ring_storage[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX *
                                         RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES];
     uint8_t xiaozhi_uplink_task_frame[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX];
     uint8_t xiaozhi_uplink_drop_frame[RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX];
-    bool xiaozhi_uplink_retry_valid;
     uint8_t xiaozhi_uplink_packet[RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX];
     uint8_t xiaozhi_downlink_ring_storage[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX *
                                           RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES];
