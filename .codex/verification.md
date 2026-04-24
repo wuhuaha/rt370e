@@ -1,5 +1,29 @@
 # Verification
 
+## Step 5.491
+Validate that XiaoZhi downlink retry-frame lifecycle transitions now route
+through owner helpers:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+rg -n 'downlink_retry_frame_pending|keep_current_downlink_frame_for_retry|consume_current_downlink_frame' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_downlink_runtime_truth\.retry_valid' \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- retry-frame pending/keep/consume transitions are centralized in helper
+  functions
+- remaining direct `retry_valid` touches are confined to those helper functions
+
 ## Step 5.490
 Validate that XiaoZhi downlink ring lifecycle, latest-frame write/drop policy,
 and supply timestamp updates are now routed through owner helpers:

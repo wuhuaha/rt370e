@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.491`
+  - `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink retry-frame
+    的 pending/keep/consume 生命周期收口到 owner helper
+  - 新增 retry-frame owner helper：
+    - `river_cloud_xiaozhi_downlink_retry_frame_pending()`
+    - `river_cloud_xiaozhi_keep_current_downlink_frame_for_retry()`
+    - `river_cloud_xiaozhi_consume_current_downlink_frame()`
+  - queued-frame 统计、playback work 判断、managed rebuffer keep-retry、inline recover
+    成功、正常写入成功和 current-frame acquire 现在统一走 helper
+  - 这一步继续把 `river_cloud` 从：
+    - multiple playback paths directly read/write `retry_valid`
+    推进到：
+    - owner helpers define retry-frame lifecycle transitions
+  - 下一步继续聚焦：
+    - downlink task acquire/write/rebuffer decision 的 query/effect 拆分
 - `Step 5.490`
   - `river_cloud` 继续重建 XiaoZhi downlink/playback 边界，把 downlink ring 的初始化、
     reset、latest-frame write/drop 和 supply timestamp 更新收口到 owner helper
