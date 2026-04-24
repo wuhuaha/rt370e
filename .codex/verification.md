@@ -1,5 +1,39 @@
 # Verification
 
+## Step 5.487
+Validate that XiaoZhi preview transcript / endpoint candidate state now lives
+behind an explicit preview-transcript-owned truth struct instead of scattered
+raw `g_river_cloud.xiaozhi_preview_*` context fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '280,294p' components/river_cloud/river_cloud_internal.h
+sed -n '346,374p' components/river_cloud/river_cloud_internal.h
+rg -n 'preview_transcript_truth_t|xiaozhi_preview_transcript_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'xiaozhi_preview_(speech_started|endpoint_candidate|final|audio_offset_ms|id|text|stable_prefix|source|endpoint_reason)' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_preview_transcript_truth_t`
+- preview observation, preview clear, runtime dump, and interrupt hint now route
+  preview transcript / endpoint candidate state through the new typed truth
+- the repo no longer contains direct raw-field references to the removed preview
+  transcript context fields
+
 ## Step 5.486
 Validate that XiaoZhi pending transcript state now lives behind an explicit
 pending-transcript-owned truth struct instead of scattered raw

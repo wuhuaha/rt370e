@@ -26,6 +26,30 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.487`
+  - `river_cloud` 继续把 XiaoZhi preview transcript / endpoint candidate 状态从散落的
+    `g_river_cloud.xiaozhi_preview_*` 裸字段收口成显式 truth
+  - 新增 preview-transcript-owned truth：
+    - `river_cloud_xiaozhi_preview_transcript_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_preview_speech_started`
+    - `xiaozhi_preview_endpoint_candidate`
+    - `xiaozhi_preview_final`
+    - `xiaozhi_preview_audio_offset_ms`
+    - `xiaozhi_preview_id`
+    - `xiaozhi_preview_text`
+    - `xiaozhi_preview_stable_prefix`
+    - `xiaozhi_preview_source`
+    - `xiaozhi_preview_endpoint_reason`
+  - preview observation、preview clear、runtime dump 和 interrupt hint 现在统一走
+    typed preview transcript truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered preview transcript / endpoint candidate bag
+    推进到：
+    - explicit preview transcript truth
+  - 下一步继续聚焦：
+    - remaining session/window/local-close/no-ref reopen 运行态，判断是否继续收口
+      为 typed truth 或转入 query/export 边界整理
 - `Step 5.486`
   - `river_cloud` 继续把 XiaoZhi pending transcript 状态从散落的
     `g_river_cloud.xiaozhi_pending_text*` 裸字段收口成显式 truth

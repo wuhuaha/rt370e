@@ -1243,8 +1243,8 @@ void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger, const char *re
     RIVER_LOGI("xiaozhi interrupt hint: trigger=%s reason=%s preview_id=%s stream=%s playback_physical=%s phase=%s backend=%s",
                trigger != NULL ? trigger : "-",
                reason != NULL ? reason : "-",
-               g_river_cloud.xiaozhi_preview_id[0] != '\0' ?
-                   g_river_cloud.xiaozhi_preview_id :
+               g_river_cloud.xiaozhi_preview_transcript_truth.preview_id[0] != '\0' ?
+                   g_river_cloud.xiaozhi_preview_transcript_truth.preview_id :
                    "-",
                g_river_cloud.stream_active ? "yes" : "no",
                river_cloud_xiaozhi_playback_physical_active() ? "yes" : "no",

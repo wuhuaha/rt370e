@@ -281,6 +281,18 @@ typedef struct {
 } river_cloud_xiaozhi_pending_transcript_truth_t;
 
 typedef struct {
+    bool speech_started;
+    bool endpoint_candidate;
+    bool is_final;
+    uint32_t audio_offset_ms;
+    char preview_id[RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX];
+    char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
+    char endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
+} river_cloud_xiaozhi_preview_transcript_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -350,9 +362,6 @@ typedef struct {
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     bool xiaozhi_listening;
     bool xiaozhi_window_active;
-    bool xiaozhi_preview_speech_started;
-    bool xiaozhi_preview_endpoint_candidate;
-    bool xiaozhi_preview_final;
     river_cloud_xiaozhi_turn_semantics_state_t xiaozhi_turn_semantics;
     river_cloud_xiaozhi_playback_meta_truth_t xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
@@ -370,6 +379,8 @@ typedef struct {
         xiaozhi_endpoint_soft_close_truth;
     river_cloud_xiaozhi_pending_transcript_truth_t
         xiaozhi_pending_transcript_truth;
+    river_cloud_xiaozhi_preview_transcript_truth_t
+        xiaozhi_preview_transcript_truth;
     river_cloud_xiaozhi_control_queue_truth_t xiaozhi_control_queue_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
@@ -402,12 +413,6 @@ typedef struct {
     river_cloud_xiaozhi_control_request_t
         xiaozhi_control_queue[RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH];
     bool xiaozhi_no_ref_reopen_rearm;
-    char xiaozhi_preview_id[RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX];
-    char xiaozhi_preview_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
-    char xiaozhi_preview_stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
-    char xiaozhi_preview_source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
-    char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
-    uint32_t xiaozhi_preview_audio_offset_ms;
 #endif
     char last_text[192];
     char last_error[128];

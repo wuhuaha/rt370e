@@ -15,11 +15,35 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.486 收口 pending transcript truth`
+  - `5.487 收口 preview transcript truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi preview transcript / endpoint candidate 真相从散落裸字段收口成显式
+      typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_preview_transcript_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_preview_speech_started`
+      - `xiaozhi_preview_endpoint_candidate`
+      - `xiaozhi_preview_final`
+      - `xiaozhi_preview_audio_offset_ms`
+      - `xiaozhi_preview_id`
+      - `xiaozhi_preview_text`
+      - `xiaozhi_preview_stable_prefix`
+      - `xiaozhi_preview_source`
+      - `xiaozhi_preview_endpoint_reason`
+    - preview observation、preview clear、runtime dump 和 interrupt hint 现在统一消费：
+      - `g_river_cloud.xiaozhi_preview_transcript_truth`
+    - 这一步把：
+      - scattered preview transcript / endpoint candidate bag
+      收口成：
+      - explicit preview transcript truth
+    - 下一步继续聚焦：
+      - remaining session/window/local-close/no-ref reopen 运行态，判断是否继续收口
+        为 typed truth 或转入 query/export 边界整理
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi pending transcript 真相从散落裸字段收口成显式
       typed truth

@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.487
+- `river_cloud` 继续收口 XiaoZhi preview transcript / endpoint candidate 真相源，
+  消除 `session` / `playback_runtime` 对 preview id、text、stable-prefix、source、
+  endpoint reason、audio offset、speech-started、is-final、endpoint-candidate 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 preview-transcript-owned truth：
+  - `river_cloud_xiaozhi_preview_transcript_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_preview_speech_started`
+  - `xiaozhi_preview_endpoint_candidate`
+  - `xiaozhi_preview_final`
+  - `xiaozhi_preview_audio_offset_ms`
+  - `xiaozhi_preview_id`
+  - `xiaozhi_preview_text`
+  - `xiaozhi_preview_stable_prefix`
+  - `xiaozhi_preview_source`
+  - `xiaozhi_preview_endpoint_reason`
+- preview observation、preview clear、runtime dump 和 interrupt hint 现在统一消费：
+  - `g_river_cloud.xiaozhi_preview_transcript_truth`
+- 这一步把 XiaoZhi preview transcript 从：
+  - scattered preview transcript / endpoint candidate bag
+  收口成：
+  - explicit preview transcript truth
+
 ## Step 5.486
 - `river_cloud` 继续收口 XiaoZhi pending transcript 真相源，消除
   `session` / `round_runtime` 对 pending text valid / finalized / text 这批裸字段的散读散写：
