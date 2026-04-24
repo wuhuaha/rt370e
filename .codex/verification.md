@@ -1,5 +1,37 @@
 # Verification
 
+## Step 5.485
+Validate that XiaoZhi endpoint soft-close state now lives behind an explicit
+endpoint-soft-close-owned truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_endpoint_soft_close_*` context fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '268,278p' components/river_cloud/river_cloud_internal.h
+sed -n '352,366p' components/river_cloud/river_cloud_internal.h
+sed -n '1194,1274p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'endpoint_soft_close_truth_t|xiaozhi_endpoint_soft_close_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'g_river_cloud\.xiaozhi_endpoint_soft_close_pending|g_river_cloud\.xiaozhi_endpoint_soft_close_deadline_ms|g_river_cloud\.xiaozhi_endpoint_soft_close_reason|bool xiaozhi_endpoint_soft_close_pending;|uint64_t xiaozhi_endpoint_soft_close_deadline_ms;|char xiaozhi_endpoint_soft_close_reason' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_endpoint_soft_close_truth_t`
+- endpoint soft-close pending / remaining / reason / clear / arm / timeout-poll
+  paths now route pending, deadline, and reason through the new typed truth
+- the repo no longer contains direct raw-field references to the removed
+  endpoint soft-close context fields
+
 ## Step 5.484
 Validate that XiaoZhi ASR round stats now live behind an explicit ASR-round-owned
 truth struct instead of scattered raw `g_river_cloud.xiaozhi_asr_round_*`

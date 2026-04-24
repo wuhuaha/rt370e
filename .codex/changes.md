@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.485
+- `river_cloud` 继续收口 XiaoZhi endpoint soft-close 真相源，消除
+  `playback_runtime` 对 endpoint soft-close pending / deadline / reason 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 endpoint-soft-close-owned truth：
+  - `river_cloud_xiaozhi_endpoint_soft_close_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_endpoint_soft_close_pending`
+  - `xiaozhi_endpoint_soft_close_deadline_ms`
+  - `xiaozhi_endpoint_soft_close_reason`
+- endpoint soft-close 的 pending 查询、剩余时间、reason、clear、arm、timeout poll
+  现在统一消费：
+  - `g_river_cloud.xiaozhi_endpoint_soft_close_truth`
+- 这一步把 XiaoZhi endpoint soft-close 从：
+  - scattered endpoint defer pending/deadline/reason bag
+  收口成：
+  - explicit endpoint soft-close truth
+
 ## Step 5.484
 - `river_cloud` 继续收口 XiaoZhi ASR round stats 真相源，消除
   `session` / `round_runtime` 对 round id、active、首包时间、发包数、

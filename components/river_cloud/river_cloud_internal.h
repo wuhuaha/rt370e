@@ -269,6 +269,12 @@ typedef struct {
 } river_cloud_xiaozhi_asr_round_truth_t;
 
 typedef struct {
+    bool pending;
+    uint64_t deadline_ms;
+    char reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
+} river_cloud_xiaozhi_endpoint_soft_close_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -356,10 +362,11 @@ typedef struct {
         xiaozhi_server_audio_format_truth;
     river_cloud_xiaozhi_uplink_runtime_truth_t xiaozhi_uplink_runtime_truth;
     river_cloud_xiaozhi_asr_round_truth_t xiaozhi_asr_round_truth;
+    river_cloud_xiaozhi_endpoint_soft_close_truth_t
+        xiaozhi_endpoint_soft_close_truth;
     river_cloud_xiaozhi_control_queue_truth_t xiaozhi_control_queue_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
-    bool xiaozhi_endpoint_soft_close_pending;
     rtos_mutex_t xiaozhi_control_lock;
     rtos_sema_t xiaozhi_control_ready;
     rtos_sema_t xiaozhi_control_space;
@@ -372,7 +379,6 @@ typedef struct {
     uint64_t xiaozhi_tts_stop_deadline_ms;
     uint64_t xiaozhi_window_deadline_ms;
     uint64_t xiaozhi_local_close_deadline_ms;
-    uint64_t xiaozhi_endpoint_soft_close_deadline_ms;
     uint64_t xiaozhi_no_ref_reopen_guard_deadline_ms;
     uint32_t xiaozhi_no_ref_reopen_silence_frames;
     uint8_t xiaozhi_uplink_accum[RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX];
@@ -396,7 +402,6 @@ typedef struct {
     char xiaozhi_preview_stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char xiaozhi_preview_source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
     char xiaozhi_preview_endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
-    char xiaozhi_endpoint_soft_close_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     uint32_t xiaozhi_preview_audio_offset_ms;
 #endif
     char last_text[192];

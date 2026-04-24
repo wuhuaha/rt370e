@@ -26,6 +26,24 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.485`
+  - `river_cloud` 继续把 XiaoZhi endpoint soft-close 状态从散落的
+    `g_river_cloud.xiaozhi_endpoint_soft_close_*` 裸字段收口成显式 truth
+  - 新增 endpoint-soft-close-owned truth：
+    - `river_cloud_xiaozhi_endpoint_soft_close_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_endpoint_soft_close_pending`
+    - `xiaozhi_endpoint_soft_close_deadline_ms`
+    - `xiaozhi_endpoint_soft_close_reason`
+  - endpoint soft-close 的 pending 查询、剩余时间、reason、clear、arm、
+    timeout poll 现在统一走 typed endpoint soft-close truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered endpoint defer pending/deadline/reason bag
+    推进到：
+    - explicit endpoint soft-close truth
+  - 下一步继续聚焦：
+    - pending transcript / preview transcript 这批文本与端点观测状态，避免
+      STT / preview / finalize 路径继续散读散写
 - `Step 5.484`
   - `river_cloud` 继续把 XiaoZhi ASR round stats 从散落的
     `g_river_cloud.xiaozhi_asr_round_*` 裸字段收口成显式 truth
