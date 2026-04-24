@@ -224,6 +224,11 @@ typedef struct {
 } river_cloud_xiaozhi_downlink_stream_truth_t;
 
 typedef struct {
+    uint32_t sample_rate;
+    uint32_t frame_duration_ms;
+} river_cloud_xiaozhi_server_audio_format_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -307,6 +312,8 @@ typedef struct {
         xiaozhi_playback_segment_queue_truth;
     river_cloud_xiaozhi_downlink_runtime_truth_t xiaozhi_downlink_runtime_truth;
     river_cloud_xiaozhi_downlink_stream_truth_t xiaozhi_downlink_stream_truth;
+    river_cloud_xiaozhi_server_audio_format_truth_t
+        xiaozhi_server_audio_format_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
     bool xiaozhi_endpoint_soft_close_pending;
@@ -320,8 +327,6 @@ typedef struct {
     river_audio_frame_ring_t xiaozhi_uplink_ring;
     river_opus_encoder_t xiaozhi_encoder;
     river_opus_decoder_t xiaozhi_decoder;
-    uint32_t xiaozhi_server_sample_rate;
-    uint32_t xiaozhi_server_frame_duration_ms;
     uint32_t xiaozhi_open_speech_frames;
     uint32_t xiaozhi_uplink_timestamp_ms;
     uint32_t xiaozhi_uplink_ring_dropped;

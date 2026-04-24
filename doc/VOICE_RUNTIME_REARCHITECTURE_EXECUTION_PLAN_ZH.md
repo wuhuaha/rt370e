@@ -26,6 +26,29 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.481`
+  - `river_cloud` 继续把 XiaoZhi transport/server audio format
+    状态从散落的 `g_river_cloud.xiaozhi_server_*` 裸字段收口成显式 truth
+  - 新增 transport-owned format truth：
+    - `river_cloud_xiaozhi_server_audio_format_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_server_sample_rate`
+    - `xiaozhi_server_frame_duration_ms`
+  - `adapter` / `session` / `playback_runtime` 里的：
+    - default format init
+    - server hello observation
+    - decoder open success note
+    - audio event sample-rate / frame-duration fallback
+    现在都统一走 typed server audio format truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered server-format fallback bag
+    推进到：
+    - explicit server audio format truth
+  - 下一步继续聚焦：
+    - playback/downlink 范围已基本完成状态真相收口，继续评估是否转向
+      `resource boundary + typed query/export`，或者进一步收口 XiaoZhi
+      io/uplink worker 生命周期，减少 dialog/runtime 对 cloud transport
+      执行细节的感知
 - `Step 5.480`
   - `river_cloud` 继续把 XiaoZhi downlink worker / stream-format
     状态从散落的 `g_river_cloud.xiaozhi_downlink_*` 裸字段收口成显式 truth

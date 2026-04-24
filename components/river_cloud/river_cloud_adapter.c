@@ -755,8 +755,8 @@ river_status_t river_cloud_adapter_init(void)
     } else {
         RIVER_LOGW("xiaozhi session backend init failed; keep fallback split cloud path only");
     }
-    g_river_cloud.xiaozhi_server_sample_rate = 16000U;
-    g_river_cloud.xiaozhi_server_frame_duration_ms =
+    g_river_cloud.xiaozhi_server_audio_format_truth.sample_rate = 16000U;
+    g_river_cloud.xiaozhi_server_audio_format_truth.frame_duration_ms =
         RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
 #endif
 #if RIVER_CLOUD_BACKEND_IFLYTEK_ENABLED && RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED

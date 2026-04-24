@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.481
+- `river_cloud` 继续收口 XiaoZhi transport/server audio format 真相源，消除
+  `adapter`、`session`、`playback_runtime` 对 server sample-rate /
+  frame-duration fallback 这批协商字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增显式 transport-owned format truth：
+  - `river_cloud_xiaozhi_server_audio_format_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_server_sample_rate`
+  - `xiaozhi_server_frame_duration_ms`
+- `river_cloud_xiaozhi_playback_runtime.c` 里原先直接依赖旧 server-format
+  裸字段的关键路径，现在统一改走 typed format truth：
+  - decoder open 成功后的 format note
+  - audio event sample-rate / frame-duration fallback
+- `adapter` / `session` 里的默认初始化和 `server hello` 观测，也统一改写到
+  typed transport format truth
+- 这一步把 XiaoZhi transport/server audio format 从：
+  - scattered server-format fallback bag
+  收口成：
+  - explicit server audio format truth
+
 ## Step 5.480
 - `river_cloud` 继续收口 XiaoZhi downlink worker / stream format 真相源，消除
   `playback_runtime` 对 worker-started、sample-rate、frame-duration

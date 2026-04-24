@@ -1,5 +1,45 @@
 # Verification
 
+## Step 5.481
+Validate that XiaoZhi transport/server audio format state now lives behind an
+explicit typed truth struct instead of scattered raw
+`g_river_cloud.xiaozhi_server_*` fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '220,232p' components/river_cloud/river_cloud_internal.h
+sed -n '310,318p' components/river_cloud/river_cloud_internal.h
+sed -n '752,760p' components/river_cloud/river_cloud_adapter.c
+sed -n '554,562p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1458,1484p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+sed -n '4280,4312p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'server_audio_format_truth|note_server_audio_format|server_audio_(sample_rate|frame_duration_ms)' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_adapter.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'g_river_cloud\.xiaozhi_server_sample_rate|g_river_cloud\.xiaozhi_server_frame_duration_ms|uint32_t xiaozhi_server_sample_rate;|uint32_t xiaozhi_server_frame_duration_ms;' \
+  components/river_cloud
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_server_audio_format_truth_t`
+- `adapter` / `session` / `playback_runtime` now all route server audio-format
+  initialization, hello observation, decoder fallback, and audio-event fallback
+  through the new typed truth
+- the repo no longer contains direct raw-field references to the removed
+  server-format fields:
+  - `xiaozhi_server_sample_rate`
+  - `xiaozhi_server_frame_duration_ms`
+
 ## Step 5.480
 Validate that XiaoZhi downlink worker / stream-format state now lives behind an
 explicit downlink-owned stream truth struct instead of scattered raw

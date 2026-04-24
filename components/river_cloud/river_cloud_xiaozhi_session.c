@@ -554,9 +554,9 @@ void river_cloud_xiaozhi_note_server_hello_observation(const river_xiaozhi_event
         return;
     }
 
-    g_river_cloud.xiaozhi_server_sample_rate =
+    g_river_cloud.xiaozhi_server_audio_format_truth.sample_rate =
         event->sample_rate != 0U ? event->sample_rate : 16000U;
-    g_river_cloud.xiaozhi_server_frame_duration_ms =
+    g_river_cloud.xiaozhi_server_audio_format_truth.frame_duration_ms =
         event->frame_duration_ms != 0U ? event->frame_duration_ms :
                                          RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
     river_cloud_xiaozhi_copy_session_id_from_transport();

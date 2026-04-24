@@ -1457,11 +1457,29 @@ static bool river_cloud_xiaozhi_downlink_worker_started(void)
     return g_river_cloud.xiaozhi_downlink_stream_truth.worker_started;
 }
 
+static uint32_t river_cloud_xiaozhi_server_audio_sample_rate(void)
+{
+    return g_river_cloud.xiaozhi_server_audio_format_truth.sample_rate;
+}
+
+static uint32_t river_cloud_xiaozhi_server_audio_frame_duration_ms(void)
+{
+    return g_river_cloud.xiaozhi_server_audio_format_truth.frame_duration_ms;
+}
+
 static void river_cloud_xiaozhi_note_downlink_stream_format(uint32_t sample_rate,
                                                             uint32_t frame_duration_ms)
 {
     g_river_cloud.xiaozhi_downlink_stream_truth.sample_rate = sample_rate;
     g_river_cloud.xiaozhi_downlink_stream_truth.frame_duration_ms =
+        frame_duration_ms;
+}
+
+static void river_cloud_xiaozhi_note_server_audio_format(uint32_t sample_rate,
+                                                         uint32_t frame_duration_ms)
+{
+    g_river_cloud.xiaozhi_server_audio_format_truth.sample_rate = sample_rate;
+    g_river_cloud.xiaozhi_server_audio_format_truth.frame_duration_ms =
         frame_duration_ms;
 }
 
@@ -4266,8 +4284,8 @@ static void river_cloud_xiaozhi_prepare_decoder_if_needed(uint32_t sample_rate,
                                 sample_rate,
                                 1U,
                                 frame_duration_ms) == RIVER_OK) {
-        g_river_cloud.xiaozhi_server_sample_rate = sample_rate;
-        g_river_cloud.xiaozhi_server_frame_duration_ms = frame_duration_ms;
+        river_cloud_xiaozhi_note_server_audio_format(sample_rate,
+                                                     frame_duration_ms);
     }
 }
 
@@ -4285,10 +4303,10 @@ river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
     }
 
     sample_rate = event->sample_rate != 0U ? event->sample_rate :
-                                           g_river_cloud.xiaozhi_server_sample_rate;
+                                           river_cloud_xiaozhi_server_audio_sample_rate();
     frame_duration_ms =
         event->frame_duration_ms != 0U ? event->frame_duration_ms :
-                                         g_river_cloud.xiaozhi_server_frame_duration_ms;
+                                         river_cloud_xiaozhi_server_audio_frame_duration_ms();
     if (sample_rate == 0U) {
         sample_rate = 16000U;
     }

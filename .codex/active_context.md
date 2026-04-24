@@ -15,11 +15,33 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.480 收口 downlink stream truth`
+  - `5.481 收口 server audio format truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi transport/server audio format
+      真相从散落裸字段收口成显式 typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_server_audio_format_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_server_sample_rate`
+      - `xiaozhi_server_frame_duration_ms`
+    - `adapter` / `session` / `playback_runtime` 里的：
+      - default format init
+      - server hello observation
+      - decoder open success note
+      - audio event sample-rate / frame-duration fallback
+      现在都统一消费 transport-owned server-audio-format truth
+    - 这一步把：
+      - scattered server-format fallback bag
+      收口成：
+      - explicit server audio format truth
+    - 下一步继续聚焦：
+      - playback/downlink 范围已基本完成状态真相收口，继续评估是否转向
+        `resource boundary + typed query/export`，或者收口 XiaoZhi io/uplink
+        worker 生命周期，减少 dialog/runtime 对 cloud transport 执行细节的感知
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi downlink worker / stream-format
       真相从散落裸字段收口成显式 typed truth
