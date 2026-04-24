@@ -26,6 +26,36 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.484`
+  - `river_cloud` 继续把 XiaoZhi ASR round stats 从散落的
+    `g_river_cloud.xiaozhi_asr_round_*` 裸字段收口成显式 truth
+  - 新增 ASR-round-owned truth：
+    - `river_cloud_xiaozhi_asr_round_truth_t`
+  - `river_cloud_context_t` 不再保留散落的：
+    - `xiaozhi_asr_round_id`
+    - `xiaozhi_asr_round_active`
+    - `xiaozhi_asr_round_started_ms`
+    - `xiaozhi_asr_round_first_packet_ms`
+    - `xiaozhi_asr_round_pre_roll_frames`
+    - `xiaozhi_asr_round_packets_sent`
+    - `xiaozhi_asr_round_partial_count`
+    - `xiaozhi_asr_round_final_count`
+    - `xiaozhi_asr_round_partial_seen`
+    - `xiaozhi_asr_round_final_seen`
+    - `xiaozhi_asr_round_busy_base`
+    - `xiaozhi_asr_round_fail_base`
+    - `xiaozhi_asr_round_stale_drop_base`
+    - `xiaozhi_asr_round_ring_drop_base`
+    - `xiaozhi_asr_round_close_reason`
+  - ASR result emitted、round begin / packet-sent / finish、local-close defer、
+    follow-up reopen 和 IO status 诊断现在统一走 typed ASR round truth
+  - 这一步继续把 `river_cloud` 从：
+    - scattered ASR round timing/counter/reason bag
+    推进到：
+    - explicit ASR round truth
+  - 下一步继续聚焦：
+    - pending / preview / endpoint soft-close 这批与 endpoint 延迟、响应慢和
+      transcript 可观测性直接相关的状态
 - `Step 5.483`
   - `river_cloud` 继续把 XiaoZhi control queue 状态从散落的
     `g_river_cloud.xiaozhi_control_*` 裸字段收口成显式 truth

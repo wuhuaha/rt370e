@@ -112,9 +112,9 @@ bool river_cloud_xiaozhi_uplink_send_ready(void)
 
 bool river_cloud_xiaozhi_should_defer_local_close(void)
 {
-    return g_river_cloud.xiaozhi_asr_round_active &&
-           !g_river_cloud.xiaozhi_asr_round_partial_seen &&
-           !g_river_cloud.xiaozhi_asr_round_final_seen &&
+    return g_river_cloud.xiaozhi_asr_round_truth.active &&
+           !g_river_cloud.xiaozhi_asr_round_truth.partial_seen &&
+           !g_river_cloud.xiaozhi_asr_round_truth.final_seen &&
            !g_river_cloud.xiaozhi_pending_text_valid;
 }
 
@@ -266,8 +266,8 @@ void river_cloud_xiaozhi_close_local_round_for_cause(
         RIVER_LOGI("xiaozhi local round close: cause=%s trigger=%s partial=%s final=%s",
                    cause_name,
                    resolved_reason,
-                   g_river_cloud.xiaozhi_asr_round_partial_seen ? "yes" : "no",
-                   g_river_cloud.xiaozhi_asr_round_final_seen ? "yes" : "no");
+                   g_river_cloud.xiaozhi_asr_round_truth.partial_seen ? "yes" : "no",
+                   g_river_cloud.xiaozhi_asr_round_truth.final_seen ? "yes" : "no");
         river_cloud_xiaozhi_emit_session_closed();
         river_cloud_xiaozhi_round_finish(resolved_reason);
         river_runtime_stats_snapshot("asr_stream_finish");
@@ -425,7 +425,7 @@ river_status_t river_cloud_xiaozhi_start_followup_round(uint32_t pre_roll_frames
     if (status != RIVER_OK) {
         return status;
     }
-    if (g_river_cloud.xiaozhi_asr_round_active) {
+    if (g_river_cloud.xiaozhi_asr_round_truth.active) {
         river_cloud_xiaozhi_round_finish("reopen_overlap");
     }
     river_cloud_xiaozhi_round_begin(pre_roll_frames);

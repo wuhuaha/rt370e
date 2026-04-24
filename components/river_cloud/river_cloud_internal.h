@@ -251,6 +251,24 @@ typedef struct {
 } river_cloud_xiaozhi_uplink_runtime_truth_t;
 
 typedef struct {
+    uint32_t id;
+    bool active;
+    uint32_t started_ms;
+    uint32_t first_packet_ms;
+    uint32_t pre_roll_frames;
+    uint32_t packets_sent;
+    uint32_t partial_count;
+    uint32_t final_count;
+    bool partial_seen;
+    bool final_seen;
+    uint32_t busy_base;
+    uint32_t fail_base;
+    uint32_t stale_drop_base;
+    uint32_t ring_drop_base;
+    char close_reason[32];
+} river_cloud_xiaozhi_asr_round_truth_t;
+
+typedef struct {
     char session_id[RIVER_CLOUD_XIAOZHI_SESSION_ID_MAX];
     bool accepted;
     bool barge_in_enabled_known;
@@ -337,6 +355,7 @@ typedef struct {
     river_cloud_xiaozhi_server_audio_format_truth_t
         xiaozhi_server_audio_format_truth;
     river_cloud_xiaozhi_uplink_runtime_truth_t xiaozhi_uplink_runtime_truth;
+    river_cloud_xiaozhi_asr_round_truth_t xiaozhi_asr_round_truth;
     river_cloud_xiaozhi_control_queue_truth_t xiaozhi_control_queue_truth;
     bool xiaozhi_listen_stop_pending;
     bool xiaozhi_local_close_pending;
@@ -370,22 +389,7 @@ typedef struct {
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
     river_cloud_xiaozhi_control_request_t
         xiaozhi_control_queue[RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH];
-    uint32_t xiaozhi_asr_round_id;
-    bool xiaozhi_asr_round_active;
-    uint32_t xiaozhi_asr_round_started_ms;
-    uint32_t xiaozhi_asr_round_first_packet_ms;
-    uint32_t xiaozhi_asr_round_pre_roll_frames;
-    uint32_t xiaozhi_asr_round_packets_sent;
-    uint32_t xiaozhi_asr_round_partial_count;
-    uint32_t xiaozhi_asr_round_final_count;
-    bool xiaozhi_asr_round_partial_seen;
-    bool xiaozhi_asr_round_final_seen;
-    uint32_t xiaozhi_asr_round_busy_base;
-    uint32_t xiaozhi_asr_round_fail_base;
-    uint32_t xiaozhi_asr_round_stale_drop_base;
-    uint32_t xiaozhi_asr_round_ring_drop_base;
     bool xiaozhi_no_ref_reopen_rearm;
-    char xiaozhi_asr_round_close_reason[32];
     char xiaozhi_pending_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char xiaozhi_preview_id[RIVER_CLOUD_XIAOZHI_PREVIEW_ID_MAX];
     char xiaozhi_preview_text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];

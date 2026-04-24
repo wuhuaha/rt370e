@@ -1,5 +1,38 @@
 # Verification
 
+## Step 5.484
+Validate that XiaoZhi ASR round stats now live behind an explicit ASR-round-owned
+truth struct instead of scattered raw `g_river_cloud.xiaozhi_asr_round_*`
+fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '250,274p' components/river_cloud/river_cloud_internal.h
+sed -n '350,392p' components/river_cloud/river_cloud_internal.h
+rg -n 'asr_round_truth_t|xiaozhi_asr_round_truth' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+rg -n 'xiaozhi_asr_round_(id|active|started_ms|first_packet_ms|pre_roll_frames|packets_sent|partial_count|final_count|partial_seen|final_seen|busy_base|fail_base|stale_drop_base|ring_drop_base|close_reason)' \
+  components/river_cloud -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_asr_round_truth_t`
+- ASR result emitted, round begin / packet-sent / finish, local-close defer,
+  follow-up reopen, and IO status paths now route round timing/counters/reason
+  through the new typed truth
+- the repo no longer contains direct raw-field references to the removed ASR
+  round fields
+
 ## Step 5.483
 Validate that XiaoZhi control queue state now lives behind an explicit
 control-queue-owned truth struct instead of scattered raw

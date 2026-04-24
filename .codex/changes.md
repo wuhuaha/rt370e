@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.484
+- `river_cloud` 继续收口 XiaoZhi ASR round stats 真相源，消除
+  `session` / `round_runtime` 对 round id、active、首包时间、发包数、
+  partial/final 观测、uplink busy/drop 基线和 close reason 这批裸字段的散读散写：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+- 新增显式 ASR-round-owned truth：
+  - `river_cloud_xiaozhi_asr_round_truth_t`
+- `river_cloud_context_t` 不再暴露散落的：
+  - `xiaozhi_asr_round_id`
+  - `xiaozhi_asr_round_active`
+  - `xiaozhi_asr_round_started_ms`
+  - `xiaozhi_asr_round_first_packet_ms`
+  - `xiaozhi_asr_round_pre_roll_frames`
+  - `xiaozhi_asr_round_packets_sent`
+  - `xiaozhi_asr_round_partial_count`
+  - `xiaozhi_asr_round_final_count`
+  - `xiaozhi_asr_round_partial_seen`
+  - `xiaozhi_asr_round_final_seen`
+  - `xiaozhi_asr_round_busy_base`
+  - `xiaozhi_asr_round_fail_base`
+  - `xiaozhi_asr_round_stale_drop_base`
+  - `xiaozhi_asr_round_ring_drop_base`
+  - `xiaozhi_asr_round_close_reason`
+- ASR result emitted、round begin / packet-sent / finish、local close defer、
+  follow-up reopen 和 IO status 诊断现在统一消费：
+  - `g_river_cloud.xiaozhi_asr_round_truth`
+- 这一步把 XiaoZhi ASR round stats 从：
+  - scattered round timing/counter/reason bag
+  收口成：
+  - explicit ASR round truth
+
 ## Step 5.483
 - `river_cloud` 继续收口 XiaoZhi control queue 真相源，消除
   `session` 对 control queue read/write/count/high-watermark 这批裸字段的散读散写：

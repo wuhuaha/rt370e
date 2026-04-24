@@ -15,11 +15,42 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.483 收口 control queue truth`
+  - `5.484 收口 ASR round stats truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi ASR round stats 真相从散落裸字段收口成显式
+      typed truth
+    - 新增：
+      - `river_cloud_xiaozhi_asr_round_truth_t`
+    - `river_cloud_context_t` 不再保留散落的：
+      - `xiaozhi_asr_round_id`
+      - `xiaozhi_asr_round_active`
+      - `xiaozhi_asr_round_started_ms`
+      - `xiaozhi_asr_round_first_packet_ms`
+      - `xiaozhi_asr_round_pre_roll_frames`
+      - `xiaozhi_asr_round_packets_sent`
+      - `xiaozhi_asr_round_partial_count`
+      - `xiaozhi_asr_round_final_count`
+      - `xiaozhi_asr_round_partial_seen`
+      - `xiaozhi_asr_round_final_seen`
+      - `xiaozhi_asr_round_busy_base`
+      - `xiaozhi_asr_round_fail_base`
+      - `xiaozhi_asr_round_stale_drop_base`
+      - `xiaozhi_asr_round_ring_drop_base`
+      - `xiaozhi_asr_round_close_reason`
+    - ASR result emitted、round begin / packet-sent / finish、local-close defer、
+      follow-up reopen 和 IO status 诊断现在统一消费：
+      - `g_river_cloud.xiaozhi_asr_round_truth`
+    - 这一步把：
+      - scattered ASR round timing/counter/reason bag
+      收口成：
+      - explicit ASR round truth
+    - 下一步继续聚焦：
+      - pending / preview / endpoint soft-close 这批与 endpoint 延迟、响应慢和
+        transcript 可观测性直接相关的状态
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi control queue 真相从散落裸字段收口成显式
       typed truth
