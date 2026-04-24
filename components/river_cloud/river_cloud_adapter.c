@@ -828,7 +828,7 @@ river_status_t river_cloud_adapter_set_xiaozhi_config(const river_xiaozhi_config
     }
 
     river_cloud_xiaozhi_clear_pending_text();
-    g_river_cloud.xiaozhi_session_id[0] = '\0';
+    river_cloud_xiaozhi_clear_session_id();
     river_cloud_xiaozhi_apply_playback_backend_refresh_policy();
     RIVER_LOGI("realtime session backend refresh: xiaozhi configured=%s",
                g_river_cloud.xiaozhi_enabled ? "yes" : "no");

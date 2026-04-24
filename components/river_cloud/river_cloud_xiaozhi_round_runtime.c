@@ -188,7 +188,7 @@ void river_cloud_xiaozhi_window_close(const char *reason)
     g_river_cloud.xiaozhi_listening = false;
     river_cloud_pre_roll_reset();
     (void)river_cloud_xiaozhi_request_close_session();
-    g_river_cloud.xiaozhi_session_id[0] = '\0';
+    river_cloud_xiaozhi_clear_session_id();
     RIVER_LOGI("xiaozhi conversation window closed: reason=%s",
                reason != NULL ? reason : "-");
     river_cloud_request_state_sync(reason != NULL ? reason : "window_closed");
@@ -356,7 +356,7 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     river_cloud_xiaozhi_clear_preview_state();
     river_cloud_xiaozhi_clear_turn_semantics_state();
     river_cloud_pre_roll_reset();
-    g_river_cloud.xiaozhi_session_id[0] = '\0';
+    river_cloud_xiaozhi_clear_session_id();
 }
 
 void river_cloud_xiaozhi_check_window_timeout(void)

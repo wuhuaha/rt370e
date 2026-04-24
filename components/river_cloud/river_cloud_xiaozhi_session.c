@@ -815,11 +815,13 @@ void river_cloud_xiaozhi_note_asr_result_emitted(river_cloud_asr_event_type_t ty
 void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *snapshot)
 {
     uint64_t now_ms;
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
 
     if (snapshot == NULL) {
         return;
     }
 
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     snapshot->conversation_window_active = river_cloud_xiaozhi_conversation_window_active();
     snapshot->conversation_window_remaining_ms =
@@ -830,33 +832,35 @@ void river_cloud_xiaozhi_fill_runtime_snapshot(river_cloud_runtime_snapshot_t *s
     snapshot->local_close_remaining_ms =
         (uint32_t)river_cloud_xiaozhi_local_close_remaining_ms(now_ms);
     river_cloud_xiaozhi_fill_playback_runtime_snapshot(snapshot);
-    snapshot->turn_accepted = g_river_cloud.xiaozhi_turn_accepted;
-    snapshot->barge_in_enabled_known = g_river_cloud.xiaozhi_transport_barge_in_enabled_known;
-    snapshot->barge_in_enabled = g_river_cloud.xiaozhi_transport_barge_in_enabled;
+    snapshot->turn_accepted = semantics_view.accepted;
+    snapshot->barge_in_enabled_known = semantics_view.barge_in_enabled_known;
+    snapshot->barge_in_enabled = semantics_view.barge_in_enabled;
     river_cloud_xiaozhi_copy_optional_text(snapshot->session_id,
                                            sizeof(snapshot->session_id),
-                                           g_river_cloud.xiaozhi_session_id);
+                                           semantics_view.session_id);
     river_cloud_xiaozhi_copy_optional_text(snapshot->turn_id,
                                            sizeof(snapshot->turn_id),
-                                           g_river_cloud.xiaozhi_turn_id);
+                                           semantics_view.turn_id);
     river_cloud_xiaozhi_copy_optional_text(snapshot->accept_reason,
                                            sizeof(snapshot->accept_reason),
-                                           g_river_cloud.xiaozhi_accept_reason);
+                                           semantics_view.accept_reason);
     river_cloud_xiaozhi_copy_optional_text(snapshot->input_state,
                                            sizeof(snapshot->input_state),
-                                           g_river_cloud.xiaozhi_input_state);
+                                           semantics_view.input_state);
     river_cloud_xiaozhi_copy_optional_text(snapshot->output_state,
                                            sizeof(snapshot->output_state),
-                                           g_river_cloud.xiaozhi_output_state);
+                                           semantics_view.output_state);
 }
 
 void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
 {
     uint64_t endpoint_soft_close_left_ms;
     river_cloud_runtime_snapshot_t snapshot;
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
 
     memset(&snapshot, 0, sizeof(snapshot));
     river_cloud_xiaozhi_fill_runtime_snapshot(&snapshot);
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
     endpoint_soft_close_left_ms = river_cloud_xiaozhi_endpoint_soft_close_remaining_ms(now_ms);
 
     RIVER_LOGI("xiaozhi runtime enabled=%s io=%s session=%s listening=%s playback=%s phase=%s rebuffer=%s/%s recovery_path=%s recovery_outcome=%s stop_pending=%s close_pending=%s window=%s followup_left_ms=%lu close_left_ms=%lu wake_admission=%s sid=%s pending_text=%s",
@@ -907,16 +911,15 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                    "-",
                (unsigned long)endpoint_soft_close_left_ms);
     RIVER_LOGI("xiaozhi turn_semantics accepted=%s accept_reason=%s turn_id=%s input_state=%s output_state=%s barge_in_enabled=%s fallback=%s",
-               snapshot.turn_accepted ? "yes" : "no",
-               snapshot.accept_reason[0] != '\0' ? snapshot.accept_reason : "-",
-               snapshot.turn_id[0] != '\0' ? snapshot.turn_id : "-",
-               snapshot.input_state[0] != '\0' ? snapshot.input_state : "-",
-               snapshot.output_state[0] != '\0' ? snapshot.output_state : "-",
-               snapshot.barge_in_enabled_known ? (snapshot.barge_in_enabled ? "yes" : "no") :
-                                                 "-",
-               g_river_cloud.xiaozhi_semantic_fallback_reason[0] != '\0' ?
-                   g_river_cloud.xiaozhi_semantic_fallback_reason :
-                   "-");
+               semantics_view.accepted ? "yes" : "no",
+               semantics_view.accept_reason != NULL ? semantics_view.accept_reason : "-",
+               semantics_view.turn_id != NULL ? semantics_view.turn_id : "-",
+               semantics_view.input_state != NULL ? semantics_view.input_state : "-",
+               semantics_view.output_state != NULL ? semantics_view.output_state : "-",
+               semantics_view.barge_in_enabled_known ?
+                   (semantics_view.barge_in_enabled ? "yes" : "no") :
+                   "-",
+               semantics_view.fallback_reason != NULL ? semantics_view.fallback_reason : "-");
 }
 
 void river_cloud_xiaozhi_dump_io_status(void)
@@ -1653,14 +1656,40 @@ void river_cloud_xiaozhi_clear_preview_state(void)
 
 void river_cloud_xiaozhi_clear_turn_semantics_state(void)
 {
-    g_river_cloud.xiaozhi_turn_accepted = false;
-    g_river_cloud.xiaozhi_transport_barge_in_enabled_known = false;
-    g_river_cloud.xiaozhi_transport_barge_in_enabled = false;
-    g_river_cloud.xiaozhi_turn_id[0] = '\0';
-    g_river_cloud.xiaozhi_accept_reason[0] = '\0';
-    g_river_cloud.xiaozhi_input_state[0] = '\0';
-    g_river_cloud.xiaozhi_output_state[0] = '\0';
-    g_river_cloud.xiaozhi_semantic_fallback_reason[0] = '\0';
+    g_river_cloud.xiaozhi_turn_semantics.accepted = false;
+    g_river_cloud.xiaozhi_turn_semantics.barge_in_enabled_known = false;
+    g_river_cloud.xiaozhi_turn_semantics.barge_in_enabled = false;
+    g_river_cloud.xiaozhi_turn_semantics.turn_id[0] = '\0';
+    g_river_cloud.xiaozhi_turn_semantics.accept_reason[0] = '\0';
+    g_river_cloud.xiaozhi_turn_semantics.input_state[0] = '\0';
+    g_river_cloud.xiaozhi_turn_semantics.output_state[0] = '\0';
+    g_river_cloud.xiaozhi_turn_semantics.fallback_reason[0] = '\0';
+}
+
+void river_cloud_xiaozhi_clear_session_id(void)
+{
+    g_river_cloud.xiaozhi_turn_semantics.session_id[0] = '\0';
+}
+
+void river_cloud_xiaozhi_capture_turn_semantics_view(
+    river_cloud_xiaozhi_turn_semantics_view_t *view)
+{
+    river_cloud_xiaozhi_turn_semantics_state_t *state = &g_river_cloud.xiaozhi_turn_semantics;
+
+    if (view == NULL) {
+        return;
+    }
+
+    memset(view, 0, sizeof(*view));
+    view->accepted = state->accepted && state->accept_reason[0] != '\0';
+    view->barge_in_enabled_known = state->barge_in_enabled_known;
+    view->barge_in_enabled = state->barge_in_enabled;
+    view->session_id = state->session_id[0] != '\0' ? state->session_id : NULL;
+    view->turn_id = state->turn_id[0] != '\0' ? state->turn_id : NULL;
+    view->accept_reason = state->accept_reason[0] != '\0' ? state->accept_reason : NULL;
+    view->input_state = state->input_state[0] != '\0' ? state->input_state : NULL;
+    view->output_state = state->output_state[0] != '\0' ? state->output_state : NULL;
+    view->fallback_reason = state->fallback_reason[0] != '\0' ? state->fallback_reason : NULL;
 }
 
 void river_cloud_xiaozhi_copy_session_id_from_transport(void)
@@ -1669,8 +1698,8 @@ void river_cloud_xiaozhi_copy_session_id_from_transport(void)
 
     sid = river_xiaozhi_session_id();
     if (sid != NULL && sid[0] != '\0') {
-        snprintf(g_river_cloud.xiaozhi_session_id,
-                 sizeof(g_river_cloud.xiaozhi_session_id),
+        snprintf(g_river_cloud.xiaozhi_turn_semantics.session_id,
+                 sizeof(g_river_cloud.xiaozhi_turn_semantics.session_id),
                  "%s",
                  sid);
     }
@@ -1678,20 +1707,21 @@ void river_cloud_xiaozhi_copy_session_id_from_transport(void)
 
 const char *river_cloud_xiaozhi_current_sid(void)
 {
-    return g_river_cloud.xiaozhi_session_id[0] != '\0' ?
-               g_river_cloud.xiaozhi_session_id :
+    return g_river_cloud.xiaozhi_turn_semantics.session_id[0] != '\0' ?
+               g_river_cloud.xiaozhi_turn_semantics.session_id :
                river_xiaozhi_session_id();
 }
 
 void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
 {
+    river_cloud_xiaozhi_turn_semantics_state_t *state = &g_river_cloud.xiaozhi_turn_semantics;
     const char *turn_id = river_xiaozhi_last_turn_id();
     const char *accept_reason = river_xiaozhi_last_accept_reason();
     const char *input_state = river_xiaozhi_last_input_state();
     const char *output_state = river_xiaozhi_last_output_state();
     bool barge_in_known = river_xiaozhi_last_barge_in_enabled_known();
     bool barge_in_enabled = river_xiaozhi_last_barge_in_enabled();
-    bool accepted_before = g_river_cloud.xiaozhi_turn_accepted;
+    bool accepted_before = state->accepted;
     bool accept_reason_present = accept_reason != NULL && accept_reason[0] != '\0';
     bool turn_id_changed;
     bool accept_reason_changed = false;
@@ -1699,112 +1729,92 @@ void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
     bool output_state_changed;
     bool barge_in_changed;
 
-    turn_id_changed = river_cloud_xiaozhi_update_semantic_text(g_river_cloud.xiaozhi_turn_id,
-                                                               sizeof(g_river_cloud.xiaozhi_turn_id),
+    turn_id_changed = river_cloud_xiaozhi_update_semantic_text(state->turn_id,
+                                                               sizeof(state->turn_id),
                                                                turn_id);
     if (accept_reason_present) {
         accept_reason_changed = river_cloud_xiaozhi_update_semantic_text(
-            g_river_cloud.xiaozhi_accept_reason,
-            sizeof(g_river_cloud.xiaozhi_accept_reason),
+            state->accept_reason,
+            sizeof(state->accept_reason),
             accept_reason);
-        g_river_cloud.xiaozhi_turn_accepted = true;
-        if (strcmp(g_river_cloud.xiaozhi_semantic_fallback_reason,
-                   "await_accept_reason") == 0) {
-            g_river_cloud.xiaozhi_semantic_fallback_reason[0] = '\0';
+        state->accepted = true;
+        if (strcmp(state->fallback_reason, "await_accept_reason") == 0) {
+            state->fallback_reason[0] = '\0';
         }
     }
     input_state_changed = river_cloud_xiaozhi_update_semantic_text(
-        g_river_cloud.xiaozhi_input_state,
-        sizeof(g_river_cloud.xiaozhi_input_state),
+        state->input_state,
+        sizeof(state->input_state),
         input_state);
     output_state_changed = river_cloud_xiaozhi_update_semantic_text(
-        g_river_cloud.xiaozhi_output_state,
-        sizeof(g_river_cloud.xiaozhi_output_state),
+        state->output_state,
+        sizeof(state->output_state),
         output_state);
-    barge_in_changed =
-        (g_river_cloud.xiaozhi_transport_barge_in_enabled_known != barge_in_known) ||
-        (barge_in_known &&
-         (g_river_cloud.xiaozhi_transport_barge_in_enabled != barge_in_enabled));
-    g_river_cloud.xiaozhi_transport_barge_in_enabled_known = barge_in_known;
-    g_river_cloud.xiaozhi_transport_barge_in_enabled = barge_in_known && barge_in_enabled;
+    barge_in_changed = (state->barge_in_enabled_known != barge_in_known) ||
+                       (barge_in_known && (state->barge_in_enabled != barge_in_enabled));
+    state->barge_in_enabled_known = barge_in_known;
+    state->barge_in_enabled = barge_in_known && barge_in_enabled;
 
     if (accept_reason_present &&
         (!accepted_before || accept_reason_changed || turn_id_changed ||
          input_state_changed || output_state_changed || barge_in_changed)) {
         RIVER_LOGI("xiaozhi turn accepted: trigger=%s accept_reason=%s turn_id=%s input_state=%s output_state=%s barge_in_enabled=%s",
                    trigger != NULL ? trigger : "-",
-                   g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
-                       g_river_cloud.xiaozhi_accept_reason :
-                       "-",
-                   g_river_cloud.xiaozhi_turn_id[0] != '\0' ?
-                       g_river_cloud.xiaozhi_turn_id :
-                       "-",
-                   g_river_cloud.xiaozhi_input_state[0] != '\0' ?
-                       g_river_cloud.xiaozhi_input_state :
-                       "-",
-                   g_river_cloud.xiaozhi_output_state[0] != '\0' ?
-                       g_river_cloud.xiaozhi_output_state :
-                       "-",
-                   river_cloud_xiaozhi_optional_bool_text(
-                       g_river_cloud.xiaozhi_transport_barge_in_enabled_known,
-                       g_river_cloud.xiaozhi_transport_barge_in_enabled));
+                   state->accept_reason[0] != '\0' ? state->accept_reason : "-",
+                   state->turn_id[0] != '\0' ? state->turn_id : "-",
+                   state->input_state[0] != '\0' ? state->input_state : "-",
+                   state->output_state[0] != '\0' ? state->output_state : "-",
+                   river_cloud_xiaozhi_optional_bool_text(state->barge_in_enabled_known,
+                                                          state->barge_in_enabled));
     } else if (!accept_reason_present &&
                (turn_id_changed || input_state_changed || output_state_changed ||
                 barge_in_changed)) {
         RIVER_LOGI("xiaozhi turn semantics updated before accept: trigger=%s turn_id=%s input_state=%s output_state=%s barge_in_enabled=%s",
                    trigger != NULL ? trigger : "-",
-                   g_river_cloud.xiaozhi_turn_id[0] != '\0' ?
-                       g_river_cloud.xiaozhi_turn_id :
-                       "-",
-                   g_river_cloud.xiaozhi_input_state[0] != '\0' ?
-                       g_river_cloud.xiaozhi_input_state :
-                       "-",
-                   g_river_cloud.xiaozhi_output_state[0] != '\0' ?
-                       g_river_cloud.xiaozhi_output_state :
-                       "-",
-                   river_cloud_xiaozhi_optional_bool_text(
-                       g_river_cloud.xiaozhi_transport_barge_in_enabled_known,
-                       g_river_cloud.xiaozhi_transport_barge_in_enabled));
+                   state->turn_id[0] != '\0' ? state->turn_id : "-",
+                   state->input_state[0] != '\0' ? state->input_state : "-",
+                   state->output_state[0] != '\0' ? state->output_state : "-",
+                   river_cloud_xiaozhi_optional_bool_text(state->barge_in_enabled_known,
+                                                          state->barge_in_enabled));
     }
 }
 
 bool river_cloud_xiaozhi_turn_accepted(void)
 {
-    return g_river_cloud.xiaozhi_turn_accepted &&
-           g_river_cloud.xiaozhi_accept_reason[0] != '\0';
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
+
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
+    return semantics_view.accepted;
 }
 
 void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
 {
     river_voice_duplex_ready_eval_t duplex_eval;
+    river_cloud_xiaozhi_turn_semantics_state_t *state = &g_river_cloud.xiaozhi_turn_semantics;
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
     const char *duplex_default_reason;
     bool duplex_default_on;
 
     if (reason == NULL || reason[0] == '\0') {
         return;
     }
-    if (strcmp(g_river_cloud.xiaozhi_semantic_fallback_reason, reason) == 0) {
+    if (strcmp(state->fallback_reason, reason) == 0) {
         return;
     }
 
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
     duplex_default_reason = river_xiaozhi_duplex_default_fallback_reason();
     duplex_default_on = duplex_default_reason == NULL;
-    river_cloud_xiaozhi_copy_semantic_text(g_river_cloud.xiaozhi_semantic_fallback_reason,
-                                           sizeof(g_river_cloud.xiaozhi_semantic_fallback_reason),
+    river_cloud_xiaozhi_copy_semantic_text(state->fallback_reason,
+                                           sizeof(state->fallback_reason),
                                            reason);
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
     RIVER_LOGW("xiaozhi fallback: reason=%s accepted=%s accept_reason=%s input_state=%s output_state=%s duplex_default_on=%s duplex_default_reason=%s duplex_ready=%s duplex_reason=%s playback=%s/%s error=%s sid=%s",
-               g_river_cloud.xiaozhi_semantic_fallback_reason,
-               river_cloud_xiaozhi_turn_accepted() ? "yes" : "no",
-               g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
-                   g_river_cloud.xiaozhi_accept_reason :
-                   "-",
-               g_river_cloud.xiaozhi_input_state[0] != '\0' ?
-                   g_river_cloud.xiaozhi_input_state :
-                   "-",
-               g_river_cloud.xiaozhi_output_state[0] != '\0' ?
-                   g_river_cloud.xiaozhi_output_state :
-                   "-",
+               semantics_view.fallback_reason != NULL ? semantics_view.fallback_reason : "-",
+               semantics_view.accepted ? "yes" : "no",
+               semantics_view.accept_reason != NULL ? semantics_view.accept_reason : "-",
+               semantics_view.input_state != NULL ? semantics_view.input_state : "-",
+               semantics_view.output_state != NULL ? semantics_view.output_state : "-",
                duplex_default_on ? "yes" : "no",
                duplex_default_reason != NULL ? duplex_default_reason : "-",
                duplex_eval.ready ? "yes" : "no",
@@ -1825,15 +1835,14 @@ static bool river_cloud_xiaozhi_pending_text_ready_for_finalize(void)
 
 static void river_cloud_xiaozhi_commit_pending_text_finalization(const char *trigger)
 {
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
+
     g_river_cloud.xiaozhi_pending_text_finalized = true;
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
     RIVER_LOGI("xiaozhi accepted turn final text: trigger=%s accept_reason=%s turn_id=%s text=%s",
                trigger != NULL ? trigger : "-",
-               g_river_cloud.xiaozhi_accept_reason[0] != '\0' ?
-                   g_river_cloud.xiaozhi_accept_reason :
-                   "-",
-               g_river_cloud.xiaozhi_turn_id[0] != '\0' ?
-                   g_river_cloud.xiaozhi_turn_id :
-                   "-",
+               semantics_view.accept_reason != NULL ? semantics_view.accept_reason : "-",
+               semantics_view.turn_id != NULL ? semantics_view.turn_id : "-",
                g_river_cloud.xiaozhi_pending_text);
     river_cloud_emit_asr_result(RIVER_CLOUD_ASR_EVENT_FINAL,
                                 g_river_cloud.xiaozhi_pending_text,

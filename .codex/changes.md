@@ -1,5 +1,37 @@
 # Change Log
 
+## Step 5.475
+- `river_cloud` 先把 XiaoZhi `turn semantics` 从散落的 `g_river_cloud.xiaozhi_*`
+  裸字段收口成显式子状态与窄视图：
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+  - [components/river_cloud/river_cloud_xiaozhi_session.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_session.c)
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_xiaozhi_round_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_round_runtime.c)
+  - [components/river_cloud/river_cloud_adapter.c](/root/ameba-river/components/river_cloud/river_cloud_adapter.c)
+- 新增显式 cloud-owned 真相与读取边界：
+  - `river_cloud_xiaozhi_turn_semantics_state_t`
+  - `river_cloud_xiaozhi_turn_semantics_view_t`
+  - `river_cloud_xiaozhi_capture_turn_semantics_view(...)`
+  - `river_cloud_xiaozhi_clear_session_id(...)`
+- `river_cloud_xiaozhi_fill_runtime_snapshot(...)`、
+  `river_cloud_xiaozhi_dump_session_status(...)`、
+  `river_cloud_xiaozhi_turn_accepted(...)`、
+  `river_cloud_xiaozhi_note_semantic_fallback(...)`、
+  `river_cloud_xiaozhi_commit_pending_text_finalization(...)`
+  不再直接拼接散落字段，而是统一消费：
+  - typed turn-semantics view
+- `river_cloud_xiaozhi_playback_runtime.c` 的输出 speaking 判定不再直接读：
+  - `g_river_cloud.xiaozhi_output_state`
+  而是改走：
+  - `river_cloud_xiaozhi_capture_turn_semantics_view(...)`
+- `adapter` / `round_runtime` 的 session-id 清理也从直接改裸字段收口成：
+  - `river_cloud_xiaozhi_clear_session_id(...)`
+- 这一步继续把：
+  - scattered cloud turn-semantics bag
+  收口成：
+  - explicit XiaoZhi turn-semantics truth
+  - typed turn-semantics export/view boundary
+
 ## Step 5.474
 - `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
   `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释：

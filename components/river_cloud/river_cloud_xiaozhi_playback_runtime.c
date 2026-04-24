@@ -1115,6 +1115,7 @@ static void river_cloud_xiaozhi_apply_playback_started_round_policy(void)
 static bool river_cloud_xiaozhi_output_speaking_active(void)
 {
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
+    river_cloud_xiaozhi_turn_semantics_view_t semantics_view;
 
     river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
 
@@ -1122,7 +1123,9 @@ static bool river_cloud_xiaozhi_output_speaking_active(void)
         return true;
     }
 
-    if (strcmp(g_river_cloud.xiaozhi_output_state, "speaking") != 0) {
+    river_cloud_xiaozhi_capture_turn_semantics_view(&semantics_view);
+    if (semantics_view.output_state == NULL ||
+        strcmp(semantics_view.output_state, "speaking") != 0) {
         return false;
     }
 

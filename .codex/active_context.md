@@ -15,11 +15,32 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.474 导出 voice policy view`
+  - `5.475 收口 turn semantics state`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 先把 XiaoZhi `turn semantics` 从散落的
+      `g_river_cloud.xiaozhi_*` 裸字段收口成显式子状态与窄视图
+    - 新增显式 cloud-owned 真相与读取边界：
+      - `river_cloud_xiaozhi_turn_semantics_state_t`
+      - `river_cloud_xiaozhi_turn_semantics_view_t`
+      - `river_cloud_xiaozhi_capture_turn_semantics_view(...)`
+      - `river_cloud_xiaozhi_clear_session_id(...)`
+    - `river_cloud_xiaozhi_fill_runtime_snapshot(...)`、
+      `river_cloud_xiaozhi_dump_session_status(...)`、
+      `river_cloud_xiaozhi_turn_accepted(...)`、
+      `river_cloud_xiaozhi_note_semantic_fallback(...)`、
+      `river_cloud_xiaozhi_commit_pending_text_finalization(...)`
+      现在都统一消费 typed turn-semantics view
+    - `river_cloud_xiaozhi_playback_runtime.c` 的 speaking 判定也不再直读
+      `g_river_cloud.xiaozhi_output_state`
+    - 这一步把：
+      - scattered cloud turn-semantics bag
+      收口成：
+      - explicit XiaoZhi turn-semantics truth
+      - typed turn-semantics export/view boundary
   - newest landed runtime-ownership slice:
     - `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
       `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释

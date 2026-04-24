@@ -1,5 +1,50 @@
 # Verification
 
+## Step 5.475
+Validate that XiaoZhi turn semantics now live behind an explicit cloud-owned
+sub-state and typed view instead of scattered `g_river_cloud.xiaozhi_*`
+fields:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+git diff --check
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+sed -n '151,190p' components/river_cloud/river_cloud_internal.h
+sed -n '536,553p' components/river_cloud/river_cloud_internal.h
+sed -n '815,920p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1656,1845p' components/river_cloud/river_cloud_xiaozhi_session.c
+sed -n '1115,1134p' components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+rg -n 'turn_semantics_state_t|turn_semantics_view_t|capture_turn_semantics_view|clear_session_id' \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_adapter.c
+rg -n 'xiaozhi_turn_accepted|xiaozhi_transport_barge_in_enabled|xiaozhi_transport_barge_in_enabled_known|xiaozhi_turn_id|xiaozhi_accept_reason|xiaozhi_input_state|xiaozhi_output_state|xiaozhi_semantic_fallback_reason|xiaozhi_session_id' \
+  components/river_cloud include/river -g'*.[ch]'
+```
+
+Expected result:
+- harness output contains:
+  - `check_codex_harness: all checks passed`
+- `git diff --check` prints no whitespace or patch-format errors
+- build output ends with:
+  - `Build done`
+- `river_cloud_internal.h` now defines:
+  - `river_cloud_xiaozhi_turn_semantics_state_t`
+  - `river_cloud_xiaozhi_turn_semantics_view_t`
+- `river_cloud_xiaozhi_session.c` now exposes:
+  - `river_cloud_xiaozhi_capture_turn_semantics_view(...)`
+  - `river_cloud_xiaozhi_clear_session_id(...)`
+- snapshot fill / dump / accepted-turn / fallback / finalization paths now all
+  read turn semantics through the typed view
+- `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c` no longer
+  directly references:
+  - `g_river_cloud.xiaozhi_output_state`
+- the legacy scattered raw-field hits only remain as:
+  - public/helper function names such as `river_cloud_xiaozhi_turn_accepted(...)`
+  - transport-side `river_xiaozhi_session_id(...)`
+
 ## Step 5.474
 Validate that `river_voice_runtime_policy.c` now consumes a narrow typed dialog
 voice-policy view instead of pulling the full dialog snapshot:

@@ -26,6 +26,33 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.475`
+  - `river_cloud` 先把 XiaoZhi `turn semantics` 从散落的
+    `g_river_cloud.xiaozhi_*` 裸字段收口成显式子状态与窄视图
+  - 新增显式 cloud-owned 真相与读取边界：
+    - `river_cloud_xiaozhi_turn_semantics_state_t`
+    - `river_cloud_xiaozhi_turn_semantics_view_t`
+    - `river_cloud_xiaozhi_capture_turn_semantics_view(...)`
+    - `river_cloud_xiaozhi_clear_session_id(...)`
+  - `river_cloud_xiaozhi_fill_runtime_snapshot(...)`、
+    `river_cloud_xiaozhi_dump_session_status(...)`、
+    `river_cloud_xiaozhi_turn_accepted(...)`、
+    `river_cloud_xiaozhi_note_semantic_fallback(...)`、
+    `river_cloud_xiaozhi_commit_pending_text_finalization(...)`
+    现在都统一消费 typed turn-semantics view
+  - `river_cloud_xiaozhi_playback_runtime.c` 的输出 speaking 判定也不再直读：
+    - `g_river_cloud.xiaozhi_output_state`
+  - `adapter` / `round_runtime` 的 session-id 清理统一走：
+    - `river_cloud_xiaozhi_clear_session_id(...)`
+  - 这一步继续把 `river_cloud` 从：
+    - scattered cloud turn-semantics bag
+    推进到：
+    - explicit XiaoZhi turn-semantics truth
+    - typed turn-semantics export/view boundary
+  - 下一步继续聚焦：
+    - 把 XiaoZhi downlink/playback 剩余散落的 supply / wait / terminal /
+      segment-gap 观测状态继续收口成更明确的 playback/downlink truth，
+      让 session/runtime/policy 不再回读裸字段和字符串拼装结果
 - `Step 5.474`
   - `dialog runtime` 开始把外部模块从整份 `snapshot` 读取中解耦，先收口
     `river_voice_runtime_policy.c` 对 `dialog snapshot` 的直接策略解释
