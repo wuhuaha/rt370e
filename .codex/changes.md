@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.504
+- `river_cloud` 继续把 XiaoZhi downlink acquire/write 子结果中的 status/error
+  细节纳入 typed result，让 acquire miss 与 write failed 不再只携带布尔结果：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- `river_cloud_xiaozhi_downlink_frame_acquire_result_t` 现在记录
+  `river_status_t status`，ring read 失败时保留原始 `river_audio_frame_ring_read(...)`
+  返回值
+- `river_cloud_xiaozhi_downlink_frame_write_result_t` 现在记录
+  `river_status_t status`，frame oversize 和 playback write failure 会保留明确错误码
+- `river_cloud_xiaozhi_downlink_task_cycle_result_t` / wait plan 现在把子结果
+  status 投影到 downlink runtime truth 的 `last_cycle_status`
+- `river xiaozhi status` 的 downlink 行现在输出
+  `wait=<kind>/<delay>ms cycle_status=<status>`，用于区分同一个 wait reason
+  下的具体错误码
+- 这一步把 Step 5.503 后的 acquire/write 诊断从：
+  - typed sub-result only says acquired/write_failed
+  推进到：
+  - typed sub-result owns source status and publishes it as cycle diagnostic truth
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `rg -n "last_cycle_status|downlink_cycle_status|cycle_status=%d|acquire_result.status|write_result.status|wait_plan.status" ...` confirmed typed status propagation and status dump
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`
+
 ## Step 5.503
 - `river_cloud` 继续细分 XiaoZhi downlink ready-plan 的 not-ready 原因，
   让 wait reason 不再只有粗粒度 `not_ready`：

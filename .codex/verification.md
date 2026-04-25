@@ -1,3 +1,52 @@
+## Step 5.504 Verification
+
+Rebuild the latest-SDK external project image after adding downlink cycle status truth:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm acquire/write status details flow through typed results and diagnostics:
+```bash
+cd /root/ameba-river
+rg -n "last_cycle_status|downlink_cycle_status|cycle_status=%d|acquire_result.status|write_result.status|wait_plan.status" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  .codex/verification.md
+```
+
+Expected result:
+- acquire and write typed results carry a `river_status_t status`
+- the cycle result records acquire-miss and write-failed status details
+- the wait-plan projection preserves the cycle status into downlink runtime truth
+- `river xiaozhi status` prints `cycle_status=<status>` on the downlink line
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for status-bearing wait diagnostics:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- the downlink line includes `wait=<kind>/<delay>ms cycle_status=<status>`
+- normal no-error cycles report `cycle_status=0`
+- acquire miss / write failed cycles keep their concrete wait reason and expose
+  the source `river_status_t` value in `cycle_status`
+
 ## Step 5.503 Verification
 
 Rebuild the latest-SDK external project image after the downlink ready-block reason change:

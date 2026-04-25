@@ -239,6 +239,7 @@ typedef struct {
     uint64_t starved_since_ms;
     uint64_t last_supply_ms;
     uint32_t last_wait_delay_ms;
+    river_status_t last_cycle_status;
     river_cloud_xiaozhi_downlink_wait_kind_t last_wait_kind;
     bool retry_valid;
 } river_cloud_xiaozhi_downlink_runtime_truth_t;

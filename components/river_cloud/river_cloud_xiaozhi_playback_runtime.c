@@ -681,6 +681,7 @@ typedef struct {
     uint32_t prefetch_frames;
     uint64_t ring_dropped;
     uint32_t downlink_wait_delay_ms;
+    river_status_t downlink_cycle_status;
     uint64_t meta_gap_ms;
     uint64_t reopen_guard_left_ms;
     uint32_t rebuffer_count;
@@ -794,11 +795,13 @@ typedef struct {
 
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    river_status_t status;
     bool acquired;
 } river_cloud_xiaozhi_downlink_frame_acquire_result_t;
 
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    river_status_t status;
     bool frame_consumed;
     bool write_failed;
     bool aborted;
@@ -806,6 +809,7 @@ typedef struct {
 
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    river_status_t status;
     river_cloud_xiaozhi_downlink_cycle_plan_t cycle_plan;
     river_cloud_xiaozhi_downlink_frame_acquire_result_t acquire_result;
     river_cloud_xiaozhi_downlink_frame_write_result_t write_result;
@@ -814,6 +818,7 @@ typedef struct {
 typedef struct {
     bool sleep;
     uint32_t delay_ms;
+    river_status_t status;
     river_cloud_xiaozhi_downlink_wait_kind_t wait_kind;
 } river_cloud_xiaozhi_downlink_task_wait_plan_t;
 
@@ -1779,6 +1784,8 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->ring_dropped = g_river_cloud.xiaozhi_downlink_runtime_truth.ring_dropped;
     view->downlink_wait_delay_ms =
         g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms;
+    view->downlink_cycle_status =
+        g_river_cloud.xiaozhi_downlink_runtime_truth.last_cycle_status;
     view->downlink_wait_kind =
         g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_kind;
     view->meta_gap_ms = meta_truth->last_meta_gap_ms;
@@ -2262,26 +2269,31 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
 {
     river_cloud_xiaozhi_downlink_frame_write_result_t result = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE,
+        .status = RIVER_OK,
         .frame_consumed = false,
         .write_failed = false,
         .aborted = false,
     };
     river_cloud_xiaozhi_downlink_write_view_t write_view;
     river_cloud_xiaozhi_write_failed_recovery_result_t failed_result;
+    river_status_t write_status;
 
     river_cloud_xiaozhi_capture_current_downlink_write_view(&write_view);
     if (write_view.frame_too_large) {
         (void)river_cloud_xiaozhi_playback_abort_for_cause(
             RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_FRAME_OVERSIZE,
             NULL);
+        result.status = RIVER_ERR_ARG;
         result.aborted = true;
         return result;
     }
 
-    if (river_cloud_xiaozhi_write_current_downlink_frame_audio(&write_view) != RIVER_OK) {
+    write_status = river_cloud_xiaozhi_write_current_downlink_frame_audio(&write_view);
+    if (write_status != RIVER_OK) {
         failed_result = river_cloud_xiaozhi_handle_playback_write_failed(
             queued_frames,
             &write_view);
+        result.status = write_status;
         result.write_failed = true;
         result.frame_consumed = failed_result.frame_consumed;
         result.step_result = failed_result.step_result;
@@ -2509,7 +2521,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES,
                (unsigned long)diag_view.reopen_guard_left_ms,
                (unsigned int)diag_view.open_hold_frames);
-    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s wait=%s/%lums sample=%luHz frame=%lums start=%u resume=%u buffer=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu supply=%s phase=%s backend=%s hold=%s rebuffer=%s/%s recovery_path=%s recovery_outcome=%s rebuffer_total=%lu streak=%lu",
+    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s wait=%s/%lums cycle_status=%d sample=%luHz frame=%lums start=%u resume=%u buffer=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu supply=%s phase=%s backend=%s hold=%s rebuffer=%s/%s recovery_path=%s recovery_outcome=%s rebuffer_total=%lu streak=%lu",
                (unsigned long)diag_view.queued_frames,
                (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES,
                (unsigned long)diag_view.ring_dropped,
@@ -2517,6 +2529,7 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                river_cloud_xiaozhi_downlink_wait_kind_name(
                    diag_view.downlink_wait_kind),
                (unsigned long)diag_view.downlink_wait_delay_ms,
+               (int)diag_view.downlink_cycle_status,
                (unsigned long)diag_view.sample_rate,
                (unsigned long)diag_view.frame_duration_ms,
                (unsigned int)diag_view.start_gate.start_frames,
@@ -4472,6 +4485,7 @@ river_cloud_xiaozhi_acquire_current_downlink_frame(void)
 {
     river_cloud_xiaozhi_downlink_frame_acquire_result_t result = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
+        .status = RIVER_OK,
         .acquired = false,
     };
     river_status_t status;
@@ -4486,6 +4500,7 @@ river_cloud_xiaozhi_acquire_current_downlink_frame(void)
                                          g_river_cloud.xiaozhi_downlink_task_frame);
     if (status != RIVER_OK) {
         river_cloud_xiaozhi_playback_check_pending_stop();
+        result.status = status;
         return result;
     }
 
@@ -4499,6 +4514,7 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
 {
     river_cloud_xiaozhi_downlink_task_cycle_result_t result = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE,
+        .status = RIVER_OK,
     };
 
     result.cycle_plan = river_cloud_xiaozhi_prepare_downlink_cycle_plan();
@@ -4509,12 +4525,14 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
 
     result.acquire_result = river_cloud_xiaozhi_acquire_current_downlink_frame();
     if (!result.acquire_result.acquired) {
+        result.status = result.acquire_result.status;
         result.step_result = result.acquire_result.step_result;
         return result;
     }
 
     result.write_result = river_cloud_xiaozhi_write_current_downlink_frame_step(
         result.cycle_plan.queued_frames);
+    result.status = result.write_result.status;
     result.step_result = result.write_result.step_result;
     return result;
 }
@@ -4526,6 +4544,7 @@ river_cloud_xiaozhi_build_downlink_task_wait_plan(
     river_cloud_xiaozhi_downlink_task_wait_plan_t wait_plan = {
         .sleep = false,
         .delay_ms = 0U,
+        .status = RIVER_OK,
         .wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE,
     };
 
@@ -4533,6 +4552,7 @@ river_cloud_xiaozhi_build_downlink_task_wait_plan(
         return wait_plan;
     }
 
+    wait_plan.status = cycle_result->status;
     if (cycle_result->step_result ==
         RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE) {
         wait_plan.sleep = true;
@@ -4570,6 +4590,8 @@ static void river_cloud_xiaozhi_finish_downlink_task_cycle(
         wait_plan.wait_kind;
     g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms =
         wait_plan.delay_ms;
+    g_river_cloud.xiaozhi_downlink_runtime_truth.last_cycle_status =
+        wait_plan.status;
     if (wait_plan.sleep) {
         rtos_time_delay_ms(wait_plan.delay_ms);
     }

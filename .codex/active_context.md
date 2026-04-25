@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.503 细分 downlink ready blocked wait reason`
+  - `5.504 暴露 downlink cycle status truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi downlink acquire/write 子结果中的 status/error
+      细节纳入 typed result，让 acquire miss 与 write failed 不再只携带布尔结果
+    - `river_cloud_xiaozhi_downlink_frame_acquire_result_t` 现在记录
+      `river_status_t status`，ring read 失败时保留原始
+      `river_audio_frame_ring_read(...)` 返回值
+    - `river_cloud_xiaozhi_downlink_frame_write_result_t` 现在记录
+      `river_status_t status`，frame oversize 和 playback write failure 会保留明确错误码
+    - cycle result / wait plan 现在把子结果 status 投影到 downlink runtime truth 的
+      `last_cycle_status`
+    - `river xiaozhi status` 的 downlink 行现在输出
+      `wait=<kind>/<delay>ms cycle_status=<status>`
+    - 这一步把：
+      - typed sub-result only says acquired/write_failed
+      收口成：
+      - typed sub-result owns source status and publishes it as cycle diagnostic truth
+    - 下一步继续聚焦：
+      - 继续检查 downlink worker 的 cycle/wait truth 是否还缺少恢复路径、
+        frame-consumed/aborted 等结果投影，逐步完成 downlink ownership 边界
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续细分 XiaoZhi downlink ready-plan 的 not-ready 原因，
       让 wait reason 不再只有粗粒度 `not_ready`
