@@ -1,3 +1,49 @@
+## Step 5.519 Verification
+
+Rebuild the latest-SDK external project image after splitting XiaoZhi playback abort / terminal policy out of the downlink worker shell:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the playback worker / abort policy boundary:
+```bash
+cd /root/ameba-river
+wc -l   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc   components/river_cloud/river_cloud_xiaozhi_playback_abort_policy.inc   components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc   components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc
+rg -n "river_cloud_xiaozhi_playback_abort_policy.inc|river_cloud_xiaozhi_playback_terminal_ack.inc|playback_abort_for_cause|playback_check_pending_stop|apply_terminal_playback_policy|apply_playback_backend_refresh_policy"   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc   components/river_cloud/river_cloud_xiaozhi_playback_abort_policy.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_downlink_worker.inc` is about `178` lines and includes the abort policy module
+- `river_cloud_xiaozhi_playback_abort_policy.inc` owns terminal ACK include, pending stop, backend refresh policy, terminal playback policy, and abort-for-cause
+- downlink cycle and terminal ACK remain in their existing include units
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+river xiaozhi open
+```
+
+Expected result:
+- playback open/abort/terminal ACK behavior is unchanged
+- this step only narrows local ownership of abort policy around the existing playback truth source
+
 ## Step 5.518 Verification
 
 Rebuild the latest-SDK external project image after splitting XiaoZhi WS public API façade into config/session/send/status include units:

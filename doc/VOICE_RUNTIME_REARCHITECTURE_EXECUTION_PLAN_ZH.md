@@ -26,6 +26,16 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.519`
+  - 继续拆分 playback downlink worker，把 abort / terminal policy 从高频 worker shell 中移出：
+    - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_abort_policy.inc`，集中承载 abort policy
+  - abort policy 模块持有 terminal ACK include chain、pending stop、backend refresh policy、terminal playback policy、abort cause/reason mapping 与 abort-for-cause
+  - worker shell 现在只串联 current segment start hook、abort policy include、downlink cycle include、decoder/audio event、stereo expand 与 worker task/start
+  - 仍保持 include-split，不新增 public header，不扩大 playback runtime truth/helper 的跨文件接口
+  - 下一步继续聚焦：
+    - 继续压窄 `river_cloud_xiaozhi_playback_terminal_ack.inc` 的 report/ACK ownership，或评估 WS bootstrap/open 是否可继续拆成 narrow internal helper
+
 - `Step 5.518`
   - 继续拆分 XiaoZhi WS public API façade，把剩余 public wrappers 按 config/session/send/status 职责拆窄：
     - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行

@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.519
+- 继续治理 XiaoZhi playback downlink worker，把 abort / terminal policy 从高频 worker shell 中拆出：
+  - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_abort_policy.inc`，当前约 `181` 行
+- 新的 abort policy 模块集中承载：
+  - terminal ACK include chain 与 terminal ACK state setter
+  - abort cause / clear reason / stream reason mapping
+  - pending stop、backend refresh policy、terminal playback policy
+  - typed abort-for-cause 入口
+- 这一步保持 truth source 收口原则：
+  - worker shell 只保留 current segment start hook、downlink cycle include、decoder/audio event、stereo expand、worker task/start
+  - terminal ACK 与 abort policy 仍在原 playback runtime translation unit 内消费 private/static truth helper
+  - 不新增 public header，也不扩大 playback runtime truth 写面
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+  - static grep confirmed pending stop / backend refresh / terminal playback / abort-for-cause live in `river_cloud_xiaozhi_playback_abort_policy.inc`, while worker shell only includes the policy module
+
 ## Step 5.518
 - 继续治理 XiaoZhi WS public API façade，把剩余 public API wrapper 按职责拆成更窄 include：
   - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行，只保留 include 顺序

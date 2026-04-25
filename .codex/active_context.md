@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.518 拆分 XiaoZhi WS public API façade`
+  - `5.519 拆分 XiaoZhi playback abort policy 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续治理 XiaoZhi playback downlink worker，把 abort / terminal policy 从高频 worker shell 中拆出：
+      - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行
+      - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_abort_policy.inc`，承载约 `181` 行 abort / terminal policy
+    - abort policy 模块集中承载 terminal ACK include chain、pending stop、backend refresh policy、terminal playback policy、abort cause/reason mapping 与 abort-for-cause
+    - worker shell 现在只保留 current segment start hook、abort policy include、downlink cycle include、decoder/audio event、stereo expand 与 worker task/start
+    - 仍不新增 public header；policy include 保留在原 playback runtime translation unit 内，避免 truth 写面外扩
+    - 下一步继续聚焦：
+      - 继续压窄 `river_cloud_xiaozhi_playback_terminal_ack.inc` 的 ACK/report ownership，或评估 WS bootstrap/open 是否可继续拆成 narrow internal helper
   - newest landed runtime-ownership slice:
     - 继续治理 XiaoZhi WS public API façade，把剩余 public wrappers 按职责拆成更窄 include：
       - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行，只保留 include 顺序
