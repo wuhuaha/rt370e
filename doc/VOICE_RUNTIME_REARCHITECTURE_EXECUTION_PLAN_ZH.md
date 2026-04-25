@@ -26,6 +26,34 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.506`
+  - 白盒审视发现一个确定性关键问题：Step 5.505 后 downlink cycle 已有
+    `wait/outcome/cycle_status`，但 `prepare_downlink_playback()` 仍用裸 `bool`
+    把 rebuffer wait、start threshold、backend recovering 和 playback start failure
+    都折叠成 generic `playback_not_ready`，其中 start failure 还会丢失原始 status
+  - 新增 `river_cloud_xiaozhi_downlink_playback_prepare_result_t`，让 playback
+    prepare 阶段返回：
+    - concrete `wait_kind`
+    - source `river_status_t status`
+    - `ready`
+  - 扩展 downlink wait reason：
+    - `rebuffer_wait`
+    - `stop_pending`
+    - `paused_resume_wait`
+    - `backend_recovering`
+    - `start_threshold`
+    - `playback_start_failed`
+  - `river_cloud_xiaozhi_downlink_cycle_plan_t` 现在持有 prepare status，
+    `river_cloud_xiaozhi_process_downlink_task_cycle()` 会把 start failure status
+    投影到 `cycle_status`
+  - 这一步继续把 `river_cloud` 从：
+    - generic `playback_not_ready` with `cycle_status=0`
+    推进到：
+    - concrete prepare wait reason plus start-failure status truth
+  - 下一步继续聚焦：
+    - 根据真实板端的 `wait=<prepare-reason>` 与 `cycle_status`，判断是否需要对
+      `playback_start_failed` / `backend_recovering` 加 cooldown 或进一步统一
+      detached fresh-start 与 attached resume 的 start policy
 - `Step 5.505`
   - `river_cloud` 继续把 XiaoZhi downlink worker 的 frame-consumed /
     write-failed / aborted 分支收口成 cycle outcome truth，避免 status 侧再从

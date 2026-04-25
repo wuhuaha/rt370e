@@ -1,5 +1,39 @@
 # Change Log
 
+## Step 5.506
+- 白盒审视发现一个确定性关键问题：Step 5.505 后 downlink cycle 已有
+  `wait/outcome/cycle_status`，但 `prepare_downlink_playback()` 仍用裸 `bool`
+  把 rebuffer wait、start threshold、backend recovering 和 playback start failure
+  都折叠成 generic `playback_not_ready`，其中 start failure 还会丢失原始 status：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增 `river_cloud_xiaozhi_downlink_playback_prepare_result_t`，让 playback prepare
+  阶段返回：
+  - concrete `wait_kind`
+  - source `river_status_t status`
+  - `ready`
+- 扩展 downlink wait reason：
+  - `rebuffer_wait`
+  - `stop_pending`
+  - `paused_resume_wait`
+  - `backend_recovering`
+  - `start_threshold`
+  - `playback_start_failed`
+- `river_cloud_xiaozhi_downlink_cycle_plan_t` 现在持有 prepare status，
+  `river_cloud_xiaozhi_process_downlink_task_cycle()` 会把 start failure status
+  投影到 `cycle_status`
+- 这一步把 playback prepare blocked 诊断从：
+  - generic `playback_not_ready` with `cycle_status=0`
+  推进到：
+  - concrete prepare wait reason plus start-failure status truth
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `rg -n "downlink_playback_prepare_result_t|WAIT_REBUFFER_WAIT|WAIT_START_THRESHOLD|WAIT_PLAYBACK_START_FAILED|prepare_result.status|cycle_plan.status" ...`
+    confirmed typed prepare result, concrete wait reasons, and status propagation
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.505
 - `river_cloud` 继续把 XiaoZhi downlink worker 的 frame-consumed / write-failed /
   aborted 分支收口成 cycle outcome truth，避免 status 侧再从多个布尔字段推断：

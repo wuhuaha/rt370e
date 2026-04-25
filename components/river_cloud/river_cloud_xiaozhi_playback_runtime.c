@@ -603,6 +603,18 @@ static const char *river_cloud_xiaozhi_downlink_wait_kind_name(
         return "playback_not_ready";
     case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STEP_POLICY:
         return "step_policy";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_REBUFFER_WAIT:
+        return "rebuffer_wait";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STOP_PENDING:
+        return "stop_pending";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PAUSED_RESUME_WAIT:
+        return "paused_resume_wait";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_BACKEND_RECOVERING:
+        return "backend_recovering";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_START_THRESHOLD:
+        return "start_threshold";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PLAYBACK_START_FAILED:
+        return "playback_start_failed";
     default:
         return "unknown";
     }
@@ -817,9 +829,16 @@ typedef struct {
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
     river_cloud_xiaozhi_downlink_wait_kind_t wait_kind;
+    river_status_t status;
     uint32_t queued_frames;
     bool ready;
 } river_cloud_xiaozhi_downlink_cycle_plan_t;
+
+typedef struct {
+    river_cloud_xiaozhi_downlink_wait_kind_t wait_kind;
+    river_status_t status;
+    bool ready;
+} river_cloud_xiaozhi_downlink_playback_prepare_result_t;
 
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
@@ -4420,50 +4439,71 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
     return RIVER_OK;
 }
 
-static bool
+static river_cloud_xiaozhi_downlink_playback_prepare_result_t
 river_cloud_xiaozhi_prepare_downlink_playback(uint32_t queued_frames, uint64_t now_ms)
 {
+    river_cloud_xiaozhi_downlink_playback_prepare_result_t result = {
+        .wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PLAYBACK_NOT_READY,
+        .status = RIVER_OK,
+        .ready = false,
+    };
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
     uint32_t start_frames;
+    river_status_t status;
 
     river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
     if (!river_cloud_xiaozhi_rebuffer_resume_ready(queued_frames,
                                                    now_ms,
                                                    truth_view.backend_state)) {
-        return false;
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_REBUFFER_WAIT;
+        return result;
     }
     if (g_river_cloud.xiaozhi_playback_runtime_truth.stop_pending &&
         truth_view.backend_state != RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE) {
         river_cloud_xiaozhi_playback_check_pending_stop();
-        return false;
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STOP_PENDING;
+        return result;
     }
     if (truth_view.backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED) {
         if (!river_cloud_xiaozhi_maybe_resume_paused_playback(queued_frames,
                                                               &truth_view)) {
-            return false;
+            result.wait_kind =
+                RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PAUSED_RESUME_WAIT;
+            return result;
         }
         river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
     }
     if (truth_view.backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE) {
-        return true;
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE;
+        result.ready = true;
+        return result;
     }
     if (truth_view.backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING) {
-        return false;
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_BACKEND_RECOVERING;
+        return result;
     }
 
     start_frames = river_cloud_xiaozhi_downlink_start_threshold_for_backend(
         truth_view.backend_state);
     if (!g_river_cloud.xiaozhi_playback_runtime_truth.stop_pending &&
         queued_frames < start_frames) {
-        return false;
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_START_THRESHOLD;
+        return result;
     }
 
-    return river_cloud_xiaozhi_start_playback_if_needed(
-               river_cloud_xiaozhi_downlink_sample_rate(),
-               river_cloud_xiaozhi_downlink_frame_duration_ms(),
-               g_river_cloud.xiaozhi_downlink_ring.frame_bytes) == RIVER_OK ?
-               true :
-               false;
+    status = river_cloud_xiaozhi_start_playback_if_needed(
+        river_cloud_xiaozhi_downlink_sample_rate(),
+        river_cloud_xiaozhi_downlink_frame_duration_ms(),
+        g_river_cloud.xiaozhi_downlink_ring.frame_bytes);
+    if (status != RIVER_OK) {
+        result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PLAYBACK_START_FAILED;
+        result.status = status;
+        return result;
+    }
+
+    result.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE;
+    result.ready = true;
+    return result;
 }
 
 static bool river_cloud_xiaozhi_downlink_active(void);
@@ -4474,9 +4514,11 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
     river_cloud_xiaozhi_downlink_cycle_plan_t plan = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
         .wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NOT_READY,
+        .status = RIVER_OK,
         .queued_frames = 0U,
         .ready = false,
     };
+    river_cloud_xiaozhi_downlink_playback_prepare_result_t prepare_result;
     uint32_t queued_frames;
     uint64_t now_ms;
 
@@ -4502,8 +4544,11 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
         plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_EMPTY;
         return plan;
     }
-    if (!river_cloud_xiaozhi_prepare_downlink_playback(queued_frames, now_ms)) {
-        plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_PLAYBACK_NOT_READY;
+    prepare_result = river_cloud_xiaozhi_prepare_downlink_playback(queued_frames,
+                                                                   now_ms);
+    if (!prepare_result.ready) {
+        plan.wait_kind = prepare_result.wait_kind;
+        plan.status = prepare_result.status;
         return plan;
     }
 
@@ -4574,6 +4619,7 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
 
     result.cycle_plan = river_cloud_xiaozhi_prepare_downlink_cycle_plan();
     if (!result.cycle_plan.ready) {
+        result.status = result.cycle_plan.status;
         result.outcome =
             result.cycle_plan.wait_kind ==
                     RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_INACTIVE ?
