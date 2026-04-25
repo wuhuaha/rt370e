@@ -22128,3 +22128,53 @@ Expected result:
   `xiaozhi bootstrap cache hit: refresh_in_ms=...`
 - that later wake should not need another synchronous OTA bootstrap before
   `xiaozhi connecting`
+
+## Step 5.524 - XiaoZhi uplink bounded catch-up
+
+Confirm the code-level uplink pacing and diagnostics are present:
+```bash
+cd /root/ameba-river
+rg -n "UPLINK_DRAIN_BURST_MAX|burst_max|next_send_ms|xiaozhi asr round finish" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` is `2U`
+- successful uplink sends advance `next_send_ms` by the 20 ms frame duration
+- `river xiaozhi status` and `xiaozhi asr round finish` expose `burst_max`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation:
+```text
+river xiaozhi status
+wake the device and speak a short request
+```
+
+Expected result:
+- `xiaozhi asr round finish` includes `burst_max=...`
+- common case `burst_max` should be close to `1`, and catch-up should not exceed `2`
+- no repeated `turn_not_ready` / `audio.in.commit is accepted only while the session is active` loop after server endpoint commit
+- if service TTS still sends no `audio.out.meta`, Step 5.523 should still log `response audio timeout recovery` and release the session/window for a later wake

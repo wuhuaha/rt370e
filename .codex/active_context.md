@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.523 response 音频超时恢复收口`
+  - `5.524 XiaoZhi uplink bounded catch-up 首步`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.524 基于 2026-04-26 服务侧更新版 RTOS 实时建议，把端侧剩余首个改进点选为 uplink bounded catch-up：
+      - 保持 20ms PCM 帧格式不变
+      - successful send 后用 `next_send_ms` 按 20ms cadence 排下一帧
+      - 本地 I/O 调度已经落后时才允许最多 `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX=2` 的 catch-up
+      - 等待下一帧 due 时不在 uplink path 内 sleep，避免阻塞 WS poll/control/downlink 处理
+    - 新增 `burst_max` 诊断：
+      - `river xiaozhi status` 输出全局/round burst 最大值
+      - `xiaozhi asr round finish` 输出 round-level `burst_max`，便于和服务侧 send interval / capture age 观测对齐
+    - 本步不改变 no-audio 收口策略：
+      - 无 `audio.out.meta` / PCM 时仍不伪造播放事实
+      - 继续由 Step 5.523 的 response audio timeout recovery 释放 session/window，等待服务侧 TTS 队列修复
+    - 下一步上板验证：
+      - 常态 `burst_max` 应接近 1，调度落后时不超过 2
+      - 不应回归重复 `turn_not_ready` / `audio.in.commit` loop
+      - 服务 TTS 无 meta 时仍应 timeout recovery 并允许后续唤醒
   - newest landed runtime bug-fix slice:
     - Step 5.523 在 `response.start` 后 5s 无 `audio.out.meta` 的诊断基础上增加本地恢复动作：
       - 首次 timeout 后打印 `xiaozhi response audio timeout recovery`

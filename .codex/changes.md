@@ -14076,3 +14076,21 @@
     `/root/ameba-rtos`
   - static grep confirmed the new cache TTL, cache-hit log, and
     `bootstrap_owned/bootstrap_refresh_in_ms` status fields
+
+## Step 5.524
+- Synced the active voice runtime plan with the updated 2026-04-26 service-side RTOS realtime recommendations:
+  - service-side no-audio root cause remains qwen_unified TTS queue/cancel timeout
+  - device-side should not synthesize playback facts without `audio.out.meta` / PCM
+  - first device-side implementation slice is bounded uplink catch-up, not a second orchestrator
+- Tightened XiaoZhi uplink pacing:
+  - reduced `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` from `4` to `2`
+  - changed the uplink sender to respect a 20 ms `next_send_ms` cadence after successful sends
+  - allowed bounded catch-up only when the local I/O task is already behind the scheduled due time
+  - stopped sleeping inside the uplink send path while waiting for the next due frame, so the IO task can keep polling control/downlink work
+- Added uplink burst diagnostics:
+  - `river xiaozhi status` now reports global and active-round `burst_max`
+  - `xiaozhi asr round finish` now reports round-level `burst_max` next to packet/pace counters
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

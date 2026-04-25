@@ -26,6 +26,20 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.524`
+  - 基于 2026-04-26 服务侧更新版建议文档，确认当前端侧首个剩余改进点不是伪造播放事实，而是收紧上行发送节奏：
+    - 继续保持 `20ms` PCM 帧格式不变
+    - 将 uplink 从“可用时连续 drain 多帧”改为“按 20ms cadence 发送，只有本地调度落后时才允许 bounded catch-up”
+    - 首步把 catch-up 上限压到小 burst，并新增 round 级 `burst_max` 诊断，方便和服务侧 `send interval p95 / capture->send age` 观察值对齐
+  - 本步目标是降低短时间 burst drain 对服务端 preview / endpoint 的抖动放大，不改变 wake / ASR / response / playback ownership：
+    - no `audio.out.meta` 时仍由 Step 5.522/5.523 的 response audio timeout 路径收口
+    - 不把本地 fallback prompt 或文本 chunk 伪装成服务端 playback ACK
+    - 后续若服务侧 TTS 队列修复，端侧应自然恢复 `audio.out.meta` / PCM 播放路径
+  - 下一步上板验证：
+    - `xiaozhi asr round finish` 中新增 `burst_max`，常态应接近 `1`，调度落后时不超过配置上限
+    - 不应再出现 server endpoint 已 committed 后的重复 `audio.in.commit` loop
+    - 若服务侧仍无音频，仍应看到 response audio timeout recovery 并释放后续唤醒
+
 - `Step 5.523`
   - 在 Step 5.522 的 response audio wait timeout 诊断基础上，增加端侧恢复动作，避免服务侧 TTS 堵塞时设备长期卡在 speaking / window：
     - `river_cloud_xiaozhi_check_response_audio_timeout()` 改为返回“本次是否新触发 timeout”

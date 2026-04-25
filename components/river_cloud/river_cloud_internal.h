@@ -74,7 +74,7 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 6U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 4U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 2U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
 #define RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH 8U
@@ -311,6 +311,7 @@ typedef struct {
     uint32_t fail_count;
     uint32_t stale_dropped;
     uint32_t busy_streak;
+    uint32_t burst_max;
     uint64_t next_send_ms;
     uint64_t last_busy_log_ms;
     size_t accum_bytes;
@@ -333,6 +334,7 @@ typedef struct {
     uint32_t fail_base;
     uint32_t stale_drop_base;
     uint32_t ring_drop_base;
+    uint32_t burst_max;
     char close_reason[32];
 } river_cloud_xiaozhi_asr_round_truth_t;
 
