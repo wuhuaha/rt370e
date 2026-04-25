@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.499 类型化 downlink frame write result`
+  - `5.500 类型化 downlink task cycle result`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续类型化 XiaoZhi downlink worker cycle，把 ready / acquire / write
+      三段结果组合成 cycle-level typed result
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_task_cycle_result_t`
+    - `river_cloud_xiaozhi_process_downlink_task_cycle()` 现在返回完整 cycle result，
+      显式持有 cycle plan、acquire result、write result 和最终 worker step policy
+    - `river_cloud_xiaozhi_downlink_task()` 现在先接收 cycle result，再交给
+      `river_cloud_xiaozhi_finish_downlink_task_cycle()` 处理 sleep policy
+    - 这一步把：
+      - ready / acquire / write 分支在 cycle 函数中直接投影成裸 step result
+      收口成：
+      - cycle-level typed result owns sub-step observations and final worker policy
+    - 下一步继续聚焦：
+      - 压缩 `finish_downlink_task_cycle()` 与 worker loop 的剩余裸 step-result 投影，
+        并继续把 downlink sleep/idle policy 收口到 typed worker result
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续类型化 XiaoZhi downlink current-frame write step，把
       `river_cloud_xiaozhi_write_current_downlink_frame_step()` 的裸 step-result

@@ -1,3 +1,48 @@
+## Step 5.500 Verification
+
+Rebuild the latest-SDK external project image after the downlink cycle typed-result change:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the cycle-level typed result is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "downlink_task_cycle_result_t|process_downlink_task_cycle|finish_downlink_task_cycle" \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_downlink_task_cycle_result_t` is defined
+- `river_cloud_xiaozhi_process_downlink_task_cycle()` returns the cycle result
+- `river_cloud_xiaozhi_finish_downlink_task_cycle()` consumes the cycle result
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for unchanged downlink worker behavior:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- downlink playback still starts and drains normally during a XiaoZhi TTS response
+- idle periods still use the normal downlink poll/idle sleep behavior
+- no new write-failed / rebuffer storm appears only after this typed-result refactor
+
 # Verification
 
 ## Step 5.499

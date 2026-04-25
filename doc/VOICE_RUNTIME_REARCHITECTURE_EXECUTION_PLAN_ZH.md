@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-24
+Last Updated: 2026-04-25
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.500`
+  - `river_cloud` 继续类型化 XiaoZhi downlink worker cycle，把 ready / acquire / write
+    三段结果组合成 cycle-level typed result
+  - 新增：
+    - `river_cloud_xiaozhi_downlink_task_cycle_result_t`
+  - `river_cloud_xiaozhi_process_downlink_task_cycle()` 现在返回完整 cycle result，显式持有：
+    - `cycle_plan`
+    - `acquire_result`
+    - `write_result`
+    - cycle-level `step_result`
+  - `river_cloud_xiaozhi_downlink_task()` 现在先接收 cycle result，再交给
+    `river_cloud_xiaozhi_finish_downlink_task_cycle()` 处理 worker sleep policy
+  - 这一步继续把 `river_cloud` 从：
+    - ready / acquire / write 分支在 cycle 函数中直接投影成裸 step result
+    推进到：
+    - cycle-level typed result owns sub-step observations and final worker policy
+  - 下一步继续聚焦：
+    - 压缩 `finish_downlink_task_cycle()` 与 worker loop 的剩余裸 step-result 投影，
+      并继续把 downlink sleep/idle policy 收口到 typed worker result
 - `Step 5.499`
   - `river_cloud` 继续类型化 XiaoZhi downlink current-frame write step，把
     `river_cloud_xiaozhi_write_current_downlink_frame_step()` 的裸 step-result
