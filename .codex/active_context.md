@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.509 节流高频 input.preview 实时日志`
+  - `5.510 拆分 XiaoZhi preview 与 playback lineage/ACK 模块`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 直接对两个超大 XiaoZhi runtime 文件做低风险 include-split：
+      - `river_xiaozhi_ws.c` 从 `4971` 行降到 `4664` 行
+      - `river_cloud_xiaozhi_playback_runtime.c` 从 `5215` 行降到 `4364` 行
+    - 新增 `components/river_cloud/river_xiaozhi_ws_preview_handlers.inc`：
+      - 集中承载 `input.speech.start` / `input.preview` / `input.endpoint`
+        receive-path handlers
+      - high-frequency preview throttle、preview truth 更新与 event emit 保持在
+        同一局部模块
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_lineage.inc`：
+      - 集中承载 playback lineage canonical truth helper，避免
+        response/meta/started/mark/cleared/completed 阶段事实散回主 runtime
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`：
+      - 集中承载 fully-heard context、completed readiness、ACK progress 与
+        terminal clear/finalize 路径
+    - 下一步继续聚焦：
+      - 在新拆出的 `.inc` 内继续把 preview truth 与 playback lineage truth
+        进一步 typed reducer 化；等静态边界稳定后再评估是否提升为独立 `.c`
+        translation unit
   - newest landed runtime-ownership slice:
     - 白盒审视当前实时交互链路后，先优化一个确定性高频热点：
       - `river_xiaozhi_ws.c` 的 `input.preview` 处理位于 WebSocket receive/dispatch

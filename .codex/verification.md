@@ -1,3 +1,60 @@
+## Step 5.510 Verification
+
+Rebuild the latest-SDK external project image after splitting XiaoZhi preview and playback lineage/terminal ACK modules:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the new split boundaries keep truth/high-frequency hooks together:
+```bash
+cd /root/ameba-river
+rg -n "river_xiaozhi_ws_preview_handlers.inc|river_cloud_xiaozhi_playback_lineage.inc|river_cloud_xiaozhi_playback_terminal_ack.inc|playback_lineage_truth|preview_logs=" \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_preview_handlers.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_lineage.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  .codex/verification.md
+```
+
+Expected result:
+- `river_xiaozhi_ws.c` includes the preview receive-path handler split
+- `river_cloud_xiaozhi_playback_runtime.c` includes the lineage and terminal ACK
+  split modules
+- lineage truth helpers still own response/meta/started/mark/cleared/completed
+  transitions
+- preview status still exposes `preview_logs=emitted/suppressed`
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- `preview_state` still reports current preview text/state and
+  `preview_logs=emitted/suppressed`
+- playback status lines remain internally consistent:
+  - `playback_meta`
+  - `playback_heard_context`
+  - `playback_terminal_context`
+  - `playback_lineage`
+
 ## Step 5.509 Verification
 
 Rebuild the latest-SDK external project image after throttling high-frequency XiaoZhi preview logs:

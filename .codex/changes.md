@@ -1,5 +1,36 @@
 # Change Log
 
+## Step 5.510
+- 直接对两个超大 XiaoZhi runtime 文件做一轮低风险结构拆分，优先保持
+  truth ownership 与高频路径局部性：
+  - `river_xiaozhi_ws.c` 从 `4971` 行降到 `4664` 行
+  - `river_cloud_xiaozhi_playback_runtime.c` 从 `5215` 行降到 `4364` 行
+- 拆出 `components/river_cloud/river_xiaozhi_ws_preview_handlers.inc`：
+  - 集中承载 `input.speech.start` / `input.preview` / `input.endpoint`
+    receive-path handlers
+  - high-frequency preview throttle、preview truth 更新与事件 emit 保持在同一
+    局部模块里，减少主 transport 文件里的高频分支噪声
+- 拆出 `components/river_cloud/river_cloud_xiaozhi_playback_lineage.inc`：
+  - 集中承载 playback lineage canonical truth 的 stage name、clear/touch、
+    segment touch 与 terminal flag 派生 helper
+  - response/meta/started/mark/cleared/completed 仍由同一 lineage truth helper
+    更新，避免后续改动重新把阶段事实散回 runtime 主文件
+- 拆出 `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`：
+  - 集中承载 fully-heard context、completed readiness、started/mark/cleared/
+    completed ACK 进度与 terminal clear/finalize 路径
+  - high-frequency ACK progress loop 与 lineage context 更新放在同一局部模块，
+    让主 playback runtime 更聚焦 backend/rebuffer/downlink orchestration
+- 本轮采用 `.inc` include-split 而不是跨 translation unit 拆分，是为了保持现有
+  static helper / private context 访问边界，避免在这一步额外暴露全局接口或扩大
+  真相源写面。
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `rg -n "river_xiaozhi_ws_preview_handlers.inc|river_cloud_xiaozhi_playback_lineage.inc|river_cloud_xiaozhi_playback_terminal_ack.inc|playback_lineage_truth|preview_logs=" ...`
+    confirmed the new split boundaries and retained truth/high-frequency hooks
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.509
 - 白盒审视当前实时交互链路后，选择一个确定性高频热点先优化：
   - `river_xiaozhi_ws.c` 的 `input.preview` 处理位于 WebSocket receive/dispatch
