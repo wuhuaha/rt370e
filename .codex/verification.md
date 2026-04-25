@@ -1,3 +1,52 @@
+## Step 5.509 Verification
+
+Rebuild the latest-SDK external project image after throttling high-frequency XiaoZhi preview logs:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm preview log throttling is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_XIAOZHI_PREVIEW_LOG_INTERVAL_MS|preview_logs_suppressed|preview_logs=|stable_changed" \
+  components/river_cloud/river_xiaozhi_ws.c \
+  .codex/verification.md
+```
+
+Expected result:
+- `input.preview` has a 250 ms normal partial log throttle
+- first preview, stable-prefix changes, and final preview still log immediately
+- `river xiaozhi status` exposes `preview_updates` and
+  `preview_logs=emitted/suppressed`
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- during a turn with multiple preview partials, `preview_updates` can exceed
+  emitted preview logs
+- normal partial preview events still update `preview_state`
+- serial logs still include first/stable-change/final `xiaozhi input.preview`
+  lines, but no longer print every unchanged partial
+
 ## Step 5.508 Verification
 
 Rebuild the latest-SDK external project image after making playback lineage the canonical source for terminal contexts and report flags:

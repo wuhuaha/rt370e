@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.509`
+  - 白盒审视当前实时交互链路后，先优化一个确定性高频热点：
+    - `river_xiaozhi_ws.c` 的 `input.preview` 处理位于 WebSocket receive/dispatch
+      路径
+    - preview partial 可能高频到达，原实现每条都同步格式化完整
+      `text/stable_prefix/timing` 并 `RIVER_LOGI`
+    - 日志 IO 与字符串格式化会抢占同一条实时消息处理路径，增加
+      preview/accept/response.start 时延抖动
+  - 新增 `RIVER_XIAOZHI_PREVIEW_LOG_INTERVAL_MS = 250`：
+    - 首条 preview、`stable_prefix` 变化、final preview 仍立即记录
+    - 其余 partial preview 只更新状态并正常 emit event，不再每条同步打印
+  - `river xiaozhi status` 的 `preview_state` 行新增
+    `preview_updates` 与 `preview_logs=emitted/suppressed`
+  - 下一步继续聚焦：
+    - 继续审视 receive path 上其他高频同步日志/字符串格式化点，优先保持
+      transport receive、preview dispatch、accept latch 三段低抖动
 - `Step 5.508`
   - 在 Step 5.507 已建立 playback lineage truth 后，继续白盒收口剩余分散读写：
     - last segment observed / fully heard context 仍主要从 terminal truth 读取

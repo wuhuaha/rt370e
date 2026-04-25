@@ -1,5 +1,38 @@
 # Change Log
 
+## Step 5.509
+- 白盒审视当前实时交互链路后，选择一个确定性高频热点先优化：
+  - `river_xiaozhi_ws.c` 的 `input.preview` 处理位于 WebSocket receive/dispatch
+    路径
+  - preview partial 可能高频到达，原实现每条都同步格式化完整
+    `text/stable_prefix/timing` 并 `RIVER_LOGI`
+  - 这会让日志 IO 与字符串格式化抢占同一条实时消息处理路径，影响
+    preview/accept/response.start 交互时延
+- 新增 preview update 日志节流：
+  - `RIVER_XIAOZHI_PREVIEW_LOG_INTERVAL_MS = 250`
+  - 首条 preview、`stable_prefix` 变化、final preview 仍立即记录
+  - 其余 partial preview 只更新状态并正常 emit event，不再每条同步打印
+- `input.preview` 仍保持完整状态更新与事件分发：
+  - `last_preview_text`
+  - `last_preview_stable_prefix`
+  - `last_preview_update_at_ms`
+  - `RIVER_XIAOZHI_EVENT_INPUT_PREVIEW`
+- 新增 preview 诊断计数：
+  - `preview_update_events`
+  - `preview_logs_emitted`
+  - `preview_logs_suppressed`
+  - `river xiaozhi status` 的 `preview_state` 行现在显示
+    `preview_updates` 与 `preview_logs=emitted/suppressed`
+- 这一步把高频 partial 日志从默认同步路径移出，保留关键边界日志与状态
+  可观测性，降低 receive thread 上的日志放大和交互时延抖动风险
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `rg -n "RIVER_XIAOZHI_PREVIEW_LOG_INTERVAL_MS|preview_logs_suppressed|preview_logs=|stable_changed" ...`
+    confirmed preview log throttling and status counters
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.508
 - 在 Step 5.507 已建立 playback lineage truth 后，继续白盒收口剩余分散读写：
   - last segment observed / fully heard context 仍主要从 terminal truth 读取
