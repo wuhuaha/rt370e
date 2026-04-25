@@ -1,3 +1,59 @@
+## Step 5.511 Verification
+
+Rebuild the latest-SDK external project image after splitting XiaoZhi public/status policy shells out of the two large runtime files:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the new split boundaries and reduced main-file sizes:
+```bash
+cd /root/ameba-river
+wc -l \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc
+rg -n "river_xiaozhi_ws_public_api.inc|river_cloud_xiaozhi_playback_public_policy.inc|river_xiaozhi_dump_status|river_cloud_xiaozhi_dump_playback_status|fill_playback_runtime_snapshot" \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc \
+  .codex/verification.md
+```
+
+Expected result:
+- `river_xiaozhi_ws.c` is about `3713` lines and includes
+  `river_xiaozhi_ws_public_api.inc`
+- `river_cloud_xiaozhi_playback_runtime.c` is about `3826` lines and includes
+  `river_cloud_xiaozhi_playback_public_policy.inc`
+- XiaoZhi status/public API and playback status/snapshot/policy shells are
+  grouped in their include modules
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- XiaoZhi status still includes the existing transport/session/preview fields
+- playback status still includes the existing meta/heard/terminal/lineage lines
+
 ## Step 5.510 Verification
 
 Rebuild the latest-SDK external project image after splitting XiaoZhi preview and playback lineage/terminal ACK modules:

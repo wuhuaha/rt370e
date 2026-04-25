@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.511
+- 继续对两个 XiaoZhi 超大 runtime 文件做第二轮结构拆分，让主文件回到更清晰的
+  high-frequency/core orchestration 视图：
+  - `river_xiaozhi_ws.c` 从 `4664` 行降到 `3713` 行
+  - `river_cloud_xiaozhi_playback_runtime.c` 从 `4364` 行降到 `3826` 行
+- 拆出 `components/river_cloud/river_xiaozhi_ws_public_api.inc`：
+  - 集中承载 XiaoZhi transport 的 public API、session open/close、send wrappers
+    与 status dump
+  - `river_xiaozhi_ws.c` 主体现在更聚焦 transport lock、send queue、protocol
+    parse/dispatch 与 realtime receive handlers，减少高频 receive/send 路径旁边的
+    低频配置/诊断噪声
+- 拆出 `components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc`：
+  - 集中承载 playback status/snapshot export、capture/session policy reset、
+    backend pause/hold/rebuffer entry
+  - 主 playback runtime 更聚焦 downlink ring、start gate、segment/rebuffer worker
+    与 terminal ACK include，减少 truth export / policy shell 与媒体 worker 路径交织
+- 本轮仍采用 `.inc` include-split，保持 static/private helper 访问边界不外扩；
+  等这些 truth/export 边界稳定后，再评估哪些块适合提升为独立 `.c`。
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `wc -l` confirmed the reduced main-file sizes and new include modules
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.510
 - 直接对两个超大 XiaoZhi runtime 文件做一轮低风险结构拆分，优先保持
   truth ownership 与高频路径局部性：

@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.511`
+  - 继续对两个超大 XiaoZhi runtime 文件做第二轮 include-split：
+    - `river_xiaozhi_ws.c` 从 `4664` 行降到 `3713` 行
+    - `river_cloud_xiaozhi_playback_runtime.c` 从 `4364` 行降到 `3826` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_public_api.inc`：
+    - 集中承载 public API、session open/close、send wrappers 与 status dump
+    - 主 transport 文件更聚焦 send queue、protocol parse/dispatch 与 realtime
+      receive handlers
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc`：
+    - 集中承载 playback status/snapshot export、capture/session policy reset、
+      backend pause/hold/rebuffer entry
+    - 主 playback runtime 更聚焦 downlink ring、start gate、segment/rebuffer
+      worker 与 terminal ACK include
+  - 下一步继续聚焦：
+    - 在这些 include 边界内继续把 status/export 变成更窄的 typed view；
+      若静态 helper 依赖继续下降，再把稳定边界提升为独立 `.c`
+
 - `Step 5.510`
   - 直接对两个超大 XiaoZhi runtime 文件做低风险 include-split：
     - `river_xiaozhi_ws.c` 从 `4971` 行降到 `4664` 行
