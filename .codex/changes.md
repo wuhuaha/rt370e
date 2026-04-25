@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.517
+- 继续治理 XiaoZhi WS public API include，把发送类 public wrappers 从 session/config/open/poll API 中拆出：
+  - `river_xiaozhi_ws_public_api.inc` 从 `719` 行降到 `618` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_send_api.inc`，当前约 `101` 行
+- 新的 send API 模块集中承载：
+  - listen start/stop/detect wrappers
+  - abort 与 `audio.out.*` ACK send wrappers
+  - binary audio send 与 MCP payload send wrapper
+- 这一步进一步压窄 public API ownership：
+  - session/config/bootstrap/open/close/poll 保留在 `river_xiaozhi_ws_public_api.inc`
+  - send wrapper 与 status dump 各自独立 include，仍在原 WS translation unit 内消费 private/static helper
+  - 不新增 public header，也不把 transport truth 或 send helper 外扩到跨 translation unit
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+  - static grep confirmed send wrappers live in `river_xiaozhi_ws_send_api.inc` while `river_xiaozhi_ws_public_api.inc` includes send/status modules at the bottom
+
 ## Step 5.516
 - 继续治理 `river_xiaozhi_ws_public_api.inc`，把低频 status dump 从 public API wrapper 集合中拆出：
   - `river_xiaozhi_ws_public_api.inc` 从 `952` 行降到 `719` 行
