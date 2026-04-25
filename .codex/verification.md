@@ -1,3 +1,52 @@
+## Step 5.505 Verification
+
+Rebuild the latest-SDK external project image after adding downlink cycle outcome truth:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm cycle outcome truth is carried from typed result to status diagnostics:
+```bash
+cd /root/ameba-river
+rg -n "downlink_cycle_outcome_t|last_cycle_outcome|downlink_cycle_outcome|outcome=%s|WRITE_RECOVERED|CYCLE_ABORTED" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  .codex/verification.md
+```
+
+Expected result:
+- the internal runtime truth stores `last_cycle_outcome`
+- the cycle result distinguishes inactive, not-ready, acquire miss, write ok,
+  write recovered, write failed, aborted, and fallback step policy
+- `river xiaozhi status` prints `outcome=<name>` on the downlink line
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for downlink outcome diagnostics:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- the downlink line includes `wait=<kind>/<delay>ms outcome=<name> cycle_status=<status>`
+- normal playback write cycles can report `outcome=write_ok`
+- retry/recovery paths can report `outcome=write_recovered`, `outcome=write_failed`,
+  or `outcome=aborted` without inferring that from raw booleans
+
 ## Step 5.504 Verification
 
 Rebuild the latest-SDK external project image after adding downlink cycle status truth:

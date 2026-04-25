@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.504 暴露 downlink cycle status truth`
+  - `5.505 暴露 downlink cycle outcome truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续把 XiaoZhi downlink worker 的 frame-consumed /
+      write-failed / aborted 分支收口成 cycle outcome truth，避免 status 侧再从
+      多个布尔字段推断
+    - 新增 `river_cloud_xiaozhi_downlink_cycle_outcome_t`，覆盖 inactive /
+      not_ready / acquire_miss / write_ok / write_recovered / write_failed /
+      aborted / step_policy
+    - `river_cloud_xiaozhi_downlink_task_cycle_result_t` 现在显式记录
+      `outcome`，写入分支通过 helper 把 `frame_consumed` / `write_failed` /
+      `aborted` 归一为 cycle outcome
+    - downlink runtime truth 新增 `last_cycle_outcome`
+    - `river xiaozhi status` 的 downlink 行现在输出
+      `wait=<kind>/<delay>ms outcome=<name> cycle_status=<status>`
+    - 这一步把：
+      - source status is visible but branch outcome still lives in sub-result booleans
+      收口成：
+      - cycle outcome is owned by the cycle result and published as runtime truth
+    - 下一步继续聚焦：
+      - 继续检查 downlink worker loop 与 playback recovery 链路是否还有裸策略投影，
+        尽量让 wait/status/recovery 诊断都来自 typed result
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续把 XiaoZhi downlink acquire/write 子结果中的 status/error
       细节纳入 typed result，让 acquire miss 与 write failed 不再只携带布尔结果

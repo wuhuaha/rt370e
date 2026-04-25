@@ -1,5 +1,35 @@
 # Change Log
 
+## Step 5.505
+- `river_cloud` 继续把 XiaoZhi downlink worker 的 frame-consumed / write-failed /
+  aborted 分支收口成 cycle outcome truth，避免 status 侧再从多个布尔字段推断：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增 `river_cloud_xiaozhi_downlink_cycle_outcome_t`，覆盖：
+  - `inactive`
+  - `not_ready`
+  - `acquire_miss`
+  - `write_ok`
+  - `write_recovered`
+  - `write_failed`
+  - `aborted`
+  - `step_policy`
+- `river_cloud_xiaozhi_downlink_task_cycle_result_t` 现在显式记录 `outcome`，
+  写入分支通过 helper 把 `frame_consumed` / `write_failed` / `aborted` 归一为
+  cycle outcome
+- downlink runtime truth 新增 `last_cycle_outcome`，`river xiaozhi status`
+  的 downlink 行现在输出
+  `wait=<kind>/<delay>ms outcome=<name> cycle_status=<status>`
+- 这一步把 Step 5.504 后的 status truth 从：
+  - source status is visible but branch outcome still lives in sub-result booleans
+  推进到：
+  - cycle outcome is owned by the cycle result and published as runtime truth
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `rg -n "downlink_cycle_outcome_t|last_cycle_outcome|downlink_cycle_outcome|outcome=%s|WRITE_RECOVERED|CYCLE_ABORTED" ...` confirmed outcome truth and status projection
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`
+
 ## Step 5.504
 - `river_cloud` 继续把 XiaoZhi downlink acquire/write 子结果中的 status/error
   细节纳入 typed result，让 acquire miss 与 write failed 不再只携带布尔结果：
