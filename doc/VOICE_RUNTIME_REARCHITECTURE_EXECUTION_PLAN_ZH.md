@@ -26,6 +26,17 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.518`
+  - 继续拆分 XiaoZhi WS public API façade，把剩余 public wrappers 按 config/session/send/status 职责拆窄：
+    - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行
+    - 新增 `components/river_cloud/river_xiaozhi_ws_config_api.inc`，集中承载 init/config/getter wrapper
+    - 新增 `components/river_cloud/river_xiaozhi_ws_session_api.inc`，集中承载 bootstrap/open/close/poll wrapper
+  - public API façade 只保留 include 顺序，避免 session/open/send/status 继续混在一个大 include 内
+  - 仍保持 include-split，不新增 public header，不扩大 WS transport truth/helper 的跨文件接口
+  - 下一步继续聚焦：
+    - 转向 playback worker shell 内 terminal ACK / abort ownership，或评估 WS bootstrap/open 是否可进一步拆出
+      narrow internal helper
+
 - `Step 5.517`
   - 继续拆分 XiaoZhi WS public API 边界，把发送类 public wrappers 从 session/config/open/poll API 中移出：
     - `river_xiaozhi_ws_public_api.inc` 从 `719` 行降到 `618` 行

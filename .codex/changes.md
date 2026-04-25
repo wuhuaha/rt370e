@@ -1,5 +1,28 @@
 # Change Log
 
+## Step 5.518
+- 继续治理 XiaoZhi WS public API façade，把剩余 public API wrapper 按职责拆成更窄 include：
+  - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行，只保留 include 顺序
+  - 新增 `components/river_cloud/river_xiaozhi_ws_config_api.inc`，当前约 `308` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_session_api.inc`，当前约 `306` 行
+- 新的 config API 模块集中承载：
+  - init / get_config / set_config / event handler
+  - configured、session id、last text/state/error/activation 等只读 getters
+  - session.update cache clear 与 discovery/ack negotiation getters
+- 新的 session API 模块集中承载：
+  - OTA bootstrap
+  - open_session / close_session / session_open / poll
+  - bootstrap cache refresh/hit 与 connect handshake path
+- 这一步保持 truth source 收口原则：
+  - public API façade 只串联 config/session/send/status 四个私有 include
+  - 不新增 public header，也不把 WS transport truth/helper 外扩到跨 translation unit
+  - connect/open 的高频与低频诊断仍在同一原编译单元内消费 private/static helper
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+  - static grep confirmed init/config/getters live in `river_xiaozhi_ws_config_api.inc`, bootstrap/open/poll live in `river_xiaozhi_ws_session_api.inc`, and the public API façade includes config/session/send/status in order
+
 ## Step 5.517
 - 继续治理 XiaoZhi WS public API include，把发送类 public wrappers 从 session/config/open/poll API 中拆出：
   - `river_xiaozhi_ws_public_api.inc` 从 `719` 行降到 `618` 行

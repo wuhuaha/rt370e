@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.517 拆分 XiaoZhi WS send API 边界`
+  - `5.518 拆分 XiaoZhi WS public API façade`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续治理 XiaoZhi WS public API façade，把剩余 public wrappers 按职责拆成更窄 include：
+      - `river_xiaozhi_ws_public_api.inc` 从 `618` 行降到 `4` 行，只保留 include 顺序
+      - 新增 `components/river_cloud/river_xiaozhi_ws_config_api.inc`，承载约 `308` 行 init/config/getter wrapper
+      - 新增 `components/river_cloud/river_xiaozhi_ws_session_api.inc`，承载约 `306` 行 bootstrap/open/close/poll wrapper
+    - public API façade 现在只串联 config/session/send/status 四个私有 include；仍不新增 public header，不扩大 WS truth/helper 写面
+    - 下一步继续聚焦：
+      - 转向 playback worker shell 内 terminal ACK / abort ownership，或评估 WS bootstrap/open 是否可进一步拆出 narrow internal helper
   - newest landed runtime-ownership slice:
     - 继续治理 XiaoZhi WS public API include，把 send wrappers 从 session/config/open/poll API 中拆出：
       - `river_xiaozhi_ws_public_api.inc` 从 `719` 行降到 `618` 行

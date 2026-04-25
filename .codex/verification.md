@@ -1,3 +1,58 @@
+## Step 5.518 Verification
+
+Rebuild the latest-SDK external project image after splitting XiaoZhi WS public API façade into config/session/send/status include units:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the WS public API façade boundaries:
+```bash
+cd /root/ameba-river
+wc -l \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_xiaozhi_ws_config_api.inc \
+  components/river_cloud/river_xiaozhi_ws_session_api.inc \
+  components/river_cloud/river_xiaozhi_ws_send_api.inc \
+  components/river_cloud/river_xiaozhi_ws_status_dump.inc
+rg -n "river_xiaozhi_ws_config_api.inc|river_xiaozhi_ws_session_api.inc|river_xiaozhi_init|river_xiaozhi_bootstrap|river_xiaozhi_open_session|river_xiaozhi_poll" \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_xiaozhi_ws_config_api.inc \
+  components/river_cloud/river_xiaozhi_ws_session_api.inc
+```
+
+Expected result:
+- `river_xiaozhi_ws_public_api.inc` is a tiny façade that includes config/session/send/status modules in order
+- init/config/getter wrappers live in `river_xiaozhi_ws_config_api.inc`
+- bootstrap/open/close/session_open/poll wrappers live in `river_xiaozhi_ws_session_api.inc`
+- send wrappers and status dump remain in their previously split include units
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+river xiaozhi open
+```
+
+Expected result:
+- config/session/open/status behavior is unchanged
+- this step only narrows local ownership of public API wrappers
+
 ## Step 5.517 Verification
 
 Rebuild the latest-SDK external project image after splitting XiaoZhi WS send API wrappers out of the public API include:
