@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.513`
+  - 按“3k 行仍过大”的治理目标继续拆分 XiaoZhi WS receive path：
+    - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行
+    - 新增 `components/river_cloud/river_xiaozhi_ws_message_handlers.inc`，集中承载
+      realtime/message receive dispatch
+  - 新模块把这些边界收在一起：
+    - realtime semantic handlers：`session.update`、`audio.out.meta`、`response.start`、
+      `response.chunk`、`session.end`、`error`
+    - legacy text handlers：`stt`、`llm`、`tts`、`system`、`alert`、`mcp`
+    - binary/text/fragmented payload 判定
+  - `river_xiaozhi_ws_preview_handlers.inc` 继续由 message handler 模块 include，
+    避免 preview truth/throttle/event emit 与 receive dispatch 再次分散
+  - 下一步继续聚焦：
+    - 将 `river_xiaozhi_ws_public_api.inc` 内 status dump / session API 继续拆窄，或
+      继续治理 playback runtime 的 segment queue / truth view 边界
+
 - `Step 5.512`
   - 按“主文件低于 3k 行”的治理目标继续拆分：
     - `river_xiaozhi_ws.c` 从 `3713` 行降到 `2965` 行

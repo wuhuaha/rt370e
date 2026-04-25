@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.513
+- 继续按“3k 行仍过大”的治理目标压缩 XiaoZhi WS 主文件；本轮把剩余 realtime/message receive dispatch 从 transport 主体中剥离：
+  - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_message_handlers.inc`，当前约 `956` 行
+- 新模块集中承载 WebSocket 下行消息的解析与分发边界：
+  - realtime semantic handlers：`session.update`、`audio.out.meta`、`response.start`、`response.chunk`、`session.end`、`error`
+  - legacy text message handlers：`stt`、`llm`、`tts`、`system`、`alert`、`mcp`
+  - binary/text frame 判定与 `CONTINUATION` fragmented payload fallback
+- 保留 Step 5.510 拆出的 `river_xiaozhi_ws_preview_handlers.inc` 在 message handler 模块内 include：
+  - preview truth、preview throttle 与 input preview event emit 仍在同一局部 receive-path ownership 内
+  - transport 主文件不再直接承载高频 preview/realtime/message dispatch 细节
+- 这一步仍不扩大 public header，也不把 private/static truth helper 暴露为跨 translation unit 接口；目标是先让主文件稳定到 transport/send/session ownership，再评估哪些 include 边界适合升级为 `.c` + narrow private header。
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - first sandboxed build exposed SDK-side generated-file write restriction on `/root/ameba-rtos/.../build_info.h`; rerun with approval succeeded
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.512
 - 按“3k 行仍过大”的治理目标继续白盒拆分两个 XiaoZhi runtime 主文件，
   这次不再只把尾部 public API 拆走，而是把剩余大块低频/专用职责从主循环

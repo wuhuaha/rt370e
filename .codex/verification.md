@@ -1,3 +1,48 @@
+## Step 5.513 Verification
+
+Rebuild the latest-SDK external project image after moving XiaoZhi realtime/message receive handlers out of the WS transport main file:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the WS main file and receive-message ownership boundary:
+```bash
+cd /root/ameba-river
+wc -l   components/river_cloud/river_xiaozhi_ws.c   components/river_cloud/river_xiaozhi_ws_message_handlers.inc   components/river_cloud/river_xiaozhi_ws_preview_handlers.inc
+rg -n "river_xiaozhi_ws_message_handlers.inc|river_xiaozhi_ws_preview_handlers.inc|river_xiaozhi_handle_realtime_response_start|river_xiaozhi_ws_message_cb|river_xiaozhi_payload_is_valid_json"   components/river_cloud/river_xiaozhi_ws.c   components/river_cloud/river_xiaozhi_ws_message_handlers.inc
+```
+
+Expected result:
+- `river_xiaozhi_ws.c` is about `2010` lines and includes `river_xiaozhi_ws_message_handlers.inc`
+- `river_xiaozhi_ws_message_handlers.inc` contains realtime/text/binary message dispatch and includes `river_xiaozhi_ws_preview_handlers.inc`
+- preview receive-path truth/throttle remains colocated with message dispatch, while the transport main file stays focused on context/send/session ownership
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- XiaoZhi transport/session/preview status remains available
+- realtime receive events still update `last_type`, preview state, response/playback IDs, and playback lineage as before
+
 ## Step 5.512 Verification
 
 Rebuild the latest-SDK external project image after moving XiaoZhi bootstrap/discovery and playback downlink worker paths out of the two main runtime files:

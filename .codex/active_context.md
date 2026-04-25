@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.512 拆分 XiaoZhi bootstrap/discovery 与 downlink worker 边界`
+  - `5.513 拆分 XiaoZhi realtime/message handler 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 按“3k 行仍过大”的治理目标继续压缩 XiaoZhi WS 主文件：
+      - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行
+      - 新增 `components/river_cloud/river_xiaozhi_ws_message_handlers.inc`，承载约
+        `956` 行 receive message ownership
+    - 新模块集中承载：
+      - realtime `session.update/audio.out.meta/response.start/response.chunk/session.end/error`
+        handlers
+      - legacy `stt/llm/tts/system/alert/mcp` text handlers
+      - binary/text frame 判定与 fragmented `CONTINUATION` payload fallback
+    - `river_xiaozhi_ws_preview_handlers.inc` 继续在 message handler 模块内 include，
+      让 preview truth/throttle/event emit 保持在 receive-path 局部 ownership 内
+    - 下一步继续聚焦：
+      - 继续把 `river_xiaozhi_ws_public_api.inc` 的 status dump / session API 分裂成
+        更窄 include，或评估 playback runtime 的 segment queue / truth view 是否可
+        提升为独立 private module
   - newest landed runtime-ownership slice:
     - 按“主文件低于 3k 行”的治理目标继续拆分：
       - `river_xiaozhi_ws.c` 从 `3713` 行降到 `2965` 行
