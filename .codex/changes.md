@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.523
+- 在 Step 5.522 的 response audio wait timeout 诊断基础上增加本地恢复策略：
+  - `river_cloud_xiaozhi_check_response_audio_timeout()` 现在返回本次是否新触发 timeout
+  - post-poll / post-uplink housekeeping 捕获首次 timeout 后执行 `response_audio_timeout` recovery
+  - recovery 日志输出 session、listening、stream、window、`input_state`、`output_state`，方便和服务侧 speaking 卡住问题对齐
+- timeout recovery 的本地收口动作：
+  - 请求 `tts interrupt` / server abort，促使服务侧停止当前卡住的 speaking response
+  - 用 `RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE` 收口本地 ASR round，避免后续再走本地 `audio.in.commit`
+  - 关闭 conversation window 并请求关闭 XiaoZhi session，让设备尽快回到可再次唤醒状态
+- 保持播放事实边界不变：
+  - 无 `audio.out.meta` / binary PCM 时不伪造 playback start
+  - 服务端恢复正常音频下发时，5s 内收到 meta 就不会触发 timeout/recovery
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.522
 - 基于服务侧对 2026-04-25 最近真实设备日志的定位，继续收口“文本 response 已到但无音频”的端侧表现：
   - ASR/LLM 主链路已经能进入 `response.start` / `response.chunk`

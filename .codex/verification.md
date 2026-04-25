@@ -1,3 +1,58 @@
+## Step 5.523 Verification
+
+Rebuild the latest-SDK external project image after adding response-audio-timeout recovery:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the timeout diagnostic now has a recovery action:
+```bash
+cd /root/ameba-river
+rg -n "response audio timeout recovery|response_audio_timeout|bool river_cloud_xiaozhi_check_response_audio_timeout" \
+  components/river_cloud include/river
+```
+
+Expected result:
+- timeout check returns `bool`
+- post-poll / post-uplink housekeeping calls `river_cloud_xiaozhi_recover_response_audio_timeout(...)`
+- recovery requests interrupt/abort, closes the local round, and closes the conversation window
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for the no-audio speaking-stuck case:
+```text
+Wake once, say a short sentence, and leave service TTS in the currently blocked state.
+Then try another wake after the timeout/recovery logs.
+```
+
+Expected result:
+- after `xiaozhi response.start`, if no `audio.out.meta` arrives within `5s`, logs include:
+  - `xiaozhi response audio wait timeout`
+  - `xiaozhi response audio timeout recovery`
+  - `tts interrupt requested: reason=response_audio_timeout` if the transport session is still open
+  - `xiaozhi conversation window closed: reason=response_audio_timeout`
+- the old speaking session should not keep the device from accepting a later wake
+- no repeated `turn_not_ready` / duplicate `audio.in.commit` loop should reappear
+
+Expected result when service TTS has recovered:
+- `audio.out.meta` and binary PCM arrive before the 5s timeout
+- playback starts normally
+- timeout recovery does not run
+
 ## Step 5.522 Verification
 
 Rebuild the latest-SDK external project image after separating realtime text

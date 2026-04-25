@@ -578,7 +578,7 @@ bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_lane_engaged(void);
 bool river_cloud_xiaozhi_playback_turn_active(void);
 bool river_cloud_xiaozhi_playback_has_work(void);
-void river_cloud_xiaozhi_check_response_audio_timeout(void);
+bool river_cloud_xiaozhi_check_response_audio_timeout(void);
 void river_cloud_xiaozhi_playback_note_duplex_ready(void);
 river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
     river_cloud_xiaozhi_playback_abort_cause_t cause,

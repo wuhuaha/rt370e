@@ -1927,17 +1927,45 @@ void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trig
     river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(trigger);
 }
 
+static void river_cloud_xiaozhi_recover_response_audio_timeout(const char *trigger)
+{
+    RIVER_LOGW("xiaozhi response audio timeout recovery: trigger=%s action=abort_close session=%s listening=%s stream=%s window=%s input_state=%s output_state=%s",
+               trigger != NULL ? trigger : "-",
+               river_xiaozhi_session_open() ? "open" : "closed",
+               g_river_cloud.xiaozhi_session_window_truth.listening ? "yes" : "no",
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_session_window_truth.window_active ? "open" : "closed",
+               g_river_cloud.xiaozhi_turn_semantics.input_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.input_state :
+                   "-",
+               g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.output_state :
+                   "-");
+
+    (void)river_cloud_xiaozhi_interrupt_tts("response_audio_timeout");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
+        "response_audio_timeout");
+    river_cloud_xiaozhi_window_close("response_audio_timeout");
+}
+
 void river_cloud_xiaozhi_run_post_poll_housekeeping(void)
 {
     river_cloud_xiaozhi_refresh_turn_semantics("poll");
-    river_cloud_xiaozhi_check_response_audio_timeout();
+    if (river_cloud_xiaozhi_check_response_audio_timeout()) {
+        river_cloud_xiaozhi_recover_response_audio_timeout("poll");
+        return;
+    }
     river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(
         "accept_reason");
 }
 
 void river_cloud_xiaozhi_run_post_uplink_housekeeping(void)
 {
-    river_cloud_xiaozhi_check_response_audio_timeout();
+    if (river_cloud_xiaozhi_check_response_audio_timeout()) {
+        river_cloud_xiaozhi_recover_response_audio_timeout("uplink");
+        return;
+    }
     river_cloud_xiaozhi_playback_check_pending_stop();
     river_cloud_xiaozhi_run_endpoint_local_close_housekeeping();
 }

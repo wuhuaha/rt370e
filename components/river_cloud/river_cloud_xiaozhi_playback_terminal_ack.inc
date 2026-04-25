@@ -310,7 +310,7 @@ void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_eve
         NULL);
 }
 
-void river_cloud_xiaozhi_check_response_audio_timeout(void)
+bool river_cloud_xiaozhi_check_response_audio_timeout(void)
 {
     river_cloud_xiaozhi_playback_lineage_truth_t *lineage =
         &g_river_cloud.xiaozhi_playback_lineage_truth;
@@ -321,17 +321,17 @@ void river_cloud_xiaozhi_check_response_audio_timeout(void)
         lineage->audio_wait_timeout_reported ||
         lineage->updated_ms == 0U ||
         lineage->meta_context.response_id[0] != '\0') {
-        return;
+        return false;
     }
 
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     if (now_ms < lineage->updated_ms) {
-        return;
+        return false;
     }
 
     wait_ms = now_ms - lineage->updated_ms;
     if (wait_ms < RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS) {
-        return;
+        return false;
     }
 
     lineage->audio_wait_timeout_reported = true;
@@ -349,6 +349,7 @@ void river_cloud_xiaozhi_check_response_audio_timeout(void)
                g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
                river_cloud_xiaozhi_playback_output_active() ? "active" : "idle",
                (unsigned long)river_cloud_xiaozhi_playback_queued_frames());
+    return true;
 }
 
 static void river_cloud_xiaozhi_try_queue_playback_started_ack(void)

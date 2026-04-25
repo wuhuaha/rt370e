@@ -26,6 +26,19 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.523`
+  - 在 Step 5.522 的 response audio wait timeout 诊断基础上，增加端侧恢复动作，避免服务侧 TTS 堵塞时设备长期卡在 speaking / window：
+    - `river_cloud_xiaozhi_check_response_audio_timeout()` 改为返回“本次是否新触发 timeout”
+    - post-poll / post-uplink housekeeping 在首次 timeout 时进入 `response_audio_timeout` recovery
+    - recovery 会先请求 `tts interrupt` / server abort，再按 `SERVER_RESPONSE` 本地收口 ASR round，最后关闭 conversation window 并请求关闭 XiaoZhi session
+  - 该动作仍不伪造音频播放事实：
+    - 若服务端没有 `audio.out.meta` / binary PCM，端侧不会进入 playback started
+    - 只是把无音频 response 作为 terminal 异常收口，释放后续唤醒机会
+  - 下一步上板验证：
+    - TTS 堵塞时，`xiaozhi response audio wait timeout` 后应紧跟 `xiaozhi response audio timeout recovery`
+    - session/window 应关闭，后续唤醒不应被旧 speaking 会话占住
+    - 服务端 TTS 恢复时，正常 `audio.out.meta` 在 5s 内到达则不触发 recovery
+
 - `Step 5.522`
   - 基于服务侧对 2026-04-25 最近真实设备日志的定位，继续收口“文本 response 成功但音频 TTS 阻塞”的端侧表现：
     - 服务端 ASR/LLM 主链路正常，但 qwen_unified TTS 单并发队列堵塞会导致 `response.start` / `response.chunk` 已到达、`audio.out.meta` / binary PCM 长时间不到达
