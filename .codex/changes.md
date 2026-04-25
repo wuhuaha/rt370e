@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.520
+- 继续治理 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中拆出：
+  - `river_xiaozhi_ws_message_handlers.inc` 从 `956` 行降到 `707` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_legacy_handlers.inc`，当前约 `250` 行
+- 新的 legacy handler 模块集中承载：
+  - `stt` / `llm` / `tts` 文本消息处理
+  - `system` / `alert` 低频消息处理
+  - `mcp` payload bridge 与 response send 处理
+- 这一步保持 receive truth source 收口原则：
+  - realtime session/update、preview、audio.out.meta、response、session.end、error handler 继续留在 message handler include
+  - text dispatcher 仍在同一 translation unit 内按 type 分发，不新增 public header
+  - legacy handler 继续直接消费原有 private/static helper，避免把 WS receive truth/helper 外扩
+- Verification:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+  - static grep confirmed legacy handlers live in `river_xiaozhi_ws_legacy_handlers.inc` and `river_xiaozhi_ws_message_handlers.inc` includes that module before the text dispatcher
+
 ## Step 5.519
 - 继续治理 XiaoZhi playback downlink worker，把 abort / terminal policy 从高频 worker shell 中拆出：
   - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行

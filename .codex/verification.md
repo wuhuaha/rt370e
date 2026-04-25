@@ -1,3 +1,49 @@
+## Step 5.520 Verification
+
+Rebuild the latest-SDK external project image after splitting legacy XiaoZhi text handlers out of the realtime message handler include:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the WS receive handler boundary:
+```bash
+cd /root/ameba-river
+wc -l   components/river_cloud/river_xiaozhi_ws_message_handlers.inc   components/river_cloud/river_xiaozhi_ws_legacy_handlers.inc   components/river_cloud/river_xiaozhi_ws_preview_handlers.inc
+rg -n "river_xiaozhi_ws_legacy_handlers.inc|handle_stt_message|handle_llm_message|handle_tts_message|handle_mcp_message|handle_text_message"   components/river_cloud/river_xiaozhi_ws_message_handlers.inc   components/river_cloud/river_xiaozhi_ws_legacy_handlers.inc
+```
+
+Expected result:
+- `river_xiaozhi_ws_message_handlers.inc` is about `707` lines and includes the legacy handler module before `river_xiaozhi_handle_text_message`
+- `river_xiaozhi_ws_legacy_handlers.inc` owns `stt` / `llm` / `tts` / `system` / `alert` / `mcp` handlers
+- realtime session/update, preview, response, audio meta, error, text dispatch, binary dispatch, and websocket callback remain in the message handler include
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+river xiaozhi open
+```
+
+Expected result:
+- realtime and legacy text message behavior is unchanged
+- this step only narrows local ownership inside the existing WS receive truth source
+
 ## Step 5.519 Verification
 
 Rebuild the latest-SDK external project image after splitting XiaoZhi playback abort / terminal policy out of the downlink worker shell:

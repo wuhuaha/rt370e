@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.519 拆分 XiaoZhi playback abort policy 边界`
+  - `5.520 拆分 XiaoZhi WS legacy handler 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续治理 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中拆出：
+      - `river_xiaozhi_ws_message_handlers.inc` 从 `956` 行降到 `707` 行
+      - 新增 `components/river_cloud/river_xiaozhi_ws_legacy_handlers.inc`，承载约 `250` 行 legacy handler
+    - legacy handler 模块集中承载 `stt` / `llm` / `tts` / `system` / `alert` / `mcp`，message handler include 更聚焦 realtime receive、text/binary dispatch 与 ws callback
+    - 仍不新增 public header；legacy include 保留在原 WS translation unit 内，避免 receive truth/helper 外扩
+    - 下一步继续聚焦：
+      - 继续压窄 `river_xiaozhi_ws_bootstrap_discovery.inc` 或 `river_cloud_xiaozhi_playback_terminal_ack.inc` 的低频职责边界
   - newest landed runtime-ownership slice:
     - 继续治理 XiaoZhi playback downlink worker，把 abort / terminal policy 从高频 worker shell 中拆出：
       - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行

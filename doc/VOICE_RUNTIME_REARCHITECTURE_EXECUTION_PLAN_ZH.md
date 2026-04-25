@@ -26,6 +26,15 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.520`
+  - 继续拆分 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中移出：
+    - `river_xiaozhi_ws_message_handlers.inc` 从 `956` 行降到 `707` 行
+    - 新增 `components/river_cloud/river_xiaozhi_ws_legacy_handlers.inc`，集中承载 legacy handler
+  - legacy handler 模块持有 `stt` / `llm` / `tts` / `system` / `alert` / `mcp` 处理，message handler include 更聚焦 realtime receive、text dispatch、binary dispatch 与 ws callback
+  - 仍保持 include-split，不新增 public header，不扩大 WS receive truth/helper 的跨文件接口
+  - 下一步继续聚焦：
+    - 继续压窄 `river_xiaozhi_ws_bootstrap_discovery.inc` 或 `river_cloud_xiaozhi_playback_terminal_ack.inc` 的低频职责边界
+
 - `Step 5.519`
   - 继续拆分 playback downlink worker，把 abort / terminal policy 从高频 worker shell 中移出：
     - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `358` 行降到 `178` 行
