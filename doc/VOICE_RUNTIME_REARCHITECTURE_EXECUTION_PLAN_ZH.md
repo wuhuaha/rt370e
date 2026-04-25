@@ -26,6 +26,23 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.515`
+  - 继续拆分 playback downlink worker，把恢复策略和 cycle 执行从 worker shell 中移出：
+    - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc`，集中承载
+      rebuffer / recovery helper
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc`，集中承载
+      playback prepare / cycle helper
+  - rebuffer recovery 模块持有 start/resume/low-water/segment-gap 门限、upstream starvation、
+    managed rebuffer、write_failed starvation preference 与 recovery fallback
+  - downlink cycle 模块持有 playback start/compact retry、prepare wait-kind/status、frame
+    acquire/write outcome、cycle result 与 wait-plan 投影
+  - worker shell 现在更接近高频 loop façade：terminal ACK include、abort policy、decoder/audio
+    event、stereo expand 与 worker task/start 仍在同一编译单元内串联
+  - 下一步继续聚焦：
+    - 将 WS public API 内 status dump/session API 继续拆窄，或继续治理 playback abort /
+      terminal ACK shell 的 ownership 边界
+
 - `Step 5.514`
   - 继续压缩 playback runtime 主文件，把 runtime view / typed result schema 从主文件拆出：
     - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行

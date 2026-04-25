@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.515
+- 继续治理 `river_cloud_xiaozhi_playback_downlink_worker.inc`，把 downlink worker 的恢复策略与 cycle 执行从 worker shell 中拆出：
+  - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc`，当前约 `538` 行
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc`，当前约 `383` 行
+- 新的 rebuffer recovery 模块集中承载：
+  - start/resume/low-water/segment-gap 门限 helper
+  - upstream starvation watch 与 managed rebuffer 请求
+  - write_failed 是否按 starvation rebuffer 处理的判断
+  - rebuffer recovery path/request/fallback 与 paused backend resume
+- 新的 downlink cycle 模块集中承载：
+  - playback stream start / compact retry
+  - prepare playback wait-kind/status
+  - acquire frame、write outcome、cycle result 与 wait-plan 投影
+- 保留原 worker shell 作为高频 loop 的窄入口：
+  - terminal ACK include 与 abort policy 仍在 shell 内串联
+  - decoder/audio event、stereo expand、worker task/start 仍留在 shell 内
+  - 没有新增 public header，也没有把 playback/runtime truth 写面外扩
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - first sandboxed build still hit SDK generated-file write restriction on `/root/ameba-rtos/.../build_info.h`; approved rerun succeeded
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.514
 - 继续压缩 `river_cloud_xiaozhi_playback_runtime.c`，把已稳定的 playback runtime view / typed result schema 从主文件拆出：
   - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行

@@ -1,3 +1,49 @@
+## Step 5.515 Verification
+
+Rebuild the latest-SDK external project image after splitting playback rebuffer recovery and downlink cycle ownership out of the downlink worker shell:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the downlink worker split boundaries:
+```bash
+cd /root/ameba-river
+wc -l   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc   components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc   components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc
+rg -n "river_cloud_xiaozhi_playback_rebuffer_recovery.inc|river_cloud_xiaozhi_playback_downlink_cycle.inc|maybe_rebuffer_starved|request_playback_rebuffer_recovery|prepare_downlink_cycle_plan|finish_downlink_task_cycle"   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc   components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc   components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_downlink_worker.inc` is about `358` lines and includes both new modules
+- rebuffer recovery helpers live in `river_cloud_xiaozhi_playback_rebuffer_recovery.inc`
+- playback prepare/acquire/write/cycle/wait-plan helpers live in `river_cloud_xiaozhi_playback_downlink_cycle.inc`
+- terminal ACK, abort policy, decoder/audio event, stereo expansion, and worker task remain in the worker shell
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- playback status still reports meta/heard/terminal/lineage/downlink state
+- downlink wait/outcome/cycle status and write_failed/upstream-starved recovery diagnostics remain visible
+
 ## Step 5.514 Verification
 
 Rebuild the latest-SDK external project image after moving playback runtime view/result schema out of the main playback runtime file:

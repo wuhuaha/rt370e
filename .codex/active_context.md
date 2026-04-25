@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.514 拆分 XiaoZhi playback runtime view/result 边界`
+  - `5.515 拆分 XiaoZhi downlink recovery/cycle 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续治理 playback downlink worker 的高频 loop 与恢复策略边界：
+      - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行
+      - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc`，
+        承载约 `538` 行 rebuffer / recovery helper
+      - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc`，
+        承载约 `383` 行 playback prepare / cycle helper
+    - rebuffer recovery 模块集中承载 start/resume/low-water/segment-gap 门限、upstream
+      starvation、managed rebuffer、write_failed starvation preference 与 recovery fallback
+    - downlink cycle 模块集中承载 playback start/compact retry、prepare wait-kind/status、
+      frame acquire/write outcome、cycle result 与 wait-plan 投影
+    - worker shell 保留 terminal ACK include、abort policy、decoder/audio event、stereo
+      expand 与 worker task/start；仍不新增 public header，不扩大 truth 写面
+    - 下一步继续聚焦：
+      - `river_xiaozhi_ws_public_api.inc` 的 status dump/session API 继续拆窄，或把
+        playback abort/terminal ACK shell 再拆成更小 ownership 模块
   - newest landed runtime-ownership slice:
     - 继续压缩 playback runtime 主文件并治理 view/result schema 边界：
       - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行
