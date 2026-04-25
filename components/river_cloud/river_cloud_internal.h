@@ -222,6 +222,8 @@ typedef struct {
     river_cloud_xiaozhi_playback_context_truth_t marked_context;
     river_cloud_xiaozhi_playback_context_truth_t cleared_context;
     river_cloud_xiaozhi_playback_context_truth_t completed_context;
+    river_cloud_xiaozhi_playback_context_truth_t last_segment_context;
+    river_cloud_xiaozhi_playback_context_truth_t fully_heard_context;
     uint32_t last_mark_ms;
     uint64_t updated_ms;
     char reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];

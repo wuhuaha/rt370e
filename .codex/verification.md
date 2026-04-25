@@ -1,3 +1,51 @@
+## Step 5.508 Verification
+
+Rebuild the latest-SDK external project image after making playback lineage the canonical source for terminal contexts and report flags:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm lineage truth owns terminal context and report flag derivation:
+```bash
+cd /root/ameba-river
+rg -n "fully_heard_context|last_segment_context|sync_playback_terminal_report_flags|playback_lineage_truth|lineage_started|lineage_completed" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  .codex/verification.md
+```
+
+Expected result:
+- lineage truth carries last segment and fully heard contexts
+- completed/cleared ACK paths and status dump read lineage truth
+- meta note, wait context, and segment queue paths read lineage meta context as
+  the canonical context while legacy meta/terminal fields remain mirrors
+- terminal reported flags are derived through the sync helper
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- `playback_meta`, `playback_heard_context`, `playback_terminal_context`, and
+  `playback_lineage` remain internally consistent for the same response/playback
+
 ## Step 5.507 Verification
 
 Rebuild the latest-SDK external project image after typing write-failed recovery and adding playback lineage truth:

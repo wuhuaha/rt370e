@@ -1,5 +1,30 @@
 # Change Log
 
+## Step 5.508
+- 在 Step 5.507 已建立 playback lineage truth 后，继续白盒收口剩余分散读写：
+  - last segment observed / fully heard context 仍主要从 terminal truth 读取
+  - started/cleared/completed reported flags 仍由多个调用点直接赋值
+  - status dump 仍混合读取 meta truth、terminal truth 与 lineage truth
+- `river_cloud_xiaozhi_playback_lineage_truth_t` 新增
+  `last_segment_context` 与 `fully_heard_context`，让 last/meta/started/mark/
+  cleared/completed/heard 链路都挂到同一 lineage truth 上
+- `playback_completed_ready()`、completed wait-kind、cleared/completed ACK
+  发送上下文、status dump 均改为优先读取 lineage truth
+- `playback_note_meta()` 仍保留 `meta_truth->current_context` 作为 legacy
+  mirror，但 response/playback change detection、segment queue population、
+  wait/last/heard terminal context 派生与 gap/status 诊断都改为读取 lineage
+  context
+- 新增 `river_cloud_xiaozhi_sync_playback_terminal_report_flags()`，让 legacy
+  terminal flags 由 lineage truth 派生，避免业务逻辑继续手写
+  started/cleared/completed reported 布尔组合
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `rg -n "fully_heard_context|last_segment_context|sync_playback_terminal_report_flags|playback_lineage_truth|lineage_started|lineage_completed" ...`
+    confirmed lineage truth owns terminal context/report derivation
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.507
 - 本地白盒重构继续收口两个确定性关键问题：
   - `write_failed` recovery followup 仍通过 `inline_success` / `managed_rebuffer`
