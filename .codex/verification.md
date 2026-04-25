@@ -1,3 +1,60 @@
+## Step 5.512 Verification
+
+Rebuild the latest-SDK external project image after moving XiaoZhi bootstrap/discovery and playback downlink worker paths out of the two main runtime files:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the main runtime files are now below the 3k-line target and the new ownership boundaries are present:
+```bash
+cd /root/ameba-river
+wc -l \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_bootstrap_discovery.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc
+rg -n "river_xiaozhi_ws_bootstrap_discovery.inc|river_cloud_xiaozhi_playback_downlink_worker.inc|river_xiaozhi_http_post_json|river_xiaozhi_refresh_discovery_profile|river_cloud_xiaozhi_prepare_downlink_cycle_plan|river_cloud_xiaozhi_playback_handle_audio_event" \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_bootstrap_discovery.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc \
+  .codex/verification.md
+```
+
+Expected result:
+- `river_xiaozhi_ws.c` is about `2965` lines and includes
+  `river_xiaozhi_ws_bootstrap_discovery.inc`
+- `river_cloud_xiaozhi_playback_runtime.c` is about `2550` lines and includes
+  `river_cloud_xiaozhi_playback_downlink_worker.inc`
+- bootstrap/discovery HTTP logic is isolated from the realtime WS dispatch body
+- downlink worker / audio event / cycle plan logic is isolated from the playback
+  truth/policy body
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- XiaoZhi transport/session/preview status remains available
+- playback status still reports meta/heard/terminal/lineage/downlink state
+
 ## Step 5.511 Verification
 
 Rebuild the latest-SDK external project image after splitting XiaoZhi public/status policy shells out of the two large runtime files:

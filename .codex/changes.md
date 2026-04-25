@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.512
+- 按“3k 行仍过大”的治理目标继续白盒拆分两个 XiaoZhi runtime 主文件，
+  这次不再只把尾部 public API 拆走，而是把剩余大块低频/专用职责从主循环
+  中移出：
+  - `river_xiaozhi_ws.c` 从 `3713` 行降到 `2965` 行
+  - `river_cloud_xiaozhi_playback_runtime.c` 从 `3826` 行降到 `2550` 行
+- 拆出 `components/river_cloud/river_xiaozhi_ws_bootstrap_discovery.inc`：
+  - 集中承载 HTTP URL 解析、OTA bootstrap POST、discovery GET、bootstrap /
+    discovery JSON parse
+  - `river_xiaozhi_ws.c` 主体现在只保留 realtime transport、send queue、
+    negotiation/cache 状态与 dispatch 关键路径，低频联网探测不再混在 receive
+    path 附近
+- 拆出 `components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc`：
+  - 集中承载 downlink start gate、segment gap/rebuffer、downlink cycle plan、
+    decoder/audio event、downlink worker task 与 terminal ACK include
+  - `river_cloud_xiaozhi_playback_runtime.c` 主体保留 backend/source/truth view、
+    lineage、terminal wait、policy/status include，媒体 worker 细节整体后移
+- 这一步的治理边界：
+  - 不扩大 public header，不把 private truth 写面暴露给跨 translation unit
+  - 优先用 include-split 建立稳定 ownership，再决定下一轮是否把 bootstrap /
+    downlink worker 升级为独立 `.c` + narrow internal header
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `wc -l` confirmed both main runtime files are now below `3000` lines
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.511
 - 继续对两个 XiaoZhi 超大 runtime 文件做第二轮结构拆分，让主文件回到更清晰的
   high-frequency/core orchestration 视图：

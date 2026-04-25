@@ -26,6 +26,25 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.512`
+  - 按“主文件低于 3k 行”的治理目标继续拆分：
+    - `river_xiaozhi_ws.c` 从 `3713` 行降到 `2965` 行
+    - `river_cloud_xiaozhi_playback_runtime.c` 从 `3826` 行降到 `2550` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_bootstrap_discovery.inc`：
+    - 集中承载 HTTP URL 解析、OTA bootstrap POST、discovery GET、bootstrap /
+      discovery JSON parse
+    - 主 WS 文件更聚焦 realtime transport、send queue、negotiation/cache 状态与
+      dispatch
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc`：
+    - 集中承载 downlink start gate、segment gap/rebuffer、cycle plan、decoder/audio
+      event、worker task 与 terminal ACK include
+    - 主 playback runtime 更聚焦 backend/source/truth view、lineage、terminal wait、
+      policy/status include
+  - 下一步继续聚焦：
+    - 把已稳定的 `.inc` ownership 边界继续缩窄 internal interface；优先评估
+      bootstrap/discovery 和 downlink worker 是否可升级为独立 `.c` + narrow
+      private header
+
 - `Step 5.511`
   - 继续对两个超大 XiaoZhi runtime 文件做第二轮 include-split：
     - `river_xiaozhi_ws.c` 从 `4664` 行降到 `3713` 行
