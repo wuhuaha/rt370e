@@ -1,3 +1,50 @@
+## Step 5.521 Verification
+
+Rebuild the latest-SDK external project image after suppressing duplicate
+`audio.in.commit` once server endpoint has already committed the input:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for the 2026-04-25 `turn_not_ready` loop:
+```text
+Wake once, say a short sentence, then wait through the response/follow-up window.
+Wake again after the window closes.
+```
+
+Expected result:
+- after `accept_reason=server_endpoint` and `input_state=committed`, logs include
+  `xiaozhi server committed input; closing local round without audio.in.commit`
+- if any later close path tries to commit, logs include
+  `xiaozhi audio.in.commit skipped`
+- logs no longer show `turn_not_ready` / `audio.in.commit is accepted only while the session is active`
+- interaction should not remain in or repeatedly re-enter `error_recovering`
+
+Separate audio-output validation:
+```text
+Watch the same wake for downlink events.
+```
+
+Expected result:
+- if the server sends audio, logs should include `xiaozhi audio.out.meta` and binary audio handling before playback starts
+- if logs still show only `response.start` / `response.chunk` text and no `audio.out.meta` / binary PCM, the remaining "no sound" issue is upstream audio downlink absence, not local playback start logic
+
 ## Step 5.520 Verification
 
 Rebuild the latest-SDK external project image after splitting legacy XiaoZhi text handlers out of the realtime message handler include:

@@ -15,11 +15,27 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.520 拆分 XiaoZhi WS legacy handler 边界`
+  - `5.521 跳过 server endpoint 已提交后的重复 commit`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - 2026-04-25 板端日志显示 `server_endpoint` 已接受本轮输入并把
+      `input_state` 推进到 `committed` 后，本地 post-roll 仍发送兼容
+      `audio.in.commit`
+    - 服务端拒绝该重复 commit 并返回 `turn_not_ready` /
+      `audio.in.commit is accepted only while the session is active`，触发
+      `asr_error`、`error_recovering` 与同一 server session 内重复 reopen ASR
+      loop
+    - Step 5.521 现在在 accepted + `input_state=committed` 时关闭本地 round，
+      并在 `river_xiaozhi_send_audio_commit_internal()` 增加 committed 语义缓存
+      保险，避免再发 wire-level `audio.in.commit`
+    - 当前“无声音”仍需单独追踪：日志只有 `response.start` / `response.chunk`
+      文本，没有 `audio.out.meta` 或 binary PCM，设备端没有可播放下行输入
+    - 下一步上板验证：
+      - 不再出现 `turn_not_ready` / `error_recovering` loop
+      - 若仍无声，确认服务端是否实际下发 `audio.out.meta` 与 binary 音频
   - newest landed runtime-ownership slice:
     - 继续治理 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中拆出：
       - `river_xiaozhi_ws_message_handlers.inc` 从 `956` 行降到 `707` 行

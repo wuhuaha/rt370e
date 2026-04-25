@@ -1,7 +1,7 @@
 # Voice Runtime Re-Architecture Execution Plan
 
 Status: active
-Last Updated: 2026-04-25
+Last Updated: 2026-04-26
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -25,6 +25,22 @@ Branch: `agent-server-v2`
   - [doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md)
 
 ### 1.1 最新进展
+
+- `Step 5.521`
+  - 针对 2026-04-25 板端日志中的 `turn_not_ready` / `audio.in.commit is accepted only while the session is active`：
+    - 确认服务端已经通过 `server_endpoint` 接受本轮输入，并把 `input_state` 推进到 `committed`
+    - 本地 post-roll 后继续发送兼容 `audio.in.commit` 会被服务端拒绝，导致 `asr_error`、`error_recovering` 与重复 reopen ASR loop
+  - 本步把 server endpoint 已提交视为本地轮次结束事实：
+    - `river_cloud_xiaozhi_refresh_turn_semantics()` 看到 accepted + `input_state=committed` 后，直接关闭本地 ASR round
+    - `RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE` 允许在 `listening=yes` 但 `stream_active=no` 的窗口收口
+    - `river_xiaozhi_send_audio_commit_internal()` 增加 wire-level 保险，若缓存语义已经是 committed + accept_reason，则跳过 `audio.in.commit`
+  - 本步不解决“无声音”的服务端音频下行缺失：
+    - 当前日志只有 `response.start` / `response.chunk` 文本，没有 `audio.out.meta` 或 binary PCM
+    - 设备端没有音频元数据/PCM 时不会启动 playback，需继续用服务端日志或协议能力字段定位音频输出侧
+  - 下一步上板验证：
+    - `server_endpoint` accept 后应出现本地 round close / commit skipped 日志
+    - 不应再出现 `turn_not_ready` 导致的 `error_recovering` 循环
+    - 若仍无声，重点确认服务端是否发送 `audio.out.meta` 与 binary 音频帧
 
 - `Step 5.520`
   - 继续拆分 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中移出：

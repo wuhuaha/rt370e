@@ -1677,6 +1677,14 @@ static river_status_t river_xiaozhi_send_audio_commit_internal(const char *reaso
     if (!g_river_xiaozhi.dialog_started) {
         return RIVER_OK;
     }
+    if (strcmp(g_river_xiaozhi.last_input_state, "committed") == 0 &&
+        g_river_xiaozhi.last_accept_reason[0] != '\0') {
+        RIVER_LOGI("xiaozhi audio.in.commit skipped: reason=%s input_state=%s accept_reason=%s",
+                   reason != NULL && reason[0] != '\0' ? reason : "-",
+                   g_river_xiaozhi.last_input_state,
+                   g_river_xiaozhi.last_accept_reason);
+        return RIVER_OK;
+    }
 
     root = river_xiaozhi_create_control_event("audio.in.commit", &payload);
     if (root == NULL || payload == NULL) {

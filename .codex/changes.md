@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.521
+- 分析 2026-04-25 板端 XiaoZhi 日志后，修正 server endpoint 已提交后的重复 `audio.in.commit`：
+  - 日志显示服务端已返回 `accept_reason=server_endpoint` 且 `input_state=committed`
+  - 之后本地 post-roll 再发送 `audio.in.commit`，服务端按当前状态拒绝并返回 `turn_not_ready`
+  - 该错误会把 interaction 推入 `error_recovering`，随后 VAD 触发同一 server session 内的重复 ASR round/reopen loop
+- 新增本地语义收口：
+  - `river_cloud_xiaozhi_refresh_turn_semantics()` 在 accepted + `input_state=committed` 时关闭本地 round
+  - `RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE` 现在允许在 `listening=yes` 的本地窗口内完成关闭
+  - `river_xiaozhi_send_audio_commit_internal()` 增加二道保险，语义缓存已 committed 时跳过 wire-level `audio.in.commit`
+- 对“无声音”的当前判断：
+  - 本次日志中服务端只下发 `response.start` 和 `response.chunk` 文本
+  - 未看到 `audio.out.meta` 或 binary PCM，下行播放链路没有可播放输入
+  - 该现象需要继续从服务端 TTS/audio 输出或协议 capability 字段定位，设备端本步仅避免状态机被重复 commit 错误污染
+- Verification:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.520
 - 继续治理 XiaoZhi WS receive path，把 legacy 文本消息处理从 realtime message handler include 中拆出：
   - `river_xiaozhi_ws_message_handlers.inc` 从 `956` 行降到 `707` 行

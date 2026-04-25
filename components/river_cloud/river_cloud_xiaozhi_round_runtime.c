@@ -275,6 +275,7 @@ void river_cloud_xiaozhi_close_local_round_for_cause(
 
     case RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE:
         if (!g_river_cloud.stream_active &&
+            !g_river_cloud.xiaozhi_session_window_truth.listening &&
             !g_river_cloud.xiaozhi_session_window_truth.listen_stop_pending &&
             !g_river_cloud.xiaozhi_session_window_truth.local_close_pending) {
             return;

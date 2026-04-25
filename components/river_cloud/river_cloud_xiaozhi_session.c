@@ -1733,6 +1733,38 @@ const char *river_cloud_xiaozhi_current_sid(void)
                river_xiaozhi_session_id();
 }
 
+static bool river_cloud_xiaozhi_input_state_server_committed(const char *input_state)
+{
+    return input_state != NULL && strcmp(input_state, "committed") == 0;
+}
+
+static void river_cloud_xiaozhi_close_local_round_after_server_commit(
+    const river_cloud_xiaozhi_turn_semantics_state_t *state,
+    const char *trigger)
+{
+    if (state == NULL || !state->accepted ||
+        !river_cloud_xiaozhi_input_state_server_committed(state->input_state)) {
+        return;
+    }
+    if (!g_river_cloud.stream_active &&
+        !g_river_cloud.xiaozhi_session_window_truth.listening &&
+        !g_river_cloud.xiaozhi_session_window_truth.listen_stop_pending &&
+        !g_river_cloud.xiaozhi_session_window_truth.local_close_pending) {
+        return;
+    }
+
+    RIVER_LOGI("xiaozhi server committed input; closing local round without audio.in.commit: trigger=%s accept_reason=%s input_state=%s output_state=%s stream=%s listening=%s",
+               trigger != NULL ? trigger : "-",
+               state->accept_reason[0] != '\0' ? state->accept_reason : "-",
+               state->input_state[0] != '\0' ? state->input_state : "-",
+               state->output_state[0] != '\0' ? state->output_state : "-",
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_session_window_truth.listening ? "yes" : "no");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
+        "server_endpoint_accept");
+}
+
 void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
 {
     river_cloud_xiaozhi_turn_semantics_state_t *state = &g_river_cloud.xiaozhi_turn_semantics;
@@ -1798,6 +1830,8 @@ void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
                    river_cloud_xiaozhi_optional_bool_text(state->barge_in_enabled_known,
                                                           state->barge_in_enabled));
     }
+
+    river_cloud_xiaozhi_close_local_round_after_server_commit(state, trigger);
 }
 
 bool river_cloud_xiaozhi_turn_accepted(void)
