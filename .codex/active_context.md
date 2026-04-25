@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.500 类型化 downlink task cycle result`
+  - `5.501 类型化 downlink task wait plan`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续类型化 XiaoZhi downlink worker sleep/idle 收尾策略，把
+      cycle result 到 RTOS delay 的投影收口成 typed wait plan
+    - 新增：
+      - `river_cloud_xiaozhi_downlink_task_wait_plan_t`
+      - `river_cloud_xiaozhi_build_downlink_task_wait_plan()`
+    - `river_cloud_xiaozhi_finish_downlink_task_cycle()` 现在只消费 wait plan，
+      不再内联把 cycle step result 分支直接映射到 `rtos_time_delay_ms(...)`
+    - 这一步把：
+      - finish helper 内直接判断 `SLEEP_IDLE` / `SLEEP_POLL` 并执行 delay
+      收口成：
+      - typed wait plan owns sleep/no-sleep and delay duration before the RTOS effect
+    - 下一步继续聚焦：
+      - 继续检查 downlink cycle 中 ready/acquire/write 子结果是否还能服务诊断或
+        recovery policy，避免 typed result 只停留在结构包装层
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续类型化 XiaoZhi downlink worker cycle，把 ready / acquire / write
       三段结果组合成 cycle-level typed result

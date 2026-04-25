@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.501
+- `river_cloud` 继续类型化 XiaoZhi downlink worker sleep/idle 收尾策略，把
+  cycle result 到 RTOS delay 的投影收口成 typed wait plan：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+- 新增：
+  - `river_cloud_xiaozhi_downlink_task_wait_plan_t`
+  - `river_cloud_xiaozhi_build_downlink_task_wait_plan()`
+- `river_cloud_xiaozhi_finish_downlink_task_cycle()` 现在只消费 wait plan，
+  不再内联把 cycle step result 分支直接映射到 `rtos_time_delay_ms(...)`
+- 这一步把 worker 收尾从：
+  - finish helper 内直接判断 `SLEEP_IDLE` / `SLEEP_POLL` 并执行 delay
+  推进到：
+  - typed wait plan owns sleep/no-sleep and delay duration before the RTOS effect
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `rg -n "downlink_task_wait_plan_t|build_downlink_task_wait_plan|finish_downlink_task_cycle" components/river_cloud/river_cloud_xiaozhi_playback_runtime.c` confirmed the wait-plan boundary
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
 ## Step 5.500
 - `river_cloud` 继续类型化 XiaoZhi downlink worker cycle，把 ready / acquire / write
   三段结果组合成 cycle-level typed result：

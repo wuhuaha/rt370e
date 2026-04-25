@@ -1,3 +1,47 @@
+## Step 5.501 Verification
+
+Rebuild the latest-SDK external project image after the downlink wait-plan change:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the wait-plan boundary is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "downlink_task_wait_plan_t|build_downlink_task_wait_plan|finish_downlink_task_cycle" \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_downlink_task_wait_plan_t` is defined
+- `river_cloud_xiaozhi_build_downlink_task_wait_plan()` maps cycle result to delay policy
+- `river_cloud_xiaozhi_finish_downlink_task_cycle()` executes only the wait-plan effect
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for unchanged downlink wait behavior:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- XiaoZhi TTS downlink still drains without added busy-looping
+- idle downlink periods still remain quiet and responsive to new audio
+
 ## Step 5.500 Verification
 
 Rebuild the latest-SDK external project image after the downlink cycle typed-result change:

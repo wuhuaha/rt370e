@@ -779,6 +779,11 @@ typedef struct {
     river_cloud_xiaozhi_downlink_frame_write_result_t write_result;
 } river_cloud_xiaozhi_downlink_task_cycle_result_t;
 
+typedef struct {
+    bool sleep;
+    uint32_t delay_ms;
+} river_cloud_xiaozhi_downlink_task_wait_plan_t;
+
 static void river_cloud_xiaozhi_capture_playback_truth_view(
     river_cloud_xiaozhi_playback_truth_view_t *view)
 {
@@ -4464,22 +4469,40 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
     return result;
 }
 
+static river_cloud_xiaozhi_downlink_task_wait_plan_t
+river_cloud_xiaozhi_build_downlink_task_wait_plan(
+    const river_cloud_xiaozhi_downlink_task_cycle_result_t *cycle_result)
+{
+    river_cloud_xiaozhi_downlink_task_wait_plan_t wait_plan = {
+        .sleep = false,
+        .delay_ms = 0U,
+    };
+
+    if (cycle_result == NULL) {
+        return wait_plan;
+    }
+
+    if (cycle_result->step_result ==
+        RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE) {
+        wait_plan.sleep = true;
+        wait_plan.delay_ms = RIVER_CLOUD_XIAOZHI_DOWNLINK_IDLE_MS;
+    } else if (cycle_result->step_result ==
+               RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL) {
+        wait_plan.sleep = true;
+        wait_plan.delay_ms = RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS;
+    }
+
+    return wait_plan;
+}
+
 static void river_cloud_xiaozhi_finish_downlink_task_cycle(
     const river_cloud_xiaozhi_downlink_task_cycle_result_t *cycle_result)
 {
-    river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    river_cloud_xiaozhi_downlink_task_wait_plan_t wait_plan =
+        river_cloud_xiaozhi_build_downlink_task_wait_plan(cycle_result);
 
-    if (cycle_result == NULL) {
-        return;
-    }
-
-    step_result = cycle_result->step_result;
-    if (step_result == RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE) {
-        rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_IDLE_MS);
-        return;
-    }
-    if (step_result == RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL) {
-        rtos_time_delay_ms(RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS);
+    if (wait_plan.sleep) {
+        rtos_time_delay_ms(wait_plan.delay_ms);
     }
 }
 
