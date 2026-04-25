@@ -1,5 +1,34 @@
 # Change Log
 
+## Step 5.503
+- `river_cloud` 继续细分 XiaoZhi downlink ready-plan 的 not-ready 原因，
+  让 wait reason 不再只有粗粒度 `not_ready`：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 扩展 `river_cloud_xiaozhi_downlink_wait_kind_t`：
+  - `starved`
+  - `segment_gap`
+  - `empty`
+  - `playback_not_ready`
+- `river_cloud_xiaozhi_downlink_cycle_plan_t` 现在持有 `wait_kind`，
+  `river_cloud_xiaozhi_prepare_downlink_cycle_plan()` 在各个 not-ready 分支中显式
+  标注 blocked reason
+- `river_cloud_xiaozhi_build_downlink_task_wait_plan()` 现在直接消费 cycle plan 的
+  ready-block reason，status 中的 `wait=<kind>/<delay>ms` 可以区分：
+  - 上游断供触发 rebuffer
+  - segment gap hold
+  - 队列为空
+  - playback start/prep gate 未满足
+- 这一步把 Step 5.502 的 wait reason 从：
+  - generic `not_ready`
+  推进到：
+  - ready-plan owns concrete blocked reason before wait-plan projection
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `rg -n "WAIT_STARVED|WAIT_SEGMENT_GAP|WAIT_EMPTY|WAIT_PLAYBACK_NOT_READY|cycle_plan\.wait_kind|wait=<kind>" ...` confirmed the enum, ready-plan ownership, and wait-plan projection
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`
+
 ## Step 5.502
 - `river_cloud` 继续让 XiaoZhi downlink cycle sub-results 服务诊断，把 worker
   wait plan 的原因锁存到 downlink runtime truth 并在 status 中输出：

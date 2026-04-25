@@ -15,11 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.502 暴露 downlink wait reason truth`
+  - `5.503 细分 downlink ready blocked wait reason`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - `river_cloud` 继续细分 XiaoZhi downlink ready-plan 的 not-ready 原因，
+      让 wait reason 不再只有粗粒度 `not_ready`
+    - 扩展 `river_cloud_xiaozhi_downlink_wait_kind_t`：
+      - `starved`
+      - `segment_gap`
+      - `empty`
+      - `playback_not_ready`
+    - `river_cloud_xiaozhi_downlink_cycle_plan_t` 现在持有 `wait_kind`，
+      ready-plan 在各个 not-ready 分支中显式标注 blocked reason
+    - wait plan 现在直接消费 cycle plan 的 ready-block reason，status 中的
+      `wait=<kind>/<delay>ms` 可以区分上游断供、segment gap、空队列和
+      playback start/prep gate 未满足
+    - 这一步把：
+      - generic `not_ready`
+      收口成：
+      - ready-plan owns concrete blocked reason before wait-plan projection
+    - 下一步继续聚焦：
+      - 继续把 acquire/write 子结果中的 status/error 细节纳入 typed result，
+        让 acquire miss 和 write failed 也能携带更明确的 failure reason
   - newest landed runtime-ownership slice:
     - `river_cloud` 继续让 XiaoZhi downlink cycle sub-results 服务诊断，把 worker
       wait plan 的原因锁存到 downlink runtime truth 并在 status 中输出
