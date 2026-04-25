@@ -1903,37 +1903,6 @@ static river_status_t river_xiaozhi_send_audio_out_completed_internal(const char
     return river_xiaozhi_send_json_root(root);
 }
 
-static void river_xiaozhi_emit_tts_event(const char *state, const char *text)
-{
-    river_xiaozhi_set_last_type("tts");
-    river_xiaozhi_set_last_state(state);
-    if (text != NULL && text[0] != '\0') {
-        river_xiaozhi_set_last_text(text);
-    }
-    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_TTS,
-                             text,
-                             state,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             0U,
-                             0U,
-                             0U,
-                             0U,
-                             0U,
-                             NULL,
-                             0U,
-                             0U,
-                             false,
-                             false,
-                             false);
-}
-
 #include "river_xiaozhi_ws_message_handlers.inc"
 
 static void river_xiaozhi_ws_close_cb(wsclient_context *wsclient, void *user_data)

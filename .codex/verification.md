@@ -1,3 +1,56 @@
+## Step 5.522 Verification
+
+Rebuild the latest-SDK external project image after separating realtime text
+response events from audio TTS playback facts:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Confirm the realtime text/TTS split is compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS|xiaozhi response audio wait timeout|audio_wait_timeout_reported" \
+  components/river_cloud include/river
+rg -n "river_xiaozhi_emit_tts_event" components/river_cloud || true
+```
+
+Expected result:
+- response audio timeout symbols and log text are present
+- `river_xiaozhi_emit_tts_event` is absent from the realtime WS path
+- legacy `tts` handling still emits `RIVER_XIAOZHI_EVENT_TTS` from `river_xiaozhi_ws_legacy_handlers.inc`
+
+Post-flash board validation for the 2026-04-25 no-audio case:
+```text
+Wake once, say a short sentence, and watch logs from response.start through
+the first audio segment or timeout.
+```
+
+Expected result when service TTS is still blocked:
+- logs include `xiaozhi response.start` / `xiaozhi response.chunk`
+- logs no longer include misleading realtime-derived `xiaozhi tts sentence_start`
+- if no `audio.out.meta` arrives within `5s`, logs include `xiaozhi response audio wait timeout`
+- no repeated `turn_not_ready` / `audio.in.commit is accepted only while the session is active` loop should appear with Step 5.521 also present
+
+Expected result when service TTS has recovered:
+- logs include `xiaozhi audio.out.meta`, binary PCM handling, and playback start
+- `xiaozhi response audio wait timeout` should not appear for that response
+
 ## Step 5.521 Verification
 
 Rebuild the latest-SDK external project image after suppressing duplicate

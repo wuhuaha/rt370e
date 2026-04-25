@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.522
+- 基于服务侧对 2026-04-25 最近真实设备日志的定位，继续收口“文本 response 已到但无音频”的端侧表现：
+  - ASR/LLM 主链路已经能进入 `response.start` / `response.chunk`
+  - 失败发生在后续 `audio.out.meta` / binary PCM 长时间不到达，服务侧 qwen_unified TTS 单并发队列堵塞是主要原因
+  - 端侧此前把 realtime 文本 response 合成为本地 `TTS start/sentence_start`，容易误导日志与 round/playback 判断
+- 拆分 realtime 文本 response 与音频播放事实：
+  - `response.start` / `response.chunk` 只保留 realtime response/text 日志与 response lineage
+  - 不再从 realtime 文本 response 合成 `RIVER_XIAOZHI_EVENT_TTS`
+  - legacy `tts` 文本消息仍保留原 `RIVER_XIAOZHI_EVENT_TTS` 兼容路径
+  - 音频播放事实继续只由 `audio.out.meta` 与 binary PCM 驱动
+- 新增 response 后音频等待诊断：
+  - `response.start` 会重置 playback lineage 并记录 response id
+  - 若 `5s` 内未观察到 `audio.out.meta`，打印 `xiaozhi response audio wait timeout`
+  - timeout 日志带上 `response_id`、等待时长、`input_state`、`output_state`、accepted 状态、playback 活跃状态和已排队音频帧数
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.521
 - 分析 2026-04-25 板端 XiaoZhi 日志后，修正 server endpoint 已提交后的重复 `audio.in.commit`：
   - 日志显示服务端已返回 `accept_reason=server_endpoint` 且 `input_state=committed`

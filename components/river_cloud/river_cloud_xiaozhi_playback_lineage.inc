@@ -54,6 +54,7 @@ static void river_cloud_xiaozhi_touch_playback_lineage(
 
     switch (stage) {
     case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED:
+        lineage->audio_wait_timeout_reported = false;
         river_cloud_xiaozhi_copy_playback_context_truth(&lineage->response_context,
                                                         context);
         break;

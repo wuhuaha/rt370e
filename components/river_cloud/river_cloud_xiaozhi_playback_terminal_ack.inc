@@ -298,6 +298,7 @@ void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_eve
         return;
     }
 
+    river_cloud_xiaozhi_clear_playback_lineage_truth();
     memset(&context, 0, sizeof(context));
     river_cloud_xiaozhi_copy_optional_text(context.response_id,
                                            sizeof(context.response_id),
@@ -307,6 +308,47 @@ void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_eve
         &context,
         0U,
         NULL);
+}
+
+void river_cloud_xiaozhi_check_response_audio_timeout(void)
+{
+    river_cloud_xiaozhi_playback_lineage_truth_t *lineage =
+        &g_river_cloud.xiaozhi_playback_lineage_truth;
+    uint64_t now_ms;
+    uint64_t wait_ms;
+
+    if (lineage->stage != RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED ||
+        lineage->audio_wait_timeout_reported ||
+        lineage->updated_ms == 0U ||
+        lineage->meta_context.response_id[0] != '\0') {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (now_ms < lineage->updated_ms) {
+        return;
+    }
+
+    wait_ms = now_ms - lineage->updated_ms;
+    if (wait_ms < RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS) {
+        return;
+    }
+
+    lineage->audio_wait_timeout_reported = true;
+    RIVER_LOGW("xiaozhi response audio wait timeout: response_id=%s wait_ms=%lu input_state=%s output_state=%s accepted=%s playback=%s queued=%lu",
+               lineage->response_context.response_id[0] != '\0' ?
+                   lineage->response_context.response_id :
+                   "-",
+               (unsigned long)wait_ms,
+               g_river_cloud.xiaozhi_turn_semantics.input_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.input_state :
+                   "-",
+               g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.output_state :
+                   "-",
+               g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
+               river_cloud_xiaozhi_playback_output_active() ? "active" : "idle",
+               (unsigned long)river_cloud_xiaozhi_playback_queued_frames());
 }
 
 static void river_cloud_xiaozhi_try_queue_playback_started_ack(void)

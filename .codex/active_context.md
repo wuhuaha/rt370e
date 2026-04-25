@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.521 跳过 server endpoint 已提交后的重复 commit`
+  - `5.522 拆分 realtime 文本响应与音频 TTS 诊断`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - 基于 2026-04-25 服务侧与板端日志复盘，“一直没有声音”的直接端侧现象是：
+      - 已收到 realtime `response.start` / `response.chunk` 文本
+      - 未收到 `audio.out.meta` 或 binary PCM
+      - 服务侧定位 qwen_unified TTS 单并发队列堵塞，导致 agentd 等待音频超时
+    - Step 5.522 将端侧 realtime 文本 response 与音频播放事实拆开：
+      - `response.start` / `response.chunk` 不再合成本地 `RIVER_XIAOZHI_EVENT_TTS`
+      - legacy `tts` 消息仍保留兼容 TTS event 路径
+      - 音频播放事实继续只由 `audio.out.meta` 与 binary PCM 驱动
+    - 新增 `5s` response audio wait timeout 诊断：
+      - 若 response 已开始但未看到 `audio.out.meta`，打印 `xiaozhi response audio wait timeout`
+      - 日志带 response id、turn semantics、accepted 状态、playback 活跃状态与队列帧数
+    - 下一步上板验证：
+      - 服务端 TTS 堵塞时应看到 audio wait timeout，而不是误导性的 `xiaozhi tts sentence_start`
+      - 服务端 TTS 恢复后应看到 `audio.out.meta` / binary PCM / playback start，且不触发 timeout
   - newest landed runtime bug-fix slice:
     - 2026-04-25 板端日志显示 `server_endpoint` 已接受本轮输入并把
       `input_state` 推进到 `committed` 后，本地 post-roll 仍发送兼容

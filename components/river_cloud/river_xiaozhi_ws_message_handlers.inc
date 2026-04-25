@@ -139,7 +139,6 @@ static void river_xiaozhi_handle_realtime_session_update(const cJSON *payload)
     if (state != NULL && strcmp(state, "active") == 0 &&
         g_river_xiaozhi.response_started) {
         g_river_xiaozhi.response_started = false;
-        river_xiaozhi_emit_tts_event("stop", NULL);
     }
 }
 
@@ -317,7 +316,6 @@ static void river_xiaozhi_handle_realtime_response_start(const cJSON *payload)
                              false,
                              false,
                              false);
-    river_xiaozhi_emit_tts_event("start", NULL);
 }
 
 static void river_xiaozhi_handle_realtime_response_chunk(const cJSON *payload)
@@ -349,13 +347,11 @@ static void river_xiaozhi_handle_realtime_response_chunk(const cJSON *payload)
 
     if (!g_river_xiaozhi.response_started) {
         g_river_xiaozhi.response_started = true;
-        river_xiaozhi_emit_tts_event("start", NULL);
     }
 
     RIVER_LOGI("xiaozhi response.chunk: sid=%s text=%s",
                g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
                text);
-    river_xiaozhi_emit_tts_event("sentence_start", text);
 }
 
 static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
@@ -384,7 +380,6 @@ static void river_xiaozhi_handle_realtime_session_end(const cJSON *payload)
     }
     if (g_river_xiaozhi.response_started) {
         g_river_xiaozhi.response_started = false;
-        river_xiaozhi_emit_tts_event("stop", NULL);
     }
     g_river_xiaozhi.dialog_started = false;
     river_xiaozhi_clear_last_preview_fields();

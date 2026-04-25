@@ -26,6 +26,22 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.522`
+  - 基于服务侧对 2026-04-25 最近真实设备日志的定位，继续收口“文本 response 成功但音频 TTS 阻塞”的端侧表现：
+    - 服务端 ASR/LLM 主链路正常，但 qwen_unified TTS 单并发队列堵塞会导致 `response.start` / `response.chunk` 已到达、`audio.out.meta` / binary PCM 长时间不到达
+    - 端侧此前把 realtime `response.start` 与文本 `response.chunk` 映射成本地 `TTS start/sentence_start`，容易误导 runtime 与日志，把“文本回复开始”看成“音频 TTS 开始”
+  - 本步拆开文本 response 与音频播放事实：
+    - `response.start` / `response.chunk` 只保留 realtime response/text 日志与 response lineage，不再合成 `RIVER_XIAOZHI_EVENT_TTS`
+    - legacy `tts` 消息仍保留原 `RIVER_XIAOZHI_EVENT_TTS` 语义
+    - 音频播放事实继续由 `audio.out.meta` 与 binary PCM 驱动
+  - 新增 response 后音频等待诊断：
+    - `response.start` 会重置 playback lineage
+    - 若 `5s` 内未观察到 `audio.out.meta`，会打印 `xiaozhi response audio wait timeout`
+    - 日志同时带上 `response_id`、等待时长、`input_state`、`output_state`、accepted 状态、playback 活跃状态与已排队音频帧数
+  - 下一步上板验证：
+    - 服务端 TTS 堵塞时应看到明确的 audio wait timeout，而不是误导性的 `xiaozhi tts sentence_start`
+    - 服务端恢复音频下发后，应看到 `audio.out.meta` / binary PCM / playback start，且不会触发该 timeout
+
 - `Step 5.521`
   - 针对 2026-04-25 板端日志中的 `turn_not_ready` / `audio.in.commit is accepted only while the session is active`：
     - 确认服务端已经通过 `server_endpoint` 接受本轮输入，并把 `input_state` 推进到 `committed`

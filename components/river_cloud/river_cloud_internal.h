@@ -90,6 +90,7 @@
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
 #define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
+#define RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS 5000U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_MARK_INTERVAL_MS 80U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
@@ -226,6 +227,7 @@ typedef struct {
     river_cloud_xiaozhi_playback_context_truth_t fully_heard_context;
     uint32_t last_mark_ms;
     uint64_t updated_ms;
+    bool audio_wait_timeout_reported;
     char reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
 } river_cloud_xiaozhi_playback_lineage_truth_t;
 
@@ -576,6 +578,7 @@ bool river_cloud_xiaozhi_playback_output_active(void);
 bool river_cloud_xiaozhi_playback_lane_engaged(void);
 bool river_cloud_xiaozhi_playback_turn_active(void);
 bool river_cloud_xiaozhi_playback_has_work(void);
+void river_cloud_xiaozhi_check_response_audio_timeout(void);
 void river_cloud_xiaozhi_playback_note_duplex_ready(void);
 river_status_t river_cloud_xiaozhi_playback_abort_for_cause(
     river_cloud_xiaozhi_playback_abort_cause_t cause,

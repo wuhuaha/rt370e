@@ -1930,12 +1930,14 @@ void river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted(const char *trig
 void river_cloud_xiaozhi_run_post_poll_housekeeping(void)
 {
     river_cloud_xiaozhi_refresh_turn_semantics("poll");
+    river_cloud_xiaozhi_check_response_audio_timeout();
     river_cloud_xiaozhi_finalize_pending_text_if_turn_accepted_after_refresh(
         "accept_reason");
 }
 
 void river_cloud_xiaozhi_run_post_uplink_housekeeping(void)
 {
+    river_cloud_xiaozhi_check_response_audio_timeout();
     river_cloud_xiaozhi_playback_check_pending_stop();
     river_cloud_xiaozhi_run_endpoint_local_close_housekeeping();
 }
