@@ -1,3 +1,48 @@
+## Step 5.514 Verification
+
+Rebuild the latest-SDK external project image after moving playback runtime view/result schema out of the main playback runtime file:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the playback main file and view/result ownership boundary:
+```bash
+cd /root/ameba-river
+wc -l   components/river_cloud/river_cloud_xiaozhi_playback_runtime.c   components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc
+rg -n "river_cloud_xiaozhi_playback_runtime_views.inc|capture_playback_truth_view|downlink_task_cycle_result_t|write_failed_followup_t|playback_gate_view"   components/river_cloud/river_cloud_xiaozhi_playback_runtime.c   components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_runtime.c` is about `2063` lines and includes `river_cloud_xiaozhi_playback_runtime_views.inc`
+- runtime view/result schemas are grouped in the new include without creating a new public header
+- downlink worker and public policy continue to consume the same typed view/result helpers through the original runtime translation unit
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- playback status still reports meta/heard/terminal/lineage/downlink state
+- downlink wait/outcome/cycle status and write_failed recovery diagnostics remain visible
+
 ## Step 5.513 Verification
 
 Rebuild the latest-SDK external project image after moving XiaoZhi realtime/message receive handlers out of the WS transport main file:

@@ -15,11 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.513 拆分 XiaoZhi realtime/message handler 边界`
+  - `5.514 拆分 XiaoZhi playback runtime view/result 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续压缩 playback runtime 主文件并治理 view/result schema 边界：
+      - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行
+      - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc`，
+        承载约 `488` 行 runtime view / typed result helper
+    - 新模块集中承载：
+      - current segment accessor、supply kind 计算、downlink wait/outcome name helper
+      - playback truth/observe/diag/gap/gate/recovery view structs 与 capture helper
+      - write_failed followup、downlink prepare/acquire/write/cycle/wait typed result
+    - 仍不新增 public header；view include 保留在原 runtime translation unit 内，避免
+      truth 写面外扩
+    - 下一步继续聚焦：
+      - `river_xiaozhi_ws_public_api.inc` 的 status dump/session API 继续拆窄，或把
+        `river_cloud_xiaozhi_playback_downlink_worker.inc` 继续拆成 rebuffer recovery
+        与 downlink cycle 两个更小 ownership 模块
   - newest landed runtime-ownership slice:
     - 按“3k 行仍过大”的治理目标继续压缩 XiaoZhi WS 主文件：
       - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行

@@ -26,6 +26,21 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.514`
+  - 继续压缩 playback runtime 主文件，把 runtime view / typed result schema 从主文件拆出：
+    - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行
+    - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc`，集中承载
+      playback view/result helper
+  - 新模块把这些边界收在一起：
+    - current segment accessor、supply kind 计算与 downlink wait/outcome name helper
+    - playback truth/observe/diag/gap/gate/recovery view structs 与 capture helper
+    - write_failed followup、downlink prepare/acquire/write/cycle/wait typed result structs
+  - 仍保持 include-split，不新增 public header，不扩大 runtime truth 写入口；先稳定
+    private ownership 后再评估是否升级为独立 `.c` + narrow internal header
+  - 下一步继续聚焦：
+    - 将 downlink worker 继续拆成 rebuffer recovery / downlink cycle 两个更小模块，或
+      将 WS public API 内 status dump / session API 继续拆窄
+
 - `Step 5.513`
   - 按“3k 行仍过大”的治理目标继续拆分 XiaoZhi WS receive path：
     - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行

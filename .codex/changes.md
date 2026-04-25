@@ -1,5 +1,25 @@
 # Change Log
 
+## Step 5.514
+- 继续压缩 `river_cloud_xiaozhi_playback_runtime.c`，把已稳定的 playback runtime view / typed result schema 从主文件拆出：
+  - `river_cloud_xiaozhi_playback_runtime.c` 从 `2550` 行降到 `2063` 行
+  - 新增 `components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc`，当前约 `488` 行
+- 新模块集中承载 playback runtime 的只读视图与局部 typed result 定义：
+  - current segment accessor 与 supply kind 计算
+  - downlink wait / cycle outcome name helper
+  - playback truth/observe/diag/gap/gate/recovery view structs
+  - write_failed followup、downlink prepare/acquire/write/cycle/wait typed result structs
+  - `capture_playback_truth_view` / observe / gate / gap hold helper
+- 这一步保持 truth source 收口原则：
+  - 不新增 public header
+  - 不把 runtime truth 写入口暴露到跨 translation unit
+  - view include 只在原 runtime 编译单元内消费 private/static helper，避免高频 downlink worker 与诊断视图继续堆在主文件中
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - first sandboxed build again hit SDK generated-file write restriction on `/root/ameba-rtos/.../build_info.h`; approved rerun succeeded
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.513
 - 继续按“3k 行仍过大”的治理目标压缩 XiaoZhi WS 主文件；本轮把剩余 realtime/message receive dispatch 从 transport 主体中剥离：
   - `river_xiaozhi_ws.c` 从 `2965` 行降到 `2010` 行
