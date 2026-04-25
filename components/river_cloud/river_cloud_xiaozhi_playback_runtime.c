@@ -579,6 +579,27 @@ static const char *river_cloud_xiaozhi_playback_supply_kind_name(
     return river_cloud_playback_supply_kind_name(supply_kind);
 }
 
+static const char *river_cloud_xiaozhi_downlink_wait_kind_name(
+    river_cloud_xiaozhi_downlink_wait_kind_t wait_kind)
+{
+    switch (wait_kind) {
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE:
+        return "none";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_INACTIVE:
+        return "inactive";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NOT_READY:
+        return "not_ready";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_ACQUIRE_MISS:
+        return "acquire_miss";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_WRITE_FAILED:
+        return "write_failed";
+    case RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STEP_POLICY:
+        return "step_policy";
+    default:
+        return "unknown";
+    }
+}
+
 static river_cloud_playback_supply_kind_t
 river_cloud_xiaozhi_compute_playback_supply_kind_from_source(
     const river_cloud_xiaozhi_playback_supply_source_t *source)
@@ -651,10 +672,12 @@ typedef struct {
     uint32_t start_frames;
     uint32_t prefetch_frames;
     uint64_t ring_dropped;
+    uint32_t downlink_wait_delay_ms;
     uint64_t meta_gap_ms;
     uint64_t reopen_guard_left_ms;
     uint32_t rebuffer_count;
     uint32_t rebuffer_streak;
+    river_cloud_xiaozhi_downlink_wait_kind_t downlink_wait_kind;
     bool downlink_started;
     bool terminal_closed;
     bool terminal_waiting;
@@ -782,6 +805,7 @@ typedef struct {
 typedef struct {
     bool sleep;
     uint32_t delay_ms;
+    river_cloud_xiaozhi_downlink_wait_kind_t wait_kind;
 } river_cloud_xiaozhi_downlink_task_wait_plan_t;
 
 static void river_cloud_xiaozhi_capture_playback_truth_view(
@@ -1532,6 +1556,9 @@ static void river_cloud_xiaozhi_reset_downlink_ring_runtime(void)
     }
     river_cloud_xiaozhi_consume_current_downlink_frame();
     g_river_cloud.xiaozhi_downlink_runtime_truth.last_supply_ms = 0U;
+    g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms = 0U;
+    g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_kind =
+        RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE;
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
 }
 
@@ -1741,6 +1768,10 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->prefetch_frames =
         g_river_cloud.xiaozhi_playback_gate_truth.prefetch_frames;
     view->ring_dropped = g_river_cloud.xiaozhi_downlink_runtime_truth.ring_dropped;
+    view->downlink_wait_delay_ms =
+        g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms;
+    view->downlink_wait_kind =
+        g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_kind;
     view->meta_gap_ms = meta_truth->last_meta_gap_ms;
     view->rebuffer_count = g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_count;
     view->rebuffer_streak =
@@ -2469,11 +2500,14 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                (unsigned int)RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES,
                (unsigned long)diag_view.reopen_guard_left_ms,
                (unsigned int)diag_view.open_hold_frames);
-    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s sample=%luHz frame=%lums start=%u resume=%u buffer=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu supply=%s phase=%s backend=%s hold=%s rebuffer=%s/%s recovery_path=%s recovery_outcome=%s rebuffer_total=%lu streak=%lu",
+    RIVER_LOGI("xiaozhi downlink queue=%lu/%u dropped=%lu worker=%s wait=%s/%lums sample=%luHz frame=%lums start=%u resume=%u buffer=%u policy=%s cautious=%s target_ms=%lu prefetch_frames=%u meta_gap_ms=%lu supply=%s phase=%s backend=%s hold=%s rebuffer=%s/%s recovery_path=%s recovery_outcome=%s rebuffer_total=%lu streak=%lu",
                (unsigned long)diag_view.queued_frames,
                (unsigned int)RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES,
                (unsigned long)diag_view.ring_dropped,
                diag_view.downlink_started ? "running" : "off",
+               river_cloud_xiaozhi_downlink_wait_kind_name(
+                   diag_view.downlink_wait_kind),
+               (unsigned long)diag_view.downlink_wait_delay_ms,
                (unsigned long)diag_view.sample_rate,
                (unsigned long)diag_view.frame_duration_ms,
                (unsigned int)diag_view.start_gate.start_frames,
@@ -4476,6 +4510,7 @@ river_cloud_xiaozhi_build_downlink_task_wait_plan(
     river_cloud_xiaozhi_downlink_task_wait_plan_t wait_plan = {
         .sleep = false,
         .delay_ms = 0U,
+        .wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE,
     };
 
     if (cycle_result == NULL) {
@@ -4486,10 +4521,20 @@ river_cloud_xiaozhi_build_downlink_task_wait_plan(
         RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_IDLE) {
         wait_plan.sleep = true;
         wait_plan.delay_ms = RIVER_CLOUD_XIAOZHI_DOWNLINK_IDLE_MS;
+        wait_plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_INACTIVE;
     } else if (cycle_result->step_result ==
                RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL) {
         wait_plan.sleep = true;
         wait_plan.delay_ms = RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS;
+        if (!cycle_result->cycle_plan.ready) {
+            wait_plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NOT_READY;
+        } else if (!cycle_result->acquire_result.acquired) {
+            wait_plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_ACQUIRE_MISS;
+        } else if (cycle_result->write_result.write_failed) {
+            wait_plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_WRITE_FAILED;
+        } else {
+            wait_plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STEP_POLICY;
+        }
     }
 
     return wait_plan;
@@ -4501,6 +4546,10 @@ static void river_cloud_xiaozhi_finish_downlink_task_cycle(
     river_cloud_xiaozhi_downlink_task_wait_plan_t wait_plan =
         river_cloud_xiaozhi_build_downlink_task_wait_plan(cycle_result);
 
+    g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_kind =
+        wait_plan.wait_kind;
+    g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms =
+        wait_plan.delay_ms;
     if (wait_plan.sleep) {
         rtos_time_delay_ms(wait_plan.delay_ms);
     }

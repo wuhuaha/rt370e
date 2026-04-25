@@ -1,5 +1,33 @@
 # Change Log
 
+## Step 5.502
+- `river_cloud` 继续让 XiaoZhi downlink cycle sub-results 服务诊断，把 worker
+  wait plan 的原因锁存到 downlink runtime truth 并在 status 中输出：
+  - [components/river_cloud/river_cloud_xiaozhi_playback_runtime.c](/root/ameba-river/components/river_cloud/river_cloud_xiaozhi_playback_runtime.c)
+  - [components/river_cloud/river_cloud_internal.h](/root/ameba-river/components/river_cloud/river_cloud_internal.h)
+- 新增：
+  - `river_cloud_xiaozhi_downlink_wait_kind_t`
+  - `river_cloud_xiaozhi_downlink_wait_kind_name()`
+  - `last_wait_kind` / `last_wait_delay_ms` downlink runtime truth
+- `river_cloud_xiaozhi_build_downlink_task_wait_plan()` 现在根据 cycle result 的
+  子结果区分：
+  - inactive
+  - not_ready
+  - acquire_miss
+  - write_failed
+  - step_policy
+- `river xiaozhi status` 的 downlink 行现在输出 `wait=<kind>/<delay>ms`，
+  让 wait/poll 的来源不再只能从裸 step result 反推
+- 这一步把 Step 5.501 的 wait plan 从：
+  - 只表达 sleep/no-sleep 与 delay duration
+  推进到：
+  - typed wait reason consumes ready/acquire/write sub-results and becomes runtime-visible truth
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `rg -n "downlink_wait_kind_t|last_wait_kind|last_wait_delay_ms|wait=%s/%lums|DOWNLINK_WAIT_WRITE_FAILED" components/river_cloud/river_cloud_internal.h components/river_cloud/river_cloud_xiaozhi_playback_runtime.c` confirmed the wait-reason truth/status path
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
 ## Step 5.501
 - `river_cloud` 继续类型化 XiaoZhi downlink worker sleep/idle 收尾策略，把
   cycle result 到 RTOS delay 的投影收口成 typed wait plan：

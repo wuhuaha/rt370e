@@ -124,6 +124,15 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_STREAM_FINISH_ENDPOINT_TIMEOUT = 1
 } river_cloud_xiaozhi_stream_finish_cause_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE = 0,
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_INACTIVE = 1,
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NOT_READY = 2,
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_ACQUIRE_MISS = 3,
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_WRITE_FAILED = 4,
+    RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STEP_POLICY = 5
+} river_cloud_xiaozhi_downlink_wait_kind_t;
+
 typedef struct {
     bool valid;
     bool started;
@@ -225,6 +234,8 @@ typedef struct {
     uint32_t ring_dropped;
     uint64_t starved_since_ms;
     uint64_t last_supply_ms;
+    uint32_t last_wait_delay_ms;
+    river_cloud_xiaozhi_downlink_wait_kind_t last_wait_kind;
     bool retry_valid;
 } river_cloud_xiaozhi_downlink_runtime_truth_t;
 

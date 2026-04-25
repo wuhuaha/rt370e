@@ -1,3 +1,50 @@
+## Step 5.502 Verification
+
+Rebuild the latest-SDK external project image after the downlink wait-reason truth change:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the wait-reason truth and status projection are compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "downlink_wait_kind_t|last_wait_kind|last_wait_delay_ms|wait=%s/%lums|WAIT_WRITE_FAILED" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_downlink_wait_kind_t` is defined in the internal context
+- downlink runtime truth stores `last_wait_kind` and `last_wait_delay_ms`
+- the XiaoZhi status downlink line prints `wait=<kind>/<delay>ms`
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for wait reason diagnostics:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- the downlink line includes `wait=.../...ms`
+- idle/no-work periods report `wait=inactive/20ms` or an equivalent non-busy wait
+- queued-but-not-ready periods report `wait=not_ready/5ms` or a more specific
+  wait reason such as `acquire_miss` / `write_failed`
+
 ## Step 5.501 Verification
 
 Rebuild the latest-SDK external project image after the downlink wait-plan change:
