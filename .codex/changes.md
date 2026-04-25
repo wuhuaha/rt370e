@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.516
+- 继续治理 `river_xiaozhi_ws_public_api.inc`，把低频 status dump 从 public API wrapper 集合中拆出：
+  - `river_xiaozhi_ws_public_api.inc` 从 `952` 行降到 `719` 行
+  - 新增 `components/river_cloud/river_xiaozhi_ws_status_dump.inc`，当前约 `234` 行
+- 新的 status dump 模块集中承载：
+  - send queue snapshot / audio soft-limit / bootstrap cache 剩余时间诊断
+  - session lane、timing age、timing chain、preview state、playback meta、discovery negotiation 输出
+  - activation challenge 状态输出
+- 这一步保持 truth source 收口原则：
+  - status dump 仍在原 WS translation unit 内 include，继续只读取 `g_river_xiaozhi` 及 private/static helper
+  - 不新增 public header，也不把诊断读取路径暴露为跨 translation unit API
+  - session/open/send wrappers 主路径不再携带大块诊断格式化代码，降低 public API include 的维护噪声
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+  - static grep confirmed `river_xiaozhi_dump_status` and timing/preview/discovery diagnostics live in `river_xiaozhi_ws_status_dump.inc` while `river_xiaozhi_ws_public_api.inc` includes it at the bottom
+
 ## Step 5.515
 - 继续治理 `river_cloud_xiaozhi_playback_downlink_worker.inc`，把 downlink worker 的恢复策略与 cycle 执行从 worker shell 中拆出：
   - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行

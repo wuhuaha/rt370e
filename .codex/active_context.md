@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.515 拆分 XiaoZhi downlink recovery/cycle 边界`
+  - `5.516 拆分 XiaoZhi WS status dump 边界`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 继续治理 XiaoZhi WS public API include，把低频 status dump 从 session/open/send wrapper 集合中拆出：
+      - `river_xiaozhi_ws_public_api.inc` 从 `952` 行降到 `719` 行
+      - 新增 `components/river_cloud/river_xiaozhi_ws_status_dump.inc`，承载约 `234` 行 status dump formatter
+    - status dump 模块集中承载 send queue/bootstrap/timing/preview/playback/discovery/activation 诊断输出
+    - 仍不新增 public header；status dump 继续在原 WS translation unit 内读取 private/static truth helper，避免诊断读取面外扩
+    - 下一步继续聚焦：
+      - 将 `river_xiaozhi_ws_public_api.inc` 继续拆成 session/config wrappers 与 send wrappers，或治理 playback worker shell 内 terminal ACK / abort ownership
   - newest landed runtime-ownership slice:
     - 继续治理 playback downlink worker 的高频 loop 与恢复策略边界：
       - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行

@@ -1,3 +1,52 @@
+## Step 5.516 Verification
+
+Rebuild the latest-SDK external project image after splitting XiaoZhi WS status dump out of the public API wrapper include:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+- if the sandbox blocks SDK-generated writes under `/root/ameba-rtos`, rerun the same build with approval
+
+Confirm the WS public API/status dump split boundary:
+```bash
+cd /root/ameba-river
+wc -l \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_xiaozhi_ws_status_dump.inc
+rg -n "river_xiaozhi_ws_status_dump.inc|river_xiaozhi_dump_status|preview_state|timing_chain_ms|discovery turn_mode" \
+  components/river_cloud/river_xiaozhi_ws_public_api.inc \
+  components/river_cloud/river_xiaozhi_ws_status_dump.inc
+```
+
+Expected result:
+- `river_xiaozhi_ws_public_api.inc` is about `719` lines and includes `river_xiaozhi_ws_status_dump.inc` at the bottom
+- `river_xiaozhi_dump_status` and the timing/preview/discovery diagnostic logs live in `river_xiaozhi_ws_status_dump.inc`
+- public API wrappers keep session/open/send ownership without carrying the large status formatting block inline
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status output still includes session, timing age, timing chain, preview state, playback meta, discovery negotiation, and activation diagnostics
+- no behavior change is expected; this step only narrows local ownership of the diagnostic formatter
+
 ## Step 5.515 Verification
 
 Rebuild the latest-SDK external project image after splitting playback rebuffer recovery and downlink cycle ownership out of the downlink worker shell:

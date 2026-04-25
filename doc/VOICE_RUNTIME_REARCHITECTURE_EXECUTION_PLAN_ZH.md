@@ -26,6 +26,18 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.516`
+  - 继续拆分 XiaoZhi WS public API 边界，把低频 status dump 从 public API wrapper include 中移出：
+    - `river_xiaozhi_ws_public_api.inc` 从 `952` 行降到 `719` 行
+    - 新增 `components/river_cloud/river_xiaozhi_ws_status_dump.inc`，集中承载 status dump formatter
+  - status dump 模块持有 send queue/bootstrap/timing/preview/playback/discovery/activation 诊断输出；
+    session/open/send wrapper 主路径不再携带大块诊断格式化代码
+  - 仍保持 include-split，不新增 public header，不扩大 WS transport truth 读取/写入面；先继续压窄
+    private ownership，再评估是否将稳定边界升级为独立 `.c` + narrow internal header
+  - 下一步继续聚焦：
+    - 将 `river_xiaozhi_ws_public_api.inc` 继续拆成 session/config wrappers 与 send wrappers，或继续治理
+      playback worker shell 内 terminal ACK / abort ownership 边界
+
 - `Step 5.515`
   - 继续拆分 playback downlink worker，把恢复策略和 cycle 执行从 worker shell 中移出：
     - `river_cloud_xiaozhi_playback_downlink_worker.inc` 从 `1277` 行降到 `358` 行
