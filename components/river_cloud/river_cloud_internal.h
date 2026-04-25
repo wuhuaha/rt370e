@@ -202,6 +202,31 @@ typedef struct {
     char segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
 } river_cloud_xiaozhi_playback_context_truth_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_NONE = 0,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED = 1,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_META_OBSERVED = 2,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_SEGMENT_STARTED = 3,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_MARK_QUEUED = 4,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_CLEARED_QUEUED = 5,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_COMPLETED_QUEUED = 6,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_CLEARED = 7,
+    RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED = 8
+} river_cloud_xiaozhi_playback_lineage_stage_t;
+
+typedef struct {
+    river_cloud_xiaozhi_playback_lineage_stage_t stage;
+    river_cloud_xiaozhi_playback_context_truth_t response_context;
+    river_cloud_xiaozhi_playback_context_truth_t meta_context;
+    river_cloud_xiaozhi_playback_context_truth_t started_context;
+    river_cloud_xiaozhi_playback_context_truth_t marked_context;
+    river_cloud_xiaozhi_playback_context_truth_t cleared_context;
+    river_cloud_xiaozhi_playback_context_truth_t completed_context;
+    uint32_t last_mark_ms;
+    uint64_t updated_ms;
+    char reason[RIVER_CLOUD_XIAOZHI_PLAYBACK_CLEAR_REASON_MAX];
+} river_cloud_xiaozhi_playback_lineage_truth_t;
+
 typedef struct {
     river_cloud_xiaozhi_playback_context_truth_t current_context;
     char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
@@ -410,6 +435,7 @@ typedef struct {
 #if RIVER_CLOUD_BACKEND_XIAOZHI_ENABLED
     river_cloud_xiaozhi_session_window_truth_t xiaozhi_session_window_truth;
     river_cloud_xiaozhi_turn_semantics_state_t xiaozhi_turn_semantics;
+    river_cloud_xiaozhi_playback_lineage_truth_t xiaozhi_playback_lineage_truth;
     river_cloud_xiaozhi_playback_meta_truth_t xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t xiaozhi_playback_terminal_truth;
     river_cloud_xiaozhi_playback_runtime_truth_t xiaozhi_playback_runtime_truth;
@@ -523,6 +549,7 @@ river_status_t river_cloud_xiaozhi_control_request_async(
     const char *segment_id,
     uint32_t played_duration_ms);
 void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_event_t *event);
+void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);

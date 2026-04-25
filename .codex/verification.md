@@ -1,3 +1,52 @@
+## Step 5.507 Verification
+
+Rebuild the latest-SDK external project image after typing write-failed recovery and adding playback lineage truth:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm typed recovery and lineage truth are compiled into the tree:
+```bash
+cd /root/ameba-river
+rg -n "WRITE_FAILED_FOLLOWUP|recovery_followup_kind|playback_lineage_truth|playback_lineage|RIVER_XIAOZHI_EVENT_RESPONSE_START" \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  .codex/verification.md
+```
+
+Expected result:
+- write-failed recovery followup is typed and propagated into downlink write result
+- `response.start` enters cloud runtime as a transport event
+- playback lineage status line is available through `river xiaozhi status`
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for playback lineage and write-failed recovery diagnostics:
+```text
+river xiaozhi status
+```
+
+Expected result:
+- status includes `xiaozhi playback_lineage stage=...` with response/meta/started/mark/cleared/completed context
+- write-failed logs include `xiaozhi playback write_failed recovery typed: followup=... status=... recovery=...`
+
 ## Step 5.506 Verification
 
 Rebuild the latest-SDK external project image after splitting playback prepare blocked reasons:

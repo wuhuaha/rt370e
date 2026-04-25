@@ -3230,6 +3230,28 @@ static void river_xiaozhi_handle_realtime_response_start(const cJSON *payload)
                                                sizeof(response_from_endpoint_ms),
                                                now_ms,
                                                g_river_xiaozhi.last_endpoint_candidate_at_ms));
+    river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_RESPONSE_START,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             response_id,
+                             NULL,
+                             NULL,
+                             0U,
+                             0U,
+                             0U,
+                             0U,
+                             0U,
+                             NULL,
+                             0U,
+                             0U,
+                             false,
+                             false,
+                             false);
     river_xiaozhi_emit_tts_event("start", NULL);
 }
 

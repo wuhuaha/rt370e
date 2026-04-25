@@ -26,6 +26,29 @@ Branch: `agent-server-v2`
 
 ### 1.1 最新进展
 
+- `Step 5.507`
+  - 本地白盒重构继续收口两个确定性关键问题：
+    - `write_failed` recovery followup 仍通过 `inline_success` / `managed_rebuffer`
+      布尔组合表达，managed rebuffer 执行结果没有回填到 downlink write result
+    - playback response/meta/started/mark/cleared/completed 分散在 transport、
+      meta truth、segment queue 与 terminal truth 中，状态串联需要跨结构推断
+  - 新增 typed `river_cloud_xiaozhi_write_failed_followup_kind_t`，把恢复后续动作
+    收敛为：
+    - `inline_replay_consumed`
+    - `managed_rebuffer`
+    - `none`
+  - `river_cloud_xiaozhi_downlink_frame_write_result_t` 现在持有
+    `recovery_followup_kind`、`recovery_status` 与 `recovery_path`，让 write_failed
+    recovery 链路从 handler 内部结果继续投影到 write result
+  - 新增 `river_cloud_xiaozhi_playback_lineage_truth_t` 与
+    `river_cloud_xiaozhi_playback_lineage_stage_t`，把 response.start、
+    audio.out.meta、started ack、mark ack、cleared ack、completed ack 以及
+    local terminal fallback 串到单一 lineage truth
+  - `river xiaozhi status` 新增 `xiaozhi playback_lineage ...` 行，可直接查看
+    lineage stage 与 response/meta/started/mark/cleared/completed 上下文
+  - 下一步继续聚焦：
+    - 把 lineage truth 进一步接入 snapshot/export，减少 status-only 诊断依赖；
+      同时根据板端 write_failed recovery status 判断是否需要 cooldown 或退避策略
 - `Step 5.506`
   - 白盒审视发现一个确定性关键问题：Step 5.505 后 downlink cycle 已有
     `wait/outcome/cycle_status`，但 `prepare_downlink_playback()` 仍用裸 `bool`

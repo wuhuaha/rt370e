@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.507
+- 本地白盒重构继续收口两个确定性关键问题：
+  - `write_failed` recovery followup 仍通过 `inline_success` / `managed_rebuffer`
+    布尔组合表达，managed rebuffer 执行结果没有回填到 downlink write result
+  - playback response/meta/started/mark/cleared/completed 分散在 transport、
+    meta truth、segment queue 与 terminal truth 中，状态串联需要跨结构推断
+- 新增 typed `river_cloud_xiaozhi_write_failed_followup_kind_t`，把恢复后续动作
+  收敛为 `inline_replay_consumed` / `managed_rebuffer` / `none`，并让
+  `river_cloud_xiaozhi_downlink_frame_write_result_t` 持有
+  `recovery_followup_kind`、`recovery_status` 与 `recovery_path`
+- 新增 `RIVER_XIAOZHI_EVENT_RESPONSE_START`，让 `response.start` 从 transport
+  事件进入 cloud runtime，而不是只存在于 WebSocket 局部状态
+- 新增 `river_cloud_xiaozhi_playback_lineage_truth_t` 与
+  `river_cloud_xiaozhi_playback_lineage_stage_t`，把 response.start、
+  audio.out.meta、started ack、mark ack、cleared ack、completed ack 以及 local
+  terminal fallback 串到单一 lineage truth
+- `river xiaozhi status` 新增 `xiaozhi playback_lineage ...` 行，可直接查看
+  lineage stage 与 response/meta/started/mark/cleared/completed 上下文
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with
+    `check_codex_harness: all checks passed`
+  - `rg -n "WRITE_FAILED_FOLLOWUP|recovery_followup_kind|playback_lineage_truth|playback_lineage|RIVER_XIAOZHI_EVENT_RESPONSE_START" ...`
+    confirmed typed recovery followup, response-start event routing, and lineage truth
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done`
+
 ## Step 5.506
 - 白盒审视发现一个确定性关键问题：Step 5.505 后 downlink cycle 已有
   `wait/outcome/cycle_status`，但 `prepare_downlink_playback()` 仍用裸 `bool`

@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.506 细分 playback prepare blocked truth`
+  - `5.507 类型化 write_failed recovery 与 playback lineage truth`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime-ownership slice:
+    - 本地白盒重构继续收口两个确定性关键问题：
+      - `write_failed` recovery followup 仍通过 `inline_success` / `managed_rebuffer`
+        布尔组合表达，managed rebuffer 执行结果没有回填到 downlink write result
+      - playback response/meta/started/mark/cleared/completed 分散在 transport、
+        meta truth、segment queue 与 terminal truth 中，状态串联需要跨结构推断
+    - 新增 typed `river_cloud_xiaozhi_write_failed_followup_kind_t`，把恢复后续动作
+      收敛为 `inline_replay_consumed` / `managed_rebuffer` / `none`，并让
+      write result 持有 `recovery_followup_kind`、`recovery_status` 与
+      `recovery_path`
+    - 新增 `river_cloud_xiaozhi_playback_lineage_truth_t` 与
+      `river_cloud_xiaozhi_playback_lineage_stage_t`，把 response.start、
+      audio.out.meta、started ack、mark ack、cleared ack、completed ack 以及
+      local terminal fallback 串到单一 lineage truth
+    - `river xiaozhi status` 新增 `xiaozhi playback_lineage ...` 行，可直接查看
+      stage 与对应 response/segment lineage
+    - 下一步继续聚焦：
+      - 把 lineage truth 进一步接入 snapshot/export，减少 status-only 诊断依赖；
+        同时根据板端 write_failed recovery status 判断是否需要 cooldown 或退避策略
   - newest landed runtime-ownership slice:
     - 白盒审视发现一个确定性关键问题：downlink cycle 已有
       `wait/outcome/cycle_status`，但 `prepare_downlink_playback()` 仍用裸

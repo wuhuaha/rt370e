@@ -342,6 +342,9 @@ void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *eve
     case RIVER_XIAOZHI_EVENT_AUDIO_OUT_META:
         river_cloud_xiaozhi_note_audio_out_meta_observation(event);
         return;
+    case RIVER_XIAOZHI_EVENT_RESPONSE_START:
+        river_cloud_xiaozhi_note_response_start_observation(event);
+        return;
     case RIVER_XIAOZHI_EVENT_LLM:
         river_cloud_xiaozhi_note_llm_observation(event);
         return;

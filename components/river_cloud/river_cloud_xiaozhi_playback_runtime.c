@@ -317,6 +317,124 @@ static bool river_cloud_xiaozhi_playback_same_segment_context(
            strcmp(lhs->segment_id, rhs->segment_id) == 0;
 }
 
+static const char *river_cloud_xiaozhi_playback_lineage_stage_name(
+    river_cloud_xiaozhi_playback_lineage_stage_t stage)
+{
+    switch (stage) {
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED:
+        return "response_started";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_META_OBSERVED:
+        return "meta_observed";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_SEGMENT_STARTED:
+        return "segment_started";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_MARK_QUEUED:
+        return "mark_queued";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_CLEARED_QUEUED:
+        return "cleared_queued";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_COMPLETED_QUEUED:
+        return "completed_queued";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_CLEARED:
+        return "local_cleared";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED:
+        return "local_completed";
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_NONE:
+    default:
+        return "none";
+    }
+}
+
+static void river_cloud_xiaozhi_clear_playback_lineage_truth(void)
+{
+    memset(&g_river_cloud.xiaozhi_playback_lineage_truth,
+           0,
+           sizeof(g_river_cloud.xiaozhi_playback_lineage_truth));
+}
+
+static void river_cloud_xiaozhi_touch_playback_lineage(
+    river_cloud_xiaozhi_playback_lineage_stage_t stage,
+    const river_cloud_xiaozhi_playback_context_truth_t *context,
+    uint32_t played_duration_ms,
+    const char *reason)
+{
+    river_cloud_xiaozhi_playback_lineage_truth_t *lineage =
+        &g_river_cloud.xiaozhi_playback_lineage_truth;
+
+    lineage->stage = stage;
+    lineage->updated_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (played_duration_ms != 0U) {
+        lineage->last_mark_ms = played_duration_ms;
+    }
+    river_cloud_xiaozhi_copy_optional_text(lineage->reason,
+                                           sizeof(lineage->reason),
+                                           reason);
+
+    switch (stage) {
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->response_context,
+                                                        context);
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_META_OBSERVED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->meta_context,
+                                                        context);
+        if (lineage->response_context.response_id[0] == '\0' && context != NULL &&
+            context->response_id[0] != '\0') {
+            river_cloud_xiaozhi_copy_playback_context_truth(
+                &lineage->response_context,
+                context);
+        }
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_SEGMENT_STARTED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->started_context,
+                                                        context);
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_MARK_QUEUED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->marked_context,
+                                                        context);
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_CLEARED_QUEUED:
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_CLEARED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->cleared_context,
+                                                        context);
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_COMPLETED_QUEUED:
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED:
+        river_cloud_xiaozhi_copy_playback_context_truth(&lineage->completed_context,
+                                                        context);
+        break;
+    case RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_NONE:
+    default:
+        break;
+    }
+}
+
+static void river_cloud_xiaozhi_touch_playback_lineage_from_segment(
+    river_cloud_xiaozhi_playback_lineage_stage_t stage,
+    const river_cloud_xiaozhi_playback_segment_t *segment,
+    uint32_t played_duration_ms,
+    const char *reason)
+{
+    river_cloud_xiaozhi_playback_context_truth_t context;
+
+    if (segment == NULL) {
+        return;
+    }
+
+    memset(&context, 0, sizeof(context));
+    river_cloud_xiaozhi_copy_optional_text(context.response_id,
+                                           sizeof(context.response_id),
+                                           segment->response_id);
+    river_cloud_xiaozhi_copy_optional_text(context.playback_id,
+                                           sizeof(context.playback_id),
+                                           segment->playback_id);
+    river_cloud_xiaozhi_copy_optional_text(context.segment_id,
+                                           sizeof(context.segment_id),
+                                           segment->segment_id);
+    river_cloud_xiaozhi_touch_playback_lineage(stage,
+                                               &context,
+                                               played_duration_ms,
+                                               reason);
+}
+
 static bool river_cloud_xiaozhi_playback_wait_context_valid(void)
 {
     return river_cloud_xiaozhi_playback_segment_context_valid_from_truth(
@@ -780,6 +898,12 @@ typedef enum {
     RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED
 } river_cloud_xiaozhi_inline_recover_result_t;
 
+typedef enum {
+    RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_NONE = 0,
+    RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_INLINE_REPLAY_CONSUMED,
+    RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER
+} river_cloud_xiaozhi_write_failed_followup_kind_t;
+
 typedef struct {
     const char *recover_reason;
     bool keep_retry_frame;
@@ -800,8 +924,8 @@ typedef struct {
 } river_cloud_xiaozhi_rebuffer_recovery_result_t;
 
 typedef struct {
-    bool inline_success;
-    bool managed_rebuffer;
+    river_cloud_xiaozhi_write_failed_followup_kind_t kind;
+    river_cloud_xiaozhi_inline_recover_result_t inline_result;
     const char *request_log;
     river_cloud_xiaozhi_managed_rebuffer_request_t rebuffer_request;
 } river_cloud_xiaozhi_write_failed_followup_t;
@@ -823,6 +947,10 @@ typedef enum {
 
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
+    river_cloud_xiaozhi_write_failed_followup_kind_t followup_kind;
+    river_cloud_xiaozhi_inline_recover_result_t inline_result;
+    river_cloud_playback_recovery_path_t recovery_path;
+    river_status_t recovery_status;
     bool frame_consumed;
 } river_cloud_xiaozhi_write_failed_recovery_result_t;
 
@@ -849,6 +977,9 @@ typedef struct {
 typedef struct {
     river_cloud_xiaozhi_downlink_task_step_result_t step_result;
     river_status_t status;
+    river_status_t recovery_status;
+    river_cloud_xiaozhi_write_failed_followup_kind_t recovery_followup_kind;
+    river_cloud_playback_recovery_path_t recovery_path;
     bool frame_consumed;
     bool write_failed;
     bool aborted;
@@ -2012,6 +2143,20 @@ river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
     return result;
 }
 
+static const char *river_cloud_xiaozhi_write_failed_followup_kind_name(
+    river_cloud_xiaozhi_write_failed_followup_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_INLINE_REPLAY_CONSUMED:
+        return "inline_replay_consumed";
+    case RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER:
+        return "managed_rebuffer";
+    case RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_NONE:
+    default:
+        return "none";
+    }
+}
+
 static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
     const char *message,
     const river_cloud_xiaozhi_playback_recovery_plan_t *recovery_plan,
@@ -2045,12 +2190,20 @@ static void river_cloud_xiaozhi_log_write_failed_rebuffer_request(
                    "stop_rebuffer"));
 }
 
-static void river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
+static river_cloud_xiaozhi_rebuffer_recovery_result_t
+river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
     const river_cloud_xiaozhi_write_failed_followup_t *followup,
     river_cloud_xiaozhi_write_failed_recovery_view_t *recovery_view)
 {
-    if (followup == NULL || recovery_view == NULL || !followup->managed_rebuffer) {
-        return;
+    river_cloud_xiaozhi_rebuffer_recovery_result_t result = {
+        .status = RIVER_ERR_ARG,
+        .applied_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_STOP_REBUFFER,
+    };
+
+    if (followup == NULL || recovery_view == NULL ||
+        followup->kind !=
+            RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER) {
+        return result;
     }
 
     river_cloud_xiaozhi_start_managed_playback_rebuffer_request(
@@ -2062,9 +2215,11 @@ static void river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
         followup->request_log,
         &recovery_view->recovery_plan,
         recovery_view->recovery_path);
-    (void)river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
+    result = river_cloud_xiaozhi_execute_managed_playback_rebuffer_request(
         &followup->rebuffer_request,
         &recovery_view->recovery_plan);
+    recovery_view->recovery_path = result.applied_path;
+    return result;
 }
 
 static river_cloud_xiaozhi_inline_recover_result_t
@@ -2137,13 +2292,17 @@ static void river_cloud_xiaozhi_capture_write_failed_followup(
     }
 
     memset(followup, 0, sizeof(*followup));
+    followup->kind = RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_NONE;
+    followup->inline_result = inline_result;
     switch (inline_result) {
     case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SUCCEEDED:
-        followup->inline_success = true;
+        followup->kind =
+            RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_INLINE_REPLAY_CONSUMED;
         return;
 
     case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_REPLAY_FAILED:
-        followup->managed_rebuffer = true;
+        followup->kind =
+            RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER;
         followup->request_log =
             "xiaozhi playback rebuffer requested after inline replay fallback";
         river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(
@@ -2154,7 +2313,8 @@ static void river_cloud_xiaozhi_capture_write_failed_followup(
         return;
 
     case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_SERVICE_FAILED:
-        followup->managed_rebuffer = true;
+        followup->kind =
+            RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER;
         followup->request_log =
             "xiaozhi playback rebuffer requested after recover fallback";
         river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(
@@ -2166,7 +2326,8 @@ static void river_cloud_xiaozhi_capture_write_failed_followup(
 
     case RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_NOT_ATTEMPTED:
     default:
-        followup->managed_rebuffer = true;
+        followup->kind =
+            RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_MANAGED_REBUFFER;
         followup->request_log = "xiaozhi playback rebuffer requested";
         river_cloud_xiaozhi_capture_managed_playback_rebuffer_request(
             recover_reason,
@@ -2271,11 +2432,16 @@ river_cloud_xiaozhi_handle_playback_write_failed(
 {
     river_cloud_xiaozhi_write_failed_recovery_result_t result = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL,
+        .followup_kind = RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_NONE,
+        .inline_result = RIVER_CLOUD_XIAOZHI_INLINE_RECOVER_NOT_ATTEMPTED,
+        .recovery_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_NONE,
+        .recovery_status = RIVER_OK,
         .frame_consumed = false,
     };
     river_cloud_xiaozhi_inline_recover_result_t inline_result;
     river_cloud_xiaozhi_write_failed_followup_t followup;
     river_cloud_xiaozhi_write_failed_recovery_view_t recovery_view;
+    river_cloud_xiaozhi_rebuffer_recovery_result_t managed_result;
 
     river_cloud_xiaozhi_capture_write_failed_recovery_view(queued_frames,
                                                            write_view,
@@ -2291,15 +2457,39 @@ river_cloud_xiaozhi_handle_playback_write_failed(
     river_cloud_xiaozhi_capture_write_failed_followup(inline_result,
                                                       recovery_view.recover_reason,
                                                       &followup);
-    if (followup.inline_success) {
+    result.followup_kind = followup.kind;
+    result.inline_result = followup.inline_result;
+    result.recovery_path = recovery_view.recovery_path;
+    if (followup.kind ==
+        RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_INLINE_REPLAY_CONSUMED) {
         river_cloud_xiaozhi_consume_current_downlink_frame();
         result.frame_consumed = true;
         result.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE;
+        RIVER_LOGI("xiaozhi playback write_failed recovery typed: followup=%s inline=%d status=%d recovery=%s consumed=%s",
+                   river_cloud_xiaozhi_write_failed_followup_kind_name(
+                       result.followup_kind),
+                   (int)result.inline_result,
+                   (int)result.recovery_status,
+                   river_cloud_xiaozhi_playback_recovery_path_label(
+                       result.recovery_path,
+                       "stop_rebuffer"),
+                   result.frame_consumed ? "yes" : "no");
         return result;
     }
-    river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
+    managed_result = river_cloud_xiaozhi_execute_write_failed_managed_rebuffer_followup(
         &followup,
         &recovery_view);
+    result.recovery_status = managed_result.status;
+    result.recovery_path = recovery_view.recovery_path;
+    RIVER_LOGI("xiaozhi playback write_failed recovery typed: followup=%s inline=%d status=%d recovery=%s consumed=%s",
+               river_cloud_xiaozhi_write_failed_followup_kind_name(
+                   result.followup_kind),
+               (int)result.inline_result,
+               (int)result.recovery_status,
+               river_cloud_xiaozhi_playback_recovery_path_label(
+                   result.recovery_path,
+                   "stop_rebuffer"),
+               result.frame_consumed ? "yes" : "no");
     return result;
 }
 
@@ -2320,6 +2510,9 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
     river_cloud_xiaozhi_downlink_frame_write_result_t result = {
         .step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_CONTINUE,
         .status = RIVER_OK,
+        .recovery_status = RIVER_OK,
+        .recovery_followup_kind = RIVER_CLOUD_XIAOZHI_WRITE_FAILED_FOLLOWUP_NONE,
+        .recovery_path = RIVER_CLOUD_PLAYBACK_RECOVERY_PATH_NONE,
         .frame_consumed = false,
         .write_failed = false,
         .aborted = false,
@@ -2347,6 +2540,9 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
         result.write_failed = true;
         result.frame_consumed = failed_result.frame_consumed;
         result.step_result = failed_result.step_result;
+        result.recovery_status = failed_result.recovery_status;
+        result.recovery_followup_kind = failed_result.followup_kind;
+        result.recovery_path = failed_result.recovery_path;
         return result;
     }
 
@@ -2469,6 +2665,8 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
         &g_river_cloud.xiaozhi_playback_meta_truth;
     river_cloud_xiaozhi_playback_terminal_truth_t *terminal_truth =
         &g_river_cloud.xiaozhi_playback_terminal_truth;
+    river_cloud_xiaozhi_playback_lineage_truth_t *lineage_truth =
+        &g_river_cloud.xiaozhi_playback_lineage_truth;
 
     river_cloud_xiaozhi_capture_playback_diag_view(now_ms, &diag_view);
     river_cloud_xiaozhi_get_duplex_ready_eval(&duplex_eval);
@@ -2534,6 +2732,28 @@ void river_cloud_xiaozhi_dump_playback_status(uint64_t now_ms)
                    terminal_truth->last_segment_context.segment_id :
                    "-",
                river_cloud_xiaozhi_playback_last_segment_observed() ? "yes" : "no");
+    RIVER_LOGI("xiaozhi playback_lineage stage=%s response_id=%s meta=%s started=%s mark=%s/%lums cleared=%s completed=%s reason=%s",
+               river_cloud_xiaozhi_playback_lineage_stage_name(lineage_truth->stage),
+               lineage_truth->response_context.response_id[0] != '\0' ?
+                   lineage_truth->response_context.response_id :
+                   "-",
+               lineage_truth->meta_context.segment_id[0] != '\0' ?
+                   lineage_truth->meta_context.segment_id :
+                   "-",
+               lineage_truth->started_context.segment_id[0] != '\0' ?
+                   lineage_truth->started_context.segment_id :
+                   "-",
+               lineage_truth->marked_context.segment_id[0] != '\0' ?
+                   lineage_truth->marked_context.segment_id :
+                   "-",
+               (unsigned long)lineage_truth->last_mark_ms,
+               lineage_truth->cleared_context.segment_id[0] != '\0' ?
+                   lineage_truth->cleared_context.segment_id :
+                   "-",
+               lineage_truth->completed_context.playback_id[0] != '\0' ?
+                   lineage_truth->completed_context.playback_id :
+                   "-",
+               lineage_truth->reason[0] != '\0' ? lineage_truth->reason : "-");
     RIVER_LOGI("xiaozhi duplex_ready=%s reason=%s aec=%s playback=%s/%s error=%s ref_state=%s ref_activity=%s ref_peak=%u ref_ratio_q15=%u ref_queue=%lu/%lu ref_age_ms=%lu playback_physical=%s backend=%s duplex_seen=%s",
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
@@ -2699,6 +2919,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
 
 void river_cloud_xiaozhi_clear_playback_meta_state(void)
 {
+    river_cloud_xiaozhi_clear_playback_lineage_truth();
     g_river_cloud.xiaozhi_playback_terminal_truth.started_reported = false;
     g_river_cloud.xiaozhi_playback_terminal_truth.cleared_reported = false;
     g_river_cloud.xiaozhi_playback_terminal_truth.completed_reported = false;
@@ -3715,8 +3936,10 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
 
     if ((event->response_id != NULL && event->response_id[0] != '\0' &&
+         meta_truth->current_context.response_id[0] != '\0' &&
          strcmp(meta_truth->current_context.response_id, event->response_id) != 0) ||
         (event->playback_id != NULL && event->playback_id[0] != '\0' &&
+         meta_truth->current_context.playback_id[0] != '\0' &&
          strcmp(meta_truth->current_context.playback_id, event->playback_id) != 0)) {
         river_cloud_xiaozhi_clear_playback_meta_state();
     }
@@ -3730,6 +3953,11 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     river_cloud_xiaozhi_copy_optional_text(meta_truth->current_context.segment_id,
                                            sizeof(meta_truth->current_context.segment_id),
                                            event->segment_id);
+    river_cloud_xiaozhi_touch_playback_lineage(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_META_OBSERVED,
+        &meta_truth->current_context,
+        0U,
+        NULL);
     if (event->text != NULL && event->text[0] != '\0') {
         river_cloud_xiaozhi_copy_optional_text(meta_truth->text,
                                                sizeof(meta_truth->text),
@@ -3891,6 +4119,25 @@ void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_eve
                river_cloud_xiaozhi_turn_accepted() ? "yes" : "no");
 }
 
+void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_event_t *event)
+{
+    river_cloud_xiaozhi_playback_context_truth_t context;
+
+    if (event == NULL) {
+        return;
+    }
+
+    memset(&context, 0, sizeof(context));
+    river_cloud_xiaozhi_copy_optional_text(context.response_id,
+                                           sizeof(context.response_id),
+                                           event->response_id);
+    river_cloud_xiaozhi_touch_playback_lineage(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED,
+        &context,
+        0U,
+        NULL);
+}
+
 static void river_cloud_xiaozhi_try_queue_playback_started_ack(void)
 {
     river_status_t status;
@@ -3913,6 +4160,11 @@ static void river_cloud_xiaozhi_try_queue_playback_started_ack(void)
         0U);
     if (status == RIVER_OK) {
         segment->started_ack_reported = true;
+        river_cloud_xiaozhi_touch_playback_lineage_from_segment(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_SEGMENT_STARTED,
+            segment,
+            0U,
+            NULL);
         river_cloud_xiaozhi_copy_optional_text(
             g_river_cloud.xiaozhi_playback_terminal_truth.last_started_segment_id,
             sizeof(g_river_cloud.xiaozhi_playback_terminal_truth.last_started_segment_id),
@@ -3970,6 +4222,11 @@ static void river_cloud_xiaozhi_try_queue_playback_mark_ack(uint32_t played_dura
         played_duration_ms);
     if (status == RIVER_OK) {
         segment->last_mark_ms = played_duration_ms;
+        river_cloud_xiaozhi_touch_playback_lineage_from_segment(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_MARK_QUEUED,
+            segment,
+            played_duration_ms,
+            NULL);
     } else {
         RIVER_LOGW("xiaozhi playback ack mark queue failed: status=%d response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu",
                    (int)status,
@@ -4006,6 +4263,11 @@ static bool river_cloud_xiaozhi_try_queue_playback_cleared_ack(const char *reaso
         segment_id,
         0U);
     if (status == RIVER_OK) {
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_CLEARED_QUEUED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_fully_heard_context,
+            0U,
+            reason);
         RIVER_LOGI("xiaozhi playback ack cleared queued: response_id=%s playback_id=%s cleared_after_segment_id=%s reason=%s",
                    response_id[0] != '\0' ? response_id : "-",
                    playback_id[0] != '\0' ? playback_id : "-",
@@ -4124,11 +4386,21 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
             NULL);
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context,
+            0U,
+            NULL);
         return true;
     }
     if (!river_cloud_xiaozhi_playback_last_segment_observed()) {
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+            NULL);
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context,
+            0U,
             NULL);
         return true;
     }
@@ -4137,6 +4409,11 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
     if (response_id[0] == '\0' || playback_id[0] == '\0') {
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+            NULL);
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context,
+            0U,
             NULL);
         return true;
     }
@@ -4149,6 +4426,11 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
         NULL,
         0U);
     if (status == RIVER_OK) {
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_COMPLETED_QUEUED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context,
+            0U,
+            NULL);
         RIVER_LOGI("xiaozhi playback ack completed queued: response_id=%s playback_id=%s",
                    response_id[0] != '\0' ? response_id : "-",
                    playback_id[0] != '\0' ? playback_id : "-");
@@ -4159,6 +4441,11 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
                    playback_id[0] != '\0' ? playback_id : "-");
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+            NULL);
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context,
+            0U,
             NULL);
         return true;
     }
@@ -4209,6 +4496,11 @@ void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason)
     } else {
         river_cloud_xiaozhi_set_playback_terminal_state(
             RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_CLEARED,
+            reason);
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_CLEARED,
+            &g_river_cloud.xiaozhi_playback_terminal_truth.last_fully_heard_context,
+            0U,
             reason);
         RIVER_LOGI("xiaozhi playback clear kept local only: reason=%s last_fully_heard=%s",
                    reason != NULL && reason[0] != '\0' ? reason : "-",
