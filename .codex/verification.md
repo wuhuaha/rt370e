@@ -1,3 +1,53 @@
+## Step 5.527 Verification
+
+Confirm local commit suppression for server endpoint candidate and wire-level stale commit guards:
+```bash
+cd /root/ameba-river
+rg -n "server endpoint candidate suppresses local audio.in.commit|audio.in.commit skipped|server_endpoint_pending|RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_ENDPOINT" \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- server endpoint candidate path closes the local round without sending local `audio.in.commit`
+- wire-level commit path skips stale commits when the service is no longer active / already committed / already responding
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for server endpoint candidate races:
+```text
+Wake once, speak a short utterance, and keep speaking/following up while the service still returns text-only responses.
+```
+
+Expected result:
+- after `xiaozhi input.endpoint: candidate=yes`, local post-roll should not cause a server `turn_not_ready` commit error
+- logs should include either `xiaozhi server endpoint candidate suppresses local audio.in.commit` or a bounded `xiaozhi audio.in.commit skipped: ...` diagnostic if a stale commit reaches the transport layer
+- no `audio.in.commit is accepted only while the session is active` should appear
+- no-audio service responses should still be reported as `xiaozhi response audio abandoned` / `local fallback prompt skipped` until service audio is fixed
+
 ## Step 5.526 Verification
 
 Confirm response-pending follow-up reopen is blocked and local fallback prompt is disabled by default:

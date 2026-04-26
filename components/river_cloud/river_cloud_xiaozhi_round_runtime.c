@@ -19,6 +19,8 @@ static const char *river_cloud_xiaozhi_round_close_cause_name(
         return "local_resolved";
     case RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE:
         return "server_response_started";
+    case RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_ENDPOINT:
+        return "server_endpoint_pending";
     default:
         return "unknown";
     }
@@ -276,6 +278,7 @@ void river_cloud_xiaozhi_close_local_round_for_cause(
         return;
 
     case RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE:
+    case RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_ENDPOINT:
         if (!g_river_cloud.stream_active &&
             !g_river_cloud.xiaozhi_session_window_truth.listening &&
             !g_river_cloud.xiaozhi_session_window_truth.listen_stop_pending &&

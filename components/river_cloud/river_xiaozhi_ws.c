@@ -1714,16 +1714,39 @@ static river_status_t river_xiaozhi_send_audio_commit_internal(const char *reaso
 {
     cJSON *root = NULL;
     cJSON *payload = NULL;
+    const char *skip_reason = NULL;
 
     if (!g_river_xiaozhi.dialog_started) {
         return RIVER_OK;
     }
-    if (strcmp(g_river_xiaozhi.last_input_state, "committed") == 0 &&
-        g_river_xiaozhi.last_accept_reason[0] != '\0') {
-        RIVER_LOGI("xiaozhi audio.in.commit skipped: reason=%s input_state=%s accept_reason=%s",
+    if (g_river_xiaozhi.last_session_state[0] != '\0' &&
+        strcmp(g_river_xiaozhi.last_session_state, "active") != 0) {
+        skip_reason = "session_not_active";
+    } else if (strcmp(g_river_xiaozhi.last_input_state, "committed") == 0) {
+        skip_reason = "input_committed";
+    } else if (strcmp(g_river_xiaozhi.last_output_state, "thinking") == 0 ||
+               strcmp(g_river_xiaozhi.last_output_state, "speaking") == 0) {
+        skip_reason = "output_busy";
+    } else if (g_river_xiaozhi.response_started) {
+        skip_reason = "response_started";
+    }
+    if (skip_reason != NULL) {
+        RIVER_LOGI("xiaozhi audio.in.commit skipped: reason=%s skip=%s session_state=%s input_state=%s output_state=%s accept_reason=%s response_started=%s",
                    reason != NULL && reason[0] != '\0' ? reason : "-",
-                   g_river_xiaozhi.last_input_state,
-                   g_river_xiaozhi.last_accept_reason);
+                   skip_reason,
+                   g_river_xiaozhi.last_session_state[0] != '\0' ?
+                       g_river_xiaozhi.last_session_state :
+                       "-",
+                   g_river_xiaozhi.last_input_state[0] != '\0' ?
+                       g_river_xiaozhi.last_input_state :
+                       "-",
+                   g_river_xiaozhi.last_output_state[0] != '\0' ?
+                       g_river_xiaozhi.last_output_state :
+                       "-",
+                   g_river_xiaozhi.last_accept_reason[0] != '\0' ?
+                       g_river_xiaozhi.last_accept_reason :
+                       "-",
+                   river_xiaozhi_bool_text(g_river_xiaozhi.response_started));
         return RIVER_OK;
     }
 

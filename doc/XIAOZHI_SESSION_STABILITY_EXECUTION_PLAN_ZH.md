@@ -1,6 +1,6 @@
 # XiaoZhi Session Stability Execution Plan
 
-Status: active / device-side implementation complete; pending board replay validation
+Status: active / device-side commit-race fix complete; pending board replay validation
 Last Updated: 2026-04-26
 Branch: `agent-server-v2`
 
@@ -391,3 +391,40 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 
 - 后续更新此计划时，优先刷新 “已知事实 / 风险 / 当前下一刀”，不要把它写成历史流水账。
 - 只有在当前主目标切换时，才把它从 `.codex/active_plans.md` 的 primary plan 移走。
+### Step I: server endpoint candidate 后禁发本地 commit
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复 no-audio 连续 follow-up 日志中残留的一次 `turn_not_ready` / `audio.in.commit is accepted only while the session is active`。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+- `components/river_cloud/river_xiaozhi_ws.c`
+- `components/river_cloud/river_cloud_internal.h`
+
+实现：
+
+- 若本轮已经收到 `input.endpoint candidate=yes` 且 server endpoint negotiation 可用，端侧 post-roll 不再发送本地 `audio.in.commit`。
+- 本地 ASR round 以 `server_endpoint_candidate` 收口，等待服务端 `server_endpoint` accept。
+- wire-level commit 入口增加 session/input/output/response 状态 guard，防止 stale commit 请求在服务已进入 thinking/speaking 后发出。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 上板日志中不再出现 `audio.in.commit is accepted only while the session is active`。
+- no-audio 服务响应仍以 `response audio abandoned` 收口，不启动本地 fallback prompt。

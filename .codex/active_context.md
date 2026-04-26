@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.526 XiaoZhi no-audio 本地恢复与 response-pending 重开收口`
+  - `5.527 XiaoZhi server endpoint candidate 下禁发本地 commit`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.527 收口 2026-04-26 新日志中的残留 `audio.in.commit` 竞态：
+      - 当服务侧 preview 已给出 `input.endpoint candidate=yes` 且 discovery/negotiation 表示 server endpoint 可用时，端侧 post-roll 不再发送本地 `audio.in.commit`
+      - 该路径直接以 `server_endpoint_candidate` 关闭本地 ASR round，等待服务端随后返回 `server_endpoint` accept
+      - `audio.in.commit` wire-level 入口新增二道保险：当 session 已非 `active`、input 已 `committed`、output 为 `thinking/speaking` 或 response 已开始时跳过发送并打印 skip reason
+      - 下一步上板验证：
+        - endpoint candidate 后不应再出现 `turn_not_ready / audio.in.commit is accepted only while the session is active`
+        - 应看到 `xiaozhi server endpoint candidate suppresses local audio.in.commit` 或 `xiaozhi audio.in.commit skipped: ...` 诊断
+        - no-audio 主现象若仍存在，应继续表现为 `response audio abandoned`，而不是端侧 commit error
   - newest landed runtime bug-fix slice:
     - Step 5.526 对齐 2026-04-26 板端 no-audio 复现日志：
       - 服务端 accepted 后、response 尚未完成前，端侧不再因为本地 VAD speech 立即重开 follow-up ASR round

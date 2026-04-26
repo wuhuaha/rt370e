@@ -1648,6 +1648,14 @@ static const char *river_cloud_xiaozhi_stream_finish_cause_name(
     }
 }
 
+static bool river_cloud_xiaozhi_server_endpoint_candidate_pending(void)
+{
+    return river_xiaozhi_discovery_server_endpoint_enabled() &&
+           river_xiaozhi_preview_events_negotiated() &&
+           g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_candidate &&
+           g_river_cloud.xiaozhi_preview_transcript_truth.preview_id[0] != '\0';
+}
+
 void river_cloud_xiaozhi_apply_active_stream_capture_policy(bool is_speech)
 {
     if (!g_river_cloud.stream_active) {
@@ -1732,7 +1740,26 @@ void river_cloud_xiaozhi_complete_active_stream_finish(
     river_cloud_xiaozhi_stream_finish_cause_t cause,
     const char *detail_reason)
 {
+    const char *cause_name = river_cloud_xiaozhi_stream_finish_cause_name(cause);
+    const char *reason =
+        detail_reason != NULL && detail_reason[0] != '\0' ? detail_reason : cause_name;
+
     if (!g_river_cloud.stream_active) {
+        return;
+    }
+
+    if (river_cloud_xiaozhi_server_endpoint_candidate_pending()) {
+        RIVER_LOGI("xiaozhi server endpoint candidate suppresses local audio.in.commit: cause=%s trigger=%s preview_id=%s endpoint_reason=%s",
+                   cause_name,
+                   reason,
+                   g_river_cloud.xiaozhi_preview_transcript_truth.preview_id,
+                   g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason[0] != '\0' ?
+                       g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason :
+                       "-");
+        river_cloud_xiaozhi_note_round_finish_request("server_endpoint_candidate");
+        river_cloud_xiaozhi_close_local_round_for_cause(
+            RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_ENDPOINT,
+            "server_endpoint_candidate");
         return;
     }
 

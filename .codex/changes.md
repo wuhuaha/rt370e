@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.527
+- 修复 2026-04-26 新日志中残留的一次重复 `audio.in.commit`：
+  - 当服务端已经通过 preview 下发 `input.endpoint candidate=yes`，且 discovery/negotiation 表明 server endpoint 可用时，端侧 post-roll 不再发送本地 `audio.in.commit`
+  - 该路径改为打印 `xiaozhi server endpoint candidate suppresses local audio.in.commit ...`，并以 `server_endpoint_candidate` 收口本地 ASR round，等待服务端 accept
+- 增强 wire-level commit 保险：
+  - `river_xiaozhi_send_audio_commit_internal()` 在 session 非 `active`、input 已 `committed`、output 为 `thinking/speaking` 或 response 已开始时直接跳过发送
+  - skip 日志携带 session/input/output/accept/response 状态，便于确认是否仍有 stale commit 请求进入发送入口
+- 该步不改变 no-audio 事实边界：
+  - 仍不伪造 `audio.out.meta` 或 playback fact
+  - 服务侧未下发音频时仍由 `response audio abandoned` 收口
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.526
 - 修复 2026-04-26 板端 no-audio 日志暴露的两个端侧问题：
   - 服务端 accepted 后、response 尚未完成前，端侧不再因为本地 VAD speech 立即重开 follow-up ASR round
