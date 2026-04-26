@@ -233,6 +233,44 @@ python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 15000
 
 - 日志足以区分 follow-up reopen 与 uplink quality 问题
 
+
+### Step D: 对齐服务侧首音频失败回 active 语义
+
+目标：
+
+- 当服务侧在 `response.start` 后因首音频失败返回 `session.update state=active / output_state=idle` 且没有 `audio.out.meta` 时，端侧终止本地 response-audio wait。
+- 保留真正悬挂场景下的 `5s response_audio_timeout` recovery，避免服务完全无回包时设备卡死。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+完成标准：
+
+- 收到服务侧 `active/idle` no-meta 回退时打印：
+  - `xiaozhi response audio abandoned`
+  - `xiaozhi response audio wait cleared`
+- 此路径不发送 `audio.out.started / mark / completed`。
+- 此路径不再等待 5s 后执行 `response_audio_timeout` abort/close。
+- 若服务侧既不回 active/idle 也不发 `audio.out.meta`，现有 5s timeout recovery 仍然生效。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+期望结果：
+
+- `git diff --check` 无输出
+- `check_codex_harness: all checks passed`
+- latest SDK 构建输出 `Build done`
+
 ## 编写建议
 
 - 后续更新此计划时，优先刷新 “已知事实 / 风险 / 当前下一刀”，不要把它写成历史流水账。

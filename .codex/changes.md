@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.525
+- 对齐 2026-04-26 服务侧 realtime 首音频失败语义：
+  - 服务侧现在只有拿到首个真实 audio chunk 后才进入 `speaking` / 发送 `audio.out.meta`
+  - 如果首音频等待失败，服务侧会返回 `session.update state=active / output_state=idle`，且不会下发可播放 PCM
+- 端侧新增 no-meta abandoned 收口：
+  - `response.start` 后若尚未观察到 `audio.out.meta`，并且 turn semantics 刷新到 `active/idle`，清理 response-audio wait lineage
+  - 打印 `xiaozhi response audio abandoned` 与 `xiaozhi response audio wait cleared`，用于区分“服务已放弃本次音频”与“服务完全悬挂”
+  - 不发送 `audio.out.started / mark / completed`，继续保持 playback facts 只能由 `audio.out.meta` + 实际播放驱动
+- 保留 Step 5.523 的 5s timeout recovery：
+  - 若服务侧既不回 `active/idle` 也不发 `audio.out.meta`，仍由 `response_audio_timeout` abort/close 释放本地 session/window
+- Verification:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed with `check_codex_harness: all checks passed`
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.523
 - 在 Step 5.522 的 response audio wait timeout 诊断基础上增加本地恢复策略：
   - `river_cloud_xiaozhi_check_response_audio_timeout()` 现在返回本次是否新触发 timeout

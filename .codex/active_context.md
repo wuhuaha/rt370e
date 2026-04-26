@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.524 XiaoZhi uplink bounded catch-up 首步`
+  - `5.525 XiaoZhi response 首音频失败回 active 收口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.525 对齐 2026-04-26 服务侧首音频失败处理：
+      - 服务侧现在只有首个真实 audio chunk ready 后才进入 `speaking` / 发送 `audio.out.meta`
+      - 若服务侧返回 `session.update state=active / output_state=idle` 且本轮仍未观察到 `audio.out.meta`，端侧会清理 response-audio wait lineage
+      - 新增 `xiaozhi response audio abandoned` 与 `xiaozhi response audio wait cleared` 日志，区分“服务已放弃本次音频”与“服务完全悬挂”
+      - 不发送伪造的 `audio.out.started / mark / completed`，playback facts 仍只由 `audio.out.meta` + 实际播放驱动
+      - 若服务侧既不回 active/idle 也不发 `audio.out.meta`，Step 5.523 的 5s `response_audio_timeout` recovery 仍保留
+    - 下一步上板验证：
+      - 首音频失败但服务回 active/idle 时，应看到 abandoned/cleared 日志且不再 5s 后 abort/close 同一 response
+      - 服务完全悬挂时仍应进入 `response_audio_timeout` recovery
   - newest landed runtime bug-fix slice:
     - Step 5.524 基于 2026-04-26 服务侧更新版 RTOS 实时建议，把端侧剩余首个改进点选为 uplink bounded catch-up：
       - 保持 20ms PCM 帧格式不变

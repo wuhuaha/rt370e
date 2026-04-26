@@ -1761,6 +1761,27 @@ static bool river_cloud_xiaozhi_input_state_server_committed(const char *input_s
     return input_state != NULL && strcmp(input_state, "committed") == 0;
 }
 
+static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
+    const river_cloud_xiaozhi_turn_semantics_state_t *state,
+    const char *trigger)
+{
+    const char *session_state = river_xiaozhi_last_session_state();
+
+    if (session_state == NULL || strcmp(session_state, "active") != 0) {
+        return;
+    }
+    if (state == NULL || strcmp(state->output_state, "idle") != 0) {
+        return;
+    }
+
+    if (river_cloud_xiaozhi_note_response_audio_abandoned("server_returned_active_no_audio")) {
+        RIVER_LOGI("xiaozhi response audio wait cleared: trigger=%s session_state=%s output_state=%s",
+                   trigger != NULL ? trigger : "-",
+                   session_state,
+                   (state != NULL && state->output_state[0] != '\0') ? state->output_state : "-");
+    }
+}
+
 static void river_cloud_xiaozhi_close_local_round_after_server_commit(
     const river_cloud_xiaozhi_turn_semantics_state_t *state,
     const char *trigger)
@@ -1855,6 +1876,7 @@ void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger)
     }
 
     river_cloud_xiaozhi_close_local_round_after_server_commit(state, trigger);
+    river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(state, trigger);
 }
 
 bool river_cloud_xiaozhi_turn_accepted(void)

@@ -1,3 +1,52 @@
+## Step 5.525 Verification
+
+Rebuild the latest-SDK external project image after aligning no-meta response cleanup with service-side first-audio failure handling:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Confirm the no-meta abandoned path is present and distinct from timeout recovery:
+```bash
+cd /root/ameba-river
+rg -n "response audio abandoned|response audio wait cleared|note_response_audio_abandoned|response_audio_timeout" \
+  components/river_cloud include/river
+```
+
+Expected result:
+- the abandoned path clears only `RESPONSE_STARTED` lineage before `audio.out.meta`
+- `response_audio_timeout` recovery remains present for fully hung service responses
+
+Confirm the Codex harness pointers still match the repo workflow:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits successfully with `check_codex_harness: all checks passed`
+
+Post-flash board validation for service first-audio failure returning active/idle:
+```text
+Wake once, say a short sentence, and force/observe a service-side first-audio start failure that returns session.update active/idle without audio.out.meta.
+```
+
+Expected result:
+- logs include `xiaozhi response.start`
+- logs include `xiaozhi session.update: ... state=active ... output_state=idle ...`
+- logs include `xiaozhi response audio abandoned` and `xiaozhi response audio wait cleared`
+- logs do not include fake `audio.out.started / mark / completed` for that response
+- logs do not later trigger `xiaozhi response audio timeout recovery` for the same response
+
+Expected result when the service fully hangs instead:
+- no `active/idle` return and no `audio.out.meta` within 5s still triggers `xiaozhi response audio timeout recovery`
+
 ## Step 5.523 Verification
 
 Rebuild the latest-SDK external project image after adding response-audio-timeout recovery:
@@ -1181,8 +1230,6 @@ Expected result:
 - downlink playback still starts and drains normally during a XiaoZhi TTS response
 - idle periods still use the normal downlink poll/idle sleep behavior
 - no new write-failed / rebuffer storm appears only after this typed-result refactor
-
-# Verification
 
 ## Step 5.499
 Validate that downlink current-frame write now returns a typed branch outcome

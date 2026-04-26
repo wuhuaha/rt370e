@@ -310,6 +310,40 @@ void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_eve
         NULL);
 }
 
+bool river_cloud_xiaozhi_note_response_audio_abandoned(const char *reason)
+{
+    river_cloud_xiaozhi_playback_lineage_truth_t *lineage =
+        &g_river_cloud.xiaozhi_playback_lineage_truth;
+    uint64_t now_ms;
+    uint64_t wait_ms = 0U;
+
+    if (lineage->stage != RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED ||
+        lineage->updated_ms == 0U || lineage->meta_context.response_id[0] != '\0') {
+        return false;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (now_ms >= lineage->updated_ms) {
+        wait_ms = now_ms - lineage->updated_ms;
+    }
+
+    RIVER_LOGI("xiaozhi response audio abandoned: response_id=%s wait_ms=%lu reason=%s input_state=%s output_state=%s accepted=%s",
+               lineage->response_context.response_id[0] != '\0' ?
+                   lineage->response_context.response_id :
+                   "-",
+               (unsigned long)wait_ms,
+               reason != NULL ? reason : "-",
+               g_river_cloud.xiaozhi_turn_semantics.input_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.input_state :
+                   "-",
+               g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
+                   g_river_cloud.xiaozhi_turn_semantics.output_state :
+                   "-",
+               g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no");
+    river_cloud_xiaozhi_clear_playback_lineage_truth();
+    return true;
+}
+
 bool river_cloud_xiaozhi_check_response_audio_timeout(void)
 {
     river_cloud_xiaozhi_playback_lineage_truth_t *lineage =
