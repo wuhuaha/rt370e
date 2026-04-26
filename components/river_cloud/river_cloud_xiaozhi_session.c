@@ -739,6 +739,10 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
     frame_ms = RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
     while (drained_frames < RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX) {
         uint64_t due_ms;
+        uint32_t ready_before_send;
+        uint32_t capture_age_ms = 0U;
+        uint64_t send_begin_ms;
+        uint32_t send_duration_ms = 0U;
 
         now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
         due_ms = g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms;
@@ -765,17 +769,36 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
             return;
         }
 
+        ready_before_send = river_cloud_xiaozhi_uplink_ready_frames();
+        if (ready_before_send > 0U) {
+            uint64_t age_ms64 =
+                ((uint64_t)(ready_before_send - 1U) * (uint64_t)frame_ms);
+            if (age_ms64 > UINT32_MAX) {
+                capture_age_ms = UINT32_MAX;
+            } else {
+                capture_age_ms = (uint32_t)age_ms64;
+            }
+        }
+        send_begin_ms = (uint64_t)rtos_time_get_current_system_time_ms();
         status = river_cloud_xiaozhi_send_uplink_transport(
             g_river_cloud.xiaozhi_uplink_task_frame,
             RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX,
             g_river_cloud.xiaozhi_uplink_runtime_truth.timestamp_ms);
         now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+        if (now_ms >= send_begin_ms) {
+            uint64_t duration_ms64 = now_ms - send_begin_ms;
+
+            send_duration_ms = duration_ms64 > UINT32_MAX ? UINT32_MAX : (uint32_t)duration_ms64;
+        }
         if (status == RIVER_OK) {
             uint64_t next_due_ms;
 
             g_river_cloud.xiaozhi_uplink_runtime_truth.timestamp_ms +=
                 RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
-            river_cloud_xiaozhi_round_note_packet_sent();
+            river_cloud_xiaozhi_round_note_packet_sent(now_ms,
+                                                       ready_before_send,
+                                                       capture_age_ms,
+                                                       send_duration_ms);
             g_river_cloud.xiaozhi_uplink_runtime_truth.retry_valid = false;
             g_river_cloud.xiaozhi_uplink_runtime_truth.busy_streak = 0U;
             next_due_ms = due_ms != 0U ? (due_ms + (uint64_t)frame_ms) :
@@ -1495,6 +1518,21 @@ void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames)
     g_river_cloud.xiaozhi_asr_round_truth.ring_drop_base =
         g_river_cloud.xiaozhi_uplink_runtime_truth.ring_dropped;
     g_river_cloud.xiaozhi_asr_round_truth.burst_max = 0U;
+    memset(g_river_cloud.xiaozhi_asr_round_truth.uplink_send_interval_samples,
+           0,
+           sizeof(g_river_cloud.xiaozhi_asr_round_truth.uplink_send_interval_samples));
+    memset(g_river_cloud.xiaozhi_asr_round_truth.uplink_capture_age_samples,
+           0,
+           sizeof(g_river_cloud.xiaozhi_asr_round_truth.uplink_capture_age_samples));
+    memset(g_river_cloud.xiaozhi_asr_round_truth.uplink_backlog_samples,
+           0,
+           sizeof(g_river_cloud.xiaozhi_asr_round_truth.uplink_backlog_samples));
+    memset(g_river_cloud.xiaozhi_asr_round_truth.uplink_send_duration_samples,
+           0,
+           sizeof(g_river_cloud.xiaozhi_asr_round_truth.uplink_send_duration_samples));
+    g_river_cloud.xiaozhi_asr_round_truth.uplink_metric_count = 0U;
+    g_river_cloud.xiaozhi_asr_round_truth.uplink_metric_cursor = 0U;
+    g_river_cloud.xiaozhi_asr_round_truth.last_packet_sent_ms = 0U;
     g_river_cloud.xiaozhi_asr_round_truth.close_reason[0] = '\0';
     RIVER_LOGI("xiaozhi asr round begin: id=%lu sid=%s pre_roll_frames=%lu",
                (unsigned long)g_river_cloud.xiaozhi_asr_round_truth.id,
@@ -1504,7 +1542,78 @@ void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames)
                (unsigned long)pre_roll_frames);
 }
 
-void river_cloud_xiaozhi_round_note_packet_sent(void)
+static uint32_t river_cloud_xiaozhi_round_percentile(
+    const uint32_t *samples,
+    uint32_t sample_count,
+    uint32_t percentile)
+{
+    uint32_t sorted[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
+    uint32_t count;
+    uint32_t i;
+    uint32_t j;
+    uint32_t target;
+
+    if (samples == NULL || sample_count == 0U) {
+        return 0U;
+    }
+
+    count = sample_count;
+    if (count > RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES) {
+        count = RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES;
+    }
+    memcpy(sorted, samples, count * sizeof(uint32_t));
+    for (i = 1U; i < count; ++i) {
+        uint32_t key = sorted[i];
+        j = i;
+        while (j > 0U && sorted[j - 1U] > key) {
+            sorted[j] = sorted[j - 1U];
+            j--;
+        }
+        sorted[j] = key;
+    }
+    if (percentile >= 100U) {
+        return sorted[count - 1U];
+    }
+    target = (uint32_t)(((uint64_t)(count - 1U) * (uint64_t)percentile + 50ULL) / 100ULL);
+    if (target >= count) {
+        target = count - 1U;
+    }
+    return sorted[target];
+}
+
+static void river_cloud_xiaozhi_round_note_uplink_metrics(uint64_t now_ms,
+                                                          uint32_t backlog_frames,
+                                                          uint32_t capture_age_ms,
+                                                          uint32_t send_duration_ms)
+{
+    uint32_t send_interval_ms = 0U;
+    uint32_t slot;
+    river_cloud_xiaozhi_asr_round_truth_t *round_truth =
+        &g_river_cloud.xiaozhi_asr_round_truth;
+
+    if (!round_truth->active) {
+        return;
+    }
+    if (round_truth->last_packet_sent_ms != 0U && now_ms >= round_truth->last_packet_sent_ms) {
+        uint64_t delta_ms = now_ms - round_truth->last_packet_sent_ms;
+        send_interval_ms = delta_ms > UINT32_MAX ? UINT32_MAX : (uint32_t)delta_ms;
+    }
+    round_truth->last_packet_sent_ms = now_ms;
+    slot = round_truth->uplink_metric_cursor % RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES;
+    round_truth->uplink_send_interval_samples[slot] = send_interval_ms;
+    round_truth->uplink_capture_age_samples[slot] = capture_age_ms;
+    round_truth->uplink_backlog_samples[slot] = backlog_frames;
+    round_truth->uplink_send_duration_samples[slot] = send_duration_ms;
+    if (round_truth->uplink_metric_count < RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES) {
+        round_truth->uplink_metric_count++;
+    }
+    round_truth->uplink_metric_cursor++;
+}
+
+void river_cloud_xiaozhi_round_note_packet_sent(uint64_t now_ms,
+                                                uint32_t backlog_frames,
+                                                uint32_t capture_age_ms,
+                                                uint32_t send_duration_ms)
 {
     if (!g_river_cloud.xiaozhi_asr_round_truth.active) {
         return;
@@ -1512,11 +1621,18 @@ void river_cloud_xiaozhi_round_note_packet_sent(void)
 
     if (g_river_cloud.xiaozhi_asr_round_truth.first_packet_ms == 0U) {
         g_river_cloud.xiaozhi_asr_round_truth.first_packet_ms =
-            (uint32_t)rtos_time_get_current_system_time_ms();
+            (uint32_t)now_ms;
     }
     if (g_river_cloud.xiaozhi_asr_round_truth.packets_sent < UINT32_MAX) {
         g_river_cloud.xiaozhi_asr_round_truth.packets_sent++;
     }
+    if (backlog_frames > g_river_cloud.xiaozhi_asr_round_truth.burst_max) {
+        g_river_cloud.xiaozhi_asr_round_truth.burst_max = backlog_frames;
+    }
+    river_cloud_xiaozhi_round_note_uplink_metrics(now_ms,
+                                                  backlog_frames,
+                                                  capture_age_ms,
+                                                  send_duration_ms);
 }
 
 static const char *river_cloud_xiaozhi_stream_finish_cause_name(
@@ -1782,6 +1898,128 @@ static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
     }
 }
 
+static uint32_t river_cloud_xiaozhi_prompt_tone_step(uint32_t frequency_hz,
+                                                     uint32_t sample_rate_hz)
+{
+    if (frequency_hz == 0U || sample_rate_hz == 0U) {
+        return 0U;
+    }
+    return (uint32_t)(((uint64_t)frequency_hz << 32) / (uint64_t)sample_rate_hz);
+}
+
+static void river_cloud_xiaozhi_fill_prompt_tone(int16_t *mono,
+                                                 size_t samples,
+                                                 uint32_t *phase,
+                                                 uint32_t phase_step)
+{
+    size_t index;
+    uint32_t current_phase;
+    const int16_t amplitude = 3800;
+
+    if (mono == NULL || phase == NULL || samples == 0U) {
+        return;
+    }
+
+    current_phase = *phase;
+    for (index = 0U; index < samples; ++index) {
+        mono[index] = ((current_phase & 0x80000000UL) != 0U) ? amplitude : (int16_t)(-amplitude);
+        current_phase += phase_step;
+    }
+    *phase = current_phase;
+}
+
+bool river_cloud_xiaozhi_play_local_retry_prompt(const char *reason)
+{
+    enum {
+        RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE = 16000U,
+        RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS = 20U,
+        RIVER_XIAOZHI_LOCAL_PROMPT_FRAMES = 4U,
+        RIVER_XIAOZHI_LOCAL_PROMPT_COOLDOWN_MS = 15000U
+    };
+    static uint64_t last_prompt_ms = 0U;
+    river_playback_stream_config_t config;
+    uint64_t now_ms;
+    uint32_t frame_samples;
+    uint32_t frame_bytes;
+    uint32_t mono_step_a;
+    uint32_t mono_step_b;
+    uint32_t tone_phase = 0U;
+    uint32_t frame_index;
+    int16_t mono_frame[(RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE *
+                        RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS) /
+                       1000U];
+    int16_t stereo_frame[(RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE *
+                          RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS) /
+                         1000U * 2U];
+
+    if (river_playback_service_active()) {
+        return false;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (last_prompt_ms != 0U && now_ms >= last_prompt_ms &&
+        (now_ms - last_prompt_ms) < RIVER_XIAOZHI_LOCAL_PROMPT_COOLDOWN_MS) {
+        return false;
+    }
+
+    frame_samples =
+        (RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE * RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS) /
+        1000U;
+    frame_bytes = frame_samples * sizeof(int16_t) * 2U;
+    memset(&config, 0, sizeof(config));
+    config.stream_name = "xiaozhi_local_retry";
+    config.priority = RIVER_PLAYBACK_PRIO_TTS;
+    config.sample_rate = RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE;
+    config.frame_ms = RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS;
+    config.playback_channels = 2U;
+    config.bits_per_sample = 16U;
+    config.playback_frame_bytes = frame_bytes;
+    config.buffer_frame_count = 4U;
+    config.volume_left = 0.8f;
+    config.volume_right = 0.8f;
+    config.reference_export = true;
+    config.reference_channels = 1U;
+    config.reference_frame_bytes = frame_samples * sizeof(int16_t);
+    config.reference_history_ms = 200U;
+
+    if (river_playback_service_start_stream(&config) != RIVER_OK) {
+        RIVER_LOGW("xiaozhi local fallback prompt skipped: reason=%s playback_start_failed",
+                   reason != NULL ? reason : "-");
+        return false;
+    }
+
+    mono_step_a = river_cloud_xiaozhi_prompt_tone_step(660U, RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE);
+    mono_step_b = river_cloud_xiaozhi_prompt_tone_step(880U, RIVER_XIAOZHI_LOCAL_PROMPT_SAMPLE_RATE);
+    for (frame_index = 0U; frame_index < RIVER_XIAOZHI_LOCAL_PROMPT_FRAMES; ++frame_index) {
+        uint32_t step = (frame_index < 2U) ? mono_step_a : mono_step_b;
+        size_t sample_index;
+
+        river_cloud_xiaozhi_fill_prompt_tone(mono_frame, frame_samples, &tone_phase, step);
+        for (sample_index = 0U; sample_index < frame_samples; ++sample_index) {
+            stereo_frame[sample_index * 2U] = mono_frame[sample_index];
+            stereo_frame[sample_index * 2U + 1U] = mono_frame[sample_index];
+        }
+        if (river_playback_service_write((const uint8_t *)stereo_frame,
+                                         frame_bytes,
+                                         (const uint8_t *)mono_frame,
+                                         frame_samples * sizeof(int16_t),
+                                         true) != RIVER_OK) {
+            RIVER_LOGW("xiaozhi local fallback prompt write failed: reason=%s frame=%lu",
+                       reason != NULL ? reason : "-",
+                       (unsigned long)frame_index);
+            (void)river_playback_service_stop_stream_ex("local_retry_prompt_write_failed");
+            return false;
+        }
+    }
+
+    (void)river_playback_service_stop_stream_ex("local_retry_prompt");
+    last_prompt_ms = now_ms;
+    RIVER_LOGI("xiaozhi local fallback prompt played: reason=%s stream=xiaozhi_local_retry frames=%u ref=yes",
+               reason != NULL ? reason : "-",
+               RIVER_XIAOZHI_LOCAL_PROMPT_FRAMES);
+    return true;
+}
+
 static void river_cloud_xiaozhi_close_local_round_after_server_commit(
     const river_cloud_xiaozhi_turn_semantics_state_t *state,
     const char *trigger)
@@ -1992,6 +2230,7 @@ static void river_cloud_xiaozhi_recover_response_audio_timeout(const char *trigg
         RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
         "response_audio_timeout");
     river_cloud_xiaozhi_window_close("response_audio_timeout");
+    (void)river_cloud_xiaozhi_play_local_retry_prompt("response_audio_timeout");
 }
 
 void river_cloud_xiaozhi_run_post_poll_housekeeping(void)
@@ -2042,6 +2281,14 @@ void river_cloud_xiaozhi_round_finish(const char *reason)
     uint32_t audio_ms = 0U;
     uint32_t realtime_gap_ms = 0U;
     uint32_t pace_pct = 0U;
+    uint32_t uplink_count = g_river_cloud.xiaozhi_asr_round_truth.uplink_metric_count;
+    uint32_t send_interval_p50 = 0U;
+    uint32_t send_interval_p95 = 0U;
+    uint32_t capture_age_p50 = 0U;
+    uint32_t capture_age_p95 = 0U;
+    uint32_t backlog_p95 = 0U;
+    uint32_t send_duration_p50 = 0U;
+    uint32_t send_duration_p95 = 0U;
     uint32_t busy_delta;
     uint32_t fail_delta;
     uint32_t stale_delta;
@@ -2074,6 +2321,36 @@ void river_cloud_xiaozhi_round_finish(const char *reason)
     if (duration_ms != 0U) {
         pace_pct = (uint32_t)(((uint64_t)audio_ms * 100ULL) / (uint64_t)duration_ms);
     }
+    if (uplink_count > 0U) {
+        send_interval_p50 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_send_interval_samples,
+            uplink_count,
+            50U);
+        send_interval_p95 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_send_interval_samples,
+            uplink_count,
+            95U);
+        capture_age_p50 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_capture_age_samples,
+            uplink_count,
+            50U);
+        capture_age_p95 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_capture_age_samples,
+            uplink_count,
+            95U);
+        backlog_p95 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_backlog_samples,
+            uplink_count,
+            95U);
+        send_duration_p50 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_send_duration_samples,
+            uplink_count,
+            50U);
+        send_duration_p95 = river_cloud_xiaozhi_round_percentile(
+            g_river_cloud.xiaozhi_asr_round_truth.uplink_send_duration_samples,
+            uplink_count,
+            95U);
+    }
     busy_delta = g_river_cloud.xiaozhi_uplink_runtime_truth.busy_count -
                  g_river_cloud.xiaozhi_asr_round_truth.busy_base;
     fail_delta = g_river_cloud.xiaozhi_uplink_runtime_truth.fail_count -
@@ -2088,7 +2365,7 @@ void river_cloud_xiaozhi_round_finish(const char *reason)
                             g_river_cloud.xiaozhi_asr_round_truth.close_reason :
                             "-");
 
-    RIVER_LOGI("xiaozhi asr round finish: id=%lu sid=%s reason=%s duration_ms=%lu audio_ms=%lu realtime_gap_ms=%lu pace_pct=%lu first_packet_delay_ms=%lu pre_roll_frames=%lu packets=%lu burst_max=%lu busy=%lu fail=%lu stale_drop=%lu ring_drop=%lu partial=%lu final=%lu seen[partial=%s final=%s]",
+    RIVER_LOGI("xiaozhi asr round finish: id=%lu sid=%s reason=%s duration_ms=%lu audio_ms=%lu realtime_gap_ms=%lu pace_pct=%lu first_packet_delay_ms=%lu pre_roll_frames=%lu packets=%lu burst_max=%lu busy=%lu fail=%lu stale_drop=%lu ring_drop=%lu partial=%lu final=%lu seen[partial=%s final=%s] uplink_ms[send_interval_p50=%lu send_interval_p95=%lu capture_age_p50=%lu capture_age_p95=%lu backlog_p95=%lu send_duration_p50=%lu send_duration_p95=%lu]",
                (unsigned long)g_river_cloud.xiaozhi_asr_round_truth.id,
                river_cloud_xiaozhi_current_sid() != NULL ?
                    river_cloud_xiaozhi_current_sid() :
@@ -2109,7 +2386,14 @@ void river_cloud_xiaozhi_round_finish(const char *reason)
                (unsigned long)g_river_cloud.xiaozhi_asr_round_truth.partial_count,
                (unsigned long)g_river_cloud.xiaozhi_asr_round_truth.final_count,
                g_river_cloud.xiaozhi_asr_round_truth.partial_seen ? "yes" : "no",
-               g_river_cloud.xiaozhi_asr_round_truth.final_seen ? "yes" : "no");
+               g_river_cloud.xiaozhi_asr_round_truth.final_seen ? "yes" : "no",
+               (unsigned long)send_interval_p50,
+               (unsigned long)send_interval_p95,
+               (unsigned long)capture_age_p50,
+               (unsigned long)capture_age_p95,
+               (unsigned long)backlog_p95,
+               (unsigned long)send_duration_p50,
+               (unsigned long)send_duration_p95);
 
     g_river_cloud.xiaozhi_asr_round_truth.active = false;
     g_river_cloud.xiaozhi_asr_round_truth.started_ms = 0U;

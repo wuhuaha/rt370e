@@ -184,7 +184,7 @@ void river_xiaozhi_dump_status(void)
                (unsigned long)g_river_xiaozhi.preview_update_events,
                (unsigned long)g_river_xiaozhi.preview_logs_emitted,
                (unsigned long)g_river_xiaozhi.preview_logs_suppressed);
-    RIVER_LOGI("xiaozhi playback_meta=response_id=%s playback_id=%s segment_id=%s expected_duration_ms=%lu is_last_segment=%s valid=%s",
+    RIVER_LOGI("xiaozhi playback_meta=response_id=%s playback_id=%s segment_id=%s expected_duration_ms=%lu is_last_segment=%s output_lane=%s output_role=%s phrase_id=%s valid=%s",
                g_river_xiaozhi.last_response_id[0] != '\0' ?
                    g_river_xiaozhi.last_response_id :
                    "-",
@@ -196,6 +196,15 @@ void river_xiaozhi_dump_status(void)
                    "-",
                (unsigned long)g_river_xiaozhi.last_playback_expected_duration_ms,
                river_xiaozhi_bool_text(g_river_xiaozhi.last_playback_is_last_segment),
+               g_river_xiaozhi.last_playback_output_lane[0] != '\0' ?
+                   g_river_xiaozhi.last_playback_output_lane :
+                   "-",
+               g_river_xiaozhi.last_playback_output_role[0] != '\0' ?
+                   g_river_xiaozhi.last_playback_output_role :
+                   "-",
+               g_river_xiaozhi.last_playback_phrase_id[0] != '\0' ?
+                   g_river_xiaozhi.last_playback_phrase_id :
+                   "-",
                river_xiaozhi_bool_text(river_xiaozhi_last_playback_meta_valid()));
     RIVER_LOGI("xiaozhi discovery turn_mode=%s server_endpoint=%s/%s mode=%s voice_collaboration=%s preview_events=%s declared_preview=%s preview_reason=%s playback_ack=%s declared_playback_ack=%s playback_ack_reason=%s default_on=%s default_reason=%s",
                g_river_xiaozhi.discovery_turn_mode[0] != '\0' ?

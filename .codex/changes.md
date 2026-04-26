@@ -14109,3 +14109,23 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.525
+- Completed the remaining XiaoZhi device-side service-alignment items from the 2026-04-26 stability plan:
+  - parsed and stored service `audio.out.meta` fields `output_lane`, `output_role`, and `phrase_id`
+  - propagated those fields through `river_xiaozhi_event_t` into playback meta truth and status logs
+  - kept the fields as observed service facts only; no local fast-launch/main-dialogue planner was added
+- Added per-round uplink freshness telemetry:
+  - fixed-size 16-sample windows for send interval, estimated capture-to-send age, backlog, and transport-send duration
+  - `xiaozhi asr round finish` now reports p50/p95 metrics under `uplink_ms[...]`
+  - existing 20 ms pacing and stale-drop policy are unchanged
+- Added no-audio/no-ref diagnostics and safe local fallback UX:
+  - response-audio abandoned logs now include `ref_enabled` and `playback_active`
+  - playback status exposes `ref_enabled` next to playback meta truth
+  - no-audio recovery can play a short local retry prompt through `river_playback_service` with `reference_export=true`
+  - the prompt has a 15 s cooldown and does not synthesize `audio.out.meta` or send playback ACKs
+- Updated `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md` with Step E/F/G for meta fields, uplink telemetry, and no-ref/local fallback completion criteria.
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

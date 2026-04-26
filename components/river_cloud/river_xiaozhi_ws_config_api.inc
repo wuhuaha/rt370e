@@ -218,6 +218,30 @@ const char *river_xiaozhi_last_accept_reason(void)
                NULL;
 }
 
+const char *river_xiaozhi_last_playback_output_lane(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_playback_output_lane[0] != '\0') ?
+               g_river_xiaozhi.last_playback_output_lane :
+               NULL;
+}
+
+const char *river_xiaozhi_last_playback_output_role(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_playback_output_role[0] != '\0') ?
+               g_river_xiaozhi.last_playback_output_role :
+               NULL;
+}
+
+const char *river_xiaozhi_last_playback_phrase_id(void)
+{
+    return (g_river_xiaozhi.initialized &&
+            g_river_xiaozhi.last_playback_phrase_id[0] != '\0') ?
+               g_river_xiaozhi.last_playback_phrase_id :
+               NULL;
+}
+
 bool river_xiaozhi_last_barge_in_enabled_known(void)
 {
     return g_river_xiaozhi.initialized &&

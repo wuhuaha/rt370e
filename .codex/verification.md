@@ -22225,3 +22225,69 @@ Expected result:
 - common case `burst_max` should be close to `1`, and catch-up should not exceed `2`
 - no repeated `turn_not_ready` / `audio.in.commit is accepted only while the session is active` loop after server endpoint commit
 - if service TTS still sends no `audio.out.meta`, Step 5.523 should still log `response audio timeout recovery` and release the session/window for a later wake
+
+## Step 5.525 - XiaoZhi meta fields, uplink telemetry, and local fallback prompt
+
+Confirm the service `audio.out.meta` fields are parsed, surfaced, and kept as playback facts:
+```bash
+cd /root/ameba-river
+rg -n "output_lane|output_role|phrase_id|playback fact observed|playback_meta" \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws_message_handlers.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc
+```
+
+Expected result:
+- `river_xiaozhi_event_t` includes `output_lane`, `output_role`, and `phrase_id`
+- `audio.out.meta` logs these fields when present
+- playback fact/status logs expose these fields without creating local playback facts
+
+Confirm uplink freshness and fallback diagnostics are present:
+```bash
+cd /root/ameba-river
+rg -n "uplink_ms\[|UPLINK_METRIC_SAMPLES|capture_age|send_duration|local fallback prompt|ref_enabled" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc
+```
+
+Expected result:
+- `xiaozhi asr round finish` reports `uplink_ms[...]` p50/p95 fields
+- no-audio recovery logs include `ref_enabled` / `playback_active`
+- local retry prompt uses `reference_export=true` and has a cooldown
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation:
+```text
+river xiaozhi status
+wake the device and trigger a no-audio service response or normal TTS response
+```
+
+Expected result:
+- normal TTS: `audio.out.meta` and playback status show `output_lane/output_role/phrase_id` when service sends them
+- ASR round finish: `uplink_ms[...]` fields are printed
+- no-audio response: device clears response-audio wait and may play one short local retry prompt without sending playback ACKs

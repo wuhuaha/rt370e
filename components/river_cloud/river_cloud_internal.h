@@ -43,6 +43,10 @@
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX  96U
 #define RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX   96U
+#define RIVER_CLOUD_XIAOZHI_OUTPUT_LANE_MAX  32U
+#define RIVER_CLOUD_XIAOZHI_OUTPUT_ROLE_MAX  32U
+#define RIVER_CLOUD_XIAOZHI_PHRASE_ID_MAX    64U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES 16U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
@@ -234,6 +238,9 @@ typedef struct {
 typedef struct {
     river_cloud_xiaozhi_playback_context_truth_t current_context;
     char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
+    char output_lane[RIVER_CLOUD_XIAOZHI_OUTPUT_LANE_MAX];
+    char output_role[RIVER_CLOUD_XIAOZHI_OUTPUT_ROLE_MAX];
+    char phrase_id[RIVER_CLOUD_XIAOZHI_PHRASE_ID_MAX];
     uint32_t expected_duration_ms;
     uint32_t last_meta_gap_ms;
     uint32_t prefetch_target_ms;
@@ -335,6 +342,13 @@ typedef struct {
     uint32_t stale_drop_base;
     uint32_t ring_drop_base;
     uint32_t burst_max;
+    uint32_t uplink_send_interval_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
+    uint32_t uplink_capture_age_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
+    uint32_t uplink_backlog_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
+    uint32_t uplink_send_duration_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
+    uint32_t uplink_metric_count;
+    uint32_t uplink_metric_cursor;
+    uint64_t last_packet_sent_ms;
     char close_reason[32];
 } river_cloud_xiaozhi_asr_round_truth_t;
 
@@ -649,7 +663,10 @@ void river_cloud_xiaozhi_note_interrupt_hint(const char *trigger,
                                              const char *reason);
 river_status_t river_cloud_xiaozhi_interrupt_tts(const char *reason);
 void river_cloud_xiaozhi_round_begin(uint32_t pre_roll_frames);
-void river_cloud_xiaozhi_round_note_packet_sent(void);
+void river_cloud_xiaozhi_round_note_packet_sent(uint64_t now_ms,
+                                                uint32_t backlog_frames,
+                                                uint32_t capture_age_ms,
+                                                uint32_t send_duration_ms);
 void river_cloud_xiaozhi_arm_endpoint_soft_close(const char *trigger,
                                                  const char *reason);
 bool river_cloud_xiaozhi_poll_endpoint_soft_close_timeout(char *reason,
@@ -677,6 +694,7 @@ void river_cloud_xiaozhi_clear_turn_semantics_state(void);
 void river_cloud_xiaozhi_capture_turn_semantics_view(
     river_cloud_xiaozhi_turn_semantics_view_t *view);
 void river_cloud_xiaozhi_clear_playback_meta_state(void);
+bool river_cloud_xiaozhi_play_local_retry_prompt(const char *reason);
 void river_cloud_xiaozhi_refresh_turn_semantics(const char *trigger);
 bool river_cloud_xiaozhi_turn_accepted(void);
 void river_cloud_xiaozhi_note_semantic_fallback(const char *reason);

@@ -4368,3 +4368,14 @@ or top-of-tree verification target changes.
   register it in `.codex/active_plans.md`.
 - After changing repo-level Codex harness files, run:
   - `python3 tools/diag/check_codex_harness.py`
+
+## Latest Verified Step
+
+- 2026-04-26 / branch `agent-server-v2`: Step 5.525 completed the remaining XiaoZhi service-alignment device items:
+  - service `audio.out.meta` fields `output_lane`, `output_role`, `phrase_id`
+  - per-round uplink freshness p50/p95 telemetry
+  - no-audio/no-ref fact logs and a short local retry prompt through playback reference export
+- Verified with latest SDK `/root/ameba-rtos`:
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`

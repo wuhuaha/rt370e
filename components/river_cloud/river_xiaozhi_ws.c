@@ -50,6 +50,9 @@
 #define RIVER_XIAOZHI_LAST_RESPONSE_ID_MAX 96U
 #define RIVER_XIAOZHI_LAST_PLAYBACK_ID_MAX 96U
 #define RIVER_XIAOZHI_LAST_SEGMENT_ID_MAX  96U
+#define RIVER_XIAOZHI_LAST_OUTPUT_LANE_MAX 32U
+#define RIVER_XIAOZHI_LAST_OUTPUT_ROLE_MAX 32U
+#define RIVER_XIAOZHI_LAST_PHRASE_ID_MAX   64U
 #define RIVER_XIAOZHI_TURN_MODE_MAX        48U
 #define RIVER_XIAOZHI_COLLAB_MODE_MAX      32U
 #define RIVER_XIAOZHI_ACTIVATION_CODE_MAX  16U
@@ -190,6 +193,9 @@ typedef struct {
     char last_response_id[RIVER_XIAOZHI_LAST_RESPONSE_ID_MAX];
     char last_playback_id[RIVER_XIAOZHI_LAST_PLAYBACK_ID_MAX];
     char last_segment_id[RIVER_XIAOZHI_LAST_SEGMENT_ID_MAX];
+    char last_playback_output_lane[RIVER_XIAOZHI_LAST_OUTPUT_LANE_MAX];
+    char last_playback_output_role[RIVER_XIAOZHI_LAST_OUTPUT_ROLE_MAX];
+    char last_playback_phrase_id[RIVER_XIAOZHI_LAST_PHRASE_ID_MAX];
     uint32_t last_playback_expected_duration_ms;
     char discovery_turn_mode[RIVER_XIAOZHI_TURN_MODE_MAX];
     char discovery_server_endpoint_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
@@ -703,6 +709,9 @@ static void river_xiaozhi_clear_last_playback_fields(void)
     g_river_xiaozhi.last_response_id[0] = '\0';
     g_river_xiaozhi.last_playback_id[0] = '\0';
     g_river_xiaozhi.last_segment_id[0] = '\0';
+    g_river_xiaozhi.last_playback_output_lane[0] = '\0';
+    g_river_xiaozhi.last_playback_output_role[0] = '\0';
+    g_river_xiaozhi.last_playback_phrase_id[0] = '\0';
 }
 
 static bool river_xiaozhi_last_playback_meta_valid(void)
@@ -731,6 +740,27 @@ static void river_xiaozhi_set_last_segment_id(const char *segment_id)
     river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_segment_id,
                                        sizeof(g_river_xiaozhi.last_segment_id),
                                        segment_id);
+}
+
+static void river_xiaozhi_set_last_playback_output_lane(const char *output_lane)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_output_lane,
+                                       sizeof(g_river_xiaozhi.last_playback_output_lane),
+                                       output_lane);
+}
+
+static void river_xiaozhi_set_last_playback_output_role(const char *output_role)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_output_role,
+                                       sizeof(g_river_xiaozhi.last_playback_output_role),
+                                       output_role);
+}
+
+static void river_xiaozhi_set_last_playback_phrase_id(const char *phrase_id)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_phrase_id,
+                                       sizeof(g_river_xiaozhi.last_playback_phrase_id),
+                                       phrase_id);
 }
 
 static void river_xiaozhi_clear_discovery_profile(void)
@@ -970,6 +1000,17 @@ static void river_xiaozhi_emit_event(river_xiaozhi_event_type_t type,
     event.response_id = response_id;
     event.playback_id = playback_id;
     event.segment_id = segment_id;
+    if (type == RIVER_XIAOZHI_EVENT_AUDIO_OUT_META) {
+        event.output_lane = g_river_xiaozhi.last_playback_output_lane[0] != '\0' ?
+                                g_river_xiaozhi.last_playback_output_lane :
+                                NULL;
+        event.output_role = g_river_xiaozhi.last_playback_output_role[0] != '\0' ?
+                                g_river_xiaozhi.last_playback_output_role :
+                                NULL;
+        event.phrase_id = g_river_xiaozhi.last_playback_phrase_id[0] != '\0' ?
+                              g_river_xiaozhi.last_playback_phrase_id :
+                              NULL;
+    }
     event.sample_rate = sample_rate;
     event.frame_duration_ms = frame_duration_ms;
     event.timestamp_ms = timestamp_ms;

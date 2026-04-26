@@ -143,6 +143,15 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                                                sizeof(meta_truth->text),
                                                event->text);
     }
+    river_cloud_xiaozhi_copy_optional_text(meta_truth->output_lane,
+                                           sizeof(meta_truth->output_lane),
+                                           event->output_lane);
+    river_cloud_xiaozhi_copy_optional_text(meta_truth->output_role,
+                                           sizeof(meta_truth->output_role),
+                                           event->output_role);
+    river_cloud_xiaozhi_copy_optional_text(meta_truth->phrase_id,
+                                           sizeof(meta_truth->phrase_id),
+                                           event->phrase_id);
     if (event->expected_duration_ms != 0U) {
         meta_truth->expected_duration_ms = event->expected_duration_ms;
     }
@@ -280,10 +289,13 @@ void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_eve
     river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                      "audio_out_meta");
     river_cloud_xiaozhi_playback_note_meta(event);
-    RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
+    RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s output_lane=%s output_role=%s phrase_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
                event->response_id != NULL ? event->response_id : "-",
                event->playback_id != NULL ? event->playback_id : "-",
                event->segment_id != NULL ? event->segment_id : "-",
+               event->output_lane != NULL ? event->output_lane : "-",
+               event->output_role != NULL ? event->output_role : "-",
+               event->phrase_id != NULL ? event->phrase_id : "-",
                event->text != NULL ? event->text : "-",
                (unsigned long)event->expected_duration_ms,
                event->is_last_segment ? "yes" : "no",
@@ -327,7 +339,7 @@ bool river_cloud_xiaozhi_note_response_audio_abandoned(const char *reason)
         wait_ms = now_ms - lineage->updated_ms;
     }
 
-    RIVER_LOGI("xiaozhi response audio abandoned: response_id=%s wait_ms=%lu reason=%s input_state=%s output_state=%s accepted=%s",
+    RIVER_LOGI("xiaozhi response audio abandoned: response_id=%s wait_ms=%lu reason=%s input_state=%s output_state=%s accepted=%s ref_enabled=%s playback_active=%s",
                lineage->response_context.response_id[0] != '\0' ?
                    lineage->response_context.response_id :
                    "-",
@@ -339,8 +351,11 @@ bool river_cloud_xiaozhi_note_response_audio_abandoned(const char *reason)
                g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
                    g_river_cloud.xiaozhi_turn_semantics.output_state :
                    "-",
-               g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no");
+               g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
+               river_playback_service_reference_enabled() ? "yes" : "no",
+               river_playback_service_active() ? "yes" : "no");
     river_cloud_xiaozhi_clear_playback_lineage_truth();
+    (void)river_cloud_xiaozhi_play_local_retry_prompt(reason);
     return true;
 }
 

@@ -1,8 +1,8 @@
 # XiaoZhi Session Stability Execution Plan
 
-Status: active
-Last Updated: 2026-04-13
-Branch: `kws`
+Status: active / device-side implementation complete; pending board replay validation
+Last Updated: 2026-04-26
+Branch: `agent-server-v2`
 
 ## 1. 当前背景
 
@@ -270,6 +270,93 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 - `git diff --check` 无输出
 - `check_codex_harness: all checks passed`
 - latest SDK 构建输出 `Build done`
+
+### Step E: 透传服务侧 audio.out.meta 输出通道事实
+
+状态：已完成（Step 5.525）
+
+目标：
+
+- 消费服务侧新增的 `output_lane` / `output_role` / `phrase_id` 字段。
+- 只把这些字段作为服务事实记录和状态暴露，不在端侧重建
+  `fast_launch/main_dialogue` 规划器。
+
+范围：
+
+- `include/river/river_xiaozhi_ws.h`
+- `components/river_cloud/river_xiaozhi_ws*.inc`
+- `components/river_cloud/river_cloud_xiaozhi_playback_*.inc`
+
+完成标准：
+
+- `audio.out.meta` 解析并打印：
+  - `output_lane=...`
+  - `output_role=...`
+  - `phrase_id=...`
+- transport event 与 playback truth 均能保留这三个字段。
+- `river xiaozhi status` / playback status 可展示最近一次 meta 的字段。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'
+```
+
+期望结果：
+
+- `git diff --check` 无输出
+- `check_codex_harness: all checks passed`
+- latest SDK 构建输出 `Build done`
+
+### Step F: 补齐 uplink freshness 遥测
+
+状态：已完成（Step 5.525）
+
+目标：
+
+- 在 per-round ASR finish 日志里补齐上行健康指标：
+  - send interval p50/p95
+  - 估算 capture-to-send age p50/p95
+  - backlog p95
+  - websocket send 调用耗时 p50/p95
+- 用固定小样本窗口实现，不引入堆分配或高频日志。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+完成标准：
+
+- 每个 ASR round 结束时都能看到上述统计。
+- 统计只用于诊断，不改变当前 20 ms pacing / stale-drop 行为。
+
+### Step G: 补齐 no-ref 泄漏提示与安全本地兜底
+
+状态：已完成（Step 5.525）
+
+目标：
+
+- 在没有 playback reference、但播放/回放链路仍可能影响上行时，输出更直接的事实日志。
+- 当服务侧 response 首音频失败或超时导致没有可播放音频时，播放一个短本地兜底提示音：
+  - 不伪造 `audio.out.meta`
+  - 不发送 playback ACK
+  - 通过 playback service + reference export 进入现有 AEC / uplink 抑制路径
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+- `components/river_cloud/river_cloud_xiaozhi_playback_*.inc`
+
+完成标准：
+
+- no-ref 相关日志能说明当前 ref 缺失/泄漏风险。
+- 本地兜底只在无服务音频的失败路径触发，并带冷却保护。
+- 本地兜底不污染 playback lineage / terminal ACK truth。
 
 ## 编写建议
 
