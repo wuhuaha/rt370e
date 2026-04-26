@@ -336,7 +336,7 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 
 ### Step G: 补齐 no-ref 泄漏提示与安全本地兜底
 
-状态：已完成（Step 5.525）
+状态：已收敛（Step 5.525 完成诊断；Step 5.526 暂停默认本地提示音，待板端非阻塞验证后再打开）
 
 目标：
 
@@ -355,8 +355,37 @@ bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.s
 完成标准：
 
 - no-ref 相关日志能说明当前 ref 缺失/泄漏风险。
-- 本地兜底只在无服务音频的失败路径触发，并带冷却保护。
+- 默认不启动本地兜底播放；本地兜底重新打开前必须证明 AudioTrack
+  start/write 不会阻塞 capture/VAD 消费。
 - 本地兜底不污染 playback lineage / terminal ACK truth。
+
+### Step H: 阻断 response pending 期间的 follow-up reopen
+
+状态：已完成（Step 5.526）
+
+目标：
+
+- 服务端已 accepted 且 `output_state=thinking` 时，端侧不得因为本地 VAD
+  speech 立即重开 follow-up ASR round。
+- `response.start` 后、尚未观察到首个 `audio.out.meta` 前，也不得重开
+  follow-up ASR round。
+- 若此期间检测到 speech，只记录一次 response-pending block 诊断，并清零
+  open-hold 计数，避免 response 尚未完成时进入重叠 ASR。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+
+完成标准：
+
+- 2026-04-26 日志中的模式不再出现：
+  - `server_endpoint_accept` 后约百毫秒内立刻 `asr round begin: id=2`
+  - no-audio abandoned 前 interaction 仍被新 round 推回 `asr_streaming`
+- 若用户在 response pending 期间说话，日志显示：
+  - `xiaozhi followup reopen blocked: reason=response_pending ...`
+- no-audio 路径默认不会再触发 `xiaozhi_local_retry` 本地播放，从而避免
+  capture ring overflow 连锁故障。
 
 ## 编写建议
 

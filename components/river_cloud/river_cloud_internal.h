@@ -95,6 +95,12 @@
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
 #define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS 5000U
+/*
+ * Keep the local no-audio prompt disabled by default until AudioTrack start/write
+ * is proven non-blocking on the live RTOS path. No-audio recovery must never
+ * block capture/VAD consumption.
+ */
+#define RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED 0U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_MARK_INTERVAL_MS 80U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PCM_FRAME_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
@@ -381,6 +387,7 @@ typedef struct {
     bool window_active;
     bool listen_stop_pending;
     bool local_close_pending;
+    bool followup_response_pending_reported;
     uint64_t window_deadline_ms;
     uint64_t local_close_deadline_ms;
 } river_cloud_xiaozhi_session_window_truth_t;

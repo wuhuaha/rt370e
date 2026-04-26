@@ -1,4 +1,6 @@
 /* 小智 round/window runtime：收口 listening/window/listen-stop/local-close 状态。 */
+#include <string.h>
+
 #include "river/river_log.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_wifi_station.h"
@@ -447,6 +449,32 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
     if (river_cloud_xiaozhi_listen_stop_pending()) {
         return RIVER_ERR_BUSY;
     }
+
+    if ((g_river_cloud.xiaozhi_turn_semantics.accepted &&
+         strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "thinking") == 0) ||
+        (g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
+             RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED &&
+         g_river_cloud.xiaozhi_playback_lineage_truth.meta_context.response_id[0] == '\0')) {
+        g_river_cloud.xiaozhi_uplink_runtime_truth.open_speech_frames = 0U;
+        if (is_speech &&
+            !g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported) {
+            g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported = true;
+            RIVER_LOGI("xiaozhi followup reopen blocked: reason=response_pending accepted=%s output_state=%s response_wait=%s sid=%s",
+                       g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
+                       g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
+                           g_river_cloud.xiaozhi_turn_semantics.output_state :
+                           "-",
+                       g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
+                               RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED ?
+                           "yes" :
+                           "no",
+                       river_cloud_xiaozhi_current_sid() != NULL ?
+                           river_cloud_xiaozhi_current_sid() :
+                           "-");
+        }
+        return RIVER_OK;
+    }
+    g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported = false;
 
     if (!river_cloud_xiaozhi_conversation_window_active() &&
         river_cloud_xiaozhi_idle_requires_wakeword()) {

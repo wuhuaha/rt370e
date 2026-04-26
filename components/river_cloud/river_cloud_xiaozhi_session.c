@@ -1952,7 +1952,31 @@ bool river_cloud_xiaozhi_play_local_retry_prompt(const char *reason)
                           RIVER_XIAOZHI_LOCAL_PROMPT_FRAME_MS) /
                          1000U * 2U];
 
+    if (RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED == 0U) {
+        RIVER_LOGW("xiaozhi local fallback prompt skipped: reason=%s disabled=yes stream=%s listening=%s playback=%s",
+                   reason != NULL ? reason : "-",
+                   g_river_cloud.stream_active ? "yes" : "no",
+                   g_river_cloud.xiaozhi_session_window_truth.listening ? "yes" : "no",
+                   river_playback_service_active() ? "yes" : "no");
+        return false;
+    }
+
+    if (g_river_cloud.stream_active ||
+        g_river_cloud.xiaozhi_session_window_truth.listening ||
+        g_river_cloud.xiaozhi_session_window_truth.listen_stop_pending ||
+        g_river_cloud.xiaozhi_session_window_truth.local_close_pending) {
+        RIVER_LOGW("xiaozhi local fallback prompt skipped: reason=%s unsafe_dialog_state stream=%s listening=%s listen_stop=%s local_close=%s",
+                   reason != NULL ? reason : "-",
+                   g_river_cloud.stream_active ? "yes" : "no",
+                   g_river_cloud.xiaozhi_session_window_truth.listening ? "yes" : "no",
+                   g_river_cloud.xiaozhi_session_window_truth.listen_stop_pending ? "yes" : "no",
+                   g_river_cloud.xiaozhi_session_window_truth.local_close_pending ? "yes" : "no");
+        return false;
+    }
+
     if (river_playback_service_active()) {
+        RIVER_LOGW("xiaozhi local fallback prompt skipped: reason=%s playback_active=yes",
+                   reason != NULL ? reason : "-");
         return false;
     }
 

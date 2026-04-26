@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.526
+- 修复 2026-04-26 板端 no-audio 日志暴露的两个端侧问题：
+  - 服务端 accepted 后、response 尚未完成前，端侧不再因为本地 VAD speech 立即重开 follow-up ASR round
+  - response pending 期间如检测到 speech，会打印一次 `xiaozhi followup reopen blocked: reason=response_pending ...`，同时清零 open-hold 计数
+- 暂停默认本地 no-audio fallback prompt：
+  - 新增 `RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED=0`，避免 AudioTrack start/write 在现场路径未验证前阻塞 capture/VAD 消费
+  - no-audio abandoned / timeout recovery 仍会清理 response wait 和 session/window，但只记录 prompt skipped，不再启动本地播放
+  - 保留 unsafe-dialog-state / playback-active guard，后续若重新打开本地 prompt，需要先满足非 ASR、非 listening、非 pending close 的安全条件
+- 该步目标是先阻断日志中出现的 capture frame ring overflow 连锁故障，后续再单独验证本地 prompt 的 AudioTrack 非阻塞实现。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.525
 - 对齐 2026-04-26 服务侧 realtime 首音频失败语义：
   - 服务侧现在只有拿到首个真实 audio chunk 后才进入 `speaking` / 发送 `audio.out.meta`

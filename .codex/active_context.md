@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.525 XiaoZhi response 首音频失败回 active 收口`
+  - `5.526 XiaoZhi no-audio 本地恢复与 response-pending 重开收口`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.526 对齐 2026-04-26 板端 no-audio 复现日志：
+      - 服务端 accepted 后、response 尚未完成前，端侧不再因为本地 VAD speech 立即重开 follow-up ASR round
+      - 当 accepted turn 仍处于 `output_state=thinking`，或 `response.start` 后尚未观察到 `audio.out.meta` 时，follow-up reopen 会被 `response_pending` guard 阻断
+      - 阻断期间清零 open-hold 计数，并只打印一次 `xiaozhi followup reopen blocked: reason=response_pending ...`
+      - 默认关闭本地 no-audio fallback prompt：`RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED=0`
+      - no-audio abandoned / timeout recovery 只记录 `local fallback prompt skipped`，不再启动现场尚未证明非阻塞的 `xiaozhi_local_retry` playback
+      - 下一步上板验证：
+        - no-audio 后不应再出现默认 `playback_start_prepare` / 长时间 `capture frame ring overflow`
+        - response pending 期间不应再看到新的 ASR round reopen
   - newest landed runtime bug-fix slice:
     - Step 5.525 对齐 2026-04-26 服务侧首音频失败处理：
       - 服务侧现在只有首个真实 audio chunk ready 后才进入 `speaking` / 发送 `audio.out.meta`
@@ -4371,11 +4381,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-26 / branch `agent-server-v2`: Step 5.525 completed the remaining XiaoZhi service-alignment device items:
-  - service `audio.out.meta` fields `output_lane`, `output_role`, `phrase_id`
-  - per-round uplink freshness p50/p95 telemetry
-  - no-audio/no-ref fact logs and a short local retry prompt through playback reference export
-- Verified with latest SDK `/root/ameba-rtos`:
+- 2026-04-26 / branch `agent-server-v2`: Step 5.526 fixed the latest no-audio board regression:
+  - follow-up ASR reopen is blocked while an accepted turn is still `output_state=thinking` or waiting for first `audio.out.meta`
+  - local no-audio retry prompt is disabled by default with `RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED=0` until AudioTrack start/write is proven non-blocking
+  - no-audio recovery should now clear state without starting `xiaozhi_local_retry` playback or causing capture ring overflow
+- Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`

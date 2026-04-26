@@ -1,3 +1,53 @@
+## Step 5.526 Verification
+
+Confirm response-pending follow-up reopen is blocked and local fallback prompt is disabled by default:
+```bash
+cd /root/ameba-river
+rg -n "response_pending|LOCAL_RETRY_PROMPT_ENABLED|local fallback prompt skipped" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED` is `0U`
+- follow-up reopen logs `xiaozhi followup reopen blocked: reason=response_pending` when VAD fires before response completion
+- local prompt logs `disabled=yes` instead of starting `xiaozhi_local_retry` playback
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-26 no-audio reproduction:
+```text
+Wake once, trigger a service response that has response.chunk text but no audio.out.meta / PCM.
+```
+
+Expected result:
+- no ASR round reopens while the accepted turn is still `output_state=thinking` or waiting for first audio meta
+- if local speech is detected in that interval, exactly bounded logs show `followup reopen blocked: reason=response_pending`
+- no `playback_start_prepare` for `xiaozhi_local_retry` appears by default
+- no sustained `capture frame ring overflow` after no-audio abandoned / timeout recovery
+
 ## Step 5.525 Verification
 
 Rebuild the latest-SDK external project image after aligning no-meta response cleanup with service-side first-audio failure handling:
