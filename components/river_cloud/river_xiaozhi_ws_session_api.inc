@@ -77,7 +77,7 @@ river_status_t river_xiaozhi_open_session(void)
     river_status_t status;
     uint32_t bootstrap_cache_remaining_ms = 0U;
     bool bootstrap_refresh_needed = false;
-    char handshake_protocol[] = RIVER_XIAOZHI_REALTIME_SUBPROTOCOL;
+    char handshake_protocol[RIVER_XIAOZHI_WIRE_PROFILE_MAX];
 
     if (!g_river_xiaozhi.initialized) {
         status = river_xiaozhi_init();
@@ -171,6 +171,9 @@ river_status_t river_xiaozhi_open_session(void)
                    g_river_xiaozhi.url);
         river_xiaozhi_log_collaboration_negotiation("discovery_refresh_failed");
     }
+    river_xiaozhi_copy_string(handshake_protocol,
+                              sizeof(handshake_protocol),
+                              river_xiaozhi_active_subprotocol());
 
     status = river_ws_dispatch_init();
     if (status != RIVER_OK) {
@@ -226,10 +229,13 @@ river_status_t river_xiaozhi_open_session(void)
                           RIVER_XIAOZHI_WS_CONNECT_TIMEOUT_MS);
     ws_set_senddata_block_time(RIVER_XIAOZHI_WS_SEND_BLOCK_MS);
     ws_multisend_opts(g_river_xiaozhi.wsclient, RIVER_XIAOZHI_WS_STABLE_BUF_NUM);
-    RIVER_LOGI("xiaozhi connecting: url=%s wire=%s protocol=%u device_id=%s client_id=%s txq=%u stable=%u reserve=%u",
+    RIVER_LOGI("xiaozhi connecting: url=%s wire=%s subprotocol=%s protocol=%u product=%s mainline=%s device_id=%s client_id=%s txq=%u stable=%u reserve=%u",
                g_river_xiaozhi.url,
-               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
+               river_xiaozhi_active_protocol_version(),
+               handshake_protocol,
                (unsigned int)g_river_xiaozhi.config.protocol_version,
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                g_river_xiaozhi.open_device_id,
                g_river_xiaozhi.open_client_id,
                (unsigned int)RIVER_XIAOZHI_WS_QUEUE_MAX,

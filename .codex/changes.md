@@ -14242,3 +14242,20 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with approved SDK write permission
+
+## Step 5.533
+- 适配服务端 `smart_home_first_sound` / `rtos-smart-home-v1` 线缆协议更新，端侧不再把 XiaoZhi WebSocket profile 固定在旧 `rtos-ws-v0`：
+  - discovery 解析并缓存根字段 `protocol_version`、`subprotocol`、`product_profile`、`mainline_profile`
+  - WebSocket 握手使用 discovery 广告的 `subprotocol`，无 discovery 时回退旧 `agent-server.realtime.v0`
+  - `session.start.payload.protocol_version` 使用 discovery 广告的协议版本，缺省仍回退旧 `rtos-ws-v0`
+- 补齐诊断可见性：
+  - init / config / discovery / connecting / transport ready / `session.start` / status dump 全部输出 active `wire/subprotocol/product/mainline`
+  - 以后服务切到 `agent-server.smart-home.realtime.v1` 时，板端日志能直接确认是否按新 profile 握手与上报
+- 保持端侧行为边界：
+  - 没有引入本地 tool planner，也不把服务端 hot-input cache 镜像到设备
+  - 旧 generic/legacy 服务仍可通过 discovery 缺省或失败回退继续运行
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+  - `curl -sS --max-time 5 http://101.33.235.154:8080/v1/realtime | python3 -m json.tool` confirmed the currently deployed service still advertises `rtos-ws-v0` / `agent-server.realtime.v0`

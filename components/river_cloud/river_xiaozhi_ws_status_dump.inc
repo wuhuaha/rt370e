@@ -40,14 +40,17 @@ void river_xiaozhi_dump_status(void)
     bootstrap_refresh_in_ms = river_xiaozhi_bootstrap_cache_remaining_ms();
     now_ms = river_xiaozhi_now_ms();
 
-    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu bootstrap_owned=%s bootstrap_refresh_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
+    RIVER_LOGI("xiaozhi session=%s hello=%s configured=%s ota_set=%s url_set=%s token_set=%s wire=%s subprotocol=%s product=%s mainline=%s protocol=%u mcp=%s sid=%s device_id=%s client_id=%s retry_in_ms=%lu bootstrap_owned=%s bootstrap_refresh_in_ms=%lu server_audio=%luHz/%lums text_rx=%lu text_tx=%lu audio_rx=%lu audio_tx=%lu opened=%lu closed=%lu mcp_rx=%lu mcp_tx=%lu mcp_fail=%lu txq=%lu/%lu recycle=%lu stable=%lu audio_soft_limit=%lu q_peak=%lu bp=%lu reserve_bp=%lu full_bp=%lu activation_code=%s last_type=%s last_state=%s last_emotion=%s last_text=%s last_err=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.session_open),
                river_xiaozhi_bool_text(g_river_xiaozhi.server_hello_received),
                river_xiaozhi_bool_text(g_river_xiaozhi.config_ready),
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
-               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                river_xiaozhi_bool_text(g_river_xiaozhi.config.enable_mcp),
                g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
@@ -215,7 +218,11 @@ void river_xiaozhi_dump_status(void)
                    g_river_xiaozhi.last_playback_phrase_id :
                    "-",
                river_xiaozhi_bool_text(river_xiaozhi_last_playback_meta_valid()));
-    RIVER_LOGI("xiaozhi discovery turn_mode=%s server_endpoint=%s/%s mode=%s voice_collaboration=%s preview_events=%s declared_preview=%s preview_reason=%s playback_ack=%s declared_playback_ack=%s playback_ack_reason=%s default_on=%s default_reason=%s",
+    RIVER_LOGI("xiaozhi discovery wire=%s subprotocol=%s product=%s mainline=%s turn_mode=%s server_endpoint=%s/%s mode=%s voice_collaboration=%s preview_events=%s declared_preview=%s preview_reason=%s playback_ack=%s declared_playback_ack=%s playback_ack_reason=%s default_on=%s default_reason=%s",
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                g_river_xiaozhi.discovery_turn_mode[0] != '\0' ?
                    g_river_xiaozhi.discovery_turn_mode :
                    "-",

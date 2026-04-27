@@ -29,11 +29,14 @@ river_status_t river_xiaozhi_init(void)
     river_xiaozhi_refresh_identifiers();
     g_river_xiaozhi.initialized = true;
 
-    RIVER_LOGI("xiaozhi init: ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u mcp=%s device_id=%s client_id=%s",
+    RIVER_LOGI("xiaozhi init: ota_set=%s url_set=%s token_set=%s wire=%s subprotocol=%s product=%s mainline=%s protocol=%u mcp=%s device_id=%s client_id=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
-               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                river_xiaozhi_bool_text(g_river_xiaozhi.config.enable_mcp),
                g_river_xiaozhi.device_id,
@@ -125,11 +128,14 @@ river_status_t river_xiaozhi_set_config(const river_xiaozhi_config_t *config)
         (g_river_xiaozhi.url[0] != '\0') || (g_river_xiaozhi.ota_url[0] != '\0');
     river_xiaozhi_refresh_identifiers();
 
-    RIVER_LOGI("xiaozhi config updated: ota_set=%s url_set=%s token_set=%s wire=%s protocol=%u uplink=%luHz/%luch/%lums mcp=%s",
+    RIVER_LOGI("xiaozhi config updated: ota_set=%s url_set=%s token_set=%s wire=%s subprotocol=%s product=%s mainline=%s protocol=%u uplink=%luHz/%luch/%lums mcp=%s",
                river_xiaozhi_bool_text(g_river_xiaozhi.ota_url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.url[0] != '\0'),
                river_xiaozhi_bool_text(g_river_xiaozhi.token[0] != '\0'),
-               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION,
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                (unsigned int)g_river_xiaozhi.config.protocol_version,
                (unsigned long)g_river_xiaozhi.config.uplink_sample_rate,
                (unsigned long)g_river_xiaozhi.config.uplink_channels,

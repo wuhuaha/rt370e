@@ -55,6 +55,8 @@
 #define RIVER_XIAOZHI_LAST_PHRASE_ID_MAX   64U
 #define RIVER_XIAOZHI_TURN_MODE_MAX        48U
 #define RIVER_XIAOZHI_COLLAB_MODE_MAX      32U
+#define RIVER_XIAOZHI_WIRE_PROFILE_MAX     64U
+#define RIVER_XIAOZHI_PRODUCT_PROFILE_MAX  64U
 #define RIVER_XIAOZHI_ACTIVATION_CODE_MAX  16U
 #define RIVER_XIAOZHI_ACTIVATION_MESSAGE_MAX 192U
 #define RIVER_XIAOZHI_ACTIVATION_CHALLENGE_MAX 192U
@@ -201,6 +203,10 @@ typedef struct {
     char last_playback_output_role[RIVER_XIAOZHI_LAST_OUTPUT_ROLE_MAX];
     char last_playback_phrase_id[RIVER_XIAOZHI_LAST_PHRASE_ID_MAX];
     uint32_t last_playback_expected_duration_ms;
+    char discovery_protocol_version[RIVER_XIAOZHI_WIRE_PROFILE_MAX];
+    char discovery_subprotocol[RIVER_XIAOZHI_WIRE_PROFILE_MAX];
+    char discovery_product_profile[RIVER_XIAOZHI_PRODUCT_PROFILE_MAX];
+    char discovery_mainline_profile[RIVER_XIAOZHI_PRODUCT_PROFILE_MAX];
     char discovery_turn_mode[RIVER_XIAOZHI_TURN_MODE_MAX];
     char discovery_server_endpoint_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
     char discovery_preview_events_mode[RIVER_XIAOZHI_COLLAB_MODE_MAX];
@@ -346,6 +352,30 @@ static void river_xiaozhi_copy_optional_string(char *dst, size_t dst_size, const
 static const char *river_xiaozhi_dash_if_empty(const char *text)
 {
     return (text != NULL && text[0] != '\0') ? text : "-";
+}
+
+static const char *river_xiaozhi_active_protocol_version(void)
+{
+    return g_river_xiaozhi.discovery_protocol_version[0] != '\0' ?
+               g_river_xiaozhi.discovery_protocol_version :
+               RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION;
+}
+
+static const char *river_xiaozhi_active_subprotocol(void)
+{
+    return g_river_xiaozhi.discovery_subprotocol[0] != '\0' ?
+               g_river_xiaozhi.discovery_subprotocol :
+               RIVER_XIAOZHI_REALTIME_SUBPROTOCOL;
+}
+
+static const char *river_xiaozhi_active_product_profile(void)
+{
+    return river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_product_profile);
+}
+
+static const char *river_xiaozhi_active_mainline_profile(void)
+{
+    return river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_mainline_profile);
 }
 
 static const char *river_xiaozhi_optional_bool_text(bool known, bool value)
@@ -785,6 +815,10 @@ static void river_xiaozhi_clear_discovery_profile(void)
     g_river_xiaozhi.discovery_playback_ack_mark = false;
     g_river_xiaozhi.discovery_playback_ack_cleared = false;
     g_river_xiaozhi.discovery_playback_ack_completed = false;
+    g_river_xiaozhi.discovery_protocol_version[0] = '\0';
+    g_river_xiaozhi.discovery_subprotocol[0] = '\0';
+    g_river_xiaozhi.discovery_product_profile[0] = '\0';
+    g_river_xiaozhi.discovery_mainline_profile[0] = '\0';
     g_river_xiaozhi.discovery_turn_mode[0] = '\0';
     g_river_xiaozhi.discovery_server_endpoint_mode[0] = '\0';
     g_river_xiaozhi.discovery_preview_events_mode[0] = '\0';
@@ -1572,10 +1606,13 @@ static void river_xiaozhi_emit_transport_ready(void)
     g_river_xiaozhi.sessions_opened++;
     river_xiaozhi_set_last_type("hello");
 
-    RIVER_LOGI("xiaozhi transport ready: sample_rate=%lu frame_duration=%lums subprotocol=%s",
+    RIVER_LOGI("xiaozhi transport ready: sample_rate=%lu frame_duration=%lums wire=%s subprotocol=%s product=%s mainline=%s",
                (unsigned long)g_river_xiaozhi.server_sample_rate,
                (unsigned long)g_river_xiaozhi.server_frame_duration_ms,
-               RIVER_XIAOZHI_REALTIME_SUBPROTOCOL);
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile());
     river_xiaozhi_emit_event(RIVER_XIAOZHI_EVENT_SERVER_HELLO,
                              NULL,
                              NULL,
@@ -1650,7 +1687,7 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
         return RIVER_ERR_NO_MEMORY;
     }
 
-    cJSON_AddStringToObject(payload, "protocol_version", RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION);
+    cJSON_AddStringToObject(payload, "protocol_version", river_xiaozhi_active_protocol_version());
 
     cJSON_AddStringToObject(device, "device_id", g_river_xiaozhi.device_id);
     cJSON_AddStringToObject(device, "client_type", RIVER_XIAOZHI_REALTIME_CLIENT_TYPE);
@@ -1691,10 +1728,14 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     if (status == RIVER_OK) {
         g_river_xiaozhi.dialog_started = true;
         g_river_xiaozhi.response_started = false;
-        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s codec=%s duplex=%s half_duplex=%s default_on=%s default_reason=%s preview_events=%s playback_ack=%s discovery_voice_collaboration=%s",
+        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s wire=%s subprotocol=%s product=%s mainline=%s codec=%s duplex=%s half_duplex=%s default_on=%s default_reason=%s preview_events=%s playback_ack=%s discovery_voice_collaboration=%s",
                    (wake_reason != NULL && wake_reason[0] != '\0') ? wake_reason : "keyword",
                    g_river_xiaozhi.device_id,
                    g_river_xiaozhi.client_id,
+                   river_xiaozhi_active_protocol_version(),
+                   river_xiaozhi_active_subprotocol(),
+                   river_xiaozhi_active_product_profile(),
+                   river_xiaozhi_active_mainline_profile(),
                    RIVER_XIAOZHI_UPLINK_FORMAT,
                    river_xiaozhi_duplex_mode_name(),
                    river_xiaozhi_bool_text(half_duplex),

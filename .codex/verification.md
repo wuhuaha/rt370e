@@ -22595,3 +22595,53 @@ Expected result:
 - no immediate spurious response like `未识别到有效语音。` caused by playback-state reopen
 - a new response with service `expected_duration_ms=0` logs `expected_ms=0` or fallback prefetch target, not a stale prior segment duration
 - `xiaozhi asr round finish` should show `send_interval_p50/p95` materially below the previous `55/63ms` when `busy/fail` remain zero
+
+## Step 5.533 - XiaoZhi discovery-driven wire profile adaptation
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+
+Optional network smoke against the currently deployed server:
+```bash
+cd /root/ameba-river
+curl -sS --max-time 5 http://101.33.235.154:8080/v1/realtime | python3 -m json.tool
+```
+
+Expected result today:
+- the deployed service may still advertise `protocol_version=rtos-ws-v0` and `subprotocol=agent-server.realtime.v0`; that is valid and should exercise the compatibility path
+
+Post-flash board validation against the current server:
+```text
+wake the device once and inspect XiaoZhi discovery/connect/session.start logs
+river xiaozhi status
+```
+
+Expected result on legacy/generic discovery:
+- logs show `wire=rtos-ws-v0 subprotocol=agent-server.realtime.v0`
+- websocket handshake and `session.start` are still accepted
+
+Expected result after the server switches to smart-home discovery:
+- `xiaozhi discovery ready` shows `wire=rtos-smart-home-v1 subprotocol=agent-server.smart-home.realtime.v1 product=smart_home_first_sound mainline=smart_home_first_sound`
+- `xiaozhi connecting` uses `subprotocol=agent-server.smart-home.realtime.v1`
+- `xiaozhi session.start sent` uses `wire=rtos-smart-home-v1`
+- no server-side rejection such as missing/unsupported WebSocket subprotocol or `protocol_version must be rtos-smart-home-v1`

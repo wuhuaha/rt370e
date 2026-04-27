@@ -5517,3 +5517,30 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - TTS / rebuffer 期间不再出现误开的 follow-up ASR round。
 - 新 response 的 `expected_ms` 不再继承旧 segment。
 - `send_interval_p50/p95` 应明显低于 `55/63ms`；若仍慢，下一步定位 WS poll 阻塞或任务优先级。
+
+### Step 5.533: discovery 驱动 XiaoZhi wire profile 切换
+
+触发背景：
+
+- 服务端 `smart-home` 分支默认产品主线已切到：
+  - `product_profile=smart_home_first_sound`
+  - `mainline_profile=smart_home_first_sound`
+  - `protocol_version=rtos-smart-home-v1`
+  - `subprotocol=agent-server.smart-home.realtime.v1`
+- 服务端 WebSocket 握手与 `session.start.payload.protocol_version` 都会按当前 profile 严格校验；端侧继续硬编码旧 `rtos-ws-v0` / `agent-server.realtime.v0` 会在服务切换后直接握手或 start 失败。
+
+端侧收口：
+
+- discovery 根字段新增缓存：
+  - `protocol_version`
+  - `subprotocol`
+  - `product_profile`
+  - `mainline_profile`
+- WebSocket 握手与 `session.start` 使用 active discovery profile；没有 discovery 字段或 discovery 失败时保持旧 legacy fallback。
+- init / config / discovery / connecting / transport ready / session-start / status 诊断统一输出 active wire profile，便于上板确认设备与服务端 profile 是否一致。
+
+上板验收：
+
+- 当前 legacy/generic 服务仍显示 `rtos-ws-v0` / `agent-server.realtime.v0` 并能连通。
+- smart-home 服务发布后，板端应显示 `rtos-smart-home-v1` / `agent-server.smart-home.realtime.v1`，且不再出现 subprotocol 或 `protocol_version` 校验失败。
+- 本步不在端侧实现服务端 hot-input cache，也不引入本地 tool-call 执行；端侧只负责遵循 discovery 线缆协议与既有 first-sound 播放事实。

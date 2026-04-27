@@ -4432,12 +4432,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-27 / branch `agent-server-v2`: Step 5.532 closes the device-side XiaoZhi playback/follow-up/uplink runtime loop observed in the latest board log:
-  - downlink revalidates playback backend after frame acquire and before write, so detached/recovering stop races retry or restart instead of logging `write_failed`
-  - follow-up ASR reopen is blocked while service output is thinking/speaking, playback lane/turn is occupied, or rebuffer is pending; current no-ref barge-in remains duck-only
-  - `audio.out.meta` clears stale playback truth on response/playback id changes and accepts `expected_duration_ms=0` as a real service value
-  - XiaoZhi uplink drains before and after WS poll with bounded backlog catch-up (`4/8` normal/warmup burst)
+- 2026-04-27 / branch `agent-server-v2`: Step 5.533 adapts the device XiaoZhi client to the updated service-side smart-home wire profile:
+  - discovery now caches `protocol_version`, `subprotocol`, `product_profile`, and `mainline_profile`
+  - WebSocket handshake uses the discovery-advertised subprotocol, with legacy `agent-server.realtime.v0` fallback when discovery lacks the field
+  - `session.start.payload.protocol_version` uses the discovery-advertised wire version, with legacy `rtos-ws-v0` fallback
+  - init/config/discovery/connect/transport-ready/session-start/status logs now print active `wire/subprotocol/product/mainline`
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
+- Board expectation:
+  - current generic/legacy service logs old `rtos-ws-v0` / `agent-server.realtime.v0` and stays compatible
+  - smart-home service logs `rtos-smart-home-v1` / `agent-server.smart-home.realtime.v1` and avoids subprotocol / `protocol_version` rejection

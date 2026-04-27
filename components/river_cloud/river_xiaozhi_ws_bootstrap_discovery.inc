@@ -485,6 +485,10 @@ static river_status_t river_xiaozhi_build_discovery_url(const char *ws_url,
 static river_status_t river_xiaozhi_parse_discovery_response(const char *json_text)
 {
     cJSON *root = NULL;
+    const cJSON *protocol_version_obj;
+    const cJSON *subprotocol_obj;
+    const cJSON *product_profile_obj;
+    const cJSON *mainline_profile_obj;
     const cJSON *turn_mode_obj;
     const cJSON *server_endpoint_obj;
     const cJSON *voice_collaboration_obj;
@@ -512,6 +516,34 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
     }
 
     river_xiaozhi_clear_discovery_profile();
+
+    protocol_version_obj = cJSON_GetObjectItemCaseSensitive(root, "protocol_version");
+    if (cJSON_IsString(protocol_version_obj) && protocol_version_obj->valuestring != NULL) {
+        river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_protocol_version,
+                                           sizeof(g_river_xiaozhi.discovery_protocol_version),
+                                           protocol_version_obj->valuestring);
+    }
+
+    subprotocol_obj = cJSON_GetObjectItemCaseSensitive(root, "subprotocol");
+    if (cJSON_IsString(subprotocol_obj) && subprotocol_obj->valuestring != NULL) {
+        river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_subprotocol,
+                                           sizeof(g_river_xiaozhi.discovery_subprotocol),
+                                           subprotocol_obj->valuestring);
+    }
+
+    product_profile_obj = cJSON_GetObjectItemCaseSensitive(root, "product_profile");
+    if (cJSON_IsString(product_profile_obj) && product_profile_obj->valuestring != NULL) {
+        river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_product_profile,
+                                           sizeof(g_river_xiaozhi.discovery_product_profile),
+                                           product_profile_obj->valuestring);
+    }
+
+    mainline_profile_obj = cJSON_GetObjectItemCaseSensitive(root, "mainline_profile");
+    if (cJSON_IsString(mainline_profile_obj) && mainline_profile_obj->valuestring != NULL) {
+        river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_mainline_profile,
+                                           sizeof(g_river_xiaozhi.discovery_mainline_profile),
+                                           mainline_profile_obj->valuestring);
+    }
 
     turn_mode_obj = cJSON_GetObjectItemCaseSensitive(root, "turn_mode");
     if (cJSON_IsString(turn_mode_obj) && turn_mode_obj->valuestring != NULL) {
@@ -653,8 +685,12 @@ static river_status_t river_xiaozhi_refresh_discovery_profile(void)
         return status;
     }
 
-    RIVER_LOGI("xiaozhi discovery ready: url=%s turn_mode=%s server_endpoint=%s/%s voice_collaboration=%s preview_events=%s mode=%s playback_ack=%s mode=%s",
+    RIVER_LOGI("xiaozhi discovery ready: url=%s wire=%s subprotocol=%s product=%s mainline=%s turn_mode=%s server_endpoint=%s/%s voice_collaboration=%s preview_events=%s mode=%s playback_ack=%s mode=%s",
                discovery_url,
+               river_xiaozhi_active_protocol_version(),
+               river_xiaozhi_active_subprotocol(),
+               river_xiaozhi_active_product_profile(),
+               river_xiaozhi_active_mainline_profile(),
                river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_turn_mode),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_available),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_enabled),
