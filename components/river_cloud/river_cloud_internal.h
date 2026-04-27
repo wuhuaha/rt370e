@@ -378,6 +378,7 @@ typedef struct {
 
 typedef struct {
     bool speech_started;
+    bool accept_ready;
     bool endpoint_candidate;
     bool is_final;
     uint32_t audio_offset_ms;
@@ -385,6 +386,7 @@ typedef struct {
     char text[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char stable_prefix[RIVER_CLOUD_XIAOZHI_TEXT_MAX];
     char source[RIVER_CLOUD_XIAOZHI_PREVIEW_SOURCE_MAX];
+    char accept_ready_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
     char endpoint_reason[RIVER_CLOUD_XIAOZHI_PREVIEW_REASON_MAX];
 } river_cloud_xiaozhi_preview_transcript_truth_t;
 

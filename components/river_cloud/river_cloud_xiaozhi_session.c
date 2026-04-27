@@ -393,6 +393,7 @@ void river_cloud_xiaozhi_handle_transport_event(const river_xiaozhi_event_t *eve
         return;
     case RIVER_XIAOZHI_EVENT_INPUT_SPEECH_START:
     case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
+    case RIVER_XIAOZHI_EVENT_INPUT_ACCEPT_READY:
     case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
         river_cloud_xiaozhi_note_input_observation(event);
         return;
@@ -996,7 +997,7 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                g_river_cloud.xiaozhi_pending_transcript_truth.valid ?
                    g_river_cloud.xiaozhi_pending_transcript_truth.text :
                    "-");
-    RIVER_LOGI("xiaozhi preview preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s endpoint_candidate=%s reason=%s source=%s audio_offset_ms=%lu",
+    RIVER_LOGI("xiaozhi preview preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s accept_ready=%s accept_reason=%s endpoint_candidate=%s endpoint_reason=%s source=%s audio_offset_ms=%lu",
                g_river_cloud.xiaozhi_preview_transcript_truth.preview_id[0] != '\0' ?
                    g_river_cloud.xiaozhi_preview_transcript_truth.preview_id :
                    "-",
@@ -1009,6 +1010,10 @@ void river_cloud_xiaozhi_dump_session_status(uint64_t now_ms)
                    g_river_cloud.xiaozhi_preview_transcript_truth.stable_prefix :
                    "-",
                g_river_cloud.xiaozhi_preview_transcript_truth.is_final ? "yes" : "no",
+               g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready ? "yes" : "no",
+               g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready_reason[0] != '\0' ?
+                   g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready_reason :
+                   "-",
                g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_candidate ? "yes" : "no",
                g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason[0] != '\0' ?
                    g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason :
@@ -1132,7 +1137,13 @@ void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *e
             sizeof(g_river_cloud.xiaozhi_preview_transcript_truth.source),
             event->source);
     }
-    if (event->reason != NULL && event->reason[0] != '\0') {
+    if (event->reason != NULL && event->reason[0] != '\0' &&
+        event->type == RIVER_XIAOZHI_EVENT_INPUT_ACCEPT_READY) {
+        river_cloud_xiaozhi_copy_optional_text(
+            g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready_reason,
+            sizeof(g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready_reason),
+            event->reason);
+    } else if (event->reason != NULL && event->reason[0] != '\0') {
         river_cloud_xiaozhi_copy_optional_text(
             g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason,
             sizeof(g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason),
@@ -1148,6 +1159,9 @@ void river_cloud_xiaozhi_note_preview_observation(const river_xiaozhi_event_t *e
         break;
     case RIVER_XIAOZHI_EVENT_INPUT_PREVIEW:
         g_river_cloud.xiaozhi_preview_transcript_truth.is_final = event->is_final;
+        break;
+    case RIVER_XIAOZHI_EVENT_INPUT_ACCEPT_READY:
+        g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready = true;
         break;
     case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
         g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_candidate = event->candidate;
@@ -1179,6 +1193,11 @@ void river_cloud_xiaozhi_note_input_observation(const river_xiaozhi_event_t *eve
         if (event->text != NULL && event->text[0] != '\0') {
             river_cloud_xiaozhi_cancel_endpoint_soft_close("input_preview");
         }
+        return;
+    case RIVER_XIAOZHI_EVENT_INPUT_ACCEPT_READY:
+        river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
+                                         "input_accept_ready");
+        river_cloud_xiaozhi_note_preview_observation(event);
         return;
     case RIVER_XIAOZHI_EVENT_INPUT_ENDPOINT:
         river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
@@ -1906,6 +1925,7 @@ void river_cloud_xiaozhi_clear_pending_text(void)
 void river_cloud_xiaozhi_clear_preview_state(void)
 {
     g_river_cloud.xiaozhi_preview_transcript_truth.speech_started = false;
+    g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready = false;
     g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_candidate = false;
     g_river_cloud.xiaozhi_preview_transcript_truth.is_final = false;
     g_river_cloud.xiaozhi_preview_transcript_truth.audio_offset_ms = 0U;
@@ -1913,6 +1933,7 @@ void river_cloud_xiaozhi_clear_preview_state(void)
     g_river_cloud.xiaozhi_preview_transcript_truth.text[0] = '\0';
     g_river_cloud.xiaozhi_preview_transcript_truth.stable_prefix[0] = '\0';
     g_river_cloud.xiaozhi_preview_transcript_truth.source[0] = '\0';
+    g_river_cloud.xiaozhi_preview_transcript_truth.accept_ready_reason[0] = '\0';
     g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason[0] = '\0';
 }
 

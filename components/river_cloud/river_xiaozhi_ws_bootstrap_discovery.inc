@@ -495,6 +495,7 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
     const cJSON *mode_obj;
     const cJSON *speech_start_obj;
     const cJSON *partial_obj;
+    const cJSON *accept_ready_obj;
     const cJSON *endpoint_candidate_obj;
     const cJSON *started_obj;
     const cJSON *mark_obj;
@@ -548,6 +549,8 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
             speech_start_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj,
                                                                 "speech_start");
             partial_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj, "partial");
+            accept_ready_obj =
+                cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj, "accept_ready");
             endpoint_candidate_obj =
                 cJSON_GetObjectItemCaseSensitive((cJSON *)preview_events_obj,
                                                  "endpoint_candidate");
@@ -561,6 +564,9 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
             }
             if (cJSON_IsBool(partial_obj)) {
                 g_river_xiaozhi.discovery_preview_partial = cJSON_IsTrue(partial_obj);
+            }
+            if (cJSON_IsBool(accept_ready_obj)) {
+                g_river_xiaozhi.discovery_preview_accept_ready = cJSON_IsTrue(accept_ready_obj);
             }
             if (cJSON_IsBool(endpoint_candidate_obj)) {
                 g_river_xiaozhi.discovery_preview_endpoint_candidate =
@@ -747,4 +753,3 @@ static river_status_t river_xiaozhi_parse_bootstrap_response(const char *json_te
     cJSON_Delete(root);
     return RIVER_OK;
 }
-

@@ -12,6 +12,7 @@ void river_xiaozhi_dump_status(void)
     char accept_age_ms[16];
     char preview_speech_start_age_ms[16];
     char preview_update_age_ms[16];
+    char accept_ready_age_ms[16];
     char endpoint_age_ms[16];
     char response_start_age_ms[16];
     char audio_meta_age_ms[16];
@@ -99,7 +100,7 @@ void river_xiaozhi_dump_status(void)
                g_river_xiaozhi.last_accept_reason[0] != '\0' ?
                    g_river_xiaozhi.last_accept_reason :
                    "-");
-    RIVER_LOGI("xiaozhi timing_age_ms session_update=%s accept=%s preview_speech_start=%s preview_update=%s endpoint_candidate=%s response_start=%s audio_meta=%s",
+    RIVER_LOGI("xiaozhi timing_age_ms session_update=%s accept=%s preview_speech_start=%s preview_update=%s accept_ready=%s endpoint_candidate=%s response_start=%s audio_meta=%s",
                river_xiaozhi_format_elapsed_ms(session_update_age_ms,
                                                sizeof(session_update_age_ms),
                                                now_ms,
@@ -116,6 +117,10 @@ void river_xiaozhi_dump_status(void)
                                                sizeof(preview_update_age_ms),
                                                now_ms,
                                                g_river_xiaozhi.last_preview_update_at_ms),
+               river_xiaozhi_format_elapsed_ms(accept_ready_age_ms,
+                                               sizeof(accept_ready_age_ms),
+                                               now_ms,
+                                               g_river_xiaozhi.last_accept_ready_at_ms),
                river_xiaozhi_format_elapsed_ms(endpoint_age_ms,
                                                sizeof(endpoint_age_ms),
                                                now_ms,
@@ -161,7 +166,7 @@ void river_xiaozhi_dump_status(void)
                                                sizeof(audio_meta_from_accept_ms),
                                                g_river_xiaozhi.last_audio_out_meta_at_ms,
                                                g_river_xiaozhi.last_accept_at_ms));
-    RIVER_LOGI("xiaozhi preview_state=preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s endpoint_candidate=%s endpoint_reason=%s source=%s audio_offset_ms=%lu preview_updates=%lu preview_logs=%lu/%lu",
+    RIVER_LOGI("xiaozhi preview_state=preview_id=%s speech_started=%s text=%s stable_prefix=%s is_final=%s accept_ready=%s accept_reason=%s endpoint_candidate=%s endpoint_reason=%s source=%s audio_offset_ms=%lu preview_updates=%lu preview_logs=%lu/%lu",
                g_river_xiaozhi.last_preview_id[0] != '\0' ?
                    g_river_xiaozhi.last_preview_id :
                    "-",
@@ -173,6 +178,10 @@ void river_xiaozhi_dump_status(void)
                    g_river_xiaozhi.last_preview_stable_prefix :
                    "-",
                river_xiaozhi_bool_text(g_river_xiaozhi.last_preview_final),
+               river_xiaozhi_bool_text(g_river_xiaozhi.last_preview_accept_ready),
+               g_river_xiaozhi.last_accept_ready_reason[0] != '\0' ?
+                   g_river_xiaozhi.last_accept_ready_reason :
+                   "-",
                river_xiaozhi_bool_text(g_river_xiaozhi.last_preview_endpoint_candidate),
                g_river_xiaozhi.last_preview_reason[0] != '\0' ?
                    g_river_xiaozhi.last_preview_reason :

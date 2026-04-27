@@ -22520,3 +22520,40 @@ Expected result:
 - `pace_pct` should move materially closer to realtime than the previous 52~56 range
 - `send_interval_p50/p95` during early packets should no longer sit around 37~61 ms unless `busy/fail` is non-zero
 - `busy`, `fail`, `stale_drop`, and `ring_drop` should remain zero in normal Wi-Fi conditions
+
+## Step 5.531 - XiaoZhi input.accept_ready protocol sync
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- if the Codex sandbox blocks SDK writes under `/root/ameba-rtos`, rerun the same build with SDK write permission
+
+Post-flash board validation:
+```text
+wake the device against the updated server and wait for preview events
+river xiaozhi status
+```
+
+Expected result:
+- no more `ignore xiaozhi message type=input.accept_ready`
+- `xiaozhi input.accept_ready: ...` appears when the server emits the observation
+- cloud and transport preview status lines show `accept_ready=yes` and the reason when observed
+- `input.accept_ready` alone does not close the local ASR round or declare accepted turn; acceptance still follows `session.update accept_reason=server_endpoint`

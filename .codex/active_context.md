@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.530 XiaoZhi preview uplink warmup 有界追赶（待上板验证）`
+  - `5.531 XiaoZhi input.accept_ready 协议同步（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed protocol-sync slice:
+    - Step 5.531 对齐服务端 `1a94986 Optimize realtime preview backlog handling`：
+      - 服务端 preview 观察现在明确为 latest-state hints，允许合并或跳过中间 `input.preview / input.accept_ready / input.endpoint`
+      - 端侧 accepted-turn 判定不变，仍只认 `session.update.accept_reason`
+      - 新增 `input.accept_ready` 解析、日志和 preview truth 缓存，避免继续打印 ignore unknown event
+      - discovery preview 日志新增 `accept_ready` 能力位
+      - `input.accept_ready` 只更新窗口和观察状态，不触发 local round close / audio.in.commit / accepted-turn
+    - 下一步上板验证：
+      - updated server 下不再出现 `ignore xiaozhi message type=input.accept_ready`
+      - 收到 accept-ready 时打印 `xiaozhi input.accept_ready: ...`，cloud/transport preview 状态行显示 `accept_ready=yes`
+      - 真正 accepted 仍由 `session.update accept_reason=server_endpoint` 驱动
   - newest landed latency slice:
     - Step 5.530 对齐服务侧 `preview_uplink_realtime_ratio=0.52~0.65` 定位：
       - 端侧确认当前 20 ms PCM 帧为 640B，发送路径直接 `ws_sendBinary`，未被旧 512B scratch 常量截断
@@ -4421,10 +4432,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-26 / branch `agent-server-v2`: Step 5.526 fixed the latest no-audio board regression:
-  - follow-up ASR reopen is blocked while an accepted turn is still `output_state=thinking` or waiting for first `audio.out.meta`
-  - local no-audio retry prompt is disabled by default with `RIVER_CLOUD_XIAOZHI_LOCAL_RETRY_PROMPT_ENABLED=0` until AudioTrack start/write is proven non-blocking
-  - no-audio recovery should now clear state without starting `xiaozhi_local_retry` playback or causing capture ring overflow
+- 2026-04-27 / branch `agent-server-v2`: Step 5.531 synced the RTOS client with the updated XiaoZhi preview backlog protocol:
+  - `input.accept_ready` is parsed, logged, and cached as preview observation truth
+  - discovery preview capability logs now include `accept_ready`
+  - accepted-turn ownership is unchanged: only `session.update.accept_reason` can confirm acceptance
+  - `input.accept_ready` remains observation-only and does not close local ASR, send `audio.in.commit`, or declare accepted-turn
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`

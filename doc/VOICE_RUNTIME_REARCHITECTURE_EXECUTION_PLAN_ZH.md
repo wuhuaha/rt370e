@@ -5473,3 +5473,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `preview_warmup.done_ms` 在无 backpressure 时应接近/低于 `350 ms`。
 - `pace_pct` 应明显高于历史 `52~56`。
 - 若仍慢，优先看 `busy/fail/send_duration_p95`，再决定是否调大 I/O task 优先级或继续拆 WS poll/uplink 任务。
+
+### Step 5.531: 同步服务端 preview backlog / accept_ready 协议收口
+
+触发背景：
+
+- 服务端 `1a94986 Optimize realtime preview backlog handling` 改为把 preview 观察当成可合并、可跳过的 latest-state hint。
+- 服务端文档明确 `input.accept_ready` 是 preview-side accept-ready 观察事件，但仍不是 accepted-turn 信号。
+
+端侧同步原则：
+
+- 不改变 accepted-turn 判定：仍只以 `session.update.payload.accept_reason` 为准。
+- 不把 `input.accept_ready` 当成 stop-recording / commit / local accepted 指令。
+- 补齐 `input.accept_ready` 解析、日志和最新 preview 状态缓存，避免继续打印 `ignore xiaozhi message type=input.accept_ready`。
+- discovery 日志补充 `preview_events.accept_ready`，便于确认服务端能力是否发布。
+
+上板验收：
+
+- 收到服务端 `input.accept_ready` 时应打印 `xiaozhi input.accept_ready: ...`。
+- `river xiaozhi status` 的 cloud/transport preview 行应能看到 `accept_ready=yes` 与对应 reason。
+- `input.accept_ready` 不应触发本地 round close、`audio.in.commit`、`asr_session_closed` 或 interaction 状态跳转到 accepted；后续仍等待 `session.update accept_reason=server_endpoint`。

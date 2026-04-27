@@ -139,6 +139,7 @@ typedef struct {
     bool last_barge_in_enabled;
     bool last_barge_in_enabled_known;
     bool last_preview_speech_started;
+    bool last_preview_accept_ready;
     bool last_preview_endpoint_candidate;
     bool last_preview_final;
     bool last_playback_is_last_segment;
@@ -148,6 +149,7 @@ typedef struct {
     bool discovery_preview_events_enabled;
     bool discovery_preview_speech_start;
     bool discovery_preview_partial;
+    bool discovery_preview_accept_ready;
     bool discovery_preview_endpoint_candidate;
     bool discovery_playback_ack_enabled;
     bool discovery_playback_ack_started;
@@ -162,6 +164,7 @@ typedef struct {
     uint64_t last_preview_speech_start_at_ms;
     uint64_t last_preview_update_at_ms;
     uint64_t last_preview_log_at_ms;
+    uint64_t last_accept_ready_at_ms;
     uint64_t last_endpoint_candidate_at_ms;
     uint64_t last_response_start_at_ms;
     uint64_t last_audio_out_meta_at_ms;
@@ -189,6 +192,7 @@ typedef struct {
     char last_preview_stable_prefix[RIVER_XIAOZHI_LAST_TEXT_MAX];
     char last_preview_source[RIVER_XIAOZHI_LAST_PREVIEW_SOURCE_MAX];
     char last_preview_reason[RIVER_XIAOZHI_LAST_PREVIEW_REASON_MAX];
+    char last_accept_ready_reason[RIVER_XIAOZHI_LAST_PREVIEW_REASON_MAX];
     uint32_t last_preview_audio_offset_ms;
     char last_response_id[RIVER_XIAOZHI_LAST_RESPONSE_ID_MAX];
     char last_playback_id[RIVER_XIAOZHI_LAST_PLAYBACK_ID_MAX];
@@ -649,12 +653,14 @@ static void river_xiaozhi_set_last_barge_in_enabled(bool known, bool enabled)
 static void river_xiaozhi_clear_last_preview_fields(void)
 {
     g_river_xiaozhi.last_preview_speech_started = false;
+    g_river_xiaozhi.last_preview_accept_ready = false;
     g_river_xiaozhi.last_preview_endpoint_candidate = false;
     g_river_xiaozhi.last_preview_final = false;
     g_river_xiaozhi.last_preview_audio_offset_ms = 0U;
     g_river_xiaozhi.last_preview_speech_start_at_ms = 0U;
     g_river_xiaozhi.last_preview_update_at_ms = 0U;
     g_river_xiaozhi.last_preview_log_at_ms = 0U;
+    g_river_xiaozhi.last_accept_ready_at_ms = 0U;
     g_river_xiaozhi.last_endpoint_candidate_at_ms = 0U;
     g_river_xiaozhi.preview_update_events = 0U;
     g_river_xiaozhi.preview_logs_emitted = 0U;
@@ -664,6 +670,7 @@ static void river_xiaozhi_clear_last_preview_fields(void)
     g_river_xiaozhi.last_preview_stable_prefix[0] = '\0';
     g_river_xiaozhi.last_preview_source[0] = '\0';
     g_river_xiaozhi.last_preview_reason[0] = '\0';
+    g_river_xiaozhi.last_accept_ready_reason[0] = '\0';
 }
 
 static void river_xiaozhi_set_last_preview_id(const char *preview_id)
@@ -771,6 +778,7 @@ static void river_xiaozhi_clear_discovery_profile(void)
     g_river_xiaozhi.discovery_preview_events_enabled = false;
     g_river_xiaozhi.discovery_preview_speech_start = false;
     g_river_xiaozhi.discovery_preview_partial = false;
+    g_river_xiaozhi.discovery_preview_accept_ready = false;
     g_river_xiaozhi.discovery_preview_endpoint_candidate = false;
     g_river_xiaozhi.discovery_playback_ack_enabled = false;
     g_river_xiaozhi.discovery_playback_ack_started = false;
@@ -1412,7 +1420,7 @@ static void river_xiaozhi_log_collaboration_negotiation(const char *trigger)
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_available),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_server_endpoint_enabled),
                river_xiaozhi_dash_if_empty(g_river_xiaozhi.discovery_server_endpoint_mode));
-    RIVER_LOGI("xiaozhi collaboration preview: trigger=%s client=%s service_enabled=%s service_mode=%s negotiated=%s reason=%s speech_start=%s partial=%s endpoint_candidate=%s",
+    RIVER_LOGI("xiaozhi collaboration preview: trigger=%s client=%s service_enabled=%s service_mode=%s negotiated=%s reason=%s speech_start=%s partial=%s accept_ready=%s endpoint_candidate=%s",
                trigger != NULL ? trigger : "-",
                river_xiaozhi_bool_text(river_xiaozhi_client_supports_preview_events()),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_preview_events_enabled),
@@ -1421,6 +1429,7 @@ static void river_xiaozhi_log_collaboration_negotiation(const char *trigger)
                preview_reason != NULL ? preview_reason : "-",
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_preview_speech_start),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_preview_partial),
+               river_xiaozhi_bool_text(g_river_xiaozhi.discovery_preview_accept_ready),
                river_xiaozhi_bool_text(g_river_xiaozhi.discovery_preview_endpoint_candidate));
     RIVER_LOGI("xiaozhi collaboration playback_ack: trigger=%s client_mode=%s service_enabled=%s service_mode=%s negotiated=%s reason=%s started=%s mark=%s cleared=%s completed=%s",
                trigger != NULL ? trigger : "-",

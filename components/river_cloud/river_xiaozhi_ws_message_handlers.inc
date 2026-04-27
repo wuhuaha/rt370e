@@ -563,6 +563,7 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
     if ((strcmp(type_text, "session.update") == 0 ||
          strcmp(type_text, "input.speech.start") == 0 ||
          strcmp(type_text, "input.preview") == 0 ||
+         strcmp(type_text, "input.accept_ready") == 0 ||
          strcmp(type_text, "input.endpoint") == 0 ||
          strcmp(type_text, "audio.out.meta") == 0 ||
          strcmp(type_text, "response.start") == 0 ||
@@ -579,6 +580,8 @@ static void river_xiaozhi_handle_text_message(const char *json_text, int json_le
         river_xiaozhi_handle_realtime_input_speech_start(payload_obj);
     } else if (strcmp(type_text, "input.preview") == 0 && cJSON_IsObject(payload_obj)) {
         river_xiaozhi_handle_realtime_input_preview(payload_obj);
+    } else if (strcmp(type_text, "input.accept_ready") == 0 && cJSON_IsObject(payload_obj)) {
+        river_xiaozhi_handle_realtime_input_accept_ready(payload_obj);
     } else if (strcmp(type_text, "input.endpoint") == 0 && cJSON_IsObject(payload_obj)) {
         river_xiaozhi_handle_realtime_input_endpoint(payload_obj);
     } else if (strcmp(type_text, "audio.out.meta") == 0 && cJSON_IsObject(payload_obj)) {

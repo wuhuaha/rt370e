@@ -30,6 +30,8 @@
 - Verification for this step:
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with approved SDK write permission
+  - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
 
 ## Step 5.526
@@ -14207,3 +14209,20 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with approved SDK write permission
+
+## Step 5.531
+- Reviewed `/root/agent-server` latest commit `1a94986 Optimize realtime preview backlog handling` against the RTOS client:
+  - server preview observations are now explicitly latest-state hints and may be coalesced or skipped under realtime backpressure
+  - `input.accept_ready` is documented as an optional preview-side accept-ready observation
+  - accepted-turn semantics remain unchanged: only `session.update.accept_reason` confirms acceptance
+- Synced the device-side protocol surface without changing turn ownership:
+  - added `RIVER_XIAOZHI_EVENT_INPUT_ACCEPT_READY`
+  - parsed `input.accept_ready` payload fields `preview_id`, `reason`, and `audio_offset_ms`
+  - cached it in the XiaoZhi preview truth as `accept_ready` / `accept_ready_reason`
+  - updated cloud and transport preview status logs to show `accept_ready` separately from `endpoint_candidate`
+  - parsed and logged discovery `voice_collaboration.preview_events.accept_ready`
+- Preserved safety semantics:
+  - `input.accept_ready` only touches the conversation window and preview observation cache
+  - it does not close the local ASR round, does not send `audio.in.commit`, and does not replace `session.update.accept_reason`
+- Verification for this step:
+  - `git diff --check` passed
