@@ -5631,3 +5631,26 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `xiaozhi asr round finish` 中 `burst_max` 常态应为 1，`send_interval_p50/p95/max` 应接近 20ms pacing；若网络阻塞，应看到 stale/ring dropped，而不是大批旧音频补发。
 - `expected_duration_ms=0 is_last_segment=yes` 应在 queue drain 后打印 `zero-duration last segment completed after drain`，再 queue/sent completed ACK。
 - 播放期间若 AEC/ref 不 ready，应继续看到 `capture held during playback` / `half_duplex_aec_blocked`，不应打开新的幻听 ASR round。
+
+### Step 5.537: 修正 endpoint candidate 只作观察、不提前关闭本地 round
+
+触发背景：
+
+- 复查 Step 5.536 后发现一条旧兼容路径仍与服务侧状态机建议不完全一致：
+  - 收到 `input.endpoint candidate=yes` 后，如果本地 VAD post-roll 到达，端侧会用 `server_endpoint_candidate` 直接关闭本地 round。
+  - 这虽然抑制了 `audio.in.commit`，但也绕过了新的 `server_accept_wait` / 1.8s fallback commit，且把 endpoint candidate 当成了 accepted truth。
+- 服务侧建议明确：`input.endpoint` 只应作为观察事件；真正 accepted truth 仍来自 `session.update.accept_reason`。
+
+端侧收口：
+
+- endpoint candidate 分支不再调用 `close_local_round_for_cause(SERVER_ENDPOINT, ...)`。
+- 本地 stop 遇到 endpoint candidate 时，转入与普通 server endpoint stop 一致的 `server_accept_wait`：
+  - 继续等待 `session.update.accept_reason` 收口本轮。
+  - 若服务端没有在 fallback deadline 内接受，仍保留 fallback commit。
+- 日志从 `suppresses local audio.in.commit` 调整为 `waits for accepted truth`，避免误导为已经接受。
+
+上板验收：
+
+- `input.endpoint candidate=yes` 后本地 post-roll 应看到 `xiaozhi server endpoint candidate waits for accepted truth` 和 `xiaozhi server accept wait armed`。
+- 后续应由 `turn accepted ... accept_reason=server_endpoint` 关闭本地 round。
+- 如果服务端只给 endpoint candidate 但不 accepted，1.8s 后仍能 fallback commit，而不是本地 round 提前关闭后无兜底。

@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.536 XiaoZhi 服务端断句、严格上行 pacing 与播放事实 ACK 收口（待上板验证）`
+  - `5.537 XiaoZhi endpoint candidate 等待 accepted truth（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.537 修正 Step 5.536 复查发现的残留路径：
+      - `input.endpoint candidate=yes` 不再在本地 post-roll 时直接关闭 round
+      - endpoint candidate 只作为观察事件，转入 `server_accept_wait`，继续等待 `session.update.accept_reason`
+      - 若服务端只给 candidate 但不 accepted，1.8s 后仍可 fallback commit
+    - 下一步上板验证：
+      - endpoint candidate 后应看到 `waits for accepted truth` 与 `server accept wait armed`
+      - local round 应由后续 accepted truth 或 fallback commit 收口
   - newest landed runtime bug-fix slice:
     - Step 5.536 对齐服务侧 2026-04-27 端侧 P0/P1/P2 建议：
       - server endpoint 可用时，本地 VAD post-roll 只进入 `server_accept_wait`，默认不发正常路径 `audio.in.commit`

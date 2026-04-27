@@ -1805,17 +1805,19 @@ void river_cloud_xiaozhi_complete_active_stream_finish(
     }
 
     if (river_cloud_xiaozhi_server_endpoint_candidate_pending()) {
-        RIVER_LOGI("xiaozhi server endpoint candidate suppresses local audio.in.commit: cause=%s trigger=%s preview_id=%s endpoint_reason=%s",
+        RIVER_LOGI("xiaozhi server endpoint candidate waits for accepted truth: cause=%s trigger=%s preview_id=%s endpoint_reason=%s",
                    cause_name,
                    reason,
                    g_river_cloud.xiaozhi_preview_transcript_truth.preview_id,
                    g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason[0] != '\0' ?
                        g_river_cloud.xiaozhi_preview_transcript_truth.endpoint_reason :
                        "-");
-        river_cloud_xiaozhi_note_round_finish_request("server_endpoint_candidate");
-        river_cloud_xiaozhi_close_local_round_for_cause(
-            RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_ENDPOINT,
+        river_cloud_xiaozhi_commit_active_stream_finish_for_cause(
+            cause,
             "server_endpoint_candidate");
+        river_cloud_xiaozhi_maybe_finalize_listen_stop(
+            river_cloud_xiaozhi_uplink_ready_frames(),
+            g_river_cloud.xiaozhi_uplink_runtime_truth.accum_bytes);
         return;
     }
 

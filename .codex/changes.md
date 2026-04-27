@@ -14312,3 +14312,16 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.537
+- 复查 Step 5.536 后修正一个残留状态机差异：
+  - `input.endpoint candidate=yes` 旧路径仍会在本地 post-roll 时直接 `close_local_round_for_cause(SERVER_ENDPOINT, ...)`
+  - 这会把 endpoint candidate 当成 accepted truth，绕过 `server_accept_wait` 和 1.8s fallback commit
+- 现在 endpoint candidate 只作为观察事件：
+  - 本地 stop 时进入 `server_accept_wait`
+  - 继续等待 `session.update.accept_reason` 作为 accepted truth
+  - 服务端未接受时仍保留 fallback commit 兜底
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

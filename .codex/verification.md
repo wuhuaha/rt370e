@@ -22755,3 +22755,37 @@ Expected result:
 - weak-network/backpressure cases drop stale/ring frames instead of replaying a large audio backlog
 - zero-duration last playback segments complete only after `zero-duration last segment completed after drain`, then queue/sent `audio.out.completed`
 - playback with missing AEC/ref remains held or half-duplex gated and does not create phantom ASR rounds from TTS leakage
+
+## Step 5.537 - endpoint candidate waits for server accepted truth
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+trigger a turn where service emits input.endpoint candidate before session.update accept_reason
+```
+
+Expected result:
+- local post-roll logs `xiaozhi server endpoint candidate waits for accepted truth`
+- local post-roll also logs `xiaozhi server accept wait armed`
+- the local round closes only after `turn accepted ... accept_reason=server_endpoint` or after fallback deadline emits `xiaozhi server accept wait fallback commit`
