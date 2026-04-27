@@ -22645,3 +22645,39 @@ Expected result after the server switches to smart-home discovery:
 - `xiaozhi connecting` uses `subprotocol=agent-server.smart-home.realtime.v1`
 - `xiaozhi session.start sent` uses `wire=rtos-smart-home-v1`
 - no server-side rejection such as missing/unsupported WebSocket subprotocol or `protocol_version must be rtos-smart-home-v1`
+
+
+## Step 5.534 - XiaoZhi segment-gap paused hold idempotency
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+wake the device once, let XiaoZhi answer with multiple TTS segments, and watch the segment-gap logs
+```
+
+Expected result:
+- during `wait_next=yes segments=0` gaps, there is no tight loop of `playback recover: stream=xiaozhi_tts epoch=...`
+- `AudioTrack_Flush`, `ameba_audio_stream_tx_close`, and `CreateAudioHwStreamOut` do not repeat every 15-30 ms while waiting for the next `audio.out.meta`
+- after a new segment meta arrives and the segment queue becomes non-empty, `xiaozhi playback paused backend resumed` may appear once and playback continues
+- final segment tail should not stay stuck in `prefetching backend=owned_paused` until idle timeout

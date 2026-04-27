@@ -14259,3 +14259,20 @@
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
   - `curl -sS --max-time 5 http://101.33.235.154:8080/v1/realtime | python3 -m json.tool` confirmed the currently deployed service still advertises `rtos-ws-v0` / `agent-server.realtime.v0`
+
+
+## Step 5.534
+- 针对 2026-04-27 17:47 板端日志里的 XiaoZhi 段间播放恢复风暴收口：
+  - 日志显示 `waiting_next_segment + segments=0` 段间等待期间，worker 在 `owned_active -> owned_paused -> owned_active` 间每 15~30 ms 自激振荡
+  - 每轮都会触发 `playback recover`，导致 `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` 和 playback epoch 从约 `192` 快速涨到 `369+`
+- 修复段间 hold 的幂等性：
+  - `owned_paused + WAITING_NEXT_SEGMENT` 现在被视为已经处于 segment-gap hold，worker 直接保持 `segment_gap` 等待，不再再次调用 recover/stop
+  - `hold_playback_for_segment_gap(...)` 对已暂停段间 hold 做 no-op 保护，避免未来路径绕过 `maybe_pause_for_segment_gap()` 时重新打到 playback service
+  - `maybe_resume_paused_playback()` 在仍处于 `WAITING_NEXT_SEGMENT` 且还没有新 segment meta/segment queue 时禁止按 queued threshold 自恢复
+- 预期修复的日志症状：
+  - 段间等待最多出现一次 attached hold/recover，不再反复打印 `playback recover: stream=xiaozhi_tts epoch=...`
+  - `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` 不再以 15~30 ms 周期循环
+  - 新 `audio.out.meta` 到达并进入 segment queue 后才允许 paused backend resume
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

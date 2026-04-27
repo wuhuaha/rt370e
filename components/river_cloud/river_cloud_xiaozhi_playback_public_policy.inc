@@ -475,8 +475,19 @@ static void river_cloud_xiaozhi_pause_playback_for_rebuffer(void)
 static river_status_t river_cloud_xiaozhi_hold_playback_for_segment_gap(const char *reason,
                                                                         bool *attached_hold)
 {
+    river_cloud_xiaozhi_playback_truth_view_t truth_view;
     river_status_t status;
     bool attached = false;
+
+    river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
+    if (truth_view.backend_state == RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED &&
+        river_cloud_xiaozhi_playback_terminal_open() &&
+        truth_view.supply_kind == RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT) {
+        if (attached_hold != NULL) {
+            *attached_hold = true;
+        }
+        return RIVER_OK;
+    }
 
     status = river_playback_service_recover_stream_ex(reason);
     if (status == RIVER_OK) {

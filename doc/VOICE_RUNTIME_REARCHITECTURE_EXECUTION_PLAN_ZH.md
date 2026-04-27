@@ -5544,3 +5544,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 当前 legacy/generic 服务仍显示 `rtos-ws-v0` / `agent-server.realtime.v0` 并能连通。
 - smart-home 服务发布后，板端应显示 `rtos-smart-home-v1` / `agent-server.smart-home.realtime.v1`，且不再出现 subprotocol 或 `protocol_version` 校验失败。
 - 本步不在端侧实现服务端 hot-input cache，也不引入本地 tool-call 执行；端侧只负责遵循 discovery 线缆协议与既有 first-sound 播放事实。
+
+
+### Step 5.534: 修复段间播放 attached hold/recover 自激循环
+
+触发背景：
+
+- 2026-04-27 17:47 板端日志显示 XiaoZhi 播放在段间等待时进入恢复风暴：
+  - `playing -> prefetching reason=cancel_stop queued=11 segments=0 wait_next=yes backend=owned_paused`
+  - `segment gap hold ... mode=attached_recover`
+  - `prefetching -> playing ... queued=12 backend=owned_active`
+  - `paused backend resumed ... backend=owned_paused`
+  - 随后 `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut / playback recover` 重复。
+- 这说明 segment-gap attached hold 不是幂等的：已暂停等待下一段时，queued threshold 又把本地 runtime 标回 playing，下一轮再次触发 recover。
+
+端侧收口：
+
+- `owned_paused + WAITING_NEXT_SEGMENT` 现在直接保持 segment-gap wait，不再重新 recover/stop。
+- `hold_playback_for_segment_gap(...)` 对已经暂停的段间 hold 做 no-op 保护。
+- `maybe_resume_paused_playback()` 在还没有新 segment meta/segment queue 时不再仅凭 queued frame 达到 resume threshold 自恢复。
+
+上板验收：
+
+- 段间等待不应再看到每 15~30 ms 一轮的 `playback recover` epoch 风暴。
+- `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` 不应在 `wait_next=yes segments=0` 时循环。
+- 新 `audio.out.meta` 到达后，才允许 paused backend 单次 resume 并继续播放。
+- 最后一段结束后不应因 stuck `prefetching backend=owned_paused` 等到 idle timeout 才清理。

@@ -4432,15 +4432,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-27 / branch `agent-server-v2`: Step 5.533 adapts the device XiaoZhi client to the updated service-side smart-home wire profile:
-  - discovery now caches `protocol_version`, `subprotocol`, `product_profile`, and `mainline_profile`
-  - WebSocket handshake uses the discovery-advertised subprotocol, with legacy `agent-server.realtime.v0` fallback when discovery lacks the field
-  - `session.start.payload.protocol_version` uses the discovery-advertised wire version, with legacy `rtos-ws-v0` fallback
-  - init/config/discovery/connect/transport-ready/session-start/status logs now print active `wire/subprotocol/product/mainline`
+- 2026-04-27 / branch `agent-server-v2`: Step 5.534 makes XiaoZhi segment-gap attached hold idempotent:
+  - `owned_paused + WAITING_NEXT_SEGMENT` is treated as an already-held segment gap, so the worker keeps waiting instead of calling playback recover/stop again
+  - the segment-gap hold helper no-ops if the backend is already paused for the next segment
+  - paused-backend resume is blocked while supply is still `WAITING_NEXT_SEGMENT`; resume waits for new segment metadata/queue truth
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
 - Board expectation:
-  - current generic/legacy service logs old `rtos-ws-v0` / `agent-server.realtime.v0` and stays compatible
-  - smart-home service logs `rtos-smart-home-v1` / `agent-server.smart-home.realtime.v1` and avoids subprotocol / `protocol_version` rejection
+  - no repeated `playback recover` epoch storm during `wait_next=yes segments=0` gaps
+  - no repeated `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` every 15-30 ms while waiting for next `audio.out.meta`
+  - playback resumes once when the next segment metadata/queue arrives, instead of oscillating between paused and playing
