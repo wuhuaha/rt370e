@@ -22445,3 +22445,40 @@ Expected result:
 - normal TTS: `audio.out.meta` and playback status show `output_lane/output_role/phrase_id` when service sends them
 - ASR round finish: `uplink_ms[...]` fields are printed
 - no-audio response: device clears response-audio wait and may play one short local retry prompt without sending playback ACKs
+
+## Step 5.529 - Capture hot-path non-blocking guardrails
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- if the Codex sandbox blocks SDK writes under `/root/ameba-rtos`, rerun the same build with SDK write permission
+
+Post-flash board validation:
+```text
+river xiaozhi status
+wake the device and trigger a service TTS response with audio.out.meta
+```
+
+Expected result:
+- `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`
+- 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`
+- 即使 `AudioTrack_Start/Write` 或 playback reference 维护短时卡顿，VAD/capture consumer 不应持续刷 `capture frame ring overflow`
+- 若 AEC/reference 锁忙，日志表现为 no-ref/aec-blocked 降级，而不是采集任务卡死

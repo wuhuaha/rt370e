@@ -14,6 +14,8 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.refsvc"
 
+#define RIVER_REFERENCE_SERVICE_CAPTURE_WAIT_MS 0U
+
 typedef struct {
     bool initialized;
     rtos_mutex_t lock;
@@ -234,7 +236,9 @@ river_status_t river_reference_service_read(uint8_t *data, size_t bytes)
         return RIVER_ERR_NO_MEMORY;
     }
 
-    if (rtos_mutex_take(g_river_reference_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+    if (rtos_mutex_take(g_river_reference_service.lock,
+                        RIVER_REFERENCE_SERVICE_CAPTURE_WAIT_MS) != RTK_SUCCESS) {
+        memset(data, 0, bytes);
         return RIVER_ERR_BUSY;
     }
 
@@ -308,8 +312,13 @@ void river_reference_service_get_stats(river_reference_service_stats_t *stats)
         return;
     }
 
-    if (rtos_mutex_take(g_river_reference_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
-        stats->state = RIVER_REFERENCE_ERROR;
+    if (rtos_mutex_take(g_river_reference_service.lock,
+                        RIVER_REFERENCE_SERVICE_CAPTURE_WAIT_MS) != RTK_SUCCESS) {
+        /*
+         * VAD/AEC readiness polls this from the capture task.  Never block the
+         * mic consumer on playback-reference maintenance.
+         */
+        *stats = g_river_reference_service.stats;
         return;
     }
 

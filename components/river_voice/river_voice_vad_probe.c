@@ -309,12 +309,17 @@ static void river_voice_vad_probe_reset_diag_counters(void)
 
 static void river_voice_vad_probe_release_barge_in_duck(const char *reason)
 {
+    river_status_t status;
+
     if (!g_river_voice_vad_probe.barge_in_duck_active) {
         g_river_voice_vad_probe.barge_in_release_frames = 0U;
         return;
     }
 
-    (void)river_playback_service_set_ducking_ex(false, 1.0f, reason);
+    status = river_playback_service_set_ducking_ex(false, 1.0f, reason);
+    if (status != RIVER_OK) {
+        return;
+    }
     g_river_voice_vad_probe.barge_in_duck_active = false;
     g_river_voice_vad_probe.barge_in_release_frames = 0U;
     RIVER_LOGI("barge-in duck release: reason=%s afe_peak=%u ref_peak=%u prob_q15=%u",

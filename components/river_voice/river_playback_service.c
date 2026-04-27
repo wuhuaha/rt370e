@@ -19,6 +19,8 @@
 #define RIVER_LOG_TAG "river.playback"
 
 #define RIVER_PLAYBACK_SERVICE_HW_VOLUME 1.0f
+#define RIVER_PLAYBACK_SERVICE_STATS_WAIT_MS 0U
+#define RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS 0U
 
 typedef struct {
     bool initialized;
@@ -930,7 +932,8 @@ river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, c
         return enabled ? RIVER_ERR_BUSY : RIVER_OK;
     }
 
-    if (rtos_mutex_take(g_river_playback_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+    if (rtos_mutex_take(g_river_playback_service.lock,
+                        RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS) != RTK_SUCCESS) {
         return RIVER_ERR_BUSY;
     }
 
@@ -1024,8 +1027,14 @@ void river_playback_service_get_stats(river_playback_service_stats_t *stats)
         return;
     }
 
-    if (rtos_mutex_take(g_river_playback_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
-        stats->state = RIVER_PLAYBACK_ERROR;
+    if (rtos_mutex_take(g_river_playback_service.lock,
+                        RIVER_PLAYBACK_SERVICE_STATS_WAIT_MS) != RTK_SUCCESS) {
+        /*
+         * This getter is used by VAD/AEC policy on the capture hot path.  Do
+         * not wait behind AudioTrack_Start/Write; a slightly stale snapshot is
+         * safer than starving the mic consumer and overflowing capture frames.
+         */
+        *stats = g_river_playback_service.stats;
         return;
     }
 

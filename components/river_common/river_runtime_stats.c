@@ -17,6 +17,7 @@
 #define RIVER_LOG_TAG "river.stats"
 
 #define RIVER_RUNTIME_STATS_TOP_TASKS 3U
+#define RIVER_RUNTIME_STATS_SNAPSHOT_WAIT_MS 0U
 
 static bool g_river_runtime_stats_initialized;
 static bool g_river_runtime_stats_lock_ready;
@@ -200,8 +201,9 @@ void river_runtime_stats_snapshot(const char *reason)
         const TaskStatus_t *kws_task;
 
         if (!g_river_runtime_stats_lock_ready ||
-            rtos_mutex_take(g_river_runtime_stats_lock, RTOS_MAX_TIMEOUT) != 0) {
-            RIVER_LOGW("snapshot reason=%s heap_free=%lu heap_min=%lu task_stats=alloc_failed",
+            rtos_mutex_take(g_river_runtime_stats_lock,
+                            RIVER_RUNTIME_STATS_SNAPSHOT_WAIT_MS) != 0) {
+            RIVER_LOGW("snapshot reason=%s heap_free=%lu heap_min=%lu task_stats=busy",
                        snapshot_reason,
                        (unsigned long)heap_free,
                        (unsigned long)heap_min);

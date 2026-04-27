@@ -14175,3 +14175,17 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.529
+- Re-reviewed the 2026-04-27 `audio.out.meta` / playback-start failure path for capture hot-path blocking risks beyond the previous state-machine fix.
+- Converted capture/VAD/AEC policy reads to non-blocking best-effort snapshots:
+  - playback service stats now return a stale snapshot instead of waiting behind `AudioTrack_Start/Write`
+  - reference service read/stats and the lower playback-reference ring read/stats now return zero/busy instead of blocking the mic consumer
+  - native capture-reference publish/get now drops or returns an empty observation if its mutex is busy
+  - dialog runtime voice-policy view now uses a try-lock so cloud/playback reconciliation cannot stall AEC gating
+- Made runtime stats snapshots non-blocking so VAD state-change diagnostics cannot wait forever on the stats mutex.
+- Made VAD barge-in ducking control non-blocking and kept the local duck-active flag set when duck release cannot acquire the playback lock, so release can be retried instead of silently desynchronizing.
+- Verification for this step:
+  - `git diff --check` passed
+  - first sandboxed `python3 /root/ameba-rtos/ameba.py build -p` failed because the SDK build writes `/root/ameba-rtos/component/soc/amebasmart/main/ap/inc/build_info.h.tmp` outside the workspace sandbox
+  - rerun with approved SDK build permission completed successfully with `Build done`

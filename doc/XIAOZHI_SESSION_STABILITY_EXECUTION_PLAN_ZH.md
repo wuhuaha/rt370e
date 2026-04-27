@@ -471,3 +471,51 @@ python3 /root/ameba-rtos/ameba.py build -p
 - `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`。
 - 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`。
 - `playback_start_prepare` 后不再持续刷 `capture frame ring overflow`。
+
+### Step K: 采集热路径非阻塞防护
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 继续收口 2026-04-27 日志中 `audio.out.meta` 后播放启动异常引发的端侧连锁问题。
+- 即使 `AudioTrack_Start/Write`、playback reference 维护、dialog runtime reconciliation 或 runtime stats 采样短时卡顿，VAD/capture consumer 也不能被同步锁等待拖死。
+- reference / AEC / duplex readiness 在锁忙时应降级为 no-ref/aec-blocked，而不是阻塞采集任务。
+
+范围：
+
+- `components/river_common/river_runtime_stats.c`
+- `components/river_core/river_dialog_runtime.c`
+- `components/river_voice/river_playback_service.c`
+- `components/river_voice/river_reference_service.c`
+- `components/river_voice/river_voice_ref.c`
+- `components/river_voice/river_voice_runtime_policy.c`
+- `components/river_voice/river_voice_vad_probe.c`
+
+实现：
+
+- playback stats getter 使用 try-lock，锁忙时返回已有 snapshot。
+- reference service read/stats 与底层 playback-reference ring read/stats 使用 try-lock，锁忙时清零参考帧并返回 busy/空统计。
+- native capture reference publish/get 使用 try-lock，锁忙时丢弃本帧观测或返回 unavailable。
+- dialog runtime voice-policy view 使用 try-lock，锁忙时让 AEC policy 走保守降级。
+- runtime stats snapshot 使用 try-lock，避免 VAD 状态变更日志卡住采集线程。
+- VAD barge-in duck 控制使用非阻塞 playback control；release 失败时保留本地 active 标志，后续继续重试。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`。
+- 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`。
+- 播放启动或 reference 维护异常时，端侧不再持续刷 `capture frame ring overflow`。
+- 若 AEC/reference 暂不可用，表现为 no-ref/aec-blocked 降级，而不是采集任务阻塞。

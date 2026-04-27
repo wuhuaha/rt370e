@@ -16,6 +16,7 @@
 #define RIVER_LOG_TAG "river.voice.ref"
 
 #define RIVER_VOICE_REF_DEFAULT_HISTORY_MS  1536U
+#define RIVER_VOICE_REF_CAPTURE_WAIT_MS     0U
 
 typedef struct {
     bool opened;
@@ -166,7 +167,8 @@ river_status_t river_voice_ref_read(uint8_t *data, size_t bytes)
         return RIVER_ERR_ARG;
     }
 
-    if (rtos_mutex_take(g_river_voice_ref.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+    if (rtos_mutex_take(g_river_voice_ref.lock,
+                        RIVER_VOICE_REF_CAPTURE_WAIT_MS) != RTK_SUCCESS) {
         memset(data, 0, bytes);
         return RIVER_ERR_BUSY;
     }
@@ -202,7 +204,8 @@ void river_voice_ref_get_stats(river_voice_ref_stats_t *stats)
         return;
     }
 
-    if (rtos_mutex_take(g_river_voice_ref.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+    if (rtos_mutex_take(g_river_voice_ref.lock,
+                        RIVER_VOICE_REF_CAPTURE_WAIT_MS) != RTK_SUCCESS) {
         return;
     }
 

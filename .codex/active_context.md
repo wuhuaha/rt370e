@@ -15,12 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.528 XiaoZhi audio.out.meta 后播放/采集状态机修复（待验证）`
+  - `5.529 采集热路径非阻塞防护（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
   - newest runtime bug-fix slice in progress:
+    - Step 5.529 继续收口 2026-04-27 `audio.out.meta` 后播放启动异常的端侧风险：
+      - playback stats / reference read+stats / native capture reference observation / dialog voice policy view 均改为 capture-hot-path 非阻塞降级
+      - runtime stats snapshot 改为非阻塞，避免 VAD state-change 诊断卡住采集消费者
+      - VAD barge-in duck 控制改为非阻塞；release 拿不到 playback lock 时保留 duck-active 标志以便后续重试
+      - 目标是即使 AudioTrack 或 reference 维护短时卡顿，也不再饿死 VAD/capture consumer 导致 `capture frame ring overflow` 持续增长
+    - 下一步上板验证：
+      - `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`
+      - 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`
+      - `playback_start_prepare` 后不再持续刷 `capture frame ring overflow`
     - Step 5.528 针对 2026-04-27 新日志中的端侧问题：
       - 服务端已下发 `audio.out.meta` 且 `output_state=speaking`，端侧不应由 `note_meta` 把 interaction 推回 `asr_streaming`
       - speaking playback lane engaged 但物理播放/AEC 未 ready 时，follow-up reopen 继续阻断，避免空 ASR round

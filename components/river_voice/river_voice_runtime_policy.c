@@ -8,6 +8,8 @@
 
 #include "river/river_dialog_runtime.h"
 
+#define RIVER_VOICE_NATIVE_REFERENCE_HOT_WAIT_MS 0U
+
 typedef struct {
     bool initialized;
     rtos_mutex_t lock;
@@ -223,7 +225,8 @@ void river_voice_runtime_native_reference_publish(
     observation.frames_seen = frames_seen;
     observation.last_update_ms = (uint32_t)rtos_time_get_current_system_time_ms();
 
-    if (rtos_mutex_take(g_river_voice_native_reference.lock, MUTEX_WAIT_TIMEOUT) !=
+    if (rtos_mutex_take(g_river_voice_native_reference.lock,
+                        RIVER_VOICE_NATIVE_REFERENCE_HOT_WAIT_MS) !=
         RTK_SUCCESS) {
         return;
     }
@@ -245,7 +248,8 @@ void river_voice_runtime_native_reference_get(
         return;
     }
 
-    if (rtos_mutex_take(g_river_voice_native_reference.lock, MUTEX_WAIT_TIMEOUT) !=
+    if (rtos_mutex_take(g_river_voice_native_reference.lock,
+                        RIVER_VOICE_NATIVE_REFERENCE_HOT_WAIT_MS) !=
         RTK_SUCCESS) {
         return;
     }

@@ -323,6 +323,12 @@ static bool river_dialog_runtime_lock(void)
            rtos_mutex_take(g_river_dialog_runtime.lock, MUTEX_WAIT_TIMEOUT) == RTK_SUCCESS;
 }
 
+static bool river_dialog_runtime_try_lock(void)
+{
+    return g_river_dialog_runtime.lock != NULL &&
+           rtos_mutex_take(g_river_dialog_runtime.lock, 0U) == RTK_SUCCESS;
+}
+
 static void river_dialog_runtime_unlock(void)
 {
     if (g_river_dialog_runtime.lock != NULL) {
@@ -2244,7 +2250,12 @@ river_status_t river_dialog_runtime_get_voice_policy_view(
     if (!g_river_dialog_runtime.initialized) {
         return RIVER_ERR_NOT_FOUND;
     }
-    if (!river_dialog_runtime_lock()) {
+    /*
+     * Voice/AEC policy polls this from the capture hot path.  If cloud/playback
+     * reconciliation owns the runtime lock, degrade to a conservative policy
+     * instead of blocking the mic consumer.
+     */
+    if (!river_dialog_runtime_try_lock()) {
         return RIVER_ERR_BUSY;
     }
 
