@@ -101,6 +101,9 @@ static void river_cloud_xiaozhi_downlink_expand_stereo(const uint8_t *mono_frame
 static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t start_ms);
 static void river_cloud_xiaozhi_update_playback_ack_progress(void);
 static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void);
+static bool river_cloud_xiaozhi_maybe_finish_zero_duration_tail_on_drain(
+    uint32_t queued_frames,
+    const char *trigger);
 static void river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
     const char *trigger);
 

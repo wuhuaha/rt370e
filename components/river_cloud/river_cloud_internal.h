@@ -78,10 +78,10 @@
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 6U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 4U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 5U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 1U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS 320U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX 8U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX 1U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
 #define RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH 8U
@@ -96,6 +96,7 @@
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
+#define RIVER_CLOUD_XIAOZHI_SERVER_ACCEPT_FALLBACK_MS 1800U
 #define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS 5000U
 /*
@@ -395,9 +396,11 @@ typedef struct {
     bool window_active;
     bool listen_stop_pending;
     bool local_close_pending;
+    bool server_accept_wait_pending;
     bool followup_response_pending_reported;
     uint64_t window_deadline_ms;
     uint64_t local_close_deadline_ms;
+    uint64_t server_accept_fallback_deadline_ms;
 } river_cloud_xiaozhi_session_window_truth_t;
 
 typedef struct {
@@ -696,7 +699,9 @@ void river_cloud_xiaozhi_complete_active_stream_finish(
 bool river_cloud_xiaozhi_should_defer_local_close(void);
 void river_cloud_xiaozhi_clear_local_close_defer(void);
 void river_cloud_xiaozhi_arm_local_close_defer(void);
+void river_cloud_xiaozhi_clear_server_accept_wait(void);
 void river_cloud_xiaozhi_prepare_post_commit_wait(void);
+void river_cloud_xiaozhi_prepare_server_accept_wait(const char *reason);
 void river_cloud_xiaozhi_window_touch(uint32_t duration_ms, const char *reason);
 void river_cloud_xiaozhi_window_close(const char *reason);
 void river_cloud_xiaozhi_window_abort_local(const char *reason);

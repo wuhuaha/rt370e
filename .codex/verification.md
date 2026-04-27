@@ -22714,6 +22714,44 @@ wake the device once against the smart-home XiaoZhi service and inspect response
 Expected result:
 - if the server returns text chunks but no `audio.out.meta`, logs show `xiaozhi response audio abandoned recovery ... action=close_text_only`
 - after that text-only response, the device closes the local window/turn and does not immediately open phantom follow-up ASR rounds from local VAD noise
-- if the server sends `audio.out.meta expected_duration_ms=0 is_last_segment=yes`, logs show `xiaozhi playback zero-duration last segment completed from mark` followed by `xiaozhi playback ack completed queued/sent`
+- if the server sends `audio.out.meta expected_duration_ms=0 is_last_segment=yes`, logs show `xiaozhi playback zero-duration last segment completed after drain` followed by `xiaozhi playback ack completed queued/sent`
 - the tail should not reach `xiaozhi error ... audio_stream_failed message=context deadline exceeded`
 - no new `upstream_starved` rebuffer should start after the terminal segment is already completed or after transport close cleanup begins
+
+## Step 5.536 - XiaoZhi server-endpoint commit suppression, strict uplink pacing, and factual playback ACK
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+wake the device against the smart-home XiaoZhi service, speak one short command, then inspect turn/uplink/playback logs
+```
+
+Expected result:
+- in server endpoint mode, local VAD stop logs `xiaozhi server accept wait armed` and does not send normal-path `audio.in.commit`
+- if service accepts within 1.8s, logs close the local round from `turn accepted ... accept_reason=server_endpoint` without fallback commit
+- only when service does not accept within 1.8s should `xiaozhi server accept wait fallback commit` appear
+- `xiaozhi asr round finish` shows `frame_bytes=640`, normal `burst_max=1`, and send interval metrics close to 20ms pacing
+- weak-network/backpressure cases drop stale/ring frames instead of replaying a large audio backlog
+- zero-duration last playback segments complete only after `zero-duration last segment completed after drain`, then queue/sent `audio.out.completed`
+- playback with missing AEC/ref remains held or half-duplex gated and does not create phantom ASR rounds from TTS leakage

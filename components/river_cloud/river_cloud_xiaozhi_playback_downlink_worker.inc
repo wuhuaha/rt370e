@@ -26,8 +26,13 @@ static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t star
 static void river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
     const char *trigger)
 {
-    if (!river_cloud_xiaozhi_playback_terminal_open() ||
-        !river_cloud_xiaozhi_playback_completed_ready()) {
+    if (!river_cloud_xiaozhi_playback_terminal_open()) {
+        return;
+    }
+    (void)river_cloud_xiaozhi_maybe_finish_zero_duration_tail_on_drain(
+        river_cloud_xiaozhi_playback_queued_frames(),
+        trigger);
+    if (!river_cloud_xiaozhi_playback_completed_ready()) {
         return;
     }
 

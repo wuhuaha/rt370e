@@ -591,15 +591,6 @@ static void river_cloud_xiaozhi_update_playback_ack_progress(void)
         river_cloud_xiaozhi_try_queue_playback_mark_ack(played_duration_ms);
 
         if (segment->expected_duration_ms == 0U) {
-            if (segment->is_last_segment && played_duration_ms != 0U) {
-                RIVER_LOGI("xiaozhi playback zero-duration last segment completed from mark: response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu",
-                           segment->response_id[0] != '\0' ? segment->response_id : "-",
-                           segment->playback_id[0] != '\0' ? segment->playback_id : "-",
-                           segment->segment_id[0] != '\0' ? segment->segment_id : "-",
-                           (unsigned long)played_duration_ms);
-                river_cloud_xiaozhi_mark_segment_fully_heard(segment);
-                river_cloud_xiaozhi_pop_playback_segment();
-            }
             return;
         }
         if (played_duration_ms < segment->expected_duration_ms) {
@@ -617,6 +608,39 @@ static void river_cloud_xiaozhi_update_playback_ack_progress(void)
         }
         river_cloud_xiaozhi_try_start_current_playback_segment(next_segment_start_ms);
     }
+}
+
+static bool river_cloud_xiaozhi_maybe_finish_zero_duration_tail_on_drain(
+    uint32_t queued_frames,
+    const char *trigger)
+{
+    river_cloud_xiaozhi_playback_segment_t *segment;
+    uint32_t final_mark_ms;
+
+    if (!river_cloud_xiaozhi_playback_terminal_open() ||
+        g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_pending ||
+        queued_frames != 0U ||
+        river_cloud_xiaozhi_downlink_retry_frame_pending()) {
+        return false;
+    }
+
+    segment = river_cloud_xiaozhi_current_playback_segment();
+    if (segment == NULL || !segment->valid || !segment->started ||
+        !segment->started_ack_reported || !segment->is_last_segment ||
+        segment->expected_duration_ms != 0U || segment->last_mark_ms == 0U) {
+        return false;
+    }
+
+    final_mark_ms = segment->last_mark_ms;
+    river_cloud_xiaozhi_mark_segment_fully_heard(segment);
+    RIVER_LOGI("xiaozhi playback zero-duration last segment completed after drain: response_id=%s playback_id=%s segment_id=%s final_mark_ms=%lu trigger=%s",
+               segment->response_id[0] != '\0' ? segment->response_id : "-",
+               segment->playback_id[0] != '\0' ? segment->playback_id : "-",
+               segment->segment_id[0] != '\0' ? segment->segment_id : "-",
+               (unsigned long)final_mark_ms,
+               trigger != NULL ? trigger : "-");
+    river_cloud_xiaozhi_pop_playback_segment();
+    return true;
 }
 
 static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)

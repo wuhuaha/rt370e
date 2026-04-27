@@ -5584,7 +5584,7 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 端侧收口：
 
 - `server_returned_active_no_audio` 不再只是清 response-audio wait；它按 text-only 终止响应处理，关闭本地 round/window，清 session update cache 和 turn semantics，并同步 dialog runtime。
-- 零时长 last segment 在首个有效 mark 后直接视为 fully-heard，弹出 segment，允许 terminal completed ACK 继续推进。
+- 零时长 last segment 在downlink queue/retry drain 且已有有效 mark 后视为 fully-heard，弹出 segment，允许 terminal completed ACK 继续推进。
 - downlink 写入/轮询进度后，如果 terminal last segment 已 fully-heard，则主动 queue `audio.out.completed`，并安排播放 drain stop，覆盖实时协议没有 legacy `tts.stop` 的尾段。
 
 上板验收：
@@ -5593,3 +5593,41 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `expected_duration_ms=0 is_last_segment=yes` 后应看到 completed ACK queued/sent。
 - 不应再出现该路径导致的 `audio_stream_failed context deadline exceeded`。
 - transport close/abort 清理期间不应再触发新的 `upstream_starved` rebuffer。
+
+### Step 5.536: 对齐服务端 accepted truth、严格上行 pacing 与播放事实 ACK
+
+触发背景：
+
+- 服务侧复盘 2026-04-27 联调日志后明确端侧优先级：
+  - server endpoint 模式下不要把本地 VAD stop 当作正常 `audio.in.commit`
+  - 上行音频要严格收敛到 20ms pacing，禁止 backlog burst
+  - 播放期必须依赖 AEC/ref 或抑制上行，避免 TTS 泄漏被 ASR 当作新输入
+  - playback ACK 只能来自 `audio.out.meta` + 实际播放事实，不能用 meta 或文本伪造
+- 板端日志里的直接症状包括：重复 turn / 空 commit、`bundled_burst` 风险、播放尾段 deadline、以及 no-ref 播放期误开 ASR 的风险。
+
+端侧收口：
+
+- `client_wakeup_server_endpoint` / server endpoint 可用时，本地 post-roll 只进入 `server_accept_wait`：
+  - 立即停本地 active stream、清本轮上行积压和 pre-roll，但不发送正常路径 `audio.in.commit`
+  - 等待服务端 `session.update(... accept_reason=server_endpoint/end_of_speech ...)` 作为 accepted truth，收到后关闭本地 round
+  - 仅当等待超过 `RIVER_CLOUD_XIAOZHI_SERVER_ACCEPT_FALLBACK_MS=1800` 且仍无服务接受时，才走兼容 fallback commit
+  - accepted / close / abort / transport reset 都清理 `server_accept_wait`，避免迟到 stop/commit
+- 上行 pacing 改为严格 20ms token：
+  - 常态 drain burst 上限改为 `1`，取消 preview warmup/backlog 对 due time 的 bypass
+  - 每次成功发送后以下一次实际发送时刻 `now + 20ms` 排期，不再用历史 due time 追赶补发
+  - stale queue 上限收敛到 5 帧；backpressure 时继续丢旧帧，优先保持实时性
+- Playback ACK 收口为真实播放事实：
+  - 零时长 last segment 不再在首个 mark 时直接 completed；必须等 downlink queue/retry 都 drain、segment 已 started 且至少有真实 mark 后，才标记 fully-heard
+  - completed ACK 继续由 terminal ready 驱动；无 `audio.out.meta` / 无 started playback 时仍只做本地 no-audio recovery，不报 started/completed
+  - mark 仍绑定当前 segment，`played_duration_ms` 不跨 segment 累计
+- 指标补齐：
+  - `xiaozhi asr round finish` 增加 `frame_bytes`、`send_interval_max`、`capture_age_max`、`backlog_max`、`send_duration_max`、`dropped_frames`
+  - 既有 `busy/fail/stale_drop/ring_drop/burst_max` 保留，用于和服务侧 uplink cadence / weak-network 观察对齐
+
+上板验收：
+
+- server endpoint 模式下，本地 VAD post-roll 后不应出现正常路径 `audio.in.commit`；应看到 `xiaozhi server accept wait armed`，随后由 `turn accepted ... accept_reason=server_endpoint` 收口。
+- 服务端 1.8s 内没有 accepted truth 时，才允许出现 `xiaozhi server accept wait fallback commit`。
+- `xiaozhi asr round finish` 中 `burst_max` 常态应为 1，`send_interval_p50/p95/max` 应接近 20ms pacing；若网络阻塞，应看到 stale/ring dropped，而不是大批旧音频补发。
+- `expected_duration_ms=0 is_last_segment=yes` 应在 queue drain 后打印 `zero-duration last segment completed after drain`，再 queue/sent completed ACK。
+- 播放期间若 AEC/ref 不 ready，应继续看到 `capture held during playback` / `half_duplex_aec_blocked`，不应打开新的幻听 ASR round。

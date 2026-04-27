@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.531 XiaoZhi input.accept_ready 协议同步（待上板验证）`
+  - `5.536 XiaoZhi 服务端断句、严格上行 pacing 与播放事实 ACK 收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.536 对齐服务侧 2026-04-27 端侧 P0/P1/P2 建议：
+      - server endpoint 可用时，本地 VAD post-roll 只进入 `server_accept_wait`，默认不发正常路径 `audio.in.commit`
+      - 1.8s 内等待服务端 `session.update.accept_reason` 作为 accepted truth，超时才 fallback commit
+      - 上行取消 preview/backlog due bypass，drain burst 上限为 1，发送后按 `now + 20ms` 排下一帧，避免 backlog burst
+      - 零时长 last segment 必须等 downlink queue/retry drain 且已有真实 mark 后才标记 fully-heard 并推进 completed ACK
+      - ASR round finish 日志新增 frame bytes、send interval max、capture age max、backlog max、send duration max 与 dropped_frames
+    - 下一步上板验证：
+      - server endpoint mode 下本地 stop 后应看到 `server accept wait armed`，不应出现正常路径 `audio.in.commit`
+      - 常态 `burst_max=1`，`send_interval_p50/p95/max` 接近 20ms；弱网时丢旧帧而不是补发积压
+      - `expected_duration_ms=0 is_last_segment=yes` 应在 queue drain 后 completed，不再触发服务端 audio stream deadline
   - newest landed protocol-sync slice:
     - Step 5.531 对齐服务端 `1a94986 Optimize realtime preview backlog handling`：
       - 服务端 preview 观察现在明确为 latest-state hints，允许合并或跳过中间 `input.preview / input.accept_ready / input.endpoint`

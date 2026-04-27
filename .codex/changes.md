@@ -14281,12 +14281,33 @@
 - 针对 2026-04-27 17:49 板端日志里的 XiaoZhi text-only / 零时长播放尾段收口：
   - 日志显示服务端返回 `response.chunk` 文本后直接回到 `state=active input_state=active output_state=idle`，端侧只清掉 `response audio wait`，但没有收口会话窗口和 turn semantics，导致 interaction 留在 thinking/active 并被本地 VAD 误开后续 ASR round
   - `server_returned_active_no_audio` 现在按 text-only 终止响应处理：记录恢复日志、关闭本地 round、关闭 conversation window、清掉 session.update cache / turn semantics，并触发状态同步，避免没有音频时继续留在 follow-up 会话里接收幻听输入
-  - `expected_duration_ms=0 && is_last_segment=yes` 的播放段现在在首个有效 mark 后直接标记 fully-heard 并弹出 segment，不再永久卡在 current segment 等待 duration 达标
+  - `expected_duration_ms=0 && is_last_segment=yes` 的播放段现在在downlink queue/retry drain 且已有有效 mark 后标记 fully-heard 并弹出 segment，不再永久卡在 current segment 等待 duration 达标
   - downlink 写入和轮询 ACK 进度后会在 last segment fully-heard 时主动 queue `audio.out.completed`，并给物理播放 backend 安排 drain stop，避免实时协议没有 legacy `tts.stop` 时一直等到 upstream-starved/rebuffer 或服务端 deadline
 - 预期修复的日志症状：
   - text-only/no-audio response 后会出现 `xiaozhi response audio abandoned recovery ... action=close_text_only`，随后不再从 `thinking` 被本地 VAD 拉起 `asr round id=2/3`
-  - 零时长 last segment 会出现 `zero-duration last segment completed from mark` 和 `playback ack completed ...`，不再等到服务端 `audio_stream_failed context deadline exceeded`
+  - 零时长 last segment 会出现 `zero-duration last segment completed after drain` 和 `playback ack completed ...`，不再等到服务端 `audio_stream_failed context deadline exceeded`
   - 已完成/正在关闭的尾段不再被 downlink starvation 误判成需要 `note_rebuffer` 的上游断流恢复
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.536
+- 对齐服务侧 2026-04-27 修改建议，收口 server endpoint 模式下端侧不该继续充当第二 orchestrator 的问题：
+  - 本地 VAD post-roll 在 discovery 表示 server endpoint 可用时只进入 `server_accept_wait`，默认不再发送正常路径 `audio.in.commit`
+  - 等待服务端 accepted truth；只有超过 `1800ms` 仍没有服务端 accept 时才 fallback commit
+  - accepted / local close / window close / transport reset 都清掉 `server_accept_wait`，避免迟到 stop/commit
+- 上行改为严格 20ms pacing：
+  - 常态 drain burst 上限收敛为 `1`
+  - 移除 preview warmup/backlog 对 due time 的 bypass
+  - 成功发送后用 `now + 20ms` 排下一帧，不再根据历史 due time catch-up 补发 backlog
+  - stale queue 上限收敛为 5 帧，弱网时继续丢旧帧优先保持实时性
+- Playback ACK 收口为更严格的真实播放事实：
+  - 零时长 last segment 不再在首个 mark 立即 completed
+  - 只有 downlink queue/retry 都 drain、segment 已 started 且有真实 mark 后，才把零时长尾段标为 fully-heard 并推进 completed ACK
+  - 无 meta / 无实际 started playback 路径仍不伪造 started/completed
+- 补齐端侧指标：
+  - ASR round finish 日志新增 `frame_bytes`、`send_interval_max`、`capture_age_max`、`backlog_max`、`send_duration_max`、`dropped_frames`
 - Verification for this step:
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
