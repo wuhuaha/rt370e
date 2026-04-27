@@ -4432,11 +4432,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-27 / branch `agent-server-v2`: Step 5.531 synced the RTOS client with the updated XiaoZhi preview backlog protocol:
-  - `input.accept_ready` is parsed, logged, and cached as preview observation truth
-  - discovery preview capability logs now include `accept_ready`
-  - accepted-turn ownership is unchanged: only `session.update.accept_reason` can confirm acceptance
-  - `input.accept_ready` remains observation-only and does not close local ASR, send `audio.in.commit`, or declare accepted-turn
+- 2026-04-27 / branch `agent-server-v2`: Step 5.532 closes the device-side XiaoZhi playback/follow-up/uplink runtime loop observed in the latest board log:
+  - downlink revalidates playback backend after frame acquire and before write, so detached/recovering stop races retry or restart instead of logging `write_failed`
+  - follow-up ASR reopen is blocked while service output is thinking/speaking, playback lane/turn is occupied, or rebuffer is pending; current no-ref barge-in remains duck-only
+  - `audio.out.meta` clears stale playback truth on response/playback id changes and accepts `expected_duration_ms=0` as a real service value
+  - XiaoZhi uplink drains before and after WS poll with bounded backlog catch-up (`4/8` normal/warmup burst)
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`

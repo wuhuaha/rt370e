@@ -1921,6 +1921,7 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
     river_cloud_xiaozhi_downlink_write_view_t write_view;
     river_cloud_xiaozhi_write_failed_recovery_result_t failed_result;
     river_status_t write_status;
+    river_cloud_playback_backend_state_t backend_state;
 
     river_cloud_xiaozhi_capture_current_downlink_write_view(&write_view);
     if (write_view.frame_too_large) {
@@ -1929,6 +1930,14 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
             NULL);
         result.status = RIVER_ERR_ARG;
         result.aborted = true;
+        return result;
+    }
+
+    backend_state = river_cloud_xiaozhi_playback_backend_state();
+    if (backend_state != RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_ACTIVE) {
+        river_cloud_xiaozhi_keep_current_downlink_frame_for_retry();
+        river_cloud_xiaozhi_playback_check_pending_stop();
+        result.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
         return result;
     }
 

@@ -444,6 +444,14 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
 {
     river_status_t status;
     uint32_t open_hold_frames;
+    bool output_thinking;
+    bool output_speaking;
+    bool response_waiting_audio;
+    bool playback_lane_engaged;
+    bool playback_turn_active;
+    bool playback_output_active;
+    bool playback_rebuffer_pending;
+    bool block_for_output_turn;
 
     if (opened != NULL) {
         *opened = false;
@@ -453,32 +461,40 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
         return RIVER_ERR_BUSY;
     }
 
-    if ((g_river_cloud.xiaozhi_turn_semantics.accepted &&
-         (strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "thinking") == 0 ||
-          (strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "speaking") == 0 &&
-           (!river_cloud_xiaozhi_playback_output_active() ||
-            !river_cloud_xiaozhi_playback_allows_vad_open())))) ||
-        (river_cloud_xiaozhi_playback_lane_engaged() &&
-         (!river_cloud_xiaozhi_playback_output_active() ||
-          !river_cloud_xiaozhi_playback_allows_vad_open())) ||
-        (g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
-             RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED &&
-         g_river_cloud.xiaozhi_playback_lineage_truth.meta_context.response_id[0] == '\0')) {
+    output_thinking =
+        g_river_cloud.xiaozhi_turn_semantics.accepted &&
+        strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "thinking") == 0;
+    output_speaking =
+        g_river_cloud.xiaozhi_turn_semantics.accepted &&
+        strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "speaking") == 0;
+    response_waiting_audio =
+        g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED &&
+        g_river_cloud.xiaozhi_playback_lineage_truth.meta_context.response_id[0] == '\0';
+    playback_lane_engaged = river_cloud_xiaozhi_playback_lane_engaged();
+    playback_turn_active = river_cloud_xiaozhi_playback_turn_active();
+    playback_output_active = river_cloud_xiaozhi_playback_output_active();
+    playback_rebuffer_pending = river_cloud_xiaozhi_playback_rebuffer_pending();
+    block_for_output_turn = output_thinking || output_speaking ||
+                            response_waiting_audio || playback_lane_engaged ||
+                            playback_turn_active || playback_rebuffer_pending;
+
+    if (block_for_output_turn) {
         g_river_cloud.xiaozhi_uplink_runtime_truth.open_speech_frames = 0U;
         if (is_speech &&
             !g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported) {
             g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported = true;
-            RIVER_LOGI("xiaozhi followup reopen blocked: reason=response_pending accepted=%s output_state=%s response_wait=%s playback_lane=%s playback_active=%s sid=%s",
+            RIVER_LOGI("xiaozhi followup reopen blocked: reason=output_turn_guard accepted=%s output_state=%s response_wait=%s playback_lane=%s playback_turn=%s playback_active=%s rebuffer=%s vad_open=%s sid=%s",
                        g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
                        g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
                            g_river_cloud.xiaozhi_turn_semantics.output_state :
                            "-",
-                       g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
-                               RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED ?
-                           "yes" :
-                           "no",
-                       river_cloud_xiaozhi_playback_lane_engaged() ? "yes" : "no",
-                       river_cloud_xiaozhi_playback_output_active() ? "yes" : "no",
+                       response_waiting_audio ? "yes" : "no",
+                       playback_lane_engaged ? "yes" : "no",
+                       playback_turn_active ? "yes" : "no",
+                       playback_output_active ? "yes" : "no",
+                       playback_rebuffer_pending ? "yes" : "no",
+                       river_cloud_xiaozhi_playback_allows_vad_open() ? "yes" : "no",
                        river_cloud_xiaozhi_current_sid() != NULL ?
                            river_cloud_xiaozhi_current_sid() :
                            "-");

@@ -262,6 +262,12 @@ static bool river_cloud_xiaozhi_uplink_can_bypass_due_for_preview(void)
            river_cloud_xiaozhi_uplink_ready_frames() > 0U;
 }
 
+static bool river_cloud_xiaozhi_uplink_can_bypass_due_for_backlog(void)
+{
+    return g_river_cloud.xiaozhi_uplink_runtime_truth.retry_valid ||
+           river_cloud_xiaozhi_uplink_ready_frames() > 1U;
+}
+
 static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_t backoff_ms)
 {
     if (g_river_cloud.xiaozhi_uplink_runtime_truth.last_busy_log_ms != 0U &&
@@ -787,6 +793,8 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
         uint64_t send_begin_ms;
         uint32_t send_duration_ms = 0U;
         bool preview_bypass_due = false;
+        bool backlog_bypass_due = false;
+        bool bypass_due = false;
 
         burst_limit = river_cloud_xiaozhi_uplink_drain_burst_limit();
         if (drained_frames >= burst_limit) {
@@ -797,8 +805,10 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
         due_ms = g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms;
         if (due_ms != 0U && now_ms < due_ms) {
             preview_bypass_due = river_cloud_xiaozhi_uplink_can_bypass_due_for_preview();
+            backlog_bypass_due = river_cloud_xiaozhi_uplink_can_bypass_due_for_backlog();
+            bypass_due = preview_bypass_due || backlog_bypass_due;
         }
-        if (due_ms != 0U && now_ms < due_ms && !preview_bypass_due) {
+        if (due_ms != 0U && now_ms < due_ms && !bypass_due) {
             break;
         }
 
@@ -858,7 +868,7 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
             }
             g_river_cloud.xiaozhi_uplink_runtime_truth.retry_valid = false;
             g_river_cloud.xiaozhi_uplink_runtime_truth.busy_streak = 0U;
-            next_due_ms = (due_ms != 0U && !preview_bypass_due) ?
+            next_due_ms = (due_ms != 0U && !bypass_due) ?
                               (due_ms + (uint64_t)frame_ms) :
                               (now_ms + (uint64_t)frame_ms);
             g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = next_due_ms;

@@ -14226,3 +14226,19 @@
   - it does not close the local ASR round, does not send `audio.in.commit`, and does not replace `session.update.accept_reason`
 - Verification for this step:
   - `git diff --check` passed
+
+## Step 5.532
+- 按 2026-04-27 板端日志把 XiaoZhi 端侧 runtime 问题做成闭环修复，而不是继续只补单点：
+  - 播放 downlink 在拿到音频帧后再次校验 playback backend，若 backend 已从 `owned_active` 变成 detached/stop/recovering，则保留当前帧重试并走 pending-stop/重新 start 路径，不再把“写已释放 backend”误判成 `write_failed` rebuffer
+  - follow-up ASR reopen 新增 output-turn guard：只要服务端仍处于 thinking/speaking、playback lane/turn 仍占用、或 rebuffer 未完成，就阻止本地重新打开 ASR；当前 no-ref/duck-only barge-in 只允许 duck/suppress，不再上传一轮空 follow-up
+  - `audio.out.meta` 以 response/playback 变化作为新播放上下文边界，清空上一轮 meta/segment/rebuffer 状态；`expected_duration_ms=0` 和空 text 也按服务端事实写入，防止复用上一段 `1660ms` 等脏值
+  - XiaoZhi I/O task 在 websocket poll 前后都尝试 drain uplink，并把常态/warmup burst 上限调到 `4/8`，允许 backlog 有界绕过 due time 追赶，避免 `send_interval_p50` 卡在约 55ms
+- 预期修复的日志症状：
+  - 不再出现 `xiaozhi playback write failed ... backend=detached`
+  - 播放/rebuffer 期间不再因 `playback_state` 误开 `asr round id=2`
+  - 新 response 的 `expected_duration_ms=0` 不再被打印成旧的 `expected_ms=1660`
+  - uplink `send_interval_p50/p95` 应比历史 `55/63ms` 明显下降，若仍慢则继续看 `busy/fail/send_duration_p95`
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with approved SDK write permission

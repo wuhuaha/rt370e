@@ -73,6 +73,14 @@ static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void)
         &g_river_cloud.xiaozhi_playback_lineage_truth.fully_heard_context);
 }
 
+static bool river_cloud_xiaozhi_playback_meta_id_changed(const char *old_id,
+                                                         const char *new_id)
+{
+    return old_id != NULL && old_id[0] != '\0' &&
+           new_id != NULL && new_id[0] != '\0' &&
+           strcmp(old_id, new_id) != 0;
+}
+
 static river_cloud_playback_terminal_wait_kind_t
 river_cloud_xiaozhi_playback_completed_wait_kind(void)
 {
@@ -114,12 +122,18 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         return;
     }
 
-    if ((event->response_id != NULL && event->response_id[0] != '\0' &&
-         lineage_truth->meta_context.response_id[0] != '\0' &&
-         strcmp(lineage_truth->meta_context.response_id, event->response_id) != 0) ||
-        (event->playback_id != NULL && event->playback_id[0] != '\0' &&
-         lineage_truth->meta_context.playback_id[0] != '\0' &&
-         strcmp(lineage_truth->meta_context.playback_id, event->playback_id) != 0)) {
+    if (river_cloud_xiaozhi_playback_meta_id_changed(
+            meta_truth->current_context.response_id,
+            event->response_id) ||
+        river_cloud_xiaozhi_playback_meta_id_changed(
+            meta_truth->current_context.playback_id,
+            event->playback_id) ||
+        river_cloud_xiaozhi_playback_meta_id_changed(
+            lineage_truth->meta_context.response_id,
+            event->response_id) ||
+        river_cloud_xiaozhi_playback_meta_id_changed(
+            lineage_truth->meta_context.playback_id,
+            event->playback_id)) {
         river_cloud_xiaozhi_clear_playback_meta_state();
     }
 
@@ -138,11 +152,9 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         0U,
         NULL);
     meta_context = &lineage_truth->meta_context;
-    if (event->text != NULL && event->text[0] != '\0') {
-        river_cloud_xiaozhi_copy_optional_text(meta_truth->text,
-                                               sizeof(meta_truth->text),
-                                               event->text);
-    }
+    river_cloud_xiaozhi_copy_optional_text(meta_truth->text,
+                                           sizeof(meta_truth->text),
+                                           event->text);
     river_cloud_xiaozhi_copy_optional_text(meta_truth->output_lane,
                                            sizeof(meta_truth->output_lane),
                                            event->output_lane);
@@ -152,9 +164,7 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     river_cloud_xiaozhi_copy_optional_text(meta_truth->phrase_id,
                                            sizeof(meta_truth->phrase_id),
                                            event->phrase_id);
-    if (event->expected_duration_ms != 0U) {
-        meta_truth->expected_duration_ms = event->expected_duration_ms;
-    }
+    meta_truth->expected_duration_ms = event->expected_duration_ms;
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     prefetch_target_ms = meta_truth->expected_duration_ms;
     if (prefetch_target_ms == 0U) {
@@ -249,12 +259,10 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     river_cloud_xiaozhi_copy_optional_text(segment->segment_id,
                                            sizeof(segment->segment_id),
                                            meta_context->segment_id);
-    if (meta_truth->text[0] != '\0') {
-        river_cloud_xiaozhi_copy_optional_text(segment->text,
-                                               sizeof(segment->text),
-                                               meta_truth->text);
-    }
-    segment->expected_duration_ms = meta_truth->expected_duration_ms;
+    river_cloud_xiaozhi_copy_optional_text(segment->text,
+                                           sizeof(segment->text),
+                                           meta_truth->text);
+    segment->expected_duration_ms = event->expected_duration_ms;
     segment->is_last_segment = event->is_last_segment;
     start_gate = river_cloud_xiaozhi_refresh_start_gate();
 

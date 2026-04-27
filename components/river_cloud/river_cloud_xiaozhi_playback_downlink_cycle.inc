@@ -312,6 +312,25 @@ river_cloud_xiaozhi_process_downlink_task_cycle(void)
         result.step_result = result.acquire_result.step_result;
         return result;
     }
+    river_cloud_xiaozhi_keep_current_downlink_frame_for_retry();
+
+    result.cycle_plan.queued_frames = river_cloud_xiaozhi_playback_queued_frames();
+    {
+        river_cloud_xiaozhi_downlink_playback_prepare_result_t recheck =
+            river_cloud_xiaozhi_prepare_downlink_playback(
+                result.cycle_plan.queued_frames,
+                (uint64_t)rtos_time_get_current_system_time_ms());
+
+        if (!recheck.ready) {
+            result.cycle_plan.ready = false;
+            result.cycle_plan.wait_kind = recheck.wait_kind;
+            result.cycle_plan.status = recheck.status;
+            result.status = recheck.status;
+            result.outcome = RIVER_CLOUD_XIAOZHI_DOWNLINK_CYCLE_NOT_READY;
+            result.step_result = RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STEP_SLEEP_POLL;
+            return result;
+        }
+    }
 
     result.write_result = river_cloud_xiaozhi_write_current_downlink_frame_step(
         result.cycle_plan.queued_frames);

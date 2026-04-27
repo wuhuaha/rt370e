@@ -5493,3 +5493,27 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - 收到服务端 `input.accept_ready` 时应打印 `xiaozhi input.accept_ready: ...`。
 - `river xiaozhi status` 的 cloud/transport preview 行应能看到 `accept_ready=yes` 与对应 reason。
 - `input.accept_ready` 不应触发本地 round close、`audio.in.commit`、`asr_session_closed` 或 interaction 状态跳转到 accepted；后续仍等待 `session.update accept_reason=server_endpoint`。
+
+### Step 5.532: 端侧播放 / follow-up / uplink 闭环收口
+
+触发背景：
+
+- 2026-04-27 板端日志显示端侧还有四个互相放大的 runtime 问题：
+  - 播放停止后 downlink 继续向 detached backend 写入，触发 `write_failed` / rebuffer 循环。
+  - TTS / rebuffer 期间 follow-up ASR 被 `playback_state` 误打开，服务端随后接受一轮空输入并返回“未识别到有效语音”。
+  - 新 response 的 `expected_duration_ms=0` 被旧 segment 的 `1660ms` 污染。
+  - uplink `send_interval_p50≈55ms`，即使 `busy/fail=0` 也明显慢于 20ms PCM 目标节奏。
+
+端侧收口：
+
+- downlink acquire 后进行 playback backend 二次校验，并在 write 前最后检查 `owned_active`，避免向 detached/recovering backend 写帧。
+- follow-up reopen 以服务 output-turn / playback lane / playback turn / rebuffer 为硬 guard；当前 no-ref barge-in 保持 duck-only，不再新开 ASR 上传。
+- `audio.out.meta` 以 response/playback id 变化清理上一轮播放真相，且无条件接受 `expected_duration_ms=0` 与空文本事实。
+- uplink 在 WS poll 前后都 drain，一旦 backlog 存在允许有界 catch-up，常态/warmup burst 上限调整到 `4/8`。
+
+上板验收：
+
+- `backend=detached` 不再伴随 `playback write failed`。
+- TTS / rebuffer 期间不再出现误开的 follow-up ASR round。
+- 新 response 的 `expected_ms` 不再继承旧 segment。
+- `send_interval_p50/p95` 应明显低于 `55/63ms`；若仍慢，下一步定位 WS poll 阻塞或任务优先级。

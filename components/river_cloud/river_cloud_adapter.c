@@ -192,6 +192,7 @@ static void river_cloud_xiaozhi_io_task(void *arg)
         river_cloud_xiaozhi_run_io_tick_housekeeping();
 
         if (river_cloud_xiaozhi_io_has_work()) {
+            river_cloud_xiaozhi_run_uplink_io_once();
             if (river_xiaozhi_session_open()) {
                 (void)river_xiaozhi_poll(RIVER_CLOUD_XIAOZHI_IO_ACTIVE_MS);
             } else {

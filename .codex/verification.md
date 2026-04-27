@@ -22557,3 +22557,41 @@ Expected result:
 - `xiaozhi input.accept_ready: ...` appears when the server emits the observation
 - cloud and transport preview status lines show `accept_ready=yes` and the reason when observed
 - `input.accept_ready` alone does not close the local ASR round or declare accepted turn; acceptance still follows `session.update accept_reason=server_endpoint`
+
+## Step 5.532 - XiaoZhi device-side playback/follow-up/uplink closure
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- if the Codex sandbox blocks SDK writes under `/root/ameba-rtos`, rerun the same build with SDK write permission
+
+Post-flash board validation:
+```text
+wake with 小欧管家, let XiaoZhi answer, and speak near the device during TTS/rebuffer
+watch the playback, interaction, and xiaozhi asr round finish logs
+```
+
+Expected result:
+- no `xiaozhi playback write failed ... backend=detached`
+- no follow-up `asr round begin id=2` while service `output_state=speaking` or playback/rebuffer is still active, unless a future explicit interrupt path is implemented
+- no immediate spurious response like `未识别到有效语音。` caused by playback-state reopen
+- a new response with service `expected_duration_ms=0` logs `expected_ms=0` or fallback prefetch target, not a stale prior segment duration
+- `xiaozhi asr round finish` should show `send_interval_p50/p95` materially below the previous `55/63ms` when `busy/fail` remain zero
