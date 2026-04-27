@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.527 XiaoZhi server endpoint candidate 下禁发本地 commit`
+  - `5.528 XiaoZhi audio.out.meta 后播放/采集状态机修复（待验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest runtime bug-fix slice in progress:
+    - Step 5.528 针对 2026-04-27 新日志中的端侧问题：
+      - 服务端已下发 `audio.out.meta` 且 `output_state=speaking`，端侧不应由 `note_meta` 把 interaction 推回 `asr_streaming`
+      - speaking playback lane engaged 但物理播放/AEC 未 ready 时，follow-up reopen 继续阻断，避免空 ASR round
+      - XiaoZhi downlink task 优先级降到 VAD/capture consumer 之下，避免 AudioTrack 启动卡顿导致 mic capture ring 持续 overflow
+      - native capture reference 配置下 TTS playback 不再额外打开 playback reference export，降低播放启动耦合风险
+      - playback service 新增 backend prepare / AudioTrack_Start 前日志，便于定位后续卡点
+    - 下一步上板验证：
+      - `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`
+      - 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`
+      - 不再持续刷 `capture frame ring overflow`
   - newest landed runtime bug-fix slice:
     - Step 5.527 收口 2026-04-26 新日志中的残留 `audio.in.commit` 竞态：
       - 当服务侧 preview 已给出 `input.endpoint candidate=yes` 且 discovery/negotiation 表示 server endpoint 可用时，端侧 post-roll 不再发送本地 `audio.in.commit`

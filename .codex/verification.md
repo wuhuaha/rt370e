@@ -1,3 +1,57 @@
+## Step 5.528 Verification
+
+Confirm `audio.out.meta` playback/capture guards are present:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_PRIO|native_capture_ref|playback start backend prepare|playback start backend call|playback_lane=|RIVER_DIALOG_OUTPUT_LANE_SPEAKING" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_core/river_dialog_runtime.c \
+  components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- downlink task priority is below VAD/capture consumer priority
+- native-capture-ref profiles do not request extra playback reference export on TTS start
+- follow-up reopen is blocked while speaking playback is not physically/AEC ready
+- dialog runtime retains speaking output turns while playback lane is engaged
+- playback backend logs show whether any future stall is before prepare or before `AudioTrack_Start`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-27 audio-out-meta reproduction:
+```text
+Wake once, ask a short question that returns service audio, and keep the monitor open through `audio.out.meta`.
+```
+
+Expected result:
+- after `xiaozhi audio.out.meta`, no `interaction_state: thinking -> asr_streaming reason=note_meta` appears
+- no empty ASR round with `duration_ms=4 audio_ms=0 packets=0` appears
+- playback either logs `xiaozhi playback start` / `playback start`, or the last log identifies the backend prepare/start point
+- no sustained `capture frame ring overflow` appears after `playback_start_prepare`
+
 ## Step 5.527 Verification
 
 Confirm local commit suppression for server endpoint candidate and wire-level stale commit guards:

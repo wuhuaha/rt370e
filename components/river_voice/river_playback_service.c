@@ -724,6 +724,13 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
     g_river_playback_service.stats.reference_export = config->reference_export;
     river_playback_service_copy_stream_name(config->stream_name);
 
+    RIVER_LOGI("playback start backend prepare: stream=%s ref=%s buffer=%luB desired=%luB",
+               g_river_playback_service.stats.stream_name[0] != '\0' ?
+                   g_river_playback_service.stats.stream_name :
+                   "-",
+               config->reference_export ? "yes" : "no",
+               (unsigned long)track_buffer_bytes,
+               (unsigned long)desired_buffer_bytes);
     status = river_playback_service_prepare_track_locked(config,
                                                          category_type,
                                                          track_buffer_bytes,
@@ -743,6 +750,12 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         (size_t)g_river_playback_service.prepared_track_config.buffer_bytes;
     AudioTrack_SetStartThresholdBytes(g_river_playback_service.track,
                                       (int32_t)track_buffer_bytes);
+    RIVER_LOGI("playback start backend call: stream=%s ref=%s reuse=%s",
+               g_river_playback_service.stats.stream_name[0] != '\0' ?
+                   g_river_playback_service.stats.stream_name :
+                   "-",
+               config->reference_export ? "yes" : "no",
+               reused_track ? "yes" : "no");
     if (AudioTrack_Start(g_river_playback_service.track) != 0) {
         river_playback_service_set_state_locked(RIVER_PLAYBACK_ERROR);
         river_playback_service_close_locked(true);

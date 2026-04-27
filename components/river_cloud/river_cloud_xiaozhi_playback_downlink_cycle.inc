@@ -35,7 +35,10 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
         river_cloud_xiaozhi_current_start_gate();
     uint32_t buffer_frames = RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES;
     uint64_t now_ms;
-    const bool reference_export = river_cloud_xiaozhi_playback_allows_vad_open();
+    const bool native_capture_ref =
+        river_voice_profile_uses_native_capture_ref(river_voice_profile_active_preproc());
+    const bool reference_export =
+        !native_capture_ref && river_cloud_xiaozhi_playback_allows_vad_open();
     const char *mode = reference_export ? "ref" : "no_ref";
 
     river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);

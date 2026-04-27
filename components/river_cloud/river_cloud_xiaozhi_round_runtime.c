@@ -454,7 +454,13 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
     }
 
     if ((g_river_cloud.xiaozhi_turn_semantics.accepted &&
-         strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "thinking") == 0) ||
+         (strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "thinking") == 0 ||
+          (strcmp(g_river_cloud.xiaozhi_turn_semantics.output_state, "speaking") == 0 &&
+           (!river_cloud_xiaozhi_playback_output_active() ||
+            !river_cloud_xiaozhi_playback_allows_vad_open())))) ||
+        (river_cloud_xiaozhi_playback_lane_engaged() &&
+         (!river_cloud_xiaozhi_playback_output_active() ||
+          !river_cloud_xiaozhi_playback_allows_vad_open())) ||
         (g_river_cloud.xiaozhi_playback_lineage_truth.stage ==
              RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED &&
          g_river_cloud.xiaozhi_playback_lineage_truth.meta_context.response_id[0] == '\0')) {
@@ -462,7 +468,7 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
         if (is_speech &&
             !g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported) {
             g_river_cloud.xiaozhi_session_window_truth.followup_response_pending_reported = true;
-            RIVER_LOGI("xiaozhi followup reopen blocked: reason=response_pending accepted=%s output_state=%s response_wait=%s sid=%s",
+            RIVER_LOGI("xiaozhi followup reopen blocked: reason=response_pending accepted=%s output_state=%s response_wait=%s playback_lane=%s playback_active=%s sid=%s",
                        g_river_cloud.xiaozhi_turn_semantics.accepted ? "yes" : "no",
                        g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
                            g_river_cloud.xiaozhi_turn_semantics.output_state :
@@ -471,6 +477,8 @@ river_status_t river_cloud_xiaozhi_maybe_start_followup_round(bool is_speech,
                                RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_RESPONSE_STARTED ?
                            "yes" :
                            "no",
+                       river_cloud_xiaozhi_playback_lane_engaged() ? "yes" : "no",
+                       river_cloud_xiaozhi_playback_output_active() ? "yes" : "no",
                        river_cloud_xiaozhi_current_sid() != NULL ?
                            river_cloud_xiaozhi_current_sid() :
                            "-");

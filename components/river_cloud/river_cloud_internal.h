@@ -62,7 +62,8 @@
 #define RIVER_CLOUD_XIAOZHI_IO_FAIRNESS_DELAY_MS 1U
 #define RIVER_CLOUD_XIAOZHI_IO_IDLE_MS       20U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_STACK (1024U * 16U)
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_PRIO  4U
+/* Keep VAD/capture consumers above playback setup so AudioTrack stalls cannot fill the mic ring. */
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_PRIO  3U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_POLL_MS    5U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_IDLE_MS    20U
 /* Favor continuity over lowest latency while the service often stays on no-ref playback. */

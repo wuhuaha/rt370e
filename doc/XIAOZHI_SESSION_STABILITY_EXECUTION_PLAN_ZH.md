@@ -428,3 +428,46 @@ python3 /root/ameba-rtos/ameba.py build -p
 - `Build done`。
 - 上板日志中不再出现 `audio.in.commit is accepted only while the session is active`。
 - no-audio 服务响应仍以 `response audio abandoned` 收口，不启动本地 fallback prompt。
+### Step J: audio.out.meta 后播放/采集状态机收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复 2026-04-27 日志中服务端已进入 `speaking` 并下发 `audio.out.meta` 后，端侧仍由 `note_meta` 触发 `asr_streaming` / 空 ASR round 的问题。
+- 避免 AudioTrack 启动路径卡顿时阻塞 VAD/capture consumer，导致 `capture frame ring overflow` 持续增长。
+- native capture reference 配置下减少播放启动对 playback reference export 的额外耦合。
+
+范围：
+
+- `components/river_core/river_dialog_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc`
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_voice/river_playback_service.c`
+
+实现：
+
+- dialog runtime 在 `output_state=speaking` 且 playback lane engaged 时保留输出轮次，避免 `note_meta` 将状态推回 ASR。
+- follow-up reopen 在 speaking playback 未物理 active 或 AEC 未 ready 时阻断并清零 open-hold。
+- XiaoZhi downlink task 优先级低于 VAD/capture consumer，播放启动异常不应饿死采集消费者。
+- native capture reference profile 下 TTS playback 使用 `no_ref` 启动，避免重复 reference export。
+- playback backend prepare / `AudioTrack_Start` 前增加定位日志。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- `audio.out.meta` 后不再出现 `interaction_state: thinking -> asr_streaming reason=note_meta`。
+- 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`。
+- `playback_start_prepare` 后不再持续刷 `capture frame ring overflow`。

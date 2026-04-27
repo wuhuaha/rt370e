@@ -1330,6 +1330,10 @@ static bool river_dialog_runtime_playback_turn_retains_output_turn_from_projecti
                  river_dialog_runtime_terminal_wait_suppresses_speaking_from_projection(
                      projection));
     }
+    if (projection->output_lane == RIVER_DIALOG_OUTPUT_LANE_SPEAKING &&
+        !projection->terminal_closed) {
+        return true;
+    }
     if (!projection->cloud_runtime_available) {
         return true;
     }

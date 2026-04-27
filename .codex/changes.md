@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.528
+- 修复 2026-04-27 日志中 `audio.out.meta` 后端侧播放/采集连锁问题：
+  - `output_state=speaking` 且 playback lane 已经 engaged 时，dialog runtime 现在保留输出轮次，不再因为 `note_meta` 把交互态错误推回 `asr_streaming`
+  - follow-up reopen 在 speaking 但物理播放/AEC 尚未 ready 时继续阻断，避免 `audio.out.meta` 后立即开空 ASR round
+  - XiaoZhi downlink task 优先级降到 VAD/capture consumer 之下，避免 AudioTrack 启动路径阻塞时让 mic capture ring 堆满
+  - 使用 native capture reference 的配置下，XiaoZhi TTS 启动不再额外打开 playback reference export，降低 AudioTrack start 与参考服务耦合风险
+  - playback service 在 backend prepare / AudioTrack_Start 前新增明确日志，若板端仍卡住可直接定位卡在 prepare 还是 start 调用
+- 预期上板变化：
+  - `audio.out.meta` 后不应再看到 `interaction_state: thinking -> asr_streaming reason=note_meta`
+  - 不应再出现 `duration_ms=4 audio_ms=0 packets=0` 的空 follow-up ASR round
+  - 即使 AudioTrack 启动异常，也不应持续刷 `capture frame ring overflow`；日志会停在更明确的 playback backend prepare/start 位置
+- Verification for this step:
+  - `rg -n "RIVER_CLOUD_XIAOZHI_DOWNLINK_TASK_PRIO|native_capture_ref|playback start backend prepare|playback start backend call|playback_lane=|RIVER_DIALOG_OUTPUT_LANE_SPEAKING" ...` confirmed guards/log points
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.527
 - 修复 2026-04-26 新日志中残留的一次重复 `audio.in.commit`：
   - 当服务端已经通过 preview 下发 `input.endpoint candidate=yes`，且 discovery/negotiation 表明 server endpoint 可用时，端侧 post-roll 不再发送本地 `audio.in.commit`

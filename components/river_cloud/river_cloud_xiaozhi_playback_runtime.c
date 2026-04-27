@@ -8,6 +8,7 @@
 
 #include "river/river_log.h"
 #include "river/river_playback_service.h"
+#include "river/river_voice_profile.h"
 #include "river_cloud_internal.h"
 
 #undef RIVER_LOG_TAG
