@@ -80,6 +80,8 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 6U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 2U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS 320U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX 6U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
 #define RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH 8U
@@ -350,6 +352,8 @@ typedef struct {
     uint32_t stale_drop_base;
     uint32_t ring_drop_base;
     uint32_t burst_max;
+    uint32_t preview_warmup_done_ms;
+    uint32_t preview_warmup_bypass_count;
     uint32_t uplink_send_interval_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
     uint32_t uplink_capture_age_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];
     uint32_t uplink_backlog_samples[RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES];

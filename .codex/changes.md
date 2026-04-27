@@ -14189,3 +14189,21 @@
   - `git diff --check` passed
   - first sandboxed `python3 /root/ameba-rtos/ameba.py build -p` failed because the SDK build writes `/root/ameba-rtos/component/soc/amebasmart/main/ap/inc/build_info.h.tmp` outside the workspace sandbox
   - rerun with approved SDK build permission completed successfully with `Build done`
+
+## Step 5.530
+- 对齐服务侧关于 `preview_uplink_realtime_ratio=0.52~0.65` 的定位，复查端侧 XiaoZhi uplink：
+  - 当前 PCM 20 ms 帧是 640B，发送路径直接调用 `ws_sendBinary(payload, bytes, ...)`，未被旧的 512B scratch 常量截断
+  - 真实慢点来自 warmup 阶段仍按 20 ms due pacing 慢慢送预滚/首段音频；日志里的 `send_interval_p50=37/61ms` 与 `pace_pct=52~56` 能解释服务端 ratio 低于 1
+- 增加预览 warmup 有界追赶：
+  - 新增 `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS=320`
+  - 新增 `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX=6`
+  - 仅在本轮已发送音频少于 320 ms 且 uplink ring/retry 有待发帧时，允许绕过下一帧 due time
+  - warmup 结束后自动回到原来的 20 ms pacing 和常态 `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX=2`
+  - 绕过 due 时把下一次 due 重新锚定到当前时间 + 20 ms，避免 warmup burst 后累积未来长睡眠
+- 增加 warmup 诊断：
+  - `xiaozhi asr round finish` 新增 `preview_warmup[target_ms=320 done_ms=... bypass=...]`
+  - `done_ms` 用于看端侧送满首 320 ms 音频的 wall time，`bypass` 用于确认是否真的进入首段追赶
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with approved SDK write permission

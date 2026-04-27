@@ -22482,3 +22482,41 @@ Expected result:
 - 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`
 - 即使 `AudioTrack_Start/Write` 或 playback reference 维护短时卡顿，VAD/capture consumer 不应持续刷 `capture frame ring overflow`
 - 若 AEC/reference 锁忙，日志表现为 no-ref/aec-blocked 降级，而不是采集任务卡死
+
+## Step 5.530 - XiaoZhi preview uplink warmup burst
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- if the Codex sandbox blocks SDK writes under `/root/ameba-rtos`, rerun the same build with SDK write permission
+
+Post-flash board validation:
+```text
+wake the device and speak a short query that previously showed slow preview_uplink_realtime_ratio
+watch the xiaozhi asr round finish log
+```
+
+Expected result:
+- `xiaozhi asr round finish` contains `preview_warmup[target_ms=320 done_ms=... bypass=...]`
+- `preview_warmup.done_ms` should be close to or below ~350 ms when the transport is not backpressured
+- `pace_pct` should move materially closer to realtime than the previous 52~56 range
+- `send_interval_p50/p95` during early packets should no longer sit around 37~61 ms unless `busy/fail` is non-zero
+- `busy`, `fail`, `stale_drop`, and `ring_drop` should remain zero in normal Wi-Fi conditions

@@ -5453,3 +5453,23 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 
 - 优先推进“唯一真相源”和“媒体语义收口”，不要先做纯文件拆分。
 - 每一步都要在 `.codex/changes.md`、`.codex/verification.md` 和 active context 中留下闭环记录。
+
+### Step 5.530: XiaoZhi preview uplink warmup 有界追赶
+
+触发背景：
+
+- 服务侧指出端侧 `preview_uplink_realtime_ratio` 只有 `0.52~0.65`，导致服务端吃到 preview 最小音频量前的 wall time 被放大到 1.5~2 倍。
+- 板端日志里的 `pace_pct=52~56`、`send_interval_p50=37/61ms` 与该定位一致：问题不是首包没有发出，而是首段音频被 20 ms due pacing / I/O 调度慢慢送到服务端。
+
+本步端侧收口：
+
+- 保留常态 20 ms PCM pacing，不回到无限 burst。
+- 仅在每轮 ASR 前 `320 ms` 预览 warmup 阶段、且 uplink ring 中确实有待发帧时，允许绕过下一帧 due time。
+- warmup burst 单次 I/O 上限为 `6` 帧，结束后回到常态 `2` 帧上限。
+- 新增 `preview_warmup[target_ms done_ms bypass]` round 结束诊断，用于和服务侧 `preview_uplink_realtime_ratio` 对齐。
+
+上板验收：
+
+- `preview_warmup.done_ms` 在无 backpressure 时应接近/低于 `350 ms`。
+- `pace_pct` 应明显高于历史 `52~56`。
+- 若仍慢，优先看 `busy/fail/send_duration_p95`，再决定是否调大 I/O task 优先级或继续拆 WS poll/uplink 任务。

@@ -15,11 +15,22 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.529 采集热路径非阻塞防护（待上板验证）`
+  - `5.530 XiaoZhi preview uplink warmup 有界追赶（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed latency slice:
+    - Step 5.530 对齐服务侧 `preview_uplink_realtime_ratio=0.52~0.65` 定位：
+      - 端侧确认当前 20 ms PCM 帧为 640B，发送路径直接 `ws_sendBinary`，未被旧 512B scratch 常量截断
+      - 真实慢点是 warmup 阶段仍被 20 ms due pacing / I/O 调度限制，导致首段音频慢慢到达服务端
+      - 新增 `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS=320` 与 `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX=6`
+      - 仅在本轮已发送音频少于 320 ms 且 ring/retry 确有待发帧时绕过 due；warmup 结束后回到原 20 ms pacing / 常态 2 帧上限
+      - `xiaozhi asr round finish` 新增 `preview_warmup[target_ms=320 done_ms=... bypass=...]`，用于与服务侧 preview ratio 对齐
+    - 下一步上板验证：
+      - `preview_warmup.done_ms` 无 backpressure 时应接近/低于 350 ms
+      - `pace_pct` 应明显高于历史 52~56，`send_interval_p50/p95` 不应继续停在 37~61 ms
+      - `busy/fail/stale_drop/ring_drop` 常态保持 0；若仍慢，优先看 `send_duration_p95` 和 WS backpressure
   - newest runtime bug-fix slice in progress:
     - Step 5.529 继续收口 2026-04-27 `audio.out.meta` 后播放启动异常的端侧风险：
       - playback stats / reference read+stats / native capture reference observation / dialog voice policy view 均改为 capture-hot-path 非阻塞降级
