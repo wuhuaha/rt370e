@@ -5570,3 +5570,26 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` 不应在 `wait_next=yes segments=0` 时循环。
 - 新 `audio.out.meta` 到达后，才允许 paused backend 单次 resume 并继续播放。
 - 最后一段结束后不应因 stuck `prefetching backend=owned_paused` 等到 idle timeout 才清理。
+
+### Step 5.535: 收口 text-only 响应与零时长播放尾段
+
+触发背景：
+
+- 2026-04-27 17:49 板端日志显示 first-sound / smart-home 协议已协商成功，但服务端两次只返回 `response.chunk` 文本、没有 `audio.out.meta`：
+  - 端侧打印 `xiaozhi response audio abandoned ... reason=server_returned_active_no_audio`
+  - 之后未关闭本地窗口/turn semantics，interaction 仍被 `input_state=active` / thinking 投影影响
+  - 本地 VAD 随后误开后续 ASR round，服务端接受了“正”等短片段并执行了非预期空调命令
+- 第三轮返回 `audio.out.meta expected_duration_ms=0 is_last_segment=yes`，端侧按零 duration 永远不满足 `played >= expected`，没有主动 `audio.out.completed`，最终服务端报 `audio_stream_failed context deadline exceeded`。
+
+端侧收口：
+
+- `server_returned_active_no_audio` 不再只是清 response-audio wait；它按 text-only 终止响应处理，关闭本地 round/window，清 session update cache 和 turn semantics，并同步 dialog runtime。
+- 零时长 last segment 在首个有效 mark 后直接视为 fully-heard，弹出 segment，允许 terminal completed ACK 继续推进。
+- downlink 写入/轮询进度后，如果 terminal last segment 已 fully-heard，则主动 queue `audio.out.completed`，并安排播放 drain stop，覆盖实时协议没有 legacy `tts.stop` 的尾段。
+
+上板验收：
+
+- text-only/no-audio response 后不会再误开 follow-up ASR round。
+- `expected_duration_ms=0 is_last_segment=yes` 后应看到 completed ACK queued/sent。
+- 不应再出现该路径导致的 `audio_stream_failed context deadline exceeded`。
+- transport close/abort 清理期间不应再触发新的 `upstream_starved` rebuffer。

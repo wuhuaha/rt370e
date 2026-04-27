@@ -4432,15 +4432,16 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-27 / branch `agent-server-v2`: Step 5.534 makes XiaoZhi segment-gap attached hold idempotent:
-  - `owned_paused + WAITING_NEXT_SEGMENT` is treated as an already-held segment gap, so the worker keeps waiting instead of calling playback recover/stop again
-  - the segment-gap hold helper no-ops if the backend is already paused for the next segment
-  - paused-backend resume is blocked while supply is still `WAITING_NEXT_SEGMENT`; resume waits for new segment metadata/queue truth
+- 2026-04-27 / branch `agent-server-v2`: Step 5.535 closes XiaoZhi text-only responses and zero-duration terminal playback tails:
+  - `server_returned_active_no_audio` now closes the local round/window, clears cached session update / turn semantics, and syncs dialog runtime so local VAD cannot immediately open phantom follow-up rounds after a no-audio response
+  - `expected_duration_ms=0 && is_last_segment=yes` is marked fully-heard on the first valid playback mark so the segment queue can drain
+  - playback progress now queues `audio.out.completed` once the last segment is fully heard and arms a drain stop for the physical backend, covering realtime responses that do not emit legacy `tts.stop`
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
 - Board expectation:
-  - no repeated `playback recover` epoch storm during `wait_next=yes segments=0` gaps
-  - no repeated `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut` every 15-30 ms while waiting for next `audio.out.meta`
-  - playback resumes once when the next segment metadata/queue arrives, instead of oscillating between paused and playing
+  - text-only/no-audio response logs `xiaozhi response audio abandoned recovery ... action=close_text_only` and does not start phantom follow-up ASR rounds
+  - zero-duration last segment logs `xiaozhi playback zero-duration last segment completed from mark` and sends `audio.out.completed`
+  - no `audio_stream_failed context deadline exceeded` on that terminal tail path
+  - no new `upstream_starved` rebuffer after terminal completion or transport-close cleanup

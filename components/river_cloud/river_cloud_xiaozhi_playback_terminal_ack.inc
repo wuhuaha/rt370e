@@ -590,8 +590,19 @@ static void river_cloud_xiaozhi_update_playback_ack_progress(void)
         }
         river_cloud_xiaozhi_try_queue_playback_mark_ack(played_duration_ms);
 
-        if (segment->expected_duration_ms == 0U ||
-            played_duration_ms < segment->expected_duration_ms) {
+        if (segment->expected_duration_ms == 0U) {
+            if (segment->is_last_segment && played_duration_ms != 0U) {
+                RIVER_LOGI("xiaozhi playback zero-duration last segment completed from mark: response_id=%s playback_id=%s segment_id=%s played_duration_ms=%lu",
+                           segment->response_id[0] != '\0' ? segment->response_id : "-",
+                           segment->playback_id[0] != '\0' ? segment->playback_id : "-",
+                           segment->segment_id[0] != '\0' ? segment->segment_id : "-",
+                           (unsigned long)played_duration_ms);
+                river_cloud_xiaozhi_mark_segment_fully_heard(segment);
+                river_cloud_xiaozhi_pop_playback_segment();
+            }
+            return;
+        }
+        if (played_duration_ms < segment->expected_duration_ms) {
             return;
         }
 

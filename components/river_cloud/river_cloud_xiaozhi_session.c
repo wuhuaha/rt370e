@@ -2010,6 +2010,31 @@ static bool river_cloud_xiaozhi_input_state_server_committed(const char *input_s
     return input_state != NULL && strcmp(input_state, "committed") == 0;
 }
 
+static void river_cloud_xiaozhi_recover_response_audio_abandoned(
+    const char *trigger,
+    const river_cloud_xiaozhi_turn_semantics_state_t *state)
+{
+    RIVER_LOGW("xiaozhi response audio abandoned recovery: trigger=%s action=close_text_only session=%s listening=%s stream=%s window=%s input_state=%s output_state=%s",
+               trigger != NULL ? trigger : "-",
+               river_xiaozhi_session_open() ? "open" : "closed",
+               g_river_cloud.xiaozhi_session_window_truth.listening ? "yes" : "no",
+               g_river_cloud.stream_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_session_window_truth.window_active ? "open" : "closed",
+               (state != NULL && state->input_state[0] != '\0') ?
+                   state->input_state :
+                   "-",
+               (state != NULL && state->output_state[0] != '\0') ?
+                   state->output_state :
+                   "-");
+    river_cloud_xiaozhi_close_local_round_for_cause(
+        RIVER_CLOUD_XIAOZHI_ROUND_CLOSE_SERVER_RESPONSE,
+        "response_audio_abandoned");
+    river_cloud_xiaozhi_window_close("response_audio_abandoned");
+    river_xiaozhi_clear_session_update_cache();
+    river_cloud_xiaozhi_clear_turn_semantics_state();
+    river_cloud_request_state_sync("response_audio_abandoned");
+}
+
 static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
     const river_cloud_xiaozhi_turn_semantics_state_t *state,
     const char *trigger)
@@ -2028,6 +2053,7 @@ static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
                    trigger != NULL ? trigger : "-",
                    session_state,
                    (state != NULL && state->output_state[0] != '\0') ? state->output_state : "-");
+        river_cloud_xiaozhi_recover_response_audio_abandoned(trigger, state);
     }
 }
 

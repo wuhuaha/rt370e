@@ -14276,3 +14276,18 @@
 - Verification for this step:
   - `git diff --check` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.535
+- 针对 2026-04-27 17:49 板端日志里的 XiaoZhi text-only / 零时长播放尾段收口：
+  - 日志显示服务端返回 `response.chunk` 文本后直接回到 `state=active input_state=active output_state=idle`，端侧只清掉 `response audio wait`，但没有收口会话窗口和 turn semantics，导致 interaction 留在 thinking/active 并被本地 VAD 误开后续 ASR round
+  - `server_returned_active_no_audio` 现在按 text-only 终止响应处理：记录恢复日志、关闭本地 round、关闭 conversation window、清掉 session.update cache / turn semantics，并触发状态同步，避免没有音频时继续留在 follow-up 会话里接收幻听输入
+  - `expected_duration_ms=0 && is_last_segment=yes` 的播放段现在在首个有效 mark 后直接标记 fully-heard 并弹出 segment，不再永久卡在 current segment 等待 duration 达标
+  - downlink 写入和轮询 ACK 进度后会在 last segment fully-heard 时主动 queue `audio.out.completed`，并给物理播放 backend 安排 drain stop，避免实时协议没有 legacy `tts.stop` 时一直等到 upstream-starved/rebuffer 或服务端 deadline
+- 预期修复的日志症状：
+  - text-only/no-audio response 后会出现 `xiaozhi response audio abandoned recovery ... action=close_text_only`，随后不再从 `thinking` 被本地 VAD 拉起 `asr round id=2/3`
+  - 零时长 last segment 会出现 `zero-duration last segment completed from mark` 和 `playback ack completed ...`，不再等到服务端 `audio_stream_failed context deadline exceeded`
+  - 已完成/正在关闭的尾段不再被 downlink starvation 误判成需要 `note_rebuffer` 的上游断流恢复
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

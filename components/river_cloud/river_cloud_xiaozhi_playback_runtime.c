@@ -80,6 +80,7 @@ static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
 static river_status_t river_cloud_xiaozhi_write_current_downlink_frame_audio(
     const river_cloud_xiaozhi_downlink_write_view_t *view);
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
+static bool river_cloud_xiaozhi_playback_completed_ready(void);
 static bool river_cloud_xiaozhi_playback_last_segment_observed(void);
 static void river_cloud_xiaozhi_capture_playback_supply_source(
     river_cloud_xiaozhi_playback_supply_source_t *source);
@@ -99,6 +100,9 @@ static void river_cloud_xiaozhi_downlink_expand_stereo(const uint8_t *mono_frame
                                                        size_t mono_bytes);
 static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t start_ms);
 static void river_cloud_xiaozhi_update_playback_ack_progress(void);
+static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void);
+static void river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
+    const char *trigger);
 
 static bool river_cloud_xiaozhi_playback_physical_active(void)
 {
@@ -1902,6 +1906,8 @@ static void river_cloud_xiaozhi_finish_successful_downlink_frame_write(void)
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     river_cloud_xiaozhi_try_start_current_playback_segment(now_ms);
     river_cloud_xiaozhi_update_playback_ack_progress();
+    river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
+        "downlink_write");
     river_cloud_xiaozhi_playback_check_pending_stop();
 }
 

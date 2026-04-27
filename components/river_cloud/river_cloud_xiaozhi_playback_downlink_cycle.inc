@@ -207,6 +207,8 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
     queued_frames = river_cloud_xiaozhi_playback_queued_frames();
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     river_cloud_xiaozhi_update_playback_ack_progress();
+    river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
+        "downlink_cycle");
     if (river_cloud_xiaozhi_maybe_rebuffer_starved(queued_frames, now_ms)) {
         plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STARVED;
         return plan;

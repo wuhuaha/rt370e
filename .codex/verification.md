@@ -22681,3 +22681,39 @@ Expected result:
 - `AudioTrack_Flush`, `ameba_audio_stream_tx_close`, and `CreateAudioHwStreamOut` do not repeat every 15-30 ms while waiting for the next `audio.out.meta`
 - after a new segment meta arrives and the segment queue becomes non-empty, `xiaozhi playback paused backend resumed` may appear once and playback continues
 - final segment tail should not stay stuck in `prefetching backend=owned_paused` until idle timeout
+
+## Step 5.535 - XiaoZhi text-only response and zero-duration terminal playback closure
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+wake the device once against the smart-home XiaoZhi service and inspect response/playback tail logs
+```
+
+Expected result:
+- if the server returns text chunks but no `audio.out.meta`, logs show `xiaozhi response audio abandoned recovery ... action=close_text_only`
+- after that text-only response, the device closes the local window/turn and does not immediately open phantom follow-up ASR rounds from local VAD noise
+- if the server sends `audio.out.meta expected_duration_ms=0 is_last_segment=yes`, logs show `xiaozhi playback zero-duration last segment completed from mark` followed by `xiaozhi playback ack completed queued/sent`
+- the tail should not reach `xiaozhi error ... audio_stream_failed message=context deadline exceeded`
+- no new `upstream_starved` rebuffer should start after the terminal segment is already completed or after transport close cleanup begins

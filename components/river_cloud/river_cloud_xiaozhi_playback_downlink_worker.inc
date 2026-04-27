@@ -23,6 +23,28 @@ static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t star
 
 #include "river_cloud_xiaozhi_playback_abort_policy.inc"
 
+static void river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
+    const char *trigger)
+{
+    if (!river_cloud_xiaozhi_playback_terminal_open() ||
+        !river_cloud_xiaozhi_playback_completed_ready()) {
+        return;
+    }
+
+    if (!river_cloud_xiaozhi_try_queue_playback_completed_ack()) {
+        return;
+    }
+
+    if (river_cloud_xiaozhi_playback_physical_active()) {
+        river_cloud_xiaozhi_arm_playback_stop(RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS);
+    }
+    RIVER_LOGI("xiaozhi playback terminal completed after progress: trigger=%s drain_ms=%u",
+               trigger != NULL ? trigger : "-",
+               river_cloud_xiaozhi_playback_physical_active() ?
+                   (unsigned int)RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS :
+                   0U);
+}
+
 #include "river_cloud_xiaozhi_playback_downlink_cycle.inc"
 
 static void river_cloud_xiaozhi_prepare_decoder_if_needed(uint32_t sample_rate,
