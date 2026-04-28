@@ -104,7 +104,12 @@
 #define RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
 #define RIVER_CLOUD_XIAOZHI_SERVER_ACCEPT_FALLBACK_MS 1800U
-#define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
+/*
+ * Endpoint hint is advisory only. Leave enough headroom for one delayed
+ * preview refresh/finalize cycle before local close wins and truncates the
+ * server-owned endpoint path.
+ */
+#define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 960U
 #define RIVER_CLOUD_XIAOZHI_RESPONSE_AUDIO_WAIT_TIMEOUT_MS 5000U
 /*
  * Keep the local no-audio prompt disabled by default until AudioTrack start/write

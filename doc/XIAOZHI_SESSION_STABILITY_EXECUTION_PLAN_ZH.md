@@ -935,6 +935,48 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step X: endpoint soft-close relax
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 收掉“preview 还在追平，但端侧 320 ms hint-only local close 已经先超时”的问题。
+- 给 server endpoint candidate 之后的 refresh / finalize 多留一轮补救空间，避免端侧过早结束 active stream。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+实现：
+
+- 将 `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS` 从 `320` 提高到 `960`
+  - 保持它仍显著小于 `RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS=2000`
+  - 目标是只放宽 hint-only endpoint close，不把 silent fallback 拖成长期等待
+- `input_preview` 现在只要出现以下任一真实文本进展，就撤销 endpoint soft-close：
+  - `event->text` 非空
+  - `event->stable_prefix` 非空
+- 这样即使 preview payload 还没把最终文本放进 `text`，只要稳定前缀已经开始长出来，也不会继续沿用旧的 soft-close 倒计时。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- `endpoint_soft_close_timeout` 触发频率下降。
+- preview 仍在改善的轮次，不再轻易被端侧本地 close 抢先截断。
+- 正常确实已经说完的轮次，仍能在可接受时延内结束，不出现明显挂起。
+
 ### Step W: no-ref reopen hold tighten
 
 状态：已完成代码修复，待上板复测。

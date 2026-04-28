@@ -1,3 +1,51 @@
+## Step 5.553 Verification
+
+Confirm endpoint hint no longer forces an overly short local close window, and any real preview text progress clears the soft-close timer:
+```bash
+cd /root/ameba-river
+rg -n "ENDPOINT_SOFT_CLOSE_DEFER_MS|input_preview|stable_prefix|cancel_endpoint_soft_close" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS` is now `960U`
+- the adjacent comment explains this extra wait is reserved for delayed preview refresh/finalize recovery
+- `input_preview` cancels endpoint soft-close when either `text` or `stable_prefix` is non-empty
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for endpoint soft-close:
+```text
+复现一轮“server endpoint candidate 已出现，但 preview refresh / finalize 还在追赶”的多轮对话。重点看端侧是否还会在 320 ms 级别过早触发 `endpoint_soft_close_timeout`，以及稍晚到达的 preview 文本/stable_prefix 是否能撤销本地 soft-close。
+```
+
+Expected result:
+- `endpoint_soft_close_timeout` 的触发频率下降
+- preview 仍在改善的轮次，不再轻易被端侧本地 close 抢先截断
+- 正常确实已经说完且无后续 preview 进展的轮次，仍能在可接受时延内结束
+
 ## Step 5.552 Verification
 
 Confirm no-ref follow-up reopen now requires a longer speech hold, so playback-edge residual fragments around 120 ms no longer reopen ASR:

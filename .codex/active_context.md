@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.552 XiaoZhi no-ref reopen hold tighten，先收 false accept 入口（待上板验证）`
+  - `5.553 XiaoZhi endpoint soft-close relax，给 preview 追平留窗口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.553 放宽 endpoint hint 本地 soft-close：
+      - 旧的 `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS=320 ms` 太短，preview refresh / finalize 稍晚一点就会先被本地 close 抢断
+      - 现在把 hint-only defer 提到 `960 ms`
+      - 同时 `input_preview` 只要 `text` 或 `stable_prefix` 有进展，就撤销 endpoint soft-close
+      - 目标是给 server-owned endpoint path 多一轮补救空间，降低 `endpoint_soft_close_timeout` 抢断 preview 的概率
+    - 下一步上板验证：
+      - `endpoint_soft_close_timeout` 触发频率应下降
+      - preview 仍在变好的轮次不再轻易被端侧本地 close 抢先截断
+      - 然后继续做 uplink preview warmup/catch-up
   - newest landed runtime bug-fix slice:
     - Step 5.552 先收 false accept 入口：
       - 端侧 no-ref reopen 旧门槛只有 `6` 帧/120 ms，和服务侧 turn3 的残留量级直接重合

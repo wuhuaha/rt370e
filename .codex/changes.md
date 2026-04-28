@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.553
+- 继续按顺序修 endpoint soft-close 过激；上一轮先收了 false accept 入口，这一轮改本地 endpoint hint 的收口时机。
+- 之前 `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS=320`，只给了一个很短的 hint-only 等待窗口；一旦服务侧 preview refresh / finalize 稍微晚一点，本地就可能先用 `endpoint_soft_close_timeout` 把 active stream 关掉。
+- 现在把 hint-only defer 从 `320 ms` 放宽到 `960 ms`：
+  - 目标不是延后真正的 accept，而是给 server-owned endpoint path 多留一轮 preview refresh / finalize 的补救空间。
+  - 仍明显短于 `RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS=2000`，不会把本地 silent fallback 直接拖成长期悬挂。
+- 同时把 `input_preview` 的 soft-close 取消条件从“只有 `text` 非空”放宽到“`text` 或 `stable_prefix` 任一非空”：
+  - 只要 preview 已经有实际文本进展，就先撤销本地 endpoint soft-close，不再因为 payload 只更新 `stable_prefix` 就继续倒计时。
+- 这一轮改动仍然是端侧窄修：
+  - 不碰服务侧 accept 判定；
+  - 不碰 playback ACK；
+  - 只降低 preview 还在变好时被端侧过早截断的概率。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.552
 - 先按优先级收 false accept 入口，先不碰服务侧 accept 判定，先把端侧最容易制造 stale residual turn 的 no-ref reopen 门槛抬高。
 - 当前 no-ref follow-up reopen 只要求 `RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES=6`，也就是 120 ms 连续语音就能重开 ASR；这和服务侧 turn3 的 `audio_bytes=3840` / 120 ms 残留量级正好重合。

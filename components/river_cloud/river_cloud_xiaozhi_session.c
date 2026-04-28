@@ -1227,7 +1227,8 @@ void river_cloud_xiaozhi_note_input_observation(const river_xiaozhi_event_t *eve
         river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                          "input_preview");
         river_cloud_xiaozhi_note_preview_observation(event);
-        if (event->text != NULL && event->text[0] != '\0') {
+        if ((event->text != NULL && event->text[0] != '\0') ||
+            (event->stable_prefix != NULL && event->stable_prefix[0] != '\0')) {
             river_cloud_xiaozhi_cancel_endpoint_soft_close("input_preview");
         }
         return;
