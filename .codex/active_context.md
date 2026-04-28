@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.537 XiaoZhi endpoint candidate 等待 accepted truth（待上板验证）`
+  - `5.538 XiaoZhi 上行 burst 指标与重复 playback mark ACK 收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.538 根据 2026-04-28 上板日志继续收口：
+      - uplink 成功发送后的 next due 改为沿既有 deadline 递进，减少一次 late send 对后续 20ms pacing 的永久漂移
+      - ASR round `burst_max` 不再复用 backlog 深度，只统计真实单轮发送 burst；backlog 继续看 `backlog_p95/max`
+      - async playback mark ACK 入队前增加同 segment + played duration 的队列级去重，避免重复 `audio.out.mark`
+    - 下一步上板验证：
+      - 正常 round 的 `xiaozhi asr round finish` 应回到 `burst_max=1`
+      - `send_interval_p50/p95/max` 应明显收敛，不再被一次 late send 持续拖慢
+      - 不再出现同一 `segment_id` 同一 `played_duration_ms` 的重复 `playback ack mark sent`
   - newest landed runtime bug-fix slice:
     - Step 5.537 修正 Step 5.536 复查发现的残留路径：
       - `input.endpoint candidate=yes` 不再在本地 post-roll 时直接关闭 round

@@ -5654,3 +5654,29 @@ rg -n 'UPLINK_DRAIN_BURST_MAX|uplink_retry_valid|audio_ms=|realtime_gap_ms=|pace
 - `input.endpoint candidate=yes` 后本地 post-roll 应看到 `xiaozhi server endpoint candidate waits for accepted truth` 和 `xiaozhi server accept wait armed`。
 - 后续应由 `turn accepted ... accept_reason=server_endpoint` 关闭本地 round。
 - 如果服务端只给 endpoint candidate 但不 accepted，1.8s 后仍能 fallback commit，而不是本地 round 提前关闭后无兜底。
+
+### Step 5.538: 修正 uplink burst 指标误报与重复 playback mark ACK
+
+触发背景：
+
+- 2026-04-28 上板日志显示：
+  - `xiaozhi asr round finish ... packets=25 frame_bytes=640 burst_max=5 ... backlog_p95=2 backlog_max=2`
+  - 发送循环已经限制单次 drain burst 为 1，但 round 统计仍把 `backlog_frames` 写进 `burst_max`，导致日志把“队列深度”误报成“发送 burst”。
+  - 同一短 ACK 段还出现两次 `xiaozhi playback ack mark sent ... played_duration_ms=3`，说明异步控制队列仍可能排入重复 mark ACK。
+
+端侧收口：
+
+- uplink 成功发送后的 `next_send_ms` 改为基于既有 due time 递进：
+  - 若一次发送稍晚，不再把这次晚点永久累积到后续每一帧。
+  - 若 due 已略微落后当前时刻，则只允许轻量 catch-up，避免重新回到 backlog burst。
+- `burst_max` 只保留真实“单轮发送帧数”统计：
+  - backlog 深度继续通过 `backlog_p95/max` 观察。
+  - 正常 round 的 `burst_max` 应回到 1。
+- `PLAYBACK_MARK` async 控制请求入队前增加去重：
+  - 若控制队列里已存在同 `response_id/playback_id/segment_id/played_duration_ms` 的待发送 mark，则直接复用该待发送请求，不再重复排队。
+
+上板验收：
+
+- 正常短命令 round 的 `xiaozhi asr round finish` 应看到 `burst_max=1`。
+- `send_interval_p50/p95/max` 不应因一次 late send 持续漂移到 40ms+。
+- 同一 `segment_id` 同一 `played_duration_ms` 不应再重复打印 `xiaozhi playback ack mark sent`。

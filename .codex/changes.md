@@ -14325,3 +14325,16 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step 5.538
+- 根据 2026-04-28 上板日志继续收口两个运行时问题：
+  - `xiaozhi asr round finish` 中 `burst_max=5` 虽然发送路径已限制单次 drain 只发 1 帧，但 round 统计仍把 `backlog_frames` 当成了 burst，导致日志误报
+  - `xiaozhi playback ack mark sent ... played_duration_ms=3` 出现同一 `segment_id` 的重复发送，说明异步控制队列仍可能排入重复 mark ACK
+- 本次修正：
+  - uplink 成功发送后的下一帧 deadline 改为基于已有 due time 递进，晚点时仅允许轻量 catch-up，不再把调度漂移永久累加到后续 20ms pacing
+  - ASR round 的 `burst_max` 改回只统计真实发送 burst，不再被 backlog 深度污染；backlog 继续只通过 `backlog_p95/max` 观察
+  - async `PLAYBACK_MARK` 控制请求入队前增加同 `response_id/playback_id/segment_id/played_duration_ms` 的队列级去重，避免重复 mark ACK
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

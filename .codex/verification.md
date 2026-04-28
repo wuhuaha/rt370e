@@ -22789,3 +22789,37 @@ Expected result:
 - local post-roll logs `xiaozhi server endpoint candidate waits for accepted truth`
 - local post-roll also logs `xiaozhi server accept wait armed`
 - the local round closes only after `turn accepted ... accept_reason=server_endpoint` or after fallback deadline emits `xiaozhi server accept wait fallback commit`
+
+## Step 5.538 - fix uplink burst metric drift and duplicate playback mark ACK
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+wake the device, speak one short command, then inspect the first XiaoZhi ASR round and the first short TTS ACK segment
+```
+
+Expected result:
+- `xiaozhi asr round finish` shows `burst_max=1` on a normal healthy round; backlog pressure is reflected only in `backlog_p95/max`
+- `send_interval_p50/p95/max` no longer stay inflated by accumulated due-time drift after one late send
+- the same `response_id/playback_id/segment_id/played_duration_ms` no longer produces duplicate `xiaozhi playback ack mark sent`
