@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.555
+- 开始收 `playback/meta` 侧尾巴：同一个 `segment_id` 先以 `is_last_segment=no` 发布，尾段实际播完后又迟到补一条 `is_last_segment=yes`，本地之前会把这个迟到升级当成普通重发，导致 `_0002` 这种尾段进入 `recover/gap hold/stop` 抖动。
+- 这轮只修一个窄问题：当当前播放尾段已经播到 expected mark、backend 正处于 `waiting_next_segment`，而服务端又用同一个 `segment_id` 补发 “late last meta upgrade” 时，端侧不再重新发布这个 stale tail。
+- 现在在 `river_cloud_xiaozhi_playback_note_meta()` 里增加一条 upgrade 快路：
+  - 仅命中“已有有效 segment、旧 meta 不是 last、新 meta 改成 last”的同段升级；
+  - 并且仍要求 `fold_late_last_segment_meta_for_current_tail()` 判定当前 tail 已经真正播完、处于 paused/waiting_next_segment 安全窗口；
+  - 命中后直接把当前 tail 折叠成 fully-heard/last，不再走普通 `note_meta` 重发布路径。
+- 目标是先收掉你最新日志里的这类模式：
+  - `_0002 expected_duration_ms=1100 is_last_segment=no`
+  - mark 已跑到 `1100`
+  - 随后同一 `_0002` 又迟到补成 `is_last_segment=yes`
+  - 端侧不应再因为这次补报进入额外 `playback recover` / `segment gap hold`
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.554
 - 继续按顺序压 preview/uplink backlog，这一轮只改端侧 uplink warmup/catch-up，不碰 playback ACK。
 - 之前 uplink drain 是严格单帧节拍：

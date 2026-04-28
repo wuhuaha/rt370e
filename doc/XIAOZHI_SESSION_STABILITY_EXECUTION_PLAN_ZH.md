@@ -935,6 +935,49 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step Z: late last-meta upgrade fold
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 收掉同一 `segment_id` 先按 non-last 发布、尾段播完后又迟到补成 last 时的本地 playback 抖动。
+- 避免 `_0002` 这类 stale tail 被迟到 meta 重新带回 `recover / gap hold / stop`。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 在 `river_cloud_xiaozhi_playback_note_meta()` 里增加 late same-segment last-upgrade 快路：
+  - 仅命中“已有有效 segment、旧状态不是 last、新事件把同一 `segment_id` 升级成 last”的情况
+  - 并继续复用 `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail()` 作为安全门
+- 只有当当前 tail：
+  - 已经 started
+  - mark 已达到 expected duration
+  - backend 正处于 paused / waiting-next-segment 的安全窗口
+  - 才直接把这次迟到升级折叠成 fully-heard/last
+- 命中后不再走普通 `note_meta` 重发布路径，从而避免把已经播完的 stale tail 再次暴露给 recover/gap hold 状态机。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 同一 `segment_id` 的迟到 `non-last -> last` 升级被直接折叠。
+- 尾段播完后不再因为这次补报进入额外 `playback recover` / `segment gap hold`。
+- playback completed/cleared 路径继续保持闭环。
+
 ### Step Y: preview warmup catch-up
 
 状态：已完成代码修复，待上板复测。

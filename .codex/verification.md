@@ -1,3 +1,50 @@
+## Step 5.555 Verification
+
+Confirm a late same-segment `is_last_segment=no -> yes` upgrade now folds the stale current tail instead of re-publishing it into playback recovery:
+```bash
+cd /root/ameba-river
+rg -n "late last meta upgrade|fold_late_last_segment_meta_for_current_tail|segment->is_last_segment" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_note_meta()` contains a guard for the same-segment late last-meta upgrade
+- that guard only triggers when the old segment was non-last and the new event upgrades it to last
+- the guard routes through `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail()`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for late last-meta upgrade:
+```text
+复现一轮多 segment 或单段尾部迟到补 last-meta 的回复，重点看同一个 `segment_id` 先报 `is_last_segment=no`、mark 已到 expected、随后再补 `is_last_segment=yes` 的场景。观察是否出现 `xiaozhi playback late last meta consumed stale current tail` / `late_last_meta_upgrade`，以及是否不再进入额外 `playback recover` / `segment gap hold` 抖动。
+```
+
+Expected result:
+- 同一 `segment_id` 的迟到 last-meta upgrade 被本地直接折叠
+- 尾段播完后不再因为这次补报进入额外 recover/gap hold
+- playback completed/cleared 路径保持闭环
+
 ## Step 5.554 Verification
 
 Confirm preview warmup now has a bounded catch-up path instead of strict single-frame pacing throughout startup:

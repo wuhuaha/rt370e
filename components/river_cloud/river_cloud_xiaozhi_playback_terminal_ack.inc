@@ -448,6 +448,21 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         memset(segment, 0, sizeof(*segment));
     }
 
+    /*
+     * Some service replies first publish the current tail as non-last and only
+     * later revise the same segment id to last. If the tail has already played
+     * to its expected mark and playback is paused waiting for a next segment,
+     * fold that late "last" upgrade before re-publishing the stale tail.
+     */
+    if (segment->valid && event->is_last_segment &&
+        !segment->is_last_segment &&
+        river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(event)) {
+        river_cloud_xiaozhi_store_playback_last_segment_context();
+        river_cloud_xiaozhi_sync_playback_terminal_report_flags();
+        river_cloud_xiaozhi_refresh_playback_phase("late_last_meta_upgrade");
+        return;
+    }
+
     river_cloud_xiaozhi_copy_optional_text(segment->response_id,
                                            sizeof(segment->response_id),
                                            meta_context->response_id);
