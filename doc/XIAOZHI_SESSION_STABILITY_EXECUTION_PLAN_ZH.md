@@ -826,3 +826,57 @@ python3 /root/ameba-rtos/ameba.py build -p
   - `xiaozhi stale output guard armed: ...`
   - 若 720ms 后仍未恢复，再看到 `xiaozhi stale output guard forcing playback clear: ...`
 - 触发兜底后，同一句 follow-up 能继续进入 ASR，而不是被迫等到 `idle_timeout`。
+
+
+### Step S: terminal-only stale output-turn 兜底补强
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 覆盖另一类历史残留：`playback_lane` 已经松开，但 `playback_turn` 仍因 terminal truth 残留而保持打开，导致 follow-up reopen 继续被 `output_turn_guard` 阻断。
+- 把 stale-output 语音兜底从“只处理 lane 残留”扩成“处理所有本地已不再输出、但 output turn 仍残留”的异常态。
+- 继续保持对正常 `thinking/speaking/rebuffer` 的保护，不把兜底扩大成常态路径。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+
+实现：
+
+- 复查 Step R 后确认，旧 guard 仍有盲区：
+  - 只有 `playback_lane_engaged=yes` 才会 arm stale-output guard；
+  - 若 queue / wait-context 已经空了，但 `playback_turn_active=yes` 仍被 terminal truth 卡住，设备会继续只剩 VAD，没有 ASR reopen。
+- stale-output guard 现在改为只要求：
+  - `window_active=yes`
+  - `stream_active=no`
+  - `output_state` 既不是 `thinking` 也不是 `speaking`
+  - `response_waiting_audio=no`
+  - `playback_turn_active=yes`
+  - `playback_output_active=no`
+  - `playback_rebuffer_pending=no`
+- 因而同一条 `720ms` 语音兜底现在同时覆盖：
+  - `playback_lane=yes` 的 stale lane / stale tail
+  - `playback_lane=no` 但 `playback_turn=yes` 的 terminal-only stale turn
+- guard 日志补充 `wait=yes/no`，便于从板端日志区分：
+  - 仍卡在 wait-context / segment-gap
+  - 还是已经没有 lane，只剩 terminal truth 残留
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 若再次复现“播完一轮 TTS 后后续说话完全无反应”：
+  - 即使日志里已经看不到 `playback_lane=yes`，只剩 `playback_turn=yes`，也应先看到 `xiaozhi stale output guard armed: ... playback_lane=no playback_turn=yes ...`
+  - 若异常态持续 `720ms`，应继续看到 `xiaozhi stale output guard forcing playback clear: ...`
+  - 兜底触发后，同一句 follow-up 能继续 reopen ASR，而不是只剩 VAD 到 `idle_timeout`。

@@ -76,7 +76,6 @@ static bool river_cloud_xiaozhi_stale_output_guard_eligible(
     bool output_thinking,
     bool output_speaking,
     bool response_waiting_audio,
-    bool playback_lane_engaged,
     bool playback_turn_active,
     bool playback_output_active,
     bool playback_rebuffer_pending)
@@ -85,7 +84,7 @@ static bool river_cloud_xiaozhi_stale_output_guard_eligible(
            g_river_cloud.xiaozhi_session_window_truth.window_active &&
            !g_river_cloud.stream_active &&
            !output_thinking && !output_speaking && !response_waiting_audio &&
-           playback_lane_engaged && playback_turn_active &&
+           playback_turn_active &&
            !playback_output_active && !playback_rebuffer_pending;
 }
 
@@ -105,7 +104,6 @@ static bool river_cloud_xiaozhi_maybe_recover_stale_output_guard(
                                                          output_thinking,
                                                          output_speaking,
                                                          response_waiting_audio,
-                                                         playback_lane_engaged,
                                                          playback_turn_active,
                                                          playback_output_active,
                                                          playback_rebuffer_pending)) {
@@ -118,7 +116,8 @@ static bool river_cloud_xiaozhi_maybe_recover_stale_output_guard(
         g_river_cloud.xiaozhi_session_window_truth.stale_output_guard_deadline_ms =
             now_ms + (uint64_t)RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS;
         RIVER_LOGW("xiaozhi stale output guard armed: guard_ms=%u output_state=%s "
-                   "playback_lane=%s playback_turn=%s playback_active=%s sid=%s",
+                   "playback_lane=%s playback_turn=%s playback_active=%s "
+                   "wait=%s sid=%s",
                    (unsigned int)RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS,
                    g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
                        g_river_cloud.xiaozhi_turn_semantics.output_state :
@@ -126,6 +125,8 @@ static bool river_cloud_xiaozhi_maybe_recover_stale_output_guard(
                    playback_lane_engaged ? "yes" : "no",
                    playback_turn_active ? "yes" : "no",
                    playback_output_active ? "yes" : "no",
+                   g_river_cloud.xiaozhi_playback_terminal_truth.waiting ? "yes" :
+                                                                          "no",
                    river_cloud_xiaozhi_current_sid() != NULL ?
                        river_cloud_xiaozhi_current_sid() :
                        "-");
@@ -139,7 +140,7 @@ static bool river_cloud_xiaozhi_maybe_recover_stale_output_guard(
     river_cloud_xiaozhi_clear_stale_output_guard();
     RIVER_LOGW("xiaozhi stale output guard forcing playback clear: guard_ms=%u "
                "output_state=%s playback_lane=%s playback_turn=%s "
-               "playback_active=%s sid=%s",
+               "playback_active=%s wait=%s sid=%s",
                (unsigned int)RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS,
                g_river_cloud.xiaozhi_turn_semantics.output_state[0] != '\0' ?
                    g_river_cloud.xiaozhi_turn_semantics.output_state :
@@ -147,6 +148,8 @@ static bool river_cloud_xiaozhi_maybe_recover_stale_output_guard(
                playback_lane_engaged ? "yes" : "no",
                playback_turn_active ? "yes" : "no",
                playback_output_active ? "yes" : "no",
+               g_river_cloud.xiaozhi_playback_terminal_truth.waiting ? "yes" :
+                                                                      "no",
                river_cloud_xiaozhi_current_sid() != NULL ?
                    river_cloud_xiaozhi_current_sid() :
                    "-");

@@ -1,3 +1,65 @@
+## Step 5.548 Verification
+
+Confirm stale follow-up recovery now also covers the case where the playback lane is already idle but the output turn is still held open only by stale terminal truth:
+```bash
+cd /root/ameba-river
+rg -n "stale_output_guard_eligible|stale output guard armed|wait=%s" \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_stale_output_guard_eligible(...)` no longer requires `playback_lane_engaged=yes`
+- the stale-output recovery still keeps the narrow safety gates:
+  - `window_active=yes`
+  - `stream_active=no`
+  - server `output_state` is not `thinking/speaking`
+  - `response_waiting_audio=no`
+  - `playback_turn_active=yes`
+  - `playback_output_active=no`
+  - `playback_rebuffer_pending=no`
+- stale guard logs now also carry `wait=yes/no`, so logs can distinguish:
+  - lane/wait-context residue
+  - terminal-only stale output-turn residue
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for “播完一轮 TTS 后再说话完全无反应”:
+```text
+在 follow-up window 内复现一次历史故障：一轮 TTS 播放完成后继续说话。如果设备再次进入“只有 VAD、没有 reopen ASR”的状态，保持说话约 1 秒。
+```
+
+Expected result:
+- 如果卡在 `playback_lane=yes` 的 stale tail，日志仍应看到：
+  - `xiaozhi stale output guard armed: ... playback_lane=yes ...`
+- 如果卡在 `playback_lane=no` 但 `playback_turn=yes` 的 terminal-only stale turn，日志现在也应看到：
+  - `xiaozhi stale output guard armed: ... playback_lane=no playback_turn=yes ...`
+- 必要时再看到：
+  - `xiaozhi stale output guard forcing playback clear: ...`
+- 触发后同一句 follow-up 应能重新进入：
+  - `asr provider=xiaozhi_realtime session started`
+  - `xiaozhi asr round begin: ...`
+
 ## Step 5.547 Verification
 
 Confirm follow-up reopen now has a stale output-turn fallback that only triggers when local playback truth is clearly stuck, not during normal speaking/thinking/rebuffer:
@@ -16,7 +78,6 @@ Expected result:
   - `stream_active=no`
   - server `output_state` is not `thinking/speaking`
   - `response_waiting_audio=no`
-  - local `playback_lane_engaged=yes`
   - local `playback_turn_active=yes`
   - `playback_output_active=no`
   - `playback_rebuffer_pending=no`

@@ -15,11 +15,30 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.547 XiaoZhi 多轮对话 stale output-turn 语音兜底（待上板验证）`
+  - `5.548 XiaoZhi 多轮对话 terminal-only stale output-turn 兜底（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.548 继续收窄“播完一轮 TTS 后后续说话无反应”的残留空间：
+      - 复查 Step 5.547 后确认，仍存在另一类 stale output-turn：`playback_lane` 已经空闲，但 `playback_turn` 仍因 terminal truth 残留而阻断 reopen
+      - stale output guard 现在不再要求 `playback_lane_engaged=yes`，而是只要满足：
+        - `window_active=yes`
+        - `stream_active=no`
+        - 服务端 `output_state` 不在 `thinking/speaking`
+        - `response_waiting_audio=no`
+        - `playback_turn_active=yes`
+        - `playback_output_active=no`
+        - `playback_rebuffer_pending=no`
+      - 因而同一条 720ms guard 现在同时覆盖：
+        - lane 残留
+        - terminal-only turn 残留
+      - 新日志额外带 `wait=yes/no`，便于区分是 wait-context 卡住还是 terminal truth 单独残留
+    - 下一步上板验证：
+      - 若旧故障再次出现，但 `playback_lane=no playback_turn=yes`，也应看到 `xiaozhi stale output guard armed`
+      - 必要时应继续看到 `forcing playback clear`
+      - 触发后同一句 follow-up 应继续进入 ASR，而不是只剩 VAD
   - newest landed runtime bug-fix slice:
     - Step 5.547 再补一条多轮对话兜底：
       - 如果服务端 `output_state` 已不在 `thinking/speaking`，物理 playback 也不活跃，但本地 `playback_lane/turn` 仍残留，持续用户语音现在会先 arm `stale_output_guard`

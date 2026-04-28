@@ -1,5 +1,31 @@
 # Change Log
 
+## Step 5.548
+- 复查 Step 5.547 后，继续补上另一类会把 follow-up 永久卡死的残留态：`playback_lane` 已经松开，但 `playback_turn` 仍因 terminal truth 残留而保持打开。
+  - 这类问题和 Step 5.547 不同，不一定还挂在 `WAITING_NEXT_SEGMENT`；更像是：
+    - 物理播放已经结束
+    - 本地 queue / wait_context 已经空了
+    - 服务端 `output_state` 也已经不是 `thinking/speaking`
+    - 但 `playback_turn_active=yes` 仍然阻断 `maybe_start_followup_round(...)`
+  - 旧的 stale-output guard 只在 `playback_lane_engaged=yes` 时触发，因此这类“terminal-only stale turn”会一直卡住 reopen，只剩 VAD。
+  - 现在把 stale-output guard 的命中条件扩成：
+    - 仍要求 `window_active=yes`
+    - `stream_active=no`
+    - `output_state` 不是 `thinking/speaking`
+    - `response_waiting_audio=no`
+    - `playback_turn_active=yes`
+    - `playback_output_active=no`
+    - `playback_rebuffer_pending=no`
+  - 不再强依赖 `playback_lane_engaged=yes`，因此 guard 同时覆盖：
+    - lane 残留
+    - terminal-only turn 残留
+  - guard 日志额外输出 `wait=yes/no`，便于区分是 segment-gap / wait-context 卡住，还是 terminal truth 单独残留。
+- 这一步的目标不是放宽 output-turn 保护，而是把“所有本地已经不再输出、但 turn 仍残留”的死锁态都纳入同一条 720ms 语音自恢复兜底。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.547
 - 再审视多轮对话 reopen/output-turn guard 之后，补了一条端侧兜底机制，目标不是替代主状态机，而是在 local playback truth 残留时避免整轮永久失活：
   - 新增 `RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS=720`
