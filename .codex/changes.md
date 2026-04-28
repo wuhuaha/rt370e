@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.542
+- 收口 2026-04-28 13:34 新日志里的“只说一句、后续再说无响应”残留尾态：
+  - 服务端会对同一 `segment_id` 先下发普通 meta，尾部再补一条同 `segment_id` 的 `is_last_segment=yes`
+  - 端侧此前在该 segment 已经 `fully_heard` 且已出队后，仍把这条 late last-meta 当成新 segment 重新入队，导致 playback 卡在 `owned_paused/prefetching`，output turn 一直不退出
+  - 现在对“late last-meta + same fully-heard segment + queue 已空头”的场景直接折叠为尾态更新，不再重建 segment 队列
+  - 若此时 backend 只是 `OWNED_PAUSED` 挂着旧尾帧，会丢弃这批 stale queued tail、停止 paused backend，并立刻尝试 completed 收口
+- 预期上板变化：
+  - 不再出现 `segment_id=...0003` 已经打到最终 mark 后，又因为同 `segment_id is_last_segment=yes` 重新卡在 `prefetching/backend=owned_paused`
+  - 播放完 `我没听清，请再说一遍。` 后，后续再说话可以重新进入 ASR，而不是一直到 `idle_timeout`
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.541
 - 收口 2026-04-28 新一轮 invalid-voice 复测暴露的三个残留问题：
   - playback completed ACK 在 queue/sent 入口新增 `completed_reported` 早退，并在 `COMPLETED_QUEUED` lineage touch 后立刻同步 terminal report flags，避免同一 `playback_id` 重复 `completed queued/sent`

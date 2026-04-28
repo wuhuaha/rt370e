@@ -643,3 +643,42 @@ python3 /root/ameba-rtos/ameba.py build -p
 - `audio.out.meta` 到真实 `playback start` 之间，不再出现 `... -> asr_streaming reason=playback_state`。
 - drain 尾态 `tts_stop_pending=yes` 时，不再提前退回 `asr_streaming`。
 - `transport_closed` 后，不再残留旧 `input_state=previewing` 的 `xiaozhi turn accepted: trigger=poll ...`。
+
+
+### Step O: late last-meta 尾态折叠与 paused tail 收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复服务端对同一 `segment_id` 晚到补发 `is_last_segment=yes` 时，端侧把它误当成新 segment 再次入队的问题。
+- 避免 reply 尾段已经 fully-heard 后，playback 仍卡在 `owned_paused/prefetching`，导致后续 reopen 一直进不来。
+- 让这类 paused stale tail 直接折叠到 terminal completion，而不是拖到 session idle-timeout。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 新增 late-last-meta fold 路径：当 `audio.out.meta` 是同一 `segment_id`、该 segment 已 fully-heard、且当前 segment queue 头已空时，不再分配新的 playback segment。
+- 对这种 late terminalization，直接更新 `last_segment_context` / terminal lineage。
+- 若 backend 只是 `OWNED_PAUSED` 挂着 stale queued tail，则 reset downlink ring、停止 `xiaozhi_late_last_meta` backend，并立即尝试 completed 收口。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 最后一段 final mark 之后，即使服务端再补同 `segment_id is_last_segment=yes`，也不会再把 playback 卡在 `prefetching/backend=owned_paused`。
+- 播放完 `我没听清，请再说一遍。` 后，后续再说话可重新进入 ASR。
+- 不再一直拖到 `xiaozhi session.end: ... idle_timeout` 才退出 output turn。

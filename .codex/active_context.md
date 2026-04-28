@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.541 XiaoZhi invalid-voice ACK completed 去重与 lane-engaged/transport-close 状态收口（待上板验证）`
+  - `5.542 XiaoZhi late last-meta 尾态折叠与 paused tail 收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.542 根据 2026-04-28 13:34 新日志继续收口：
+      - 服务端对同一 `segment_id` 补发 `is_last_segment=yes` 时，若该 segment 已 fully-heard，不再重建新的 playback segment
+      - same fully-heard segment 的 late last-meta 改为直接折叠进 terminal lineage，避免 playback 卡在 `owned_paused/prefetching`
+      - 对 paused attached stale tail，会 reset queued tail 并停止 `xiaozhi_late_last_meta` backend，再尝试 completed 收口
+    - 下一步上板验证：
+      - 最后一段 final mark 后，即使服务端再补同 `segment_id is_last_segment=yes`，也不会再卡住 output turn
+      - 播放完 `我没听清，请再说一遍。` 后，下一句能重新进入 ASR
+      - 不再一直拖到 `xiaozhi session.end: ... idle_timeout` 才退出 `barge_in_listening`
   - newest landed runtime bug-fix slice:
     - Step 5.541 根据 2026-04-28 新复测日志继续收口：
       - completed ACK queue/sent 增加 `completed_reported` 早退，并在 `COMPLETED_QUEUED` 后立即同步 report flags，避免同一 playback 重复 `completed`

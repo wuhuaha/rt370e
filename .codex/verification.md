@@ -1,3 +1,49 @@
+## Step 5.542 Verification
+
+Confirm late duplicate `is_last_segment=yes` meta for an already fully-heard segment is folded into terminal completion instead of reopening a paused playback tail:
+```bash
+cd /root/ameba-river
+rg -n "late last meta folded|xiaozhi_late_last_meta|fully_heard_context|current_playback_segment\(\) != NULL"   components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- a dedicated late-last-meta fold path exists in `river_cloud_xiaozhi_playback_terminal_ack.inc`
+- when the same segment was already `fully_heard`, late terminal meta updates the terminal lineage instead of allocating a fresh playback segment
+- paused attached tails can be stopped via `xiaozhi_late_last_meta` rather than lingering in `owned_paused/prefetching`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 hold.wait/main-dialogue reproduction:
+```text
+Wake once, trigger the service path that says “我没听清，请再说一遍。”, wait for that reply to finish, then say the next sentence before the session idle-timeout window closes.
+```
+
+Expected result:
+- after the final mark for the last spoken segment, a late duplicate `audio.out.meta` with the same `segment_id` no longer leaves playback stuck in `prefetching/backend=owned_paused`
+- playback exits the output turn after the reply tail instead of waiting until `xiaozhi session.end: ... idle_timeout`
+- the next spoken sentence reopens ASR normally
+
 ## Step 5.541 Verification
 
 Confirm completed ACK de-dup, output-turn retention across lane-engaged prefetch/drain windows, and transport-close pre-clear sequencing:
