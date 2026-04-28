@@ -1,6 +1,6 @@
 # XiaoZhi Session Stability Execution Plan
 
-Status: active / empty-turn active-return + follow-up transport-close recovery complete; pending board replay validation
+Status: active / playback late-audio tail suppression complete; pending board replay validation
 Last Updated: 2026-04-28
 Branch: `agent-server-v2`
 
@@ -933,3 +933,48 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 若 accepted 后长时间没有 `response.start`，也没有回到 active/idle，应看到：
   - `xiaozhi accepted response watchdog timeout: ...`
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
+
+
+### Step U: playback late completed audio drop
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 收口 2026-04-28 16:20 日志里的新主问题：最后一个 segment 已经 final mark 完成后，迟到 audio frame 仍反复取消 stop，导致 playback 在 `draining/playing` 之间抖动。
+- 避免异常拉长的 playback 尾态继续污染 follow-up turn 时序，并放大后续 preview/accept/service-error 风险。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc`
+
+实现：
+
+- 新增 `river_cloud_xiaozhi_should_drop_late_completed_audio()`：
+  - 仅在 `playback_terminal_open()`、`stop_pending=yes`、`playback_completed_ready()` 同时成立时触发；
+  - 此时若再收到迟到 audio frame，端侧直接丢弃，不再写入 downlink ring，不再触发 `cancel_playback_stop()`。
+- drop 时打印：
+  - `xiaozhi late completed audio dropped: ...`
+- drop 后立即重跑一次：
+  - `maybe_complete_terminal_playback_after_progress("late_completed_audio")`
+  - 确保 terminal-complete 收口还能继续推进到 idle。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 最后一个 segment 的 final mark 后，不再反复看到：
+  - `draining -> playing reason=cancel_stop queued=1 segments=0`
+  - `playing -> draining reason=arm_stop queued=1 segments=0`
+- 若仍有迟到尾帧，应直接看到：
+  - `xiaozhi late completed audio dropped: ...`
+- playback 应更快回到 `idle`，后续 follow-up 不再被尾态抖动拉坏。

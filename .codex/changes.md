@@ -1,5 +1,21 @@
 # Change Log
 
+## Step 5.550
+- 根据 2026-04-28 16:20 新日志，empty-turn / EOF 那条 accepted 无响应死锁已经不再是主问题；新的主卡点变成 playback 尾段的 late-audio stop 抖动：
+  - 在最终 `played_duration_ms` 已达到 last-segment `expected_duration_ms`、terminal 事实上已经 completed ready 后，端侧仍可能收到迟到音频帧。
+  - 旧逻辑会无条件写入这些 late audio，并在 `playback_terminal_open()` 下调用 `cancel_playback_stop()`，于是出现反复：
+    - `draining -> playing reason=cancel_stop queued=1 segments=0`
+    - `playing -> draining reason=arm_stop queued=1 segments=0`
+  - 这会把 playback 尾态拖长，导致 speaking/barge-in 保护窗口异常膨胀，并把后续 turn 推向更脆弱的时序。
+- 新增 late-completed audio drop：
+  - 当满足 `stop_pending=yes` 且 `playback_completed_ready()` 时，迟到 audio frame 不再写入 downlink ring，也不会再取消 stop。
+  - 新日志为 `xiaozhi late completed audio dropped: ...`。
+  - drop 时顺便重跑一次 `maybe_complete_terminal_playback_after_progress("late_completed_audio")`，确保 terminal-complete 收口继续推进。
+- 这一步的目标很具体：先切断“尾帧迟到 -> cancel_stop -> drain/playing 来回抖动”这条链，再观察 turn 3 的服务侧 400 是否随之消失。
+- Verification for this step:
+  - `git diff --check` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.549
 - 针对服务侧已确认的 `accepted -> active/idle` 空语音收口语义，端侧不再把 `accepted` 写死为“必然会收到 `response.start`”：
   - 在 `session.update accept_reason=...` 收口本地 round 后，新增 `RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS=6000`。

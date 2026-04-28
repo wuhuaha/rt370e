@@ -1,3 +1,53 @@
+## Step 5.550 Verification
+
+Confirm late audio frames can no longer re-open playback stop after the last segment has already been fully heard and the terminal is ready to complete:
+```bash
+cd /root/ameba-river
+rg -n "late completed audio dropped|should_drop_late_completed_audio|late_completed_audio"   components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_should_drop_late_completed_audio()` exists
+- the helper only triggers when:
+  - `playback_terminal_open()`
+  - `stop_pending=yes`
+  - `playback_completed_ready()`
+- late frames now log `xiaozhi late completed audio dropped: ...` instead of reviving playback
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+```
+
+Expected result:
+- no whitespace errors
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 16:20 tail-thrashing pattern:
+```text
+触发一轮“好，已帮你打开灯光”或“我没听清，请再说一遍”这类带 fast_launch + main_dialogue 的回复，重点观察最后一个 segment 的 final mark 之后，播放尾态是否还会反复在 draining/playing 之间抖动。
+```
+
+Expected result:
+- 在最后一个 `played_duration_ms` 到达 `expected_duration_ms` 后，不再反复出现：
+  - `draining -> playing reason=cancel_stop queued=1 segments=0`
+  - `playing -> draining reason=arm_stop queued=1 segments=0`
+- 若仍有迟到音频帧，应看到：
+  - `xiaozhi late completed audio dropped: ...`
+- playback 应更快回到 `idle`，后续 follow-up turn 不再被异常拉长的 playback 尾态污染。
+
 ## Step 5.549 Verification
 
 Confirm endpoint-side empty-turn handling and follow-up transport-close recovery were added as explicit first-class paths instead of assuming every accepted turn must produce `response.start`:

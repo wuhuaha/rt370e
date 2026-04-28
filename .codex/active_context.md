@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.549 XiaoZhi empty-turn active-return 与 follow-up 断链自恢复兜底（待上板验证）`
+  - `5.550 XiaoZhi late completed audio drop，收口播放尾段 cancel_stop 抖动（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.550 根据 2026-04-28 16:20 新日志继续收口：
+      - `accepted -> response.start` 主链已恢复，多轮会话可进入第 2 轮；当前新的主卡点是 playback 终段已经 completed-ready 后仍有 late audio 迟到，反复触发 `cancel_stop`
+      - 端侧现在在 `stop_pending=yes && playback_completed_ready()` 时直接丢弃 late completed audio，不再写入 ring，也不再取消 stop
+      - 新日志 `xiaozhi late completed audio dropped: ...` 用于确认是否命中这条尾段兜底
+    - 下一步上板验证：
+      - final mark 后不再反复看到 `draining -> playing reason=cancel_stop queued=1 segments=0`
+      - 若仍有迟到尾帧，应直接看到 `late completed audio dropped`
+      - 若 turn 3 的服务侧 400 由尾态污染引起，这一刀后应显著收敛或消失
   - newest landed runtime bug-fix slice:
     - Step 5.549 对齐 2026-04-28 服务侧 empty-turn / EOF 定位：
       - `accepted` 后新增 `accepted_response_watchdog`，端侧不再默认把 accepted 建模成“必然会收到 `response.start`”

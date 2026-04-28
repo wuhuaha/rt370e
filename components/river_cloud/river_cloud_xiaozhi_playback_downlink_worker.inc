@@ -85,6 +85,27 @@ static void river_cloud_xiaozhi_prepare_decoder_if_needed(uint32_t sample_rate,
     }
 }
 
+static bool river_cloud_xiaozhi_should_drop_late_completed_audio(void)
+{
+    river_cloud_xiaozhi_playback_truth_view_t truth_view;
+
+    if (!river_cloud_xiaozhi_playback_terminal_open() ||
+        !g_river_cloud.xiaozhi_playback_runtime_truth.stop_pending ||
+        !river_cloud_xiaozhi_playback_completed_ready()) {
+        return false;
+    }
+
+    river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
+    RIVER_LOGW("xiaozhi late completed audio dropped: queued=%lu phase=%s backend=%s stop_pending=yes",
+               (unsigned long)river_cloud_xiaozhi_playback_queued_frames(),
+               river_cloud_playback_phase_name(
+                   river_cloud_xiaozhi_playback_observed_phase_kind()),
+               river_cloud_playback_backend_state_name(truth_view.backend_state));
+    river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
+        "late_completed_audio");
+    return true;
+}
+
 river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
     const river_xiaozhi_event_t *event)
 {
@@ -108,6 +129,9 @@ river_status_t river_cloud_xiaozhi_playback_handle_audio_event(
     }
     if (frame_duration_ms == 0U) {
         frame_duration_ms = RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
+    }
+    if (river_cloud_xiaozhi_should_drop_late_completed_audio()) {
+        return RIVER_OK;
     }
 
     if (event->binary_type == RIVER_XIAOZHI_BINARY_PCM16) {
