@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.546 XiaoZhi stale current-tail 迟到 last-meta 强制收口（待上板验证）`
+  - `5.547 XiaoZhi 多轮对话 stale output-turn 语音兜底（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.547 再补一条多轮对话兜底：
+      - 如果服务端 `output_state` 已不在 `thinking/speaking`，物理 playback 也不活跃，但本地 `playback_lane/turn` 仍残留，持续用户语音现在会先 arm `stale_output_guard`
+      - 若该异常态持续 `720ms`，端侧会本地触发一次 `xiaozhi_stale_output_guard` playback interrupt/clear，再立即重评 follow-up reopen
+      - 目标是把“output-turn truth 残留导致整轮只剩 VAD、没有 ASR”从永久卡死降级为可自恢复异常
+    - 下一步上板验证：
+      - 正常 `thinking/speaking/rebuffer` 期间不应误触发该 guard
+      - 异常复现时应先看到 `stale output guard armed`，必要时再看到 `forcing playback clear`
+      - 触发后同一句 follow-up 能继续进入 ASR，而不是只能等 `idle_timeout`
   - newest landed runtime bug-fix slice:
     - Step 5.546 根据 2026-04-28 14:30 `已帮你打开灯光。` 新日志继续收口：
       - late last-meta 现在不仅覆盖“queue 已空”的尾态，也覆盖“current segment 仍残留，但 runtime 已经停在 `OWNED_PAUSED + WAITING_NEXT_SEGMENT`”的 stale current tail

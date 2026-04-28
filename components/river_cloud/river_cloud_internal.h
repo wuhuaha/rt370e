@@ -92,6 +92,7 @@
 #define RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS 480U
 #define RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES 6U
+#define RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS 720U
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
@@ -401,6 +402,7 @@ typedef struct {
     uint64_t window_deadline_ms;
     uint64_t local_close_deadline_ms;
     uint64_t server_accept_fallback_deadline_ms;
+    uint64_t stale_output_guard_deadline_ms;
 } river_cloud_xiaozhi_session_window_truth_t;
 
 typedef struct {

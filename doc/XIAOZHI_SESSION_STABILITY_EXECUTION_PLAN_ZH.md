@@ -771,3 +771,58 @@ python3 /root/ameba-rtos/ameba.py build -p
   - final `played_duration_ms=1100` 后即使 current segment 还残留，也不会再长期停在 `wait_next=yes`；
   - 日志出现 `xiaozhi playback late last meta consumed stale current tail: ...` 或至少 `late last meta folded: ... consumed_current=yes`；
   - 后续说话会重新进入 ASR，而不是只剩 VAD `speech/silence` 直到超时。
+
+
+### Step R: 多轮对话 stale output-turn 语音兜底
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 再补一条端侧兜底，避免多轮对话里 local playback/runtime truth 偶发残留时，follow-up reopen 被 `output_turn_guard` 长时间卡死。
+- 在不破坏正常 `thinking/speaking/rebuffer` 保护的前提下，只对“服务端已不在输出、物理播放也不活跃、但本地 playback turn 仍残留”的异常状态做自恢复。
+- 确保用户持续开口时，设备最终能回到可 reopen 的状态，而不是一直只剩 VAD 到 `idle_timeout`。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+
+实现：
+
+- 新增 `RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS=720` 兜底窗口。
+- `maybe_start_followup_round(...)` 在 `output_turn_guard` 阻断时，不再一刀切地直接丢掉当前语音意图；会先判断是否命中“stale output-turn”：
+  - `window_active=yes`
+  - `stream_active=no`
+  - `output_state` 既不是 `thinking` 也不是 `speaking`
+  - `response_waiting_audio=no`
+  - `playback_lane_engaged=yes`
+  - `playback_turn_active=yes`
+  - `playback_output_active=no`
+  - `playback_rebuffer_pending=no`
+- 若用户在上述异常态下持续说话超过 `720ms`：
+  - 打印 `xiaozhi stale output guard armed: ...`
+  - 若超时仍未恢复，再打印 `xiaozhi stale output guard forcing playback clear: ...`
+  - 本地按 `xiaozhi_stale_output_guard` 触发一次 playback interrupt/clear
+  - 然后立即重新评估 follow-up reopen，允许同一句话继续进入 ASR
+- window close / abort / transport reset / listen reopen 时会同步清掉 guard deadline，避免旧 guard 污染新一轮会话。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 正常的 `thinking/speaking/rebuffer` 期间，follow-up 仍被保护，不会因为短暂说话误清当前输出。
+- 若再次出现“物理播放已结束，但 output turn 本地残留”的异常态，持续说话时应先看到：
+  - `xiaozhi stale output guard armed: ...`
+  - 若 720ms 后仍未恢复，再看到 `xiaozhi stale output guard forcing playback clear: ...`
+- 触发兜底后，同一句 follow-up 能继续进入 ASR，而不是被迫等到 `idle_timeout`。

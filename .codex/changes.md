@@ -1,5 +1,32 @@
 # Change Log
 
+## Step 5.547
+- 再审视多轮对话 reopen/output-turn guard 之后，补了一条端侧兜底机制，目标不是替代主状态机，而是在 local playback truth 残留时避免整轮永久失活：
+  - 新增 `RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS=720`
+  - `river_cloud_xiaozhi_maybe_start_followup_round(...)` 在 `output_turn_guard` 阻断时，新增一条非常窄的“stale output-turn”判定：
+    - `window_active=yes`
+    - `stream_active=no`
+    - 服务端 `output_state` 已不在 `thinking/speaking`
+    - `response_waiting_audio=no`
+    - 本地 `playback_lane_engaged=yes`
+    - 本地 `playback_turn_active=yes`
+    - 但 `playback_output_active=no`
+    - 且 `playback_rebuffer_pending=no`
+  - 这说明不是正常播放/思考保护，而是“本地 output-turn 真相源残留”：
+    - 第一次命中时只 arm guard，并打印 `xiaozhi stale output guard armed: ...`
+    - 若用户持续说话超过 `720ms` 仍未恢复，则打印 `xiaozhi stale output guard forcing playback clear: ...`
+    - 端侧本地触发一次 `xiaozhi_stale_output_guard` playback interrupt/clear
+    - 然后立即重评 follow-up reopen，让同一句话继续进入 ASR，而不是只能等到 `idle_timeout`
+  - window close / abort / transport reset / listen reopen 时同步清掉 guard deadline，避免旧 guard 污染下一轮会话
+- 这一步的设计取舍：
+  - 不去放宽正常 `thinking/speaking/rebuffer` 保护，避免把“用户插话”误当成 stale state
+  - 只对“服务端已不输出、物理播放也不活跃、但本地 turn 仍残留”的异常态出手
+  - 兜底优先保证多轮对话最终可恢复，而不是继续依赖所有尾态路径都 100% 正确
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.546
 - 收口 2026-04-28 14:30 新日志里的“播完 `已帮你打开灯光。` 后再说话只剩 VAD、完全不 reopen”残留尾态：
   - 这次问题不再只是“queue 已空但 late last-meta 没折叠”，而是 current playback segment 仍残留在队列头

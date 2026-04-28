@@ -1,3 +1,61 @@
+## Step 5.547 Verification
+
+Confirm follow-up reopen now has a stale output-turn fallback that only triggers when local playback truth is clearly stuck, not during normal speaking/thinking/rebuffer:
+```bash
+cd /root/ameba-river
+rg -n "STALE_OUTPUT_GUARD_MS|stale_output_guard|forcing playback clear|armed: guard_ms" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS` exists
+- `river_cloud_xiaozhi_maybe_start_followup_round(...)` now has a stale output-turn recovery path
+- the fallback is only eligible when:
+  - `window_active=yes`
+  - `stream_active=no`
+  - server `output_state` is not `thinking/speaking`
+  - `response_waiting_audio=no`
+  - local `playback_lane_engaged=yes`
+  - local `playback_turn_active=yes`
+  - `playback_output_active=no`
+  - `playback_rebuffer_pending=no`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for multi-turn recovery:
+```text
+Use a normal multi-turn dialogue flow. First verify that normal speaking/thinking/rebuffer protection is unchanged. Then try the historical “播完一轮 TTS 后再说话无响应” reproduction and keep speaking for about one second inside the follow-up window.
+```
+
+Expected result:
+- during normal `thinking/speaking/rebuffer`, the device does not spuriously clear the active output turn
+- when the old “only VAD, no ASR reopen” stale-output condition happens again, logs first show:
+  - `xiaozhi stale output guard armed: ...`
+  - and if the stale state persists, `xiaozhi stale output guard forcing playback clear: ...`
+- after the fallback fires, the same follow-up utterance can reopen ASR instead of waiting until `idle_timeout`
+
 ## Step 5.546 Verification
 
 Confirm late duplicate same-segment `is_last_segment=yes` meta can close a stale current tail that is still retained as the queue head after the final playback mark:
