@@ -1,5 +1,17 @@
 # Change Log
 
+## Step 5.552
+- 先按优先级收 false accept 入口，先不碰服务侧 accept 判定，先把端侧最容易制造 stale residual turn 的 no-ref reopen 门槛抬高。
+- 当前 no-ref follow-up reopen 只要求 `RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES=6`，也就是 120 ms 连续语音就能重开 ASR；这和服务侧 turn3 的 `audio_bytes=3840` / 120 ms 残留量级正好重合。
+- 端侧现在把 no-ref reopen hold 提到 `12` 帧，也就是 240 ms：
+  - 默认 full-duplex / quiet-window 路径不受影响，仍走 `RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES=2`。
+  - 只有 `playback_allows_vad_open()==false` 的 no-ref reopen 路径，才要求更长的连续语音。
+- 目标很窄：先把“播放尾边 residual 只有百毫秒出头，也能重开 follow-up round”这一条端侧入口收紧，优先削掉 turn3 这类 120 ms false accept 样本。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.551
 - 根据 2026-04-28 17:12 新日志，上一轮 `late completed audio drop` 已经把尾段 `cancel_stop/arm_stop` 抖动收住；新的主卡点进一步收敛到多 segment 交接时的 started-ack 上下文发布竞态：
   - `audio.out.meta` 已经明确给出第二段 `_0002` 的 `playback_id/segment_id`；

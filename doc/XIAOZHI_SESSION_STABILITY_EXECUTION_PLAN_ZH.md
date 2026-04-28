@@ -935,6 +935,46 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step W: no-ref reopen hold tighten
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 先从端侧入口收掉 false accept，优先削弱播放尾边 stale residual 重开 follow-up round 的概率。
+- 命中你给的 turn3 模式：服务侧只有 120 ms 音频也被 accepted；端侧当前 no-ref reopen 门槛正好也是 120 ms，存在直接共振。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+
+实现：
+
+- 保持默认 duplex/quiet-window 路径不变：
+  - `RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES` 仍为 `2`
+- 只收紧 no-ref reopen 路径：
+  - `RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES` 从 `6` 提到 `12`
+  - 也就是从 120 ms 连续语音提高到 240 ms 连续语音才允许重开 ASR
+- 这样播放尾边百毫秒级 residual 即使还被 VAD 短暂打成 speech，也不会立刻重开 follow-up round。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 120 ms 左右播放尾边 residual 不再轻易触发一轮新的 follow-up ASR。
+- `accepted 后无 response.start` 的 silent/stale turn 数量应先下降。
+- 正常完整 follow-up 语音仍然能进入 ASR，不应整体失灵。
+
 ### Step V: playback next-segment publish-order fix
 
 状态：已完成代码修复，待上板复测。

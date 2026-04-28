@@ -89,7 +89,12 @@
 #define RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS    128U
 #define RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES   2U
-#define RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES 6U
+/*
+ * No-ref reopen is the easiest path for tail residual to turn into a bogus
+ * follow-up turn. Hold longer speech here so <200 ms playback-edge fragments
+ * do not re-open ASR and get falsely accepted upstream.
+ */
+#define RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES 12U
 #define RIVER_CLOUD_XIAOZHI_NOREF_REOPEN_GUARD_MS 480U
 #define RIVER_CLOUD_XIAOZHI_NOREF_REARM_SILENCE_FRAMES 6U
 #define RIVER_CLOUD_XIAOZHI_STALE_OUTPUT_GUARD_MS 720U

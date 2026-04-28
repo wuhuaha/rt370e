@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.551 XiaoZhi segment publish-order fix，收口多段 started-ack partial-id 竞态（待上板验证）`
+  - `5.552 XiaoZhi no-ref reopen hold tighten，先收 false accept 入口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.552 先收 false accept 入口：
+      - 端侧 no-ref reopen 旧门槛只有 `6` 帧/120 ms，和服务侧 turn3 的残留量级直接重合
+      - 现在把 `RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES` 提到 `12` 帧/240 ms，只影响 no-ref reopen 路径
+      - 目标是先削掉播放尾边短残留语音误开 follow-up round 的端侧入口，降低 silent/stale accepted turn
+    - 下一步上板验证：
+      - 120 ms 左右 residual 不再轻易重开 ASR
+      - `accepted 后无 response.start` 的 false accept turn 数量先下降
+      - 正常完整 follow-up 语音仍能继续进入 ASR
   - newest landed runtime bug-fix slice:
     - Step 5.551 根据 2026-04-28 17:12 新日志继续收口：
       - 上一轮 `late completed audio dropped` 已经收住 final tail `cancel_stop/arm_stop` 抖动；新的主卡点收敛到 `_0001 -> _0002` 多段交接

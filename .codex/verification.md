@@ -1,3 +1,49 @@
+## Step 5.552 Verification
+
+Confirm no-ref follow-up reopen now requires a longer speech hold, so playback-edge residual fragments around 120 ms no longer reopen ASR:
+```bash
+cd /root/ameba-river
+rg -n "NOREF_OPEN_HOLD_FRAMES|Hold longer speech here|OPEN_HOLD_FRAMES"   components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_NOREF_OPEN_HOLD_FRAMES` is now `12U`
+- the adjacent comment explains this is specifically for filtering playback-edge residual fragments on the no-ref reopen path
+- `RIVER_CLOUD_XIAOZHI_OPEN_HOLD_FRAMES` remains unchanged for the normal duplex/quiet-window path
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the false-accept residual case:
+```text
+复现一轮带 TTS 尾音的 follow-up 说话场景，重点观察播放尾边只带出很短残留语音时，端侧是否还会重开一轮 ASR 并最终走到 accepted。特别关注之前接近 120 ms 残留量级的样本。
+```
+
+Expected result:
+- 120 ms 左右的尾边 residual 不再轻易重开 follow-up round
+- `accepted 后无 response.start` 的 silent / stale residual turn 数量应先下降
+- 正常较完整的 follow-up 语音仍能继续进入 ASR，不应整体失灵
+
 ## Step 5.551 Verification
 
 Confirm new playback segments are only published after their ids/duration are fully populated, so the downlink worker cannot send `_0002` started ACKs with partial ids during the `_0001 -> _0002` handoff:
