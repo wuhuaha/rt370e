@@ -1,3 +1,61 @@
+## Step 5.546 Verification
+
+Confirm late duplicate same-segment `is_last_segment=yes` meta can close a stale current tail that is still retained as the queue head after the final playback mark:
+```bash
+cd /root/ameba-river
+rg -n "fold_late_last_segment_meta_for_current_tail|consumed stale current tail|consumed_current=|WAITING_NEXT_SEGMENT|last_mark_ms >= expected_duration_ms" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(...)` exists in `river_cloud_xiaozhi_playback_terminal_ack.inc`
+- the late-last-meta fold path now covers both:
+  - queue-empty tails
+  - stale current tails that are already paused in `WAITING_NEXT_SEGMENT`
+- stale current-tail folding is guarded by:
+  - same `response_id/playback_id/segment_id`
+  - `OWNED_PAUSED`
+  - `WAITING_NEXT_SEGMENT`
+  - `output_active=no`
+  - `tts_stop_pending=no`
+  - `rebuffer_pending=no`
+  - last playback mark already reaching `expected_duration_ms`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 14:30 reproduction:
+```text
+Wake once, say the command that makes the service answer “已帮你打开灯光。”, wait until that spoken reply finishes, then continue speaking before the session idle-timeout window closes.
+```
+
+Expected result:
+- after the final `played_duration_ms=1100` mark, the device no longer remains stuck in `wait_next=yes` just because the current segment was not popped yet
+- logs show either:
+  - `xiaozhi playback late last meta consumed stale current tail: ...`
+  - or `xiaozhi playback late last meta folded: ... consumed_current=yes`
+- the next spoken sentence reopens ASR normally instead of leaving only VAD `speech/silence` logs until timeout
+
 ## Step 5.545 Verification
 
 Confirm the new realtime optimization design document was created and contains the intended architecture directions:

@@ -721,3 +721,53 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 在 `已帮你打开灯光。` 场景里，final mark 之后即使再收到同一 `segment_id is_last_segment=yes`，也不会再卡在 `prefetching/backend=owned_paused`。
 - 日志至少出现 `xiaozhi playback late last meta folded: ...`；若 `fully_heard_context` 当时还未落账，还会出现 `xiaozhi playback late last meta synthesized fully-heard: ...`。
 - 下一句说话能重新进入 ASR / follow-up，而不是只剩 VAD 日志直到 `xiaozhi session.end: ... idle_timeout`。
+
+
+### Step Q: stale current-tail 迟到 last-meta 强制收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复 `final mark` 已到齐、但 current playback segment 仍残留在队列头时，晚到 same-segment `is_last_segment=yes` 仍无法收口的问题。
+- 避免 runtime 已进入 `OWNED_PAUSED + WAITING_NEXT_SEGMENT`，output turn 仍被旧 current tail 卡住，导致后续说话只有 VAD 没有 ASR reopen。
+- 把这类 stale current tail 直接折叠进 terminal completion，而不是继续走普通 `note_meta -> prefetch` 路径。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 新增 `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(...)`，专门处理“current segment 还在，但已经是 stale tail”的迟到 terminal meta。
+- 只有同时满足以下条件才强制收口：
+  - 当前 `segment_id` 与 `audio.out.meta` 完全一致；
+  - current segment 已经 started；
+  - backend 已处于 `OWNED_PAUSED`；
+  - supply 已是 `WAITING_NEXT_SEGMENT`；
+  - `output_active=no`、`tts_stop_pending=no`、`rebuffer_pending=no`；
+  - `last_mark_ms >= expected_duration_ms`（零时长尾段则要求 `last_mark_ms > 0`）。
+- 命中后直接：
+  - 把该 current tail 标记为 fully-heard；
+  - 立即 `pop` 当前 stale segment；
+  - 再复用既有 late-last-meta fold/completed 收口。
+- 新增 `xiaozhi playback late last meta consumed stale current tail: ...` 日志，并在通用 fold 日志里补充 `consumed_current=yes/no`，便于区分“空队列尾态”与“current stale tail”两类命中。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 对用户 2026-04-28 14:30 这类日志：
+  - final `played_duration_ms=1100` 后即使 current segment 还残留，也不会再长期停在 `wait_next=yes`；
+  - 日志出现 `xiaozhi playback late last meta consumed stale current tail: ...` 或至少 `late last meta folded: ... consumed_current=yes`；
+  - 后续说话会重新进入 ASR，而不是只剩 VAD `speech/silence` 直到超时。

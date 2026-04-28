@@ -1,5 +1,26 @@
 # Change Log
 
+## Step 5.546
+- 收口 2026-04-28 14:30 新日志里的“播完 `已帮你打开灯光。` 后再说话只剩 VAD、完全不 reopen”残留尾态：
+  - 这次问题不再只是“queue 已空但 late last-meta 没折叠”，而是 current playback segment 仍残留在队列头
+  - 日志模式是：final mark 已经到 `played_duration_ms=1100`，runtime 已进入 `OWNED_PAUSED + WAITING_NEXT_SEGMENT`，服务端随后才补发同一 `segment_id is_last_segment=yes`
+  - 旧逻辑在这种“current stale tail”场景下仍会把迟到 terminal meta 当普通 `note_meta` 处理，output turn 继续被旧 tail 占住，后续说话只有 VAD、没有 ASR reopen
+  - 现在新增 `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(...)`：
+    - 要求 same-segment current tail 已 started；
+    - backend 已是 `OWNED_PAUSED`；
+    - supply 已是 `WAITING_NEXT_SEGMENT`；
+    - `output_active=no`、`tts_stop_pending=no`、`rebuffer_pending=no`；
+    - 且 `last_mark_ms >= expected_duration_ms`（零时长尾段则要求存在非零 mark）
+  - 命中后直接把 current stale tail 记为 fully-heard、弹出当前 segment，再复用既有 late-last-meta fold/completed 收口
+  - 新增 `xiaozhi playback late last meta consumed stale current tail: ...` 日志，并在 `late last meta folded` 中补充 `consumed_current=yes/no`，便于区分命中的尾态类型
+- 预期上板变化：
+  - 对 14:30 这类 final mark 已到但 current tail 未退出的日志，late same-segment `is_last_segment=yes` 不会再把 playback 卡在 `wait_next=yes`
+  - 回复播完后，后续一句话会重新进入 ASR，而不是只剩 VAD `speech/silence` 到 session timeout
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.545
 - 新增端侧实时性优化设计文档 `doc/VOICE_RUNTIME_REALTIME_OPTIMIZATION_DESIGN_ZH.md`，把当前项目中影响语音流畅性/实时性的结构性问题整理为完整技术设计：
   - 明确当前系统的核心矛盾不是功能缺失，而是“热路径被慢路径污染”

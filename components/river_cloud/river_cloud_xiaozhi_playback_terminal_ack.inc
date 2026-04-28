@@ -137,6 +137,84 @@ static bool river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(
     return true;
 }
 
+static bool river_cloud_xiaozhi_playback_segment_matches_meta_context(
+    const river_cloud_xiaozhi_playback_segment_t *segment,
+    const river_cloud_xiaozhi_playback_context_truth_t *meta_context)
+{
+    return segment != NULL && segment->valid &&
+           meta_context != NULL &&
+           river_cloud_xiaozhi_playback_segment_context_valid_from_truth(meta_context) &&
+           strcmp(segment->response_id, meta_context->response_id) == 0 &&
+           strcmp(segment->playback_id, meta_context->playback_id) == 0 &&
+           strcmp(segment->segment_id, meta_context->segment_id) == 0;
+}
+
+static bool river_cloud_xiaozhi_playback_mark_reached_expected_duration(
+    uint32_t last_mark_ms,
+    uint32_t expected_duration_ms)
+{
+    if (expected_duration_ms == 0U) {
+        return last_mark_ms != 0U;
+    }
+
+    return last_mark_ms >= expected_duration_ms;
+}
+
+static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
+    const river_xiaozhi_event_t *event)
+{
+    river_cloud_xiaozhi_playback_truth_view_t truth_view;
+    river_cloud_xiaozhi_playback_segment_t *segment =
+        river_cloud_xiaozhi_current_playback_segment();
+    const river_cloud_xiaozhi_playback_context_truth_t *meta_context =
+        &g_river_cloud.xiaozhi_playback_lineage_truth.meta_context;
+    uint32_t expected_duration_ms;
+    uint32_t final_mark_ms;
+
+    if (event == NULL || !event->is_last_segment || segment == NULL ||
+        !segment->started ||
+        !river_cloud_xiaozhi_playback_segment_matches_meta_context(segment,
+                                                                   meta_context)) {
+        return false;
+    }
+
+    river_cloud_xiaozhi_capture_playback_truth_view(&truth_view);
+    if (truth_view.backend_state != RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED ||
+        truth_view.supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT ||
+        truth_view.output_active || truth_view.tts_stop_pending ||
+        truth_view.rebuffer_pending) {
+        return false;
+    }
+
+    expected_duration_ms = event->expected_duration_ms != 0U ?
+                               event->expected_duration_ms :
+                               segment->expected_duration_ms;
+    if (!river_cloud_xiaozhi_playback_mark_reached_expected_duration(
+            segment->last_mark_ms,
+            expected_duration_ms)) {
+        return false;
+    }
+    final_mark_ms = segment->last_mark_ms;
+
+    if (expected_duration_ms != 0U) {
+        segment->expected_duration_ms = expected_duration_ms;
+    }
+    segment->is_last_segment = true;
+    river_cloud_xiaozhi_mark_segment_fully_heard(segment);
+    river_cloud_xiaozhi_pop_playback_segment();
+    RIVER_LOGI("xiaozhi playback late last meta consumed stale current tail: response_id=%s playback_id=%s segment_id=%s last_mark_ms=%lu expected_ms=%lu backend=%s",
+               meta_context->response_id[0] != '\0' ? meta_context->response_id :
+                                                      "-",
+               meta_context->playback_id[0] != '\0' ? meta_context->playback_id :
+                                                      "-",
+               meta_context->segment_id[0] != '\0' ? meta_context->segment_id :
+                                                     "-",
+               (unsigned long)final_mark_ms,
+               (unsigned long)expected_duration_ms,
+               river_cloud_playback_backend_state_name(truth_view.backend_state));
+    return true;
+}
+
 static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail(
     const river_xiaozhi_event_t *event)
 {
@@ -145,11 +223,19 @@ static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail
         &g_river_cloud.xiaozhi_playback_lineage_truth.meta_context;
     uint32_t queued_frames;
     bool completed = false;
+    bool consumed_current_tail = false;
     bool synthesized_fully_heard = false;
 
-    if (event == NULL || !event->is_last_segment ||
-        river_cloud_xiaozhi_current_playback_segment() != NULL) {
+    if (event == NULL || !event->is_last_segment) {
         return false;
+    }
+    if (river_cloud_xiaozhi_current_playback_segment() != NULL) {
+        consumed_current_tail =
+            river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(event);
+        if (!consumed_current_tail &&
+            river_cloud_xiaozhi_current_playback_segment() != NULL) {
+            return false;
+        }
     }
     if (!river_cloud_xiaozhi_playback_same_segment_context(
             meta_context,
@@ -187,7 +273,7 @@ static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail
             "late_last_meta");
     }
 
-    RIVER_LOGI("xiaozhi playback late last meta folded: response_id=%s playback_id=%s segment_id=%s queued=%lu backend=%s completed=%s",
+    RIVER_LOGI("xiaozhi playback late last meta folded: response_id=%s playback_id=%s segment_id=%s queued=%lu backend=%s completed=%s consumed_current=%s",
                meta_context->response_id[0] != '\0' ? meta_context->response_id :
                                                       "-",
                meta_context->playback_id[0] != '\0' ? meta_context->playback_id :
@@ -196,7 +282,8 @@ static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail
                                                      "-",
                (unsigned long)queued_frames,
                river_cloud_playback_backend_state_name(truth_view.backend_state),
-               completed ? "yes" : "no");
+               completed ? "yes" : "no",
+               consumed_current_tail ? "yes" : "no");
     if (synthesized_fully_heard) {
         RIVER_LOGI("xiaozhi playback late last meta synthesized fully-heard: response_id=%s playback_id=%s segment_id=%s last_mark_ms=%lu",
                    meta_context->response_id[0] != '\0' ? meta_context->response_id :

@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.543 XiaoZhi marked-tail 补齐 fully-heard 收口（待上板验证）`
+  - `5.546 XiaoZhi stale current-tail 迟到 last-meta 强制收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.546 根据 2026-04-28 14:30 `已帮你打开灯光。` 新日志继续收口：
+      - late last-meta 现在不仅覆盖“queue 已空”的尾态，也覆盖“current segment 仍残留，但 runtime 已经停在 `OWNED_PAUSED + WAITING_NEXT_SEGMENT`”的 stale current tail
+      - 对 same-segment stale current tail，若 `last_mark_ms >= expected_duration_ms`，直接标记 fully-heard、弹出 current segment，再复用既有 terminal fold/completed 收口
+      - 新增 `late last meta consumed stale current tail` 日志，并在 `late last meta folded` 中补充 `consumed_current=yes/no`
+    - 下一步上板验证：
+      - 对用户 14:30 那组日志模式，final `played_duration_ms=1100` 后不再继续挂在 `wait_next=yes`
+      - 应看到 `xiaozhi playback late last meta consumed stale current tail: ...` 或 `late last meta folded: ... consumed_current=yes`
+      - 后续一句话能重新进入 ASR，而不是只剩 VAD `speech/silence`
   - newest landed runtime bug-fix slice:
     - Step 5.543 根据 2026-04-28 13:52 `已帮你打开灯光。` 新日志继续收口：
       - 同一 `segment_id` 已达到 final mark 后，若 only `marked_context` 对齐而 `fully_heard_context` 仍未及时落账，晚到 `is_last_segment=yes` 现在也能补齐 terminal fold
