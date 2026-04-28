@@ -446,8 +446,6 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         segment =
             &g_river_cloud.xiaozhi_playback_segment_queue_truth.segments[tail_index];
         memset(segment, 0, sizeof(*segment));
-        segment->valid = true;
-        g_river_cloud.xiaozhi_playback_segment_queue_truth.count++;
     }
 
     river_cloud_xiaozhi_copy_optional_text(segment->response_id,
@@ -464,6 +462,16 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                                            meta_truth->text);
     segment->expected_duration_ms = event->expected_duration_ms;
     segment->is_last_segment = event->is_last_segment;
+    if (!segment->valid) {
+        /*
+         * Publish the new segment only after its ids/duration are fully
+         * populated. The downlink worker can pop the current head and
+         * immediately observe the next slot; exposing count/valid early lets it
+         * send started ACKs with partial ids.
+         */
+        segment->valid = true;
+        g_river_cloud.xiaozhi_playback_segment_queue_truth.count++;
+    }
     start_gate = river_cloud_xiaozhi_refresh_start_gate();
 
     RIVER_LOGI("xiaozhi playback prefetch: segment_id=%s expected_ms=%lu meta_gap_ms=%lu target_ms=%lu policy=%s cautious=%s start=%u queued=%lu rebuffer=%s/%s rebuffer_total=%lu streak=%lu",

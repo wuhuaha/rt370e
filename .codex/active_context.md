@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.550 XiaoZhi late completed audio drop，收口播放尾段 cancel_stop 抖动（待上板验证）`
+  - `5.551 XiaoZhi segment publish-order fix，收口多段 started-ack partial-id 竞态（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.551 根据 2026-04-28 17:12 新日志继续收口：
+      - 上一轮 `late completed audio dropped` 已经收住 final tail `cancel_stop/arm_stop` 抖动；新的主卡点收敛到 `_0001 -> _0002` 多段交接
+      - 根因是 `river_cloud_xiaozhi_playback_note_meta(...)` 过早把新 segment `valid/count` 对外发布，downlink worker 在当前 head 被 pop 的瞬间能看到一个 ids 尚未填完的 next slot
+      - 端侧现在改为先填完 `response_id/playback_id/segment_id/text/expected_duration_ms/is_last_segment`，再发布 `valid/count`
+      - 目标是消除 `xiaozhi playback ack started send failed: status=-1 ... playback_id=- segment_id=-` 这类 partial-id started-ack
+    - 下一步上板验证：
+      - `_0002` meta 后不再出现 started queue/send failed 且 `playback_id=- segment_id=-`
+      - 应继续看到 `_0002` 的 started/mark 推进，而不是只剩 `_0001`
+      - transport close 时 `last_fully_heard` 应推进到最后一段，不再拖到 `idle_timeout`
   - newest landed runtime bug-fix slice:
     - Step 5.550 根据 2026-04-28 16:20 新日志继续收口：
       - `accepted -> response.start` 主链已恢复，多轮会话可进入第 2 轮；当前新的主卡点是 playback 终段已经 completed-ready 后仍有 late audio 迟到，反复触发 `cancel_stop`

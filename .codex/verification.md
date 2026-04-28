@@ -1,3 +1,54 @@
+## Step 5.551 Verification
+
+Confirm new playback segments are only published after their ids/duration are fully populated, so the downlink worker cannot send `_0002` started ACKs with partial ids during the `_0001 -> _0002` handoff:
+```bash
+cd /root/ameba-river
+rg -n "Publish the new segment only after its ids/duration are fully populated|segment->valid = true|playback_segment_queue_truth.count\+\+"   components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- the publish-order comment exists in `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+- for a newly allocated segment slot, `response_id/playback_id/segment_id/expected_duration_ms/is_last_segment` are written before:
+  - `segment->valid = true`
+  - `g_river_cloud.xiaozhi_playback_segment_queue_truth.count++`
+- there is no earlier `count++` / `valid=true` publication before those ids are filled
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+```
+
+Expected result:
+- no whitespace errors
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 17:12 multi-segment handoff failure:
+```text
+触发一轮会返回 fast_launch `_0001` + main_dialogue `_0002` 的回复，例如“你想把空调调到多少度？”，重点观察 `_0001` 收尾切到 `_0002` 的瞬间是否还会出现 started-ack 上下文丢失。
+```
+
+Expected result:
+- `_0002` 的 `audio.out.meta` 之后，不再出现：
+  - `xiaozhi playback ack started send failed: status=-1 ... playback_id=- segment_id=-`
+  - `xiaozhi playback ack started queue failed: status=-1 ... playback_id=- segment_id=-`
+- 应继续看到 `_0002` 的 started/mark 推进，而不是只停在 `_0001`：
+  - `xiaozhi playback ack started sent: ... segment_id=..._0002`
+  - 后续 `xiaozhi playback ack mark sent: ... segment_id=..._0002`
+- transport 不应再因为 `_0002` 未 fully-heard 而拖到 `session.end: ... idle_timeout`
+- transport close 时的 `last_fully_heard` 应推进到最后一段，而不是继续停在 `_0001`
+
 ## Step 5.550 Verification
 
 Confirm late audio frames can no longer re-open playback stop after the last segment has already been fully heard and the terminal is ready to complete:

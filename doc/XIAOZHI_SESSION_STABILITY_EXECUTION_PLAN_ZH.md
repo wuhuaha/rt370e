@@ -935,6 +935,54 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step V: playback next-segment publish-order fix
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 收口 2026-04-28 17:12 新日志里的新主卡点：fast-launch `_0001` 收尾切到 main-dialogue `_0002` 时，started-ack 因 next segment 上下文半初始化而丢 `playback_id/segment_id`。
+- 避免 `_0002` 无法进入 started/mark/fully-heard，最终把整轮 playback 挂到 `idle_timeout` 才被 transport close 收尸。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 复盘发现 `river_cloud_xiaozhi_playback_note_meta(...)` 在新建 segment slot 时，旧逻辑会先：
+  - `segment->valid = true`
+  - `g_river_cloud.xiaozhi_playback_segment_queue_truth.count++`
+  - 然后才写入 `response_id/playback_id/segment_id/text/expected_duration_ms/is_last_segment`
+- 这会让 downlink worker 在当前 head 恰好被 pop 的边界上，把一个“已经发布但尚未填完 ids”的 next slot 当作 current segment 使用，于是打出：
+  - `xiaozhi playback ack started send failed: status=-1 response_id=resp_... playback_id=- segment_id=-`
+- 现在把 publish 顺序改成：
+  - 先 `memset` tail slot
+  - 填完 `response_id/playback_id/segment_id/text/expected_duration_ms/is_last_segment`
+  - 最后才 `segment->valid = true` 并 `count++`
+- 这样 `_0001 -> _0002` 交接时，worker 只能看到“尚未发布的空 slot”或“已经完整填好的 next segment”，不会再读到 partial ids。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- `_0002` 的 `audio.out.meta` 后，不再出现：
+  - `xiaozhi playback ack started send failed: status=-1 ... playback_id=- segment_id=-`
+  - `xiaozhi playback ack started queue failed: status=-1 ... playback_id=- segment_id=-`
+- 应继续看到 `_0002` 的 started / mark 推进：
+  - `xiaozhi playback ack started sent: ... segment_id=..._0002`
+  - `xiaozhi playback ack mark sent: ... segment_id=..._0002`
+- transport close 时 `last_fully_heard` 应推进到最后一段，不再长期停在 `_0001`。
+
 ### Step U: playback late completed audio drop
 
 状态：已完成代码修复，待上板复测。

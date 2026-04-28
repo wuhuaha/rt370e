@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.551
+- 根据 2026-04-28 17:12 新日志，上一轮 `late completed audio drop` 已经把尾段 `cancel_stop/arm_stop` 抖动收住；新的主卡点进一步收敛到多 segment 交接时的 started-ack 上下文发布竞态：
+  - `audio.out.meta` 已经明确给出第二段 `_0002` 的 `playback_id/segment_id`；
+  - 但端侧仍在 `_0001` 收尾、切到 `_0002` 的瞬间打印：
+    - `xiaozhi playback ack started send failed: status=-1 response_id=resp_... playback_id=- segment_id=-`
+    - `xiaozhi playback ack started queue failed: status=-1 response_id=- playback_id=- segment_id=-`
+  - 这说明 downlink worker 在 `pop current -> start next` 的边界上，读到了一个已经“对外可见”但尚未填完 ids 的 next segment。
+- 根因在 `river_cloud_xiaozhi_playback_note_meta(...)`：
+  - 新 segment 旧逻辑会先 `segment->valid = true`、`count++`，再写入 `response_id/playback_id/segment_id/expected_duration_ms`；
+  - 一旦此时当前 head 恰好被 pop，downlink worker 会立刻把这个 next slot 当 current segment 使用，从而带着半初始化 ids 去发 `audio.out.started`。
+- 修复方式保持最小：
+  - 新 segment 仍先选好 tail slot 并 `memset`；
+  - 但把 `valid/count` 的“发布动作”延后到 ids、text、duration、`is_last_segment` 全部填完之后；
+  - 并补一条注释，明确这是为了避免 segment 交接时 started-ack 读到 partial ids。
+- 这一步的目标很窄：只收口“第二段 `_0002` started-ack 因 partial publish 丢上下文”这一条并发发布竞态，先把多段播放从 `idle_timeout` 挂死拉回正常 completed/clear 收口。
+- Verification for this step:
+  - `git diff --check` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.550
 - 根据 2026-04-28 16:20 新日志，empty-turn / EOF 那条 accepted 无响应死锁已经不再是主问题；新的主卡点变成 playback 尾段的 late-audio stop 抖动：
   - 在最终 `played_duration_ms` 已达到 last-segment `expected_duration_ms`、terminal 事实上已经 completed ready 后，端侧仍可能收到迟到音频帧。
