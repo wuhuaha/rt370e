@@ -1,3 +1,51 @@
+## Step 5.541 Verification
+
+Confirm completed ACK de-dup, output-turn retention across lane-engaged prefetch/drain windows, and transport-close pre-clear sequencing:
+```bash
+cd /root/ameba-river
+rg -n "completed_reported|sync_playback_terminal_report_flags|lane_engaged|transport_closed_preclear|clear_session_update_cache|clear_preview_state|clear_turn_semantics_state"   components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc   components/river_core/river_dialog_runtime.c   components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- completed ACK queue path short-circuits once `completed_reported` is already true
+- `COMPLETED_QUEUED` immediately synchronizes playback terminal report flags before later re-entry can queue the same ACK again
+- dialog runtime treats `lane_engaged` as sufficient to keep the output turn engaged
+- transport-close policy clears session-update / preview / turn-semantic caches before publishing the playback-stop driven state sync
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 invalid-voice follow-up replay:
+```text
+Wake once, let the service play the short invalid-voice ACK, speak a follow-up during the next reopen window, then keep the monitor open until the session idles out or the transport closes.
+```
+
+Expected result:
+- the short ACK path emits only one `xiaozhi playback ack completed queued/sent` pair per `playback_id`
+- after `xiaozhi audio.out.meta`, there is no `interaction_state: ... -> asr_streaming reason=playback_state` before the matching real `playback start`
+- during drain / stop-pending, there is no `... -> asr_streaming reason=playback_state` while `tts_stop_pending=yes`
+- after `xiaozhi transport closed`, no stale `xiaozhi turn accepted: trigger=poll ... input_state=previewing` remains
+
 ## Step 5.540 Verification
 
 Confirm late downlink audio can no longer reopen a completed zero-duration ACK tail, and that transport-close state publication no longer reuses stale preview/stream semantics:

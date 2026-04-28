@@ -656,6 +656,10 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
         river_cloud_xiaozhi_clear_playback_terminal_wait();
         return true;
     }
+    if (g_river_cloud.xiaozhi_playback_terminal_truth.completed_reported) {
+        river_cloud_xiaozhi_clear_playback_terminal_wait();
+        return true;
+    }
 
     river_cloud_xiaozhi_update_playback_ack_progress();
     if (!river_cloud_xiaozhi_playback_completed_ready()) {
@@ -738,6 +742,7 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
             &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context,
             0U,
             NULL);
+        river_cloud_xiaozhi_sync_playback_terminal_report_flags();
         RIVER_LOGI("xiaozhi playback ack completed queued: response_id=%s playback_id=%s",
                    response_id[0] != '\0' ? response_id : "-",
                    playback_id[0] != '\0' ? playback_id : "-");

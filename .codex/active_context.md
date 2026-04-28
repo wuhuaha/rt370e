@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.540 XiaoZhi invalid-voice 播放尾态卡死与 transport-close 状态发布收口（待上板验证）`
+  - `5.541 XiaoZhi invalid-voice ACK completed 去重与 lane-engaged/transport-close 状态收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.541 根据 2026-04-28 新复测日志继续收口：
+      - completed ACK queue/sent 增加 `completed_reported` 早退，并在 `COMPLETED_QUEUED` 后立即同步 report flags，避免同一 playback 重复 `completed`
+      - dialog runtime 的 output-turn engaged 现在直接承认 `lane_engaged`，覆盖 `audio.out.meta` 到真实 playback start 之间，以及 stop-pending/drain 期间的窗口
+      - transport close 终态策略先清 session-update cache、preview state、turn semantics，再触发 playback-stop 驱动的状态同步，避免旧 `previewing` truth 泄漏
+    - 下一步上板验证：
+      - 同一 `playback_id` 只出现一次 `xiaozhi playback ack completed queued/sent`
+      - `audio.out.meta` 到 `playback start` 之间不再出现 `... -> asr_streaming reason=playback_state`
+      - drain 尾态 `tts_stop_pending=yes` 时不再提前回到 `asr_streaming`
+      - `transport_closed` 后不再残留旧 `input_state=previewing` 的 `turn accepted: trigger=poll`
   - newest landed runtime bug-fix slice:
     - Step 5.540 根据 2026-04-28 `未识别到有效语音` 新日志继续收口：
       - playback terminal completed 后，晚到 downlink audio 不再无条件取消 `tts_stop_pending`，避免 `draining -> playing reason=cancel_stop queued=1 segments=0`

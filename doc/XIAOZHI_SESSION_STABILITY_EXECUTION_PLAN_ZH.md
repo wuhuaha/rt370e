@@ -1,7 +1,7 @@
 # XiaoZhi Session Stability Execution Plan
 
 Status: active / device-side commit-race fix complete; pending board replay validation
-Last Updated: 2026-04-26
+Last Updated: 2026-04-28
 Branch: `agent-server-v2`
 
 ## 1. 当前背景
@@ -601,3 +601,45 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 不再出现 `playback phase: draining -> playing reason=cancel_stop queued=1 segments=0`。
 - 复现服务端 `未识别到有效语音。` 后，播放结束后再次说话可重新触发 follow-up / ASR。
 - transport close 时不再出现带旧 `previewing` 输入语义的 `... -> asr_streaming reason=playback_state`。
+
+
+### Step N: invalid-voice ACK completed 去重与 lane-engaged / transport-close 状态收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复短 ACK 尾态在 backend 真正 detach 前重复发送 `audio.out.completed` 的问题。
+- 保证 `audio.out.meta` 已到但 playback 尚未物理 active、以及 stop-pending / drain 尚未 detach 的窗口里，dialog runtime 继续把 output turn 视为 engaged。
+- 修复 transport close 瞬间仍携带旧 `previewing` / accepted truth 发布交互态与 poll 日志的问题。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+- `components/river_core/river_dialog_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+实现：
+
+- `river_cloud_xiaozhi_try_queue_playback_completed_ack()` 在 `completed_reported` 已成立时直接早退，并在 `COMPLETED_QUEUED` lineage touch 后立刻同步 terminal report flags，压住重复 completed ACK re-entry。
+- `river_dialog_runtime_output_turn_engaged_from_projection()` 现在把 `lane_engaged` 直接视为 output-turn engaged 的充分条件，覆盖 prefetch、waiting-segment、draining 等物理播放与逻辑播放短时错位窗口。
+- `river_cloud_xiaozhi_apply_transport_closed_terminal_policy()` 在 stop playback 前先清 session-update cache、preview state、turn semantics，并主动请求一次 `transport_closed_preclear` state sync。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 同一 `playback_id` 只出现一次 `xiaozhi playback ack completed queued/sent`。
+- `audio.out.meta` 到真实 `playback start` 之间，不再出现 `... -> asr_streaming reason=playback_state`。
+- drain 尾态 `tts_stop_pending=yes` 时，不再提前退回 `asr_streaming`。
+- `transport_closed` 后，不再残留旧 `input_state=previewing` 的 `xiaozhi turn accepted: trigger=poll ...`。

@@ -1394,6 +1394,9 @@ static bool river_dialog_runtime_output_turn_engaged_from_projection(
     if (projection == NULL || projection->terminal_closed) {
         return false;
     }
+    if (projection->lane_engaged) {
+        return true;
+    }
 
     return playback_active ||
            river_dialog_runtime_playback_turn_retains_output_turn_from_projection(

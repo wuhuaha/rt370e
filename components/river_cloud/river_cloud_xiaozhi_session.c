@@ -1346,6 +1346,10 @@ void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
     river_cloud_xiaozhi_finalize_pending_text("transport_closed");
     river_cloud_xiaozhi_round_finish("transport_closed");
     river_cloud_xiaozhi_window_abort_local("transport_closed");
+    river_xiaozhi_clear_session_update_cache();
+    river_cloud_xiaozhi_clear_preview_state();
+    river_cloud_xiaozhi_clear_turn_semantics_state();
+    river_cloud_request_state_sync("transport_closed_preclear");
     river_cloud_xiaozhi_apply_terminal_playback_policy(
         RIVER_CLOUD_XIAOZHI_PLAYBACK_ABORT_TRANSPORT_CLOSED);
     river_cloud_xiaozhi_reset_transport_state(true);

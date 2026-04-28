@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.541
+- 收口 2026-04-28 新一轮 invalid-voice 复测暴露的三个残留问题：
+  - playback completed ACK 在 queue/sent 入口新增 `completed_reported` 早退，并在 `COMPLETED_QUEUED` lineage touch 后立刻同步 terminal report flags，避免同一 `playback_id` 重复 `completed queued/sent`
+  - dialog runtime 的 output-turn engaged 判定现在把 `playback lane engaged` 视为充分条件，覆盖 `audio.out.meta` 已到但物理播放尚未 active、以及 stop-pending/drain 尚未真正 detach 的窗口，避免错误回到 `asr_streaming`
+  - transport close 终态策略在 stop playback 前先清 session update cache、preview state 和 turn semantics，并主动请求一次 state sync，避免关连接瞬间仍带着旧 `previewing` / accepted truth 发布交互态或 poll 日志
+- 预期上板变化：
+  - 同一 response/playback 只出现一次 `xiaozhi playback ack completed queued/sent`
+  - `audio.out.meta` 到真实 `playback start` 之间，以及 `tts_stop_pending=yes` 的 drain 尾态期间，不再出现 `... -> asr_streaming reason=playback_state`
+  - `transport_closed` 后不再继续打印带旧 `input_state=previewing` 的 `xiaozhi turn accepted: trigger=poll ...`
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.540
 - 修复“播完 `未识别到有效语音` 后后续说话无响应”的尾态卡死：
   - XiaoZhi playback terminal 在已经判定 completed 后，不再因为晚到的 downlink audio 无条件 `cancel_playback_stop()`
