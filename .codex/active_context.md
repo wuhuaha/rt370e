@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.548 XiaoZhi 多轮对话 terminal-only stale output-turn 兜底（待上板验证）`
+  - `5.549 XiaoZhi empty-turn active-return 与 follow-up 断链自恢复兜底（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.549 对齐 2026-04-28 服务侧 empty-turn / EOF 定位：
+      - `accepted` 后新增 `accepted_response_watchdog`，端侧不再默认把 accepted 建模成“必然会收到 `response.start`”
+      - 若服务端把本轮按空语音直接收回 `active/idle`，端侧会明确走 `empty_turn returned active` 路径，清 preview / turn semantics，并重新 touch follow-up window
+      - 仅在这条 empty-turn active-return 路径内，新增一次窄范围 `transport_closed` auto-recover：若 follow-up window 仍有效、Wi-Fi 在线、且本地没有 active stream / playback turn，则直接重开 `open_session_and_listen()`
+      - 若 accepted 后既没有 `response.start` 也没有 active-return，6s watchdog 会主动 abort 并重同步会话状态，避免 accepted 后永久悬挂
+    - 下一步上板验证：
+      - empty-turn 回 active 时应看到 `xiaozhi empty turn returned active: ...`
+      - 若随后 1 次 follow-up EOF 落在 recovery window 内，应看到 `xiaozhi transport closed followup recover/recovered: ...`
+      - 若服务端/链路让 accepted 长时间没有下一步，应看到 `xiaozhi accepted response watchdog timeout: ...`
   - newest landed runtime bug-fix slice:
     - Step 5.548 继续收窄“播完一轮 TTS 后后续说话无反应”的残留空间：
       - 复查 Step 5.547 后确认，仍存在另一类 stale output-turn：`playback_lane` 已经空闲，但 `playback_turn` 仍因 terminal truth 残留而阻断 reopen

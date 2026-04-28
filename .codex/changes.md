@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.549
+- 针对服务侧已确认的 `accepted -> active/idle` 空语音收口语义，端侧不再把 `accepted` 写死为“必然会收到 `response.start`”：
+  - 在 `session.update accept_reason=...` 收口本地 round 后，新增 `RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS=6000`。
+  - 若后续确实收到了 `response.start`，watchdog 会立即清掉，继续沿原有播放链路走。
+  - 若服务侧把本轮按空语音直接收回 `active/idle`，端侧会明确记录 `xiaozhi empty turn returned active: ...`，同步清 preview / turn semantics，并重新 touch follow-up window。
+- 新增 narrow empty-turn recovery state，专门兜住“accepted 但没有 response.start”的合法 silent-recovery 路径：
+  - `empty_turn_recover_deadline_ms` 只在 empty-turn active-return 场景下建立，不污染正常 TTS 回合。
+  - follow-up window 内若随后发生一次 `transport_closed`，且本地没有 active stream / playback turn、Wi-Fi 仍在线，端侧会直接 `open_session_and_listen()` 重开当前会话窗口，而不是把这一轮永久打死。
+  - recovery 失败时仍按原路径 `window_close("transport_recover_open_failed")` 收口，避免反复重试。
+- 同时补了一条 endpoint 端自恢复 watchdog：
+  - 若 accepted 后既没有 `response.start`，也没有回到 empty-turn active/idle，而是一直卡住，watchdog 超时会 `request_abort("accepted_response_watchdog")`，清理 session-update cache / preview / turn semantics，并重新同步 follow-up state。
+  - 目标不是替代服务端语义，而是把端侧从“accepted 后永远等不到下一步”的僵态拉回可恢复状态。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.548
 - 复查 Step 5.547 后，继续补上另一类会把 follow-up 永久卡死的残留态：`playback_lane` 已经松开，但 `playback_turn` 仍因 terminal truth 残留而保持打开。
   - 这类问题和 Step 5.547 不同，不一定还挂在 `WAITING_NEXT_SEGMENT`；更像是：

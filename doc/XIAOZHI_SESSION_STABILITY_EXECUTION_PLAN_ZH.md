@@ -1,6 +1,6 @@
 # XiaoZhi Session Stability Execution Plan
 
-Status: active / device-side commit-race fix complete; pending board replay validation
+Status: active / empty-turn active-return + follow-up transport-close recovery complete; pending board replay validation
 Last Updated: 2026-04-28
 Branch: `agent-server-v2`
 
@@ -880,3 +880,56 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 即使日志里已经看不到 `playback_lane=yes`，只剩 `playback_turn=yes`，也应先看到 `xiaozhi stale output guard armed: ... playback_lane=no playback_turn=yes ...`
   - 若异常态持续 `720ms`，应继续看到 `xiaozhi stale output guard forcing playback clear: ...`
   - 兜底触发后，同一句 follow-up 能继续 reopen ASR，而不是只剩 VAD 到 `idle_timeout`。
+
+
+### Step T: empty-turn active-return 与 follow-up 断链自恢复
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 对齐服务侧已经确认存在的合法语义：某些 `accepted` 回合不会进入 `response.start/TTS`，而是会在无文本 / 空语音条件下直接回到 `active/idle`。
+- 端侧不再把 `accepted` 写死为“必有 response.start”，避免在 empty-turn/silent-recovery 场景里把状态机卡死。
+- 对 empty-turn active-return 后紧跟的一次 follow-up `transport_closed/EOF` 增加窄范围自恢复，保证多轮对话还能继续。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+实现：
+
+- 新增 `RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS=6000`，在 `server committed input` 后 arm：
+  - 若后续收到 `response.start`，立即清 watchdog；
+  - 若 accepted 后长时间既没有 `response.start` 也没有 empty-turn active-return，则 watchdog timeout 后主动 abort 并重同步 state。
+- 新增 empty-turn active-return 语义：
+  - 当 `session_state=active` 且 `output_state=idle`，并且本轮 accepted watchdog 仍然有效、同时未观察到 `response.start` 音频链路时，端侧记录 `xiaozhi empty turn returned active: ...`；
+  - 同步清 session-update cache / preview / turn semantics，重新 touch follow-up window，并建立 `empty_turn_recover_deadline_ms`。
+- 新增 follow-up `transport_closed` auto-recover：
+  - 仅当 `window_active=yes`、`empty_turn_recover_deadline_ms` 尚未过期、`stream_active=no`、`playback_turn_active=no`、Wi-Fi 仍在线时触发；
+  - 端侧记录 `xiaozhi transport closed followup recover: action=reopen_listen ...`，随后直接 `open_session_and_listen()`；
+  - 若 reopen 失败，则退回 `window_close("transport_recover_open_failed")`，避免无界重试。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 当服务端把某轮 accepted 按空语音直接收回 `active/idle` 时，端侧应看到：
+  - `xiaozhi empty turn returned active: ...`
+- 若随后立刻发生一次 follow-up window 内的 `transport_closed/EOF`，且本地没有 active stream / playback turn，应看到：
+  - `xiaozhi transport closed followup recover: action=reopen_listen ...`
+  - 成功时继续看到 `xiaozhi transport closed followup recovered: ...`
+- 若 accepted 后长时间没有 `response.start`，也没有回到 active/idle，应看到：
+  - `xiaozhi accepted response watchdog timeout: ...`
+- 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。

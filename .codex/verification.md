@@ -1,3 +1,60 @@
+## Step 5.549 Verification
+
+Confirm endpoint-side empty-turn handling and follow-up transport-close recovery were added as explicit first-class paths instead of assuming every accepted turn must produce `response.start`:
+```bash
+cd /root/ameba-river
+rg -n "ACCEPTED_RESPONSE_WATCHDOG_MS|empty_turn_recover_deadline_ms|accepted_response_deadline_ms|accepted response watchdog|empty turn returned active|transport closed followup recover"   components/river_cloud/river_cloud_internal.h   components/river_cloud/river_cloud_xiaozhi_round_runtime.c   components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS` exists in `components/river_cloud/river_cloud_internal.h`
+- session-window truth now tracks both:
+  - `empty_turn_recover_deadline_ms`
+  - `accepted_response_deadline_ms`
+- `river_cloud_xiaozhi_session.c` now contains explicit logs / paths for:
+  - `xiaozhi accepted response watchdog armed`
+  - `xiaozhi accepted response watchdog timeout`
+  - `xiaozhi empty turn returned active`
+  - `xiaozhi transport closed followup recover`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the latest empty-turn / EOF failure mode:
+```text
+在 follow-up window 内连续做多轮短句测试，重点覆盖“accepted 后服务端没有下发 response.start，而是直接回 active/idle”的场景；随后立刻继续说下一句，并观察是否还会因一次 transport EOF 直接卡死。
+```
+
+Expected result:
+- 若某轮被服务端按空语音收口，端侧应先看到：
+  - `xiaozhi empty turn returned active: ...`
+- 若该 empty-turn 后紧接着发生一次 follow-up window 内的断链，且 Wi-Fi 仍在线、本地无 playback / stream，端侧应看到：
+  - `xiaozhi transport closed followup recover: action=reopen_listen ...`
+  - 成功时再看到 `xiaozhi transport closed followup recovered: ...`
+- 若 accepted 后既没有 `response.start`，也没有回到 `active/idle`，超时后应至少看到：
+  - `xiaozhi accepted response watchdog timeout: ...`
+- 多轮对话不应再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
+
 ## Step 5.548 Verification
 
 Confirm stale follow-up recovery now also covers the case where the playback lane is already idle but the output turn is still held open only by stale terminal truth:

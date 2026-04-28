@@ -96,6 +96,7 @@
 #define RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS 8000U
 #define RIVER_CLOUD_XIAOZHI_POST_TTS_SILENCE_CLOSE_MS 3000U
 #define RIVER_CLOUD_XIAOZHI_POST_COMMIT_RESPONSE_WAIT_MS 6000U
+#define RIVER_CLOUD_XIAOZHI_ACCEPTED_RESPONSE_WATCHDOG_MS 6000U
 #define RIVER_CLOUD_XIAOZHI_LOCAL_CLOSE_DEFER_MS 2000U
 #define RIVER_CLOUD_XIAOZHI_SERVER_ACCEPT_FALLBACK_MS 1800U
 #define RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS 320U
@@ -403,6 +404,8 @@ typedef struct {
     uint64_t local_close_deadline_ms;
     uint64_t server_accept_fallback_deadline_ms;
     uint64_t stale_output_guard_deadline_ms;
+    uint64_t empty_turn_recover_deadline_ms;
+    uint64_t accepted_response_deadline_ms;
 } river_cloud_xiaozhi_session_window_truth_t;
 
 typedef struct {
