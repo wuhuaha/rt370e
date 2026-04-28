@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.540
+- 修复“播完 `未识别到有效语音` 后后续说话无响应”的尾态卡死：
+  - XiaoZhi playback terminal 在已经判定 completed 后，不再因为晚到的 downlink audio 无条件 `cancel_playback_stop()`
+  - 这样 zero-duration ACK 在 stop-pending / drain 期间不会被重新拉回 `playing`，避免长时间卡在 `barge_in_listening`
+  - `playback completed` 改为 backend stream 已退出 attached/active 后再真正 queue/sent，避免 DAC 尚未 drain 完就提前报 completed
+- 修正 transport closed 的状态发布顺序：
+  - `reset_transport_state()` 先清理 stream/preview/turn 语义，再决定是否发 `session_closed`
+  - 避免连接关闭时用旧的 `previewing` / `stream_active` 投影把交互态错误发布成 `asr_streaming`
+- 预期上板变化：
+  - 出现服务端 `未识别到有效语音。` 后，播放尾态应正常 stop，不再卡住后续 follow-up / 再次说话
+  - 不再出现 `playback phase: draining -> playing reason=cancel_stop queued=1 segments=0`
+  - transport close 时不应再出现 `barge_in_listening -> asr_streaming reason=playback_state` 这类带旧输入语义的收口
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.539
 - 收口 zero-duration fast-launch ACK 的播放尾态判定：
   - XiaoZhi playback terminal 对外 `terminal_closed` 不再只看 terminal state，而是要求 backend 已退出 output-active 且不再 `tts_stop_pending`

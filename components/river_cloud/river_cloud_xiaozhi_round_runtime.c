@@ -375,11 +375,10 @@ void river_cloud_xiaozhi_check_local_close_timeout(void)
 
 void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
 {
-    if (emit_session_closed) {
-        river_cloud_xiaozhi_emit_session_closed();
-    } else {
-        g_river_cloud.xiaozhi_session_window_truth.listening = false;
-    }
+    bool should_emit_session_closed =
+        emit_session_closed &&
+        (g_river_cloud.xiaozhi_session_window_truth.listening ||
+         g_river_cloud.xiaozhi_session_window_truth.local_close_pending);
 
     g_river_cloud.stream_active = false;
     g_river_cloud.silence_frames = 0U;
@@ -401,6 +400,11 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     river_cloud_xiaozhi_clear_preview_state();
     river_cloud_xiaozhi_clear_turn_semantics_state();
     river_cloud_pre_roll_reset();
+    if (should_emit_session_closed) {
+        river_cloud_xiaozhi_emit_session_closed();
+    } else {
+        g_river_cloud.xiaozhi_session_window_truth.listening = false;
+    }
     river_cloud_xiaozhi_clear_session_id();
 }
 

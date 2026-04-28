@@ -562,3 +562,42 @@ python3 /root/ameba-rtos/ameba.py build -p
 - zero-duration ACK 尾态不再出现 `interaction_state: barge_in_listening -> asr_streaming reason=arm_stop` 早于物理播放停止。
 - 新增 `dialog_runtime interaction_transition: ... terminal_closed=... playback_active=... tts_stop_pending=... duplex_ready_seen=...` 日志。
 - `half_duplex_aec_blocked` / `capture held during playback` 若仍出现，其前序交互态日志应仍保持 output turn engaged，而不是提前回到 ASR。
+
+### Step M: invalid-voice 播放尾态卡死与 transport-close 状态发布收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复服务端播放 `未识别到有效语音。` 后，端侧播放尾态卡在 `barge_in_listening`、后续说话无响应的问题。
+- 防止 zero-duration/短尾巴 ACK 在 terminal completed 后，被晚到 downlink audio 重新取消 `tts_stop_pending` 并拉回 `playing`。
+- 修正 transport close 时 `session_closed` 的发布顺序，避免用旧 `previewing` / `stream_active` 语义错误回到 `asr_streaming`。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc`
+- `components/river_cloud/river_cloud_xiaozhi_round_runtime.c`
+
+实现：
+
+- playback completed 改为 backend stream 已退出 attached/active 后再真正 queue/sent；attached 期间只 arm stop，不提前 completed。
+- downlink audio 写入后仅在 playback terminal 仍 open 时才取消 `tts_stop_pending`，避免 completed 尾态被晚到音频重新打开。
+- `reset_transport_state()` 先清空 stream、preview、turn semantics，再按需要发 `session_closed`，让状态发布看到的是清理后的 truth。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 不再出现 `playback phase: draining -> playing reason=cancel_stop queued=1 segments=0`。
+- 复现服务端 `未识别到有效语音。` 后，播放结束后再次说话可重新触发 follow-up / ASR。
+- transport close 时不再出现带旧 `previewing` 输入语义的 `... -> asr_streaming reason=playback_state`。

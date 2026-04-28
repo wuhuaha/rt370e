@@ -1,3 +1,51 @@
+## Step 5.540 Verification
+
+Confirm late downlink audio can no longer reopen a completed zero-duration ACK tail, and that transport-close state publication no longer reuses stale preview/stream semantics:
+```bash
+cd /root/ameba-river
+rg -n "playback_backend_stream_attached|cancel_playback_stop\\(|reset_transport_state\\(|emit_session_closed\\(" \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(...)` defers completed ACK while backend stream is still attached
+- `river_cloud_xiaozhi_playback_handle_audio_event(...)` no longer unconditionally cancels `tts_stop_pending`
+- `river_cloud_xiaozhi_reset_transport_state(...)` clears stream/preview/turn state before `session_closed` is emitted
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 invalid-voice reproduction:
+```text
+Wake once, trigger the server-side "未识别到有效语音。" path, wait for playback tail to finish, then immediately say another follow-up command.
+```
+
+Expected result:
+- playback tail completes without `playback phase: draining -> playing reason=cancel_stop queued=1 segments=0`
+- after the invalid-voice playback stops, the next spoken follow-up can reopen capture / ASR normally
+- if the server later closes the session, interaction-state logs should not regress to `asr_streaming` using stale `previewing` input semantics
+
 ## Step 5.539 Verification
 
 Confirm zero-duration ACK tails keep the output turn engaged until drain finishes, and that interaction-transition logs expose the new terminal context:
