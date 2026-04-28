@@ -1,5 +1,19 @@
 # Change Log
 
+## Step 5.544
+- 新增交互体验审查文档 `doc/VOICE_INTERACTION_HUMANIZATION_REVIEW_ZH.md`，把当前 XiaoZhi 语音链路在“人性化 / 智能化交互”上的结构性问题整理成单独研究：
+  - 梳理了 `wakeword -> follow-up -> thinking -> speaking -> barge-in -> tail close` 主链路
+  - 明确指出当前实现更偏“状态正确性优先”，而非“用户意图优先”
+  - 归纳出五类核心问题：guard 期间用户意图丢失、wakeword 无强制接管、barge-in 两端失衡、恢复缺少自解释、关键时序参数缺乏自适应
+  - 给出按优先级排序的优化方向：意图保留、wakeword override、三段式 barge-in、低成本恢复反馈、参数 profile/动态化
+- 文档目的：
+  - 作为后续交互体验优化的设计输入，而不是继续把体验问题零散埋在日志分析里
+  - 让后续改动有统一目标：从“只修尾态”升级到“按用户意图设计状态机”
+- Verification for this step:
+  - `git diff --check` passed
+  - `test -f doc/VOICE_INTERACTION_HUMANIZATION_REVIEW_ZH.md` confirmed the new review document exists
+  - `rg -n "用户意图优先|强制接管|三段式|自解释|动态调整" doc/VOICE_INTERACTION_HUMANIZATION_REVIEW_ZH.md` confirmed the key review sections were recorded
+
 ## Step 5.543
 - 收口 2026-04-28 13:52 新日志里的“播完 `已帮你打开灯光。` 后后续再说无响应”残留尾态：
   - 日志显示同一 `segment_id=..._0002` 已经打到 final mark `played_duration_ms=1100`
