@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.542 XiaoZhi late last-meta 尾态折叠与 paused tail 收口（待上板验证）`
+  - `5.543 XiaoZhi marked-tail 补齐 fully-heard 收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.543 根据 2026-04-28 13:52 `已帮你打开灯光。` 新日志继续收口：
+      - 同一 `segment_id` 已达到 final mark 后，若 only `marked_context` 对齐而 `fully_heard_context` 仍未及时落账，晚到 `is_last_segment=yes` 现在也能补齐 terminal fold
+      - fold 前会在 `last_mark_ms >= expected_duration_ms` 时，把 same-segment `marked_context` 合成为 `fully_heard_context`
+      - 新增 `late last meta synthesized fully-heard` 诊断日志，便于确认是否命中这条兜底路径
+    - 下一步上板验证：
+      - 播放完 `已帮你打开灯光。` 后，不再卡在 `prefetching/backend=owned_paused`
+      - 日志应出现 `late last meta folded`，必要时还会出现 `late last meta synthesized fully-heard`
+      - 下一句能重新进入 ASR，而不是只剩 VAD 日志直到 `idle_timeout`
   - newest landed runtime bug-fix slice:
     - Step 5.542 根据 2026-04-28 13:34 新日志继续收口：
       - 服务端对同一 `segment_id` 补发 `is_last_segment=yes` 时，若该 segment 已 fully-heard，不再重建新的 playback segment
@@ -4497,16 +4506,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-27 / branch `agent-server-v2`: Step 5.535 closes XiaoZhi text-only responses and zero-duration terminal playback tails:
-  - `server_returned_active_no_audio` now closes the local round/window, clears cached session update / turn semantics, and syncs dialog runtime so local VAD cannot immediately open phantom follow-up rounds after a no-audio response
-  - `expected_duration_ms=0 && is_last_segment=yes` is marked fully-heard on the first valid playback mark so the segment queue can drain
-  - playback progress now queues `audio.out.completed` once the last segment is fully heard and arms a drain stop for the physical backend, covering realtime responses that do not emit legacy `tts.stop`
+- 2026-04-28 / branch `agent-server-v2`: Step 5.543 broadens XiaoZhi late-last-meta tail closure for the `已帮你打开灯光。` reproduction:
+  - same-segment late `is_last_segment=yes` meta can now reuse a synthesized `fully_heard_context` when the segment already reached its final playback mark but lineage had only latched `marked_context`
+  - this keeps the late-last-meta fold path from reopening or preserving a paused tail after the spoken answer already finished
+  - the fold path now emits an explicit `xiaozhi playback late last meta synthesized fully-heard` log when it has to promote `marked_context` into terminal truth before closing the tail
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
 - Board expectation:
-  - text-only/no-audio response logs `xiaozhi response audio abandoned recovery ... action=close_text_only` and does not start phantom follow-up ASR rounds
-  - zero-duration last segment logs `xiaozhi playback zero-duration last segment completed from mark` and sends `audio.out.completed`
-  - no `audio_stream_failed context deadline exceeded` on that terminal tail path
-  - no new `upstream_starved` rebuffer after terminal completion or transport-close cleanup
+  - after the final mark for `已帮你打开灯光。`, a late duplicate same-segment `is_last_segment=yes` no longer leaves playback in `prefetching/backend=owned_paused`
+  - logs show `xiaozhi playback late last meta folded: ...`; if `fully_heard_context` was still missing, they also show `xiaozhi playback late last meta synthesized fully-heard: ...`
+  - the next spoken sentence reopens ASR before idle-timeout instead of leaving only VAD logs

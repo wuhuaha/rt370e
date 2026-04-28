@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.543
+- 收口 2026-04-28 13:52 新日志里的“播完 `已帮你打开灯光。` 后后续再说无响应”残留尾态：
+  - 日志显示同一 `segment_id=..._0002` 已经打到 final mark `played_duration_ms=1100`
+  - 随后 playback 落入 `playing -> prefetching ... wait_next=yes physical=no backend=owned_paused`
+  - 服务端接着对同一 `segment_id` 晚到补发 `is_last_segment=yes`，但此前 fold 路径只在 `fully_heard_context` 已经对齐时才能命中
+  - 若当时只有 `marked_context` 已对齐、且 `last_mark_ms >= expected_duration_ms`，旧逻辑会漏掉 terminal fold，尾态继续挂住直到 session idle-timeout
+  - 现在对这类 same-segment late last-meta 允许用 `marked_context + last_mark_ms` 合成 `fully_heard_context`，再复用既有 late-last-meta fold 路径收口
+  - 新增 `xiaozhi playback late last meta synthesized fully-heard: ...` 日志，便于直接确认是否命中了这条补救路径
+- 预期上板变化：
+  - 播完 `已帮你打开灯光。` 这类单段主回答后，即使 `fully_heard_context` 还没先对齐，晚到的 same-segment `is_last_segment=yes` 也会直接收口
+  - 不再停在 `prefetching/backend=owned_paused` 然后只剩 VAD speech/silence 日志直到 `idle_timeout`
+  - 下一句应重新进入 ASR / follow-up，而不是“第一句有反应、第二句无反应”
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.542
 - 收口 2026-04-28 13:34 新日志里的“只说一句、后续再说无响应”残留尾态：
   - 服务端会对同一 `segment_id` 先下发普通 meta，尾部再补一条同 `segment_id` 的 `is_last_segment=yes`

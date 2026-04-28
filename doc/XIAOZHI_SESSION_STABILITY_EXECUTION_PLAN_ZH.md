@@ -682,3 +682,42 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 最后一段 final mark 之后，即使服务端再补同 `segment_id is_last_segment=yes`，也不会再把 playback 卡在 `prefetching/backend=owned_paused`。
 - 播放完 `我没听清，请再说一遍。` 后，后续再说话可重新进入 ASR。
 - 不再一直拖到 `xiaozhi session.end: ... idle_timeout` 才退出 output turn。
+
+
+### Step P: marked-tail 补齐 fully-heard 后再折叠 late last-meta
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复播完 `已帮你打开灯光。` 这类单段主回答后，final mark 已经到齐，但 `fully_heard_context` 尚未及时落账时，晚到 same-segment `is_last_segment=yes` 仍会把尾态挂住的问题。
+- 让 late last-meta 折叠路径可以接受“已经完整播完、但只记到了 `marked_context`”的尾段，而不是只认已经落账的 `fully_heard_context`。
+- 避免 session 一直卡到 `idle_timeout` 才退出 output turn。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 新增 `river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(...)`：当 current segment 已空、same-segment `marked_context` 已对齐、且 `last_mark_ms >= expected_duration_ms` 时，把该尾段补记为 `fully_heard_context`。
+- `river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail(...)` 不再只接受已存在的 `fully_heard_context`；必要时先调用上述 helper 补齐 terminal truth，再走既有 fold/completed 收口。
+- 新增 `xiaozhi playback late last meta synthesized fully-heard: ...` 日志，方便上板直接确认是否走到这条兜底路径。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- 在 `已帮你打开灯光。` 场景里，final mark 之后即使再收到同一 `segment_id is_last_segment=yes`，也不会再卡在 `prefetching/backend=owned_paused`。
+- 日志至少出现 `xiaozhi playback late last meta folded: ...`；若 `fully_heard_context` 当时还未落账，还会出现 `xiaozhi playback late last meta synthesized fully-heard: ...`。
+- 下一句说话能重新进入 ASR / follow-up，而不是只剩 VAD 日志直到 `xiaozhi session.end: ... idle_timeout`。

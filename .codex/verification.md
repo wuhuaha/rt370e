@@ -1,3 +1,49 @@
+## Step 5.543 Verification
+
+Confirm late duplicate same-segment `is_last_segment=yes` meta can still close the tail when the segment already reached its final mark but `fully_heard_context` has not yet been latched:
+```bash
+cd /root/ameba-river
+rg -n "promote_marked_tail_to_fully_heard|late last meta synthesized fully-heard|marked_context|last_mark_ms <|fully_heard_context"   components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(...)` exists in `river_cloud_xiaozhi_playback_terminal_ack.inc`
+- the late-last-meta fold path accepts either an already-matching `fully_heard_context` or a synthesized one derived from the same `marked_context`
+- synthesis only happens after the last playback mark has reached the segment `expected_duration_ms` (or a non-zero mark exists for zero-duration tails)
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 `已帮你打开灯光。` reproduction:
+```text
+Wake once, say the command that makes the service answer “已帮你打开灯光。”, wait for that spoken reply to finish, then say the next sentence before the idle-timeout window closes.
+```
+
+Expected result:
+- after the final `played_duration_ms=1100` mark for the spoken answer, a late duplicate same-segment `is_last_segment=yes` meta no longer leaves playback stuck in `prefetching/backend=owned_paused`
+- logs should show `xiaozhi playback late last meta folded: ...`; if `fully_heard_context` had not been latched yet, logs should also show `xiaozhi playback late last meta synthesized fully-heard: ...`
+- the next spoken sentence reopens ASR normally instead of leaving the session stuck until `xiaozhi session.end: ... idle_timeout`
+
 ## Step 5.542 Verification
 
 Confirm late duplicate `is_last_segment=yes` meta for an already fully-heard segment is folded into terminal completion instead of reopening a paused playback tail:
