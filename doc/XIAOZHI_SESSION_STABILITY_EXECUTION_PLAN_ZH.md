@@ -519,3 +519,46 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 不再出现空 ASR round：`duration_ms=4 audio_ms=0 packets=0`。
 - 播放启动或 reference 维护异常时，端侧不再持续刷 `capture frame ring overflow`。
 - 若 AEC/reference 暂不可用，表现为 no-ref/aec-blocked 降级，而不是采集任务阻塞。
+
+### Step L: zero-duration ACK 播放尾态与交互诊断收口
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 修复 zero-duration fast-launch ACK 在 DAC 仍处于 drain / stop-pending 时，dialog runtime 已把 output turn 视为结束、交互态提前退回 `asr_streaming` 的问题。
+- 保证 `terminal_closed` 不会在 `physical_active` 或 `tts_stop_pending` 期间直接打掉 `output_turn_engaged`。
+- 在交互态切换日志中补足 `terminal_closed / playback_active / tts_stop_pending / duplex_ready_seen`，方便对齐 AEC/no-ref 尾态。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_runtime.c`
+- `components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc`
+- `components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc`
+- `components/river_core/river_dialog_runtime.c`
+- `include/river/river_cloud.h`
+- `include/river/river_dialog_runtime.h`
+
+实现：
+
+- playback terminal 对外 closed 判定改为“terminal 已完成且 backend 已不再 output-active，且不再 stop-pending”后才成立。
+- zero-duration fast-launch ACK 的 local-completed/terminal-close 对 dialog runtime 可见性延后到 DAC drain 结束后，避免播放尾巴期间提前释放 output turn。
+- dialog runtime 的交互态切换前新增结构化日志，输出 `terminal_closed`、`playback_active`、`tts_stop_pending` 和 `duplex_ready_seen`。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- zero-duration ACK 尾态不再出现 `interaction_state: barge_in_listening -> asr_streaming reason=arm_stop` 早于物理播放停止。
+- 新增 `dialog_runtime interaction_transition: ... terminal_closed=... playback_active=... tts_stop_pending=... duplex_ready_seen=...` 日志。
+- `half_duplex_aec_blocked` / `capture held during playback` 若仍出现，其前序交互态日志应仍保持 output turn engaged，而不是提前回到 ASR。

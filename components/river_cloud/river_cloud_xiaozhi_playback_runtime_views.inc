@@ -166,6 +166,7 @@ typedef struct {
     bool downlink_started;
     bool terminal_closed;
     bool terminal_waiting;
+    bool duplex_ready_seen;
     bool start_cautious_history;
     bool tts_stop_pending;
 } river_cloud_xiaozhi_playback_diag_view_t;

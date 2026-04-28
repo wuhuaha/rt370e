@@ -20,6 +20,7 @@ typedef struct {
     river_cloud_playback_hold_kind_t hold_kind;
     bool terminal_closed;
     bool tts_stop_pending;
+    bool duplex_ready_seen;
     bool terminal_waiting;
     river_cloud_playback_terminal_wait_kind_t terminal_wait_kind;
 } river_dialog_runtime_cloud_playback_facts_t;
@@ -170,6 +171,7 @@ typedef struct {
     river_cloud_playback_recovery_outcome_t recovery_outcome_kind;
     river_cloud_playback_start_policy_t start_policy_kind;
     bool tts_stop_pending;
+    bool duplex_ready_seen;
     char playback_terminal_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     char playback_terminal_wait_reason[RIVER_CLOUD_RUNTIME_REASON_MAX];
     uint32_t start_frames;
@@ -435,6 +437,8 @@ static bool river_dialog_runtime_capture_cloud_snapshot(
     cloud_import->playback.facts.terminal_closed =
         snapshot.playback_terminal_closed;
     cloud_import->playback.facts.tts_stop_pending = snapshot.tts_stop_pending;
+    cloud_import->playback.facts.duplex_ready_seen =
+        snapshot.playback_duplex_ready_seen;
     cloud_import->playback.facts.terminal_waiting =
         snapshot.playback_terminal_waiting;
     cloud_import->playback.facts.terminal_wait_kind =
@@ -701,6 +705,8 @@ static void river_dialog_runtime_capture_cloud_playback_export_view_locked(
     view->start_policy_kind =
         g_river_dialog_runtime.cloud_playback_observe.start_policy_kind;
     view->tts_stop_pending = g_river_dialog_runtime.cloud_playback_facts.tts_stop_pending;
+    view->duplex_ready_seen =
+        g_river_dialog_runtime.cloud_playback_facts.duplex_ready_seen;
     river_dialog_runtime_copy_text(view->playback_terminal_reason,
                                    sizeof(view->playback_terminal_reason),
                                    g_river_dialog_runtime.cloud_playback_observe.playback_terminal_reason);
@@ -736,6 +742,8 @@ static void river_dialog_runtime_apply_cloud_playback_export_view_to_snapshot_lo
     g_river_dialog_runtime.snapshot.playback_terminal_closed =
         view->terminal_closed;
     g_river_dialog_runtime.snapshot.tts_stop_pending = view->tts_stop_pending;
+    g_river_dialog_runtime.snapshot.playback_duplex_ready_seen =
+        view->duplex_ready_seen;
     g_river_dialog_runtime.snapshot.playback_terminal_waiting =
         view->terminal_waiting;
     g_river_dialog_runtime.snapshot.playback_terminal_wait_kind =
@@ -1095,6 +1103,7 @@ typedef struct {
     bool terminal_closed;
     bool terminal_waiting;
     bool tts_stop_pending;
+    bool duplex_ready_seen;
     river_cloud_playback_backend_state_t backend_state_kind;
     river_cloud_playback_supply_kind_t supply_kind;
     river_cloud_playback_hold_kind_t hold_kind;
@@ -1219,6 +1228,7 @@ static void river_dialog_runtime_capture_playback_projection_locked(
     projection->terminal_closed = playback_facts->terminal_closed;
     projection->terminal_waiting = playback_facts->terminal_waiting;
     projection->tts_stop_pending = playback_facts->tts_stop_pending;
+    projection->duplex_ready_seen = playback_facts->duplex_ready_seen;
     projection->backend_state_kind = playback_facts->backend_state_kind;
     projection->supply_kind = playback_facts->supply_kind;
     projection->hold_kind = playback_facts->hold_kind;
@@ -1745,6 +1755,16 @@ static void river_dialog_runtime_publish_locked(const char *reason)
     river_dialog_runtime_interaction_publish_view_t view;
 
     river_dialog_runtime_capture_interaction_publish_view_locked(reason, &view);
+    if (view.state_changed) {
+        RIVER_LOGI("dialog_runtime interaction_transition: %s -> %s reason=%s terminal_closed=%s playback_active=%s tts_stop_pending=%s duplex_ready_seen=%s",
+                   river_interaction_state_name(view.previous_state),
+                   river_interaction_state_name(view.next_state),
+                   view.reason.publish_reason != NULL ? view.reason.publish_reason : "-",
+                   view.interaction.projection.playback_terminal_closed ? "yes" : "no",
+                   view.interaction.projection.playback_active ? "yes" : "no",
+                   view.interaction.projection.playback.tts_stop_pending ? "yes" : "no",
+                   view.interaction.projection.playback.duplex_ready_seen ? "yes" : "no");
+    }
     river_dialog_runtime_apply_interaction_publish_view_locked(&view);
     river_dialog_runtime_apply_publish_reason_view_locked(&view.reason);
     river_dialog_runtime_export_publish_state_to_snapshot_locked();
@@ -2297,7 +2317,7 @@ void river_dialog_runtime_dump_status(void)
     river_dialog_runtime_capture_local_playback_shadow_view_locked(&shadow_view);
     river_dialog_runtime_unlock();
 
-    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s owner=%s phase_known=%s backend_state=%s supply=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s recovery_path=%s recovery_outcome=%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s/%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
+    RIVER_LOGI("dialog_runtime interaction=%s input_lane=%s output_lane=%s asr=%s wake_admission=%s playback=%s local_playback=%s/%s cloud_playback=%s/%s owner=%s phase_known=%s backend_state=%s supply=%s hold=%s start_gate=%s/%lu prefetch=%lu cautious=%s lane=%s turn=%s recovering=%s/%s recovery_path=%s recovery_outcome=%s local_recovering=%s terminal_closed=%s terminal=%s/%s terminal_wait=%s/%s interrupt=%s stop_pending=%s duplex_ready_seen=%s local_close=%s/%lu window=%s/%lu wake_confirmed=%s error=%s/%s turn_id=%s accept_reason=%s reason=%s transitions=%lu",
                river_interaction_state_name(snapshot.interaction_state),
                river_dialog_input_lane_name(snapshot.input_lane),
                river_dialog_output_lane_name(snapshot.output_lane),
@@ -2351,6 +2371,7 @@ void river_dialog_runtime_dump_status(void)
                    "-",
                snapshot.tts_interrupt_requested ? "yes" : "no",
                snapshot.cloud_listen_stop_pending ? "yes" : "no",
+               snapshot.playback_duplex_ready_seen ? "yes" : "no",
                snapshot.cloud_local_close_pending ? "yes" : "no",
                (unsigned long)snapshot.local_close_remaining_ms,
                snapshot.conversation_window_active ? "open" : "closed",

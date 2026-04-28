@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.539
+- 收口 zero-duration fast-launch ACK 的播放尾态判定：
+  - XiaoZhi playback terminal 对外 `terminal_closed` 不再只看 terminal state，而是要求 backend 已退出 output-active 且不再 `tts_stop_pending`
+  - 这样 zero-duration ACK 在 DAC 还处于 drain 时，dialog runtime 仍会把当前 output turn 视为 engaged，不会因为本地 terminal 提前结束而退回 `asr_streaming`
+  - 对 dialog/runtime snapshot 暂时隐藏 drain 中的 terminal completed/local-completed，可见 close 时刻延后到真实播放尾巴结束
+- 补足交互态切换诊断：
+  - dialog runtime 在真正发布状态切换前新增 `dialog_runtime interaction_transition: ...` 日志
+  - 日志显式带出 `terminal_closed`、`playback_active`、`tts_stop_pending`、`duplex_ready_seen`
+  - runtime snapshot / status dump 也同步携带 `playback_duplex_ready_seen`
+- 预期上板变化：
+  - zero-duration ACK 尾态不应再出现播放仍在进行时就 `barge_in_listening -> asr_streaming reason=arm_stop`
+  - 若仍有 `half_duplex_aec_blocked`，其前序 transition 日志也应显示 `terminal_closed=no` 或 `tts_stop_pending=yes`，便于继续定位 AEC/ref 尾态
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed with `Build done` against `/root/ameba-rtos`
+
 ## Step 5.528
 - 修复 2026-04-27 日志中 `audio.out.meta` 后端侧播放/采集连锁问题：
   - `output_state=speaking` 且 playback lane 已经 engaged 时，dialog runtime 现在保留输出轮次，不再因为 `note_meta` 把交互态错误推回 `asr_streaming`

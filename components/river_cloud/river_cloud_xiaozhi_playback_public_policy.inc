@@ -211,6 +211,7 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
         diag_view.observe_view.recovery_outcome_kind;
     snapshot->playback_start_policy_kind = diag_view.start_gate.policy;
     snapshot->tts_stop_pending = diag_view.tts_stop_pending;
+    snapshot->playback_duplex_ready_seen = diag_view.duplex_ready_seen;
     river_cloud_xiaozhi_copy_optional_text(snapshot->playback_phase,
                                            sizeof(snapshot->playback_phase),
                                            river_cloud_playback_phase_name(

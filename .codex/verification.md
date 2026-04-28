@@ -1,3 +1,55 @@
+## Step 5.539 Verification
+
+Confirm zero-duration ACK tails keep the output turn engaged until drain finishes, and that interaction-transition logs expose the new terminal context:
+```bash
+cd /root/ameba-river
+rg -n "interaction_transition:|playback_terminal_close_deferred|playback_duplex_ready_seen|terminal_closed =|terminal_state_kind =" \
+  components/river_core/river_dialog_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc \
+  include/river/river_cloud.h \
+  include/river/river_dialog_runtime.h
+```
+
+Expected result:
+- dialog runtime has a dedicated `interaction_transition` log carrying `terminal_closed`, `playback_active`, `tts_stop_pending`, and `duplex_ready_seen`
+- playback terminal close is deferred while backend output is still active or stop-pending
+- runtime snapshots export `playback_duplex_ready_seen`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 2026-04-28 zero-duration ACK tail reproduction:
+```text
+Wake once, trigger a short fast-launch ACK response, and keep the monitor open through playback drain and the next follow-up reopen window.
+```
+
+Expected result:
+- no `interaction_state: barge_in_listening -> asr_streaming reason=arm_stop` before physical playback actually stops
+- transition logs around the playback tail show `terminal_closed=no` while `playback_active=yes` or `tts_stop_pending=yes`
+- once drain completes, `terminal_closed=yes` may appear and the interaction can then leave the output-turn state
+
 ## Step 5.528 Verification
 
 Confirm `audio.out.meta` playback/capture guards are present:

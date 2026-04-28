@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.538 XiaoZhi 上行 burst 指标与重复 playback mark ACK 收口（待上板验证）`
+  - `5.539 XiaoZhi zero-duration ACK 播放尾态与交互诊断收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.539 根据 2026-04-28 旧日志复盘继续收口 zero-duration ACK tail：
+      - playback terminal 对外 `terminal_closed` 现在要求 terminal 已完成且 backend 已退出 output-active，且不再 `tts_stop_pending`
+      - zero-duration fast-launch ACK 的 local completed / terminal close 对 dialog runtime 的可见性延后到 DAC drain 结束后，避免播放尾巴期间提前回到 `asr_streaming`
+      - dialog runtime 状态切换前新增 `dialog_runtime interaction_transition` 日志，带 `terminal_closed/playback_active/tts_stop_pending/duplex_ready_seen`
+    - 下一步上板验证：
+      - zero-duration ACK 尾态不再出现 `interaction_state: barge_in_listening -> asr_streaming reason=arm_stop` 早于物理 playback stop
+      - transition 日志在 playback drain 期间应保持 `terminal_closed=no`，并带出 `tts_stop_pending=yes` 或 `playback_active=yes`
+      - drain 完成后才允许 `terminal_closed=yes` 并退出 output-turn engaged
   - newest landed runtime bug-fix slice:
     - Step 5.538 根据 2026-04-28 上板日志继续收口：
       - uplink 成功发送后的 next due 改为沿既有 deadline 递进，减少一次 late send 对后续 20ms pacing 的永久漂移

@@ -1338,6 +1338,16 @@ static river_cloud_xiaozhi_playback_start_gate_t river_cloud_xiaozhi_current_sta
     return gate;
 }
 
+static bool river_cloud_xiaozhi_playback_terminal_close_deferred(
+    const river_cloud_xiaozhi_playback_truth_view_t *truth_view)
+{
+    /* Keep the terminal logically open until the backend drain completes so
+     * zero-duration fast-launch ACK tails do not reopen ASR semantics early. */
+    return truth_view != NULL &&
+           !river_cloud_xiaozhi_playback_terminal_open() &&
+           (truth_view->output_active || truth_view->tts_stop_pending);
+}
+
 static void river_cloud_xiaozhi_capture_playback_diag_view(
     uint64_t now_ms,
     river_cloud_xiaozhi_playback_diag_view_t *view)
@@ -1357,7 +1367,6 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->start_gate = river_cloud_xiaozhi_current_start_gate();
     view->rebuffer_cause_kind = river_cloud_xiaozhi_playback_rebuffer_cause();
     view->terminal_wait_kind = terminal_truth->wait_kind;
-    view->terminal_state_kind = terminal_truth->state_kind;
     view->queued_frames = view->truth_view.queued_frames;
     view->resume_frames = river_cloud_xiaozhi_downlink_attached_resume_threshold_frames();
     view->buffer_budget_frames = river_cloud_xiaozhi_playback_buffer_frame_budget();
@@ -1382,11 +1391,17 @@ static void river_cloud_xiaozhi_capture_playback_diag_view(
     view->rebuffer_streak =
         g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_streak;
     view->downlink_started = river_cloud_xiaozhi_downlink_worker_started();
-    view->terminal_closed = !river_cloud_xiaozhi_playback_terminal_open();
+    view->tts_stop_pending = view->truth_view.tts_stop_pending;
+    view->duplex_ready_seen = terminal_truth->duplex_ready_seen;
+    view->terminal_closed =
+        !river_cloud_xiaozhi_playback_terminal_close_deferred(&view->truth_view) &&
+        !river_cloud_xiaozhi_playback_terminal_open();
+    view->terminal_state_kind =
+        view->terminal_closed ? terminal_truth->state_kind :
+                                RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE;
     view->terminal_waiting = terminal_truth->waiting;
     view->start_cautious_history =
         g_river_cloud.xiaozhi_playback_gate_truth.cautious_history;
-    view->tts_stop_pending = view->truth_view.tts_stop_pending;
     if (g_river_cloud.xiaozhi_playback_gate_truth.no_ref_reopen_guard_deadline_ms > now_ms) {
         view->reopen_guard_left_ms =
             g_river_cloud.xiaozhi_playback_gate_truth.no_ref_reopen_guard_deadline_ms - now_ms;

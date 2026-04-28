@@ -70,6 +70,7 @@ typedef struct {
     river_cloud_playback_recovery_outcome_t playback_recovery_outcome_kind;
     river_cloud_playback_start_policy_t playback_start_policy_kind;
     bool tts_stop_pending;
+    bool playback_duplex_ready_seen;
     bool tts_interrupt_requested;
     bool turn_accepted;
     bool barge_in_enabled_known;
