@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.545
+- 新增端侧实时性优化设计文档 `doc/VOICE_RUNTIME_REALTIME_OPTIMIZATION_DESIGN_ZH.md`，把当前项目中影响语音流畅性/实时性的结构性问题整理为完整技术设计：
+  - 明确当前系统的核心矛盾不是功能缺失，而是“热路径被慢路径污染”
+  - 梳理了六类关键问题：采集路径同步等待、控制面混队列、KWS gate 带锁读取、固定时延参数过硬、默认日志过重、barge-in 两端失衡
+  - 提出目标架构：硬实时音频层、实时调度层、控制编排层、诊断与策略层四层分离
+  - 提出关键改造方向：同步 control request 改异步 intent、urgent/telemetry 分队列、runtime gate snapshot、follow-up 意图保留、参数 profile 化、日志分级
+  - 给出分阶段落地建议、指标体系和兼容性约束
+- 文档目的：
+  - 为后续“端侧实时性优先”的代码重构提供统一设计基线
+  - 把零散性能/体验问题提升为可执行的架构优化方案
+- Verification for this step:
+  - `git diff --check` passed
+  - `test -f doc/VOICE_RUNTIME_REALTIME_OPTIMIZATION_DESIGN_ZH.md` confirmed the new realtime design document exists
+  - `rg -n "热路径|异步 intent|urgent control queue|lock-free|参数策略化|日志分级" doc/VOICE_RUNTIME_REALTIME_OPTIMIZATION_DESIGN_ZH.md` confirmed the core optimization sections were recorded
+
 ## Step 5.544
 - 新增交互体验审查文档 `doc/VOICE_INTERACTION_HUMANIZATION_REVIEW_ZH.md`，把当前 XiaoZhi 语音链路在“人性化 / 智能化交互”上的结构性问题整理成单独研究：
   - 梳理了 `wakeword -> follow-up -> thinking -> speaking -> barge-in -> tail close` 主链路
