@@ -1,5 +1,27 @@
 # Change Log
 
+## Step 5.554
+- 继续按顺序压 preview/uplink backlog，这一轮只改端侧 uplink warmup/catch-up，不碰 playback ACK。
+- 之前 uplink drain 是严格单帧节拍：
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX=1`
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX=1`
+  - 即使任务已经晚了、ring 里也还有 backlog，成功发完一帧后仍会把 `next_send_ms` 推到下一拍，几乎没有真正 catch-up 能力。
+- 现在恢复一个受控的 preview warmup burst：
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX` 提到 `3`
+  - 仅当 ASR round 仍在 `preview_warmup` 窗口内，且队列里确实还有后续帧时，uplink drain 才临时放宽 burst 上限
+  - steady-state 常态 drain 仍保持 `1` 帧，不改长期节拍
+- 成功发送后，如果仍处于 preview warmup 且队列里还有 backlog：
+  - 本轮会临时 bypass 一次 20 ms 帧间 pacing，允许同一个 drain 周期继续追发
+  - 并把 `preview_warmup_bypass_count` 记到现有 round metrics，便于后续对照 backlog/first_partial 改善幅度
+- 目标很明确：
+  - 先把“preview owner 刚启动时已经落后半拍到几拍，但端侧仍严格一拍一发”的人为积压削掉
+  - 降低 `preview_uplink_realtime_ratio` 掉到 0.5x 左右的概率
+  - 不把 steady-state uplink 改成长期突发发送
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.553
 - 继续按顺序修 endpoint soft-close 过激；上一轮先收了 false accept 入口，这一轮改本地 endpoint hint 的收口时机。
 - 之前 `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS=320`，只给了一个很短的 hint-only 等待窗口；一旦服务侧 preview refresh / finalize 稍微晚一点，本地就可能先用 `endpoint_soft_close_timeout` 把 active stream 关掉。

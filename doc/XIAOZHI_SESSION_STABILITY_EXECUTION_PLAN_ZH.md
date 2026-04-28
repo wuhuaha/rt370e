@@ -935,6 +935,50 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step Y: preview warmup catch-up
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 收掉 preview startup 阶段“uplink 已经落后，但端侧仍严格 20 ms 一拍一发”的人为 backlog。
+- 给首个 partial / refresh 一个受控的追平机会，优先改善 accept 前的 preview/uplink realtime ratio。
+
+范围：
+
+- `components/river_cloud/river_cloud_internal.h`
+- `components/river_cloud/river_cloud_xiaozhi_session.c`
+
+实现：
+
+- 保持 steady-state 常态 drain 不变：
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` 仍为 `1`
+- 只在 preview warmup 窗口内引入有上限的 catch-up：
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX` 从 `1` 提到 `3`
+  - 仅当 ASR round 仍处于 preview warmup，且队列里确实还有后续帧时，才允许临时放宽 burst
+- 成功发包后，如果 warmup 期间仍有 backlog：
+  - 本地本轮 drain 会临时 bypass 一次 20 ms 帧间 pacing，继续追发下一帧
+  - 同时累加 `preview_warmup_bypass_count`，方便后续和 `burst_max/backlog/first_partial` 对照
+- 这样可以把启动阶段半拍到几拍的本地排队更快消掉，但不会把 steady-state uplink 改成长期突发发送。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- `preview_warmup_bypass_count` 在有启动积压的轮次不再长期为 `0`。
+- `burst_max` 在 warmup 轮次可以上升到 `2~3`，但 steady-state 不长期突发。
+- 首个 preview partial 更早到达，accept 前 uplink backlog 指标下降。
+
 ### Step X: endpoint soft-close relax
 
 状态：已完成代码修复，待上板复测。

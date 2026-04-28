@@ -255,9 +255,28 @@ static void river_cloud_xiaozhi_note_uplink_burst(uint32_t frames)
     }
 }
 
+static bool river_cloud_xiaozhi_uplink_preview_warmup_active(void)
+{
+    return g_river_cloud.xiaozhi_asr_round_truth.active &&
+           g_river_cloud.xiaozhi_asr_round_truth.preview_warmup_done_ms == 0U &&
+           RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS != 0U;
+}
+
 static uint32_t river_cloud_xiaozhi_uplink_drain_burst_limit(void)
 {
+    if (river_cloud_xiaozhi_uplink_preview_warmup_active() &&
+        river_cloud_xiaozhi_uplink_ready_frames() > 1U &&
+        RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX >
+            RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX) {
+        return RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX;
+    }
+
     return RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX;
+}
+
+static bool river_cloud_xiaozhi_uplink_should_bypass_frame_pacing(uint32_t ready_frames)
+{
+    return river_cloud_xiaozhi_uplink_preview_warmup_active() && ready_frames > 1U;
 }
 
 static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_t backoff_ms)
@@ -881,6 +900,7 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
         }
         if (status == RIVER_OK) {
             uint64_t next_due_ms;
+            bool bypass_frame_pacing;
 
             g_river_cloud.xiaozhi_uplink_runtime_truth.timestamp_ms +=
                 RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
@@ -890,13 +910,24 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
                                                        send_duration_ms);
             g_river_cloud.xiaozhi_uplink_runtime_truth.retry_valid = false;
             g_river_cloud.xiaozhi_uplink_runtime_truth.busy_streak = 0U;
-            next_due_ms = due_ms;
-            if (next_due_ms == 0U) {
+            bypass_frame_pacing =
+                river_cloud_xiaozhi_uplink_should_bypass_frame_pacing(ready_before_send);
+            if (bypass_frame_pacing) {
                 next_due_ms = now_ms;
-            }
-            next_due_ms += (uint64_t)frame_ms;
-            if (next_due_ms <= now_ms) {
-                next_due_ms = now_ms + 1U;
+                if (g_river_cloud.xiaozhi_asr_round_truth.active &&
+                    g_river_cloud.xiaozhi_asr_round_truth.preview_warmup_bypass_count <
+                        UINT32_MAX) {
+                    g_river_cloud.xiaozhi_asr_round_truth.preview_warmup_bypass_count++;
+                }
+            } else {
+                next_due_ms = due_ms;
+                if (next_due_ms == 0U) {
+                    next_due_ms = now_ms;
+                }
+                next_due_ms += (uint64_t)frame_ms;
+                if (next_due_ms <= now_ms) {
+                    next_due_ms = now_ms + 1U;
+                }
             }
             g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = next_due_ms;
             drained_frames++;

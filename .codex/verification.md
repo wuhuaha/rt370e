@@ -1,3 +1,52 @@
+## Step 5.554 Verification
+
+Confirm preview warmup now has a bounded catch-up path instead of strict single-frame pacing throughout startup:
+```bash
+cd /root/ameba-river
+rg -n "UPLINK_DRAIN_BURST_MAX|UPLINK_PREVIEW_BURST_MAX|preview_warmup_active|bypass_frame_pacing|preview_warmup_bypass_count" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX` is now `3U`
+- steady-state `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` remains `1U`
+- there is a warmup-only helper that enables extra burst/catch-up only while preview warmup is still active
+- successful sends during warmup backlog can increment `preview_warmup_bypass_count`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for preview catch-up:
+```text
+复现一轮首个 preview partial 容易偏慢的对话，重点看 `xiaozhi asr round finish` 里的 `preview_warmup[done_ms=..., bypass=...]`、`burst_max`、`uplink_ms[send_interval/capture_age/backlog]`。同时关注首个 partial 是否更早到达，以及 `preview_uplink_realtime_ratio` / `preview_push_processing_ms_total` 是否比修复前更好。
+```
+
+Expected result:
+- `preview_warmup_bypass_count` 在有启动积压的轮次不再长期为 `0`
+- `burst_max` 可在 warmup 轮次上升到 `2~3`，但 steady-state 不应长期维持突发
+- 首个 preview partial 和 accept 前 uplink backlog 有实质改善
+
 ## Step 5.553 Verification
 
 Confirm endpoint hint no longer forces an overly short local close window, and any real preview text progress clears the soft-close timer:

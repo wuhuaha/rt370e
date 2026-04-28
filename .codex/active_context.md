@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.553 XiaoZhi endpoint soft-close relax，给 preview 追平留窗口（待上板验证）`
+  - `5.554 XiaoZhi preview warmup catch-up，先压 uplink backlog（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.554 恢复受控的 preview warmup/catch-up：
+      - 旧 uplink 成功发完一帧后仍严格等下一拍，preview startup 几乎没有追平空间
+      - 现在只在 `preview_warmup` 窗口内、且队列里确实还有 backlog 时，允许最多 `3` 帧的短 burst，并记录 `preview_warmup_bypass_count`
+      - steady-state drain 仍保持 `1` 帧，不把常态 uplink 改成长期突发发送
+    - 下一步上板验证：
+      - `burst_max` / `preview_warmup_bypass_count` 在启动积压轮次应开始变化
+      - 首个 preview partial 更早到达
+      - accept 前 preview/uplink backlog 指标应比修复前下降
   - newest landed runtime bug-fix slice:
     - Step 5.553 放宽 endpoint hint 本地 soft-close：
       - 旧的 `RIVER_CLOUD_XIAOZHI_ENDPOINT_SOFT_CLOSE_DEFER_MS=320 ms` 太短，preview refresh / finalize 稍晚一点就会先被本地 close 抢断
