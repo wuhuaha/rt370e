@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.557 XiaoZhi playback tail drain grace，避免 wall-clock 提前 pop 触发 recover/flush 切尾（待上板验证）`
+  - `5.558 XiaoZhi wake 首轮抑制 + 长段起播限幅 + 短 gap rebuffer 放宽（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.558 收当前最差体验三连：
+      - 首轮 wakeword 会话不再把第一段 pre-roll 原样重放给服务端，降低 wake residual 空轮次
+      - 长单段 `segment_prefetch` 起播门槛加上限，避免 TTS 起播前长时间沉默
+      - `upstream_starved` 的 recover 门槛从 120 ms 放宽到 240 ms，减少中途短抖动直接 flush
+    - 下一步上板验证：
+      - 观察是否出现 `xiaozhi wake preroll dropped once`
+      - 长段回复的 `audio.out.meta -> playback start` 等待是否下降
+      - `supply_gap_ms≈100~200 ms` 的抖动是否不再立刻触发 `playback recover`
   - newest landed runtime bug-fix slice:
     - Step 5.557 收主回答尾段提前切断：
       - 旧逻辑在 `played_duration_ms == expected_duration_ms` 时就立刻 fully-heard + pop 当前 non-last segment

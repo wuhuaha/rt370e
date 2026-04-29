@@ -1,3 +1,57 @@
+## Step 5.558 Verification
+
+Confirm wakeword startup no longer replays the first preroll once, long single-segment TTS startup is capped, and short upstream gaps do not trigger overly eager rebuffer recover:
+```bash
+cd /root/ameba-river
+rg -n "drop_first_wake_preroll_once|wake preroll dropped once|SEGMENT_START_CAP_FRAMES|STARVED_REBUFFER_MS" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- `drop_first_wake_preroll_once` exists in the session-window truth and is armed by wakeword admission
+- first wakeword-driven round can log `xiaozhi wake preroll dropped once: ...`
+- `segment_prefetch` startup is capped by `RIVER_CLOUD_XIAOZHI_DOWNLINK_SEGMENT_START_CAP_FRAMES`
+- `RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS` is now `240U`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for startup / playback experience:
+```text
+复现一轮“唤醒词后立刻说命令 + 长单段 TTS 回复”的对话。重点确认：
+- 不再先出现 `家。/看一下。/一调灯。` 这类 wake residual 空轮次；若命中首轮保护，应看到 `xiaozhi wake preroll dropped once`
+- 长段 `audio.out.meta -> playback start` 的等待明显缩短，`start=` 不再直接贴着整段 expected duration
+- 长段播放中，`supply_gap_ms` 在 100~200 ms 级别抖动时不再立刻进入 `playback recover`
+```
+
+Expected result:
+- wake 后首轮不再优先把 wakeword 尾音送上云端
+- 长单段回复起播延迟下降
+- 短暂上游抖动不再立刻导致中途 recover/flush
+
 ## Step 5.557 Verification
 
 Confirm playback ACK progress no longer pops a non-last tail immediately at the first wall-clock hit of `expected_duration_ms` when no successor segment is ready:

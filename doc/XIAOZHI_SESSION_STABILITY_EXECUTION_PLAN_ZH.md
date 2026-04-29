@@ -1,6 +1,6 @@
 # XiaoZhi Session Stability Execution Plan
 
-Status: active / playback tail-drain grace landed; pending board replay validation
+Status: active / wake-first-round suppression and long-segment startup tuning landed; pending board replay validation
 Last Updated: 2026-04-29
 Branch: `agent-server-v2`
 

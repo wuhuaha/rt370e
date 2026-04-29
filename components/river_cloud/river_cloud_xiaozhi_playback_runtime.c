@@ -1293,6 +1293,16 @@ static river_cloud_xiaozhi_playback_start_gate_t river_cloud_xiaozhi_build_start
         gate.start_frames = gate.prefetch_frames;
     }
 
+    /*
+     * Long single-segment replies often arrive as "non-last first, promote to
+     * last later". Do not make startup wait for the full expected duration
+     * here, or the user pays >1 s of silence before TTS even begins.
+     */
+    if (gate.policy == RIVER_CLOUD_PLAYBACK_START_POLICY_PREFETCH_SEGMENT &&
+        gate.start_frames > RIVER_CLOUD_XIAOZHI_DOWNLINK_SEGMENT_START_CAP_FRAMES) {
+        gate.start_frames = RIVER_CLOUD_XIAOZHI_DOWNLINK_SEGMENT_START_CAP_FRAMES;
+    }
+
     if (g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_streak > 1U) {
         uint32_t extra_frames =
             (g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_streak - 1U) *

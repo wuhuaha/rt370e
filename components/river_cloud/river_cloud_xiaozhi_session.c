@@ -1527,6 +1527,7 @@ static river_status_t river_cloud_xiaozhi_apply_inactive_stream_capture_policy(
 {
     river_status_t status;
     bool followup_opened = false;
+    bool drop_preroll_once = false;
     uint32_t pre_roll_frames_before_open;
     uint32_t read_index;
     uint32_t frame_index;
@@ -1549,31 +1550,43 @@ static river_status_t river_cloud_xiaozhi_apply_inactive_stream_capture_policy(
         return RIVER_OK;
     }
 
+    drop_preroll_once =
+        g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once;
+    g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once = false;
+
     if (pre_roll_frames_before_open == g_river_cloud.pre_roll_capacity_frames) {
         read_index = g_river_cloud.pre_roll_write_index_frames;
     } else {
         read_index = 0U;
     }
 
-    for (frame_index = 0U; frame_index < pre_roll_frames_before_open; ++frame_index) {
-        const uint8_t *src = g_river_cloud.pre_roll_buffer +
-                             ((size_t)read_index * g_river_cloud.frame_bytes);
+    if (!drop_preroll_once) {
+        for (frame_index = 0U; frame_index < pre_roll_frames_before_open; ++frame_index) {
+            const uint8_t *src = g_river_cloud.pre_roll_buffer +
+                                 ((size_t)read_index * g_river_cloud.frame_bytes);
 
-        status = river_cloud_xiaozhi_push_pcm(src, g_river_cloud.frame_bytes);
-        if (status != RIVER_OK) {
-            g_river_cloud.stream_feed_fail++;
-            return status;
-        }
-        g_river_cloud.stream_feed_ok++;
+            status = river_cloud_xiaozhi_push_pcm(src, g_river_cloud.frame_bytes);
+            if (status != RIVER_OK) {
+                g_river_cloud.stream_feed_fail++;
+                return status;
+            }
+            g_river_cloud.stream_feed_ok++;
 
-        read_index++;
-        if (read_index >= g_river_cloud.pre_roll_capacity_frames) {
-            read_index = 0U;
+            read_index++;
+            if (read_index >= g_river_cloud.pre_roll_capacity_frames) {
+                read_index = 0U;
+            }
         }
+    } else if (pre_roll_frames_before_open != 0U) {
+        RIVER_LOGI("xiaozhi wake preroll dropped once: frames=%lu sid=%s",
+                   (unsigned long)pre_roll_frames_before_open,
+                   river_cloud_xiaozhi_current_sid() != NULL ?
+                       river_cloud_xiaozhi_current_sid() :
+                       "-");
     }
     river_cloud_pre_roll_reset();
 
-    if (pre_roll_frames_before_open == 0U) {
+    if (pre_roll_frames_before_open == 0U || drop_preroll_once) {
         status = river_cloud_xiaozhi_push_pcm(pcm, bytes);
         if (status != RIVER_OK) {
             g_river_cloud.stream_feed_fail++;

@@ -331,6 +331,7 @@ void river_cloud_xiaozhi_window_close(const char *reason)
     river_cloud_xiaozhi_clear_server_accept_wait();
     river_cloud_xiaozhi_clear_empty_turn_recover_deadline();
     river_cloud_xiaozhi_clear_accepted_response_deadline();
+    g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once = false;
     if (g_river_cloud.xiaozhi_session_window_truth.listening && river_xiaozhi_session_open()) {
         (void)river_cloud_xiaozhi_request_listen_stop();
     }
@@ -360,6 +361,7 @@ void river_cloud_xiaozhi_window_abort_local(const char *reason)
     river_cloud_xiaozhi_clear_server_accept_wait();
     river_cloud_xiaozhi_clear_empty_turn_recover_deadline();
     river_cloud_xiaozhi_clear_accepted_response_deadline();
+    g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once = false;
     river_cloud_pre_roll_reset();
     if (should_log) {
         RIVER_LOGW("xiaozhi conversation window aborted: reason=%s",
@@ -503,6 +505,7 @@ void river_cloud_xiaozhi_reset_transport_state(bool emit_session_closed)
     river_cloud_xiaozhi_clear_server_accept_wait();
     river_cloud_xiaozhi_clear_empty_turn_recover_deadline();
     river_cloud_xiaozhi_clear_accepted_response_deadline();
+    g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once = false;
     g_river_cloud.xiaozhi_uplink_runtime_truth.accum_bytes = 0U;
     g_river_cloud.xiaozhi_uplink_runtime_truth.retry_valid = false;
     g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = 0U;
@@ -801,6 +804,8 @@ river_status_t river_cloud_xiaozhi_begin_conversation_window(const char *source)
 
     river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS, reason);
     g_river_cloud.xiaozhi_uplink_runtime_truth.open_speech_frames = 0U;
+    g_river_cloud.xiaozhi_session_window_truth.drop_first_wake_preroll_once =
+        source != NULL && strcmp(source, "wakeword") == 0;
     river_cloud_pre_roll_reset();
     RIVER_LOGI("xiaozhi wake admission ready: source=%s listening=%s window=%s sid=%s",
                reason,

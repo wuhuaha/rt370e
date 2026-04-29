@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.558
+- 根据 2026-04-29 10:17 新日志，当前体验差的主因已经不是“尾段被提前 pop”单点，而是三条链路叠加：
+  - 唤醒后首轮把 wakeword 尾音当成真实命令开流，服务侧连续 accepted 出多个空轮次；
+  - 长单段 TTS 因 `segment_prefetch` 直接按整段 expected duration 预取，起播前沉默过长；
+  - 长段音频中途只要上游 161 ms 级别短抖动就触发 `upstream_starved -> recover/flush`，造成中途卡顿。
+- 这轮只做三刀端侧窄修，不混入新的协议改造：
+  - 首轮 wakeword 会话新增一次 `drop_first_wake_preroll_once`，第一次开流不再把 wakeword 尾音 pre-roll 重放给服务端；
+  - `segment_prefetch` 启播门槛新增上限 `RIVER_CLOUD_XIAOZHI_DOWNLINK_SEGMENT_START_CAP_FRAMES=40`，长单段回复不再为了“等整段”而额外沉默 1s+；
+  - `RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS` 从 `120` 提到 `240`，避免 100 多毫秒的短暂上游抖动就直接 recover/flush。
+- 目标对应新日志里的三个直接症状：
+  - 收掉 `家。/看一下。/一调灯。` 这种 wake 后残留空 accepted turn；
+  - 把 `audio.out.meta -> playback start` 的长空等压下来；
+  - 减少 `xiaozhi playback upstream gap rebuffer ... supply_gap_ms=161` 这类短 gap 触发的中途断句。
+- Verification for this step:
+  - `git diff --check` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.557
 - 继续彻底修播放尾段被切的问题；这次不再只盯 same-segment promotion，而是直接收 `ack_progress -> pop current -> waiting_next_segment -> recover/flush` 这条提前切尾链路。
 - 根因是端侧 `update_playback_ack_progress()` 按 wall clock 计算 `played_duration_ms`，一旦达到 `expected_duration_ms` 就立刻把当前 segment 标 fully-heard 并 `pop`：

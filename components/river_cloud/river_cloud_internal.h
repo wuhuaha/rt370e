@@ -69,8 +69,14 @@
 /* Favor continuity over lowest latency while the service often stays on no-ref playback. */
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES 96U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES 16U
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_SEGMENT_START_CAP_FRAMES 40U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_START_FRAMES 28U
-#define RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS 120U
+/*
+ * Service-side downlink chunk pacing still jitters by >100 ms in bad rounds.
+ * Wait a little longer before forcing recover/flush so long single-segment
+ * replies do not chop mid-sentence on a short upstream gap.
+ */
+#define RIVER_CLOUD_XIAOZHI_DOWNLINK_STARVED_REBUFFER_MS 240U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_PREFETCH_MARGIN_MS 120U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_REBUFFER_EXTRA_FRAMES 4U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES 12U
@@ -414,6 +420,7 @@ typedef struct {
     bool local_close_pending;
     bool server_accept_wait_pending;
     bool followup_response_pending_reported;
+    bool drop_first_wake_preroll_once;
     uint64_t window_deadline_ms;
     uint64_t local_close_deadline_ms;
     uint64_t server_accept_fallback_deadline_ms;
