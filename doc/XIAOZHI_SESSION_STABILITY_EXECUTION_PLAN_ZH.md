@@ -935,6 +935,52 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 多轮对话不再因为“accepted 但没有 response.start”这条服务端合法语义而永久失活。
 
 
+### Step ZA: same-segment promotion in-place upgrade
+
+状态：已完成代码修复，待上板复测。
+
+目标：
+
+- 对齐服务侧语义：同一个 `response_id + playback_id + segment_id` 再收到 `audio.out.meta`，且只是 `is_last_segment: false -> true` 时，要按原 segment 的元数据升级处理，不能当成新 segment。
+- 避免这类 promotion 再次触发 `prefetching / recover / segment gap hold / stop`。
+
+范围：
+
+- `components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc`
+
+实现：
+
+- 在 `river_cloud_xiaozhi_playback_note_meta()` 中，将以下条件识别为 same-segment promotion：
+  - segment 已存在且上下文完全相同
+  - `segment->is_last_segment == false`
+  - `event->is_last_segment == true`
+- 命中后不再走普通新分段路径：
+  - 不再执行普通 `prefetch` / `refresh_playback_phase("note_meta")`
+  - 只更新原 segment 的 `expected_duration_ms / text / is_last_segment`
+  - 并刷新 `last_segment_context`
+- 若该 promotion 同时命中“当前 tail 已播到 expected mark”的安全窗口：
+  - 继续优先走 `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail()`
+  - 直接本地折叠闭环结束
+- 因此只有 `segment_id` 真变化时，端侧才进入真正的新分段切换逻辑。
+
+验证：
+
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望：
+
+- `Build done`。
+- same-segment false->true promotion 被按原 segment 元数据升级处理。
+- 这类 promotion 不再触发额外 `prefetching / recover / segment gap hold / stop`。
+- 若 mark 已覆盖 expected duration，则 promotion 可直接本地闭环。
+
 ### Step Z: late last-meta upgrade fold
 
 状态：已完成代码修复，待上板复测。

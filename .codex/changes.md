@@ -1,5 +1,22 @@
 # Change Log
 
+## Step 5.556
+- 继续按服务侧建议收紧 same-segment meta promotion 语义，不再只覆盖“尾段已播完再补 last”的一个窄窗口。
+- 现在当 `response_id + playback_id + segment_id` 相同，且只是 `is_last_segment: false -> true` 时，端侧按“原 segment 的元数据升级”处理，不再进入新分段路径：
+  - 不再走普通 `note_meta -> prefetch -> refresh_playback_phase`
+  - 不再因为这次 promotion 触发 recover、prefetching、segment gap hold、stop
+- 若该 promotion 命中“当前 tail 已播到 expected mark，且处于安全折叠窗口”，仍优先直接本地折叠闭环：
+  - 继续复用 `river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail()`
+- 若还没到可直接折叠的时机，也只做原 segment 的 in-place 升级：
+  - 更新 `expected_duration_ms/text/is_last_segment`
+  - 刷新 `last_segment_context`
+  - 但不会把它当成新 segment 重新驱动 playback 状态机
+- 这样就和服务侧建议对齐：只有 `segment_id` 真变化时，才进入真正的新分段切换逻辑。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.555
 - 开始收 `playback/meta` 侧尾巴：同一个 `segment_id` 先以 `is_last_segment=no` 发布，尾段实际播完后又迟到补一条 `is_last_segment=yes`，本地之前会把这个迟到升级当成普通重发，导致 `_0002` 这种尾段进入 `recover/gap hold/stop` 抖动。
 - 这轮只修一个窄问题：当当前播放尾段已经播到 expected mark、backend 正处于 `waiting_next_segment`，而服务端又用同一个 `segment_id` 补发 “late last meta upgrade” 时，端侧不再重新发布这个 stale tail。

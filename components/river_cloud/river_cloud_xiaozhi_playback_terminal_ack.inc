@@ -449,17 +449,44 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
 
     /*
-     * Some service replies first publish the current tail as non-last and only
-     * later revise the same segment id to last. If the tail has already played
-     * to its expected mark and playback is paused waiting for a next segment,
-     * fold that late "last" upgrade before re-publishing the stale tail.
+     * Same response/playback/segment may be re-published only to promote the
+     * original segment from non-last to last. Treat that as in-place metadata
+     * upgrade instead of new-segment arrival, otherwise stale tails can re-arm
+     * prefetch/recover/gap-hold after playback already reached the final mark.
      */
-    if (segment->valid && event->is_last_segment &&
-        !segment->is_last_segment &&
-        river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(event)) {
+    if (segment->valid &&
+        river_cloud_xiaozhi_playback_segment_matches_meta_context(segment,
+                                                                  meta_context) &&
+        event->is_last_segment &&
+        !segment->is_last_segment) {
+        if (river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
+                event)) {
+            river_cloud_xiaozhi_store_playback_last_segment_context();
+            river_cloud_xiaozhi_sync_playback_terminal_report_flags();
+            river_cloud_xiaozhi_refresh_playback_phase("late_last_meta_upgrade");
+            return;
+        }
+
+        river_cloud_xiaozhi_copy_optional_text(segment->text,
+                                               sizeof(segment->text),
+                                               meta_truth->text);
+        if (event->expected_duration_ms != 0U) {
+            segment->expected_duration_ms = event->expected_duration_ms;
+        }
+        segment->is_last_segment = true;
+        river_cloud_xiaozhi_clear_playback_wait_context();
         river_cloud_xiaozhi_store_playback_last_segment_context();
         river_cloud_xiaozhi_sync_playback_terminal_report_flags();
-        river_cloud_xiaozhi_refresh_playback_phase("late_last_meta_upgrade");
+        RIVER_LOGI("xiaozhi playback same-segment last-meta promotion: response_id=%s playback_id=%s segment_id=%s started=%s mark_ms=%lu expected_ms=%lu",
+                   meta_context->response_id[0] != '\0' ? meta_context->response_id :
+                                                          "-",
+                   meta_context->playback_id[0] != '\0' ? meta_context->playback_id :
+                                                          "-",
+                   meta_context->segment_id[0] != '\0' ? meta_context->segment_id :
+                                                         "-",
+                   segment->started ? "yes" : "no",
+                   (unsigned long)segment->last_mark_ms,
+                   (unsigned long)segment->expected_duration_ms);
         return;
     }
 

@@ -15,11 +15,19 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.555 XiaoZhi late last-meta upgrade fold，收 playback stale tail（待上板验证）`
+  - `5.556 XiaoZhi same-segment promotion in-place upgrade，避免误判新分段（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.556 对齐服务侧 same-segment promotion 语义：
+      - 同一 `response_id + playback_id + segment_id` 仅做 `false -> true` last 升级时，端侧按原 segment 的元数据升级处理
+      - 不再把这类 promotion 当成新 segment 重新驱动 prefetch / recover / gap hold / stop
+      - 若 mark 已覆盖 expected duration，仍可直接本地折叠闭环
+    - 下一步上板验证：
+      - 观察 `xiaozhi playback same-segment last-meta promotion`
+      - false->true promotion 不再触发新分段切换副作用
   - newest landed runtime bug-fix slice:
     - Step 5.555 收 playback stale tail：
       - 同一 `segment_id` 先报 non-last、播完后又迟到补成 last 时，旧逻辑还会把它当普通 meta 重发

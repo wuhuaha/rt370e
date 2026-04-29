@@ -1,3 +1,50 @@
+## Step 5.556 Verification
+
+Confirm same `response_id + playback_id + segment_id` false-to-true last-segment promotion is now handled as in-place metadata upgrade instead of new-segment playback transition:
+```bash
+cd /root/ameba-river
+rg -n "same-segment last-meta promotion|late_last_meta_upgrade|fold_late_last_segment_meta_for_current_tail|refresh_playback_phase\\(\" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_note_meta()` has a promotion path keyed by same segment context plus `false -> true`
+- that path can still directly fold the current tail when the mark already covers expected duration
+- otherwise it updates the original segment in place and returns without running normal prefetch/new-segment refresh flow
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for same-segment promotion:
+```text
+复现一轮同一个 `response_id + playback_id + segment_id` 先报 `is_last_segment=no`、随后再补 `is_last_segment=yes` 的场景。观察是否出现 `xiaozhi playback same-segment last-meta promotion` 或 `late_last_meta_upgrade`，并确认这次补报不会再引起新的 `prefetching / recover / segment gap hold / stop`。如果该 segment 的 mark 已覆盖 expected_duration_ms，则应直接本地闭环结束。
+```
+
+Expected result:
+- false->true promotion 被当作原 segment 元数据升级，而不是新 segment
+- 只有 `segment_id` 真变化时，才进入新分段切换逻辑
+- 已覆盖 expected mark 的尾段 promotion 可直接本地闭环
+
 ## Step 5.555 Verification
 
 Confirm a late same-segment `is_last_segment=no -> yes` upgrade now folds the stale current tail instead of re-publishing it into playback recovery:
