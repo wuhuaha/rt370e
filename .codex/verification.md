@@ -1,3 +1,54 @@
+## Step 5.557 Verification
+
+Confirm playback ACK progress no longer pops a non-last tail immediately at the first wall-clock hit of `expected_duration_ms` when no successor segment is ready:
+```bash
+cd /root/ameba-river
+rg -n "playback_tail_drain_grace_elapsed|PLAYBACK_DRAIN_MS|count <= 1U|cut the audible tail" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_terminal_ack.inc` contains a tail-drain grace helper keyed by `RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS`
+- `update_playback_ack_progress()` now holds a non-last current segment in place when it is the only queued segment and no successor is ready yet
+- the adjacent comment explains this specifically prevents `waiting_next_segment -> recover/flush` from cutting the audible tail
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for tail playback:
+```text
+复现一轮主回答段先报 `is_last_segment=no`、mark 跑到 expected 后，服务端稍后才补 `is_last_segment=yes` 的场景。重点确认：
+- 最后一个 `played_duration_ms=expected_duration_ms` 之后，不再立刻出现 `playback recover` / `segment gap hold` / `AudioTrack_Flush`
+- 若随后收到同段 promotion，应继续看到 `xiaozhi playback same-segment last-meta promotion` 或本地 late-tail fold
+- 主回答尾音能完整播完，不再只剩前半段
+```
+
+Expected result:
+- current tail reaches expected mark without immediately entering `waiting_next_segment` recovery
+- same-segment late promotion arrives before any audible tail is cut
+- TTS 主回答尾巴可完整播完
+
 ## Step 5.556 Verification
 
 Confirm same `response_id + playback_id + segment_id` false-to-true last-segment promotion is now handled as in-place metadata upgrade instead of new-segment playback transition:

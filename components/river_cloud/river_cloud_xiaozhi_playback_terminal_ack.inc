@@ -160,6 +160,26 @@ static bool river_cloud_xiaozhi_playback_mark_reached_expected_duration(
     return last_mark_ms >= expected_duration_ms;
 }
 
+static bool river_cloud_xiaozhi_playback_tail_drain_grace_elapsed(
+    const river_cloud_xiaozhi_playback_segment_t *segment,
+    uint64_t now_ms)
+{
+    uint64_t deadline_ms;
+
+    if (segment == NULL || !segment->started || segment->expected_duration_ms == 0U) {
+        return false;
+    }
+
+    deadline_ms = segment->started_at_ms + (uint64_t)segment->expected_duration_ms;
+    if (deadline_ms > UINT64_MAX - (uint64_t)RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS) {
+        deadline_ms = UINT64_MAX;
+    } else {
+        deadline_ms += (uint64_t)RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS;
+    }
+
+    return now_ms >= deadline_ms;
+}
+
 static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
     const river_xiaozhi_event_t *event)
 {
@@ -844,6 +864,20 @@ static void river_cloud_xiaozhi_update_playback_ack_progress(void)
             return;
         }
         if (played_duration_ms < segment->expected_duration_ms) {
+            return;
+        }
+
+        /*
+         * Wall-clock mark progress reaches the segment duration before the
+         * backend buffer necessarily drains to the speaker. When no successor
+         * segment is ready yet, hold the current head through a drain grace
+         * window so we do not enter waiting_next_segment -> recover/flush and
+         * cut the audible tail.
+         */
+        if (g_river_cloud.xiaozhi_playback_segment_queue_truth.count <= 1U &&
+            !segment->is_last_segment &&
+            !river_cloud_xiaozhi_playback_tail_drain_grace_elapsed(segment,
+                                                                   now_ms)) {
             return;
         }
 

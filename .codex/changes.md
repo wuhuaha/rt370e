@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.557
+- 继续彻底修播放尾段被切的问题；这次不再只盯 same-segment promotion，而是直接收 `ack_progress -> pop current -> waiting_next_segment -> recover/flush` 这条提前切尾链路。
+- 根因是端侧 `update_playback_ack_progress()` 按 wall clock 计算 `played_duration_ms`，一旦达到 `expected_duration_ms` 就立刻把当前 segment 标 fully-heard 并 `pop`：
+  - 但这时 AudioTrack/backend buffer 里的尾音通常还没真正从喇叭播完；
+  - 随后队列瞬时变空，runtime 会转入 `waiting_next_segment`，再被 `segment gap hold / playback recover` 拉到 flush/restart；
+  - 结果就是主回答段后半截尾巴被切掉。
+- 这轮修复改成“尾段 drain grace”：
+  - 当当前 segment 已跑到 `expected_duration_ms`，但队列里还没有 successor，且该 segment 还不是 last 时，先保留它，不立即 `pop`；
+  - 仅在经过一个 `RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS` 的尾段排空窗口后，才允许它从队列里退出；
+  - 这样 same-segment late-meta promotion 或真实 successor meta 都有机会在 flush 前赶到。
+- 这样做的直接效果是：
+  - 不再过早进入 `waiting_next_segment`
+  - 不再在尾音仍在 backend buffer 时触发 `playback recover` / `AudioTrack_Flush`
+  - 即使服务端 promotion 迟到，最多也是在尾音实际排空后再进入后续切换，不会先把可听尾巴切掉
+- Verification for this step:
+  - `git diff --check` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.556
 - 继续按服务侧建议收紧 same-segment meta promotion 语义，不再只覆盖“尾段已播完再补 last”的一个窄窗口。
 - 现在当 `response_id + playback_id + segment_id` 相同，且只是 `is_last_segment: false -> true` 时，端侧按“原 segment 的元数据升级”处理，不再进入新分段路径：

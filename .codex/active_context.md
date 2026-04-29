@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.556 XiaoZhi same-segment promotion in-place upgrade，避免误判新分段（待上板验证）`
+  - `5.557 XiaoZhi playback tail drain grace，避免 wall-clock 提前 pop 触发 recover/flush 切尾（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.557 收主回答尾段提前切断：
+      - 旧逻辑在 `played_duration_ms == expected_duration_ms` 时就立刻 fully-heard + pop 当前 non-last segment
+      - 队列随即变空，runtime 进入 `waiting_next_segment`，再被 `segment gap hold / playback recover` 拉去 flush/restart
+      - 现在对“当前是唯一 segment 且还不是 last”的场景增加 tail drain grace，先给 backend buffer 排空和 late promotion/successor 一个安全窗口
+    - 下一步上板验证：
+      - `played_duration_ms=expected_duration_ms` 后不应立刻出现 `playback recover` / `segment gap hold`
+      - same-segment late promotion 仍可继续本地折叠/升级
+      - 主回答尾音应完整播完，不再只剩前半段
   - newest landed runtime bug-fix slice:
     - Step 5.556 对齐服务侧 same-segment promotion 语义：
       - 同一 `response_id + playback_id + segment_id` 仅做 `false -> true` last 升级时，端侧按原 segment 的元数据升级处理
