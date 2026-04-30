@@ -103,7 +103,8 @@ river_cloud_xiaozhi_playback_completed_wait_kind(void)
     return RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE;
 }
 
-static bool river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(
+static bool __attribute__((unused))
+river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(
     const river_xiaozhi_event_t *event)
 {
     const river_cloud_xiaozhi_playback_context_truth_t *meta_context =
@@ -137,7 +138,8 @@ static bool river_cloud_xiaozhi_promote_marked_tail_to_fully_heard(
     return true;
 }
 
-static bool river_cloud_xiaozhi_playback_segment_matches_meta_context(
+static bool __attribute__((unused))
+river_cloud_xiaozhi_playback_segment_matches_meta_context(
     const river_cloud_xiaozhi_playback_segment_t *segment,
     const river_cloud_xiaozhi_playback_context_truth_t *meta_context)
 {
@@ -149,7 +151,8 @@ static bool river_cloud_xiaozhi_playback_segment_matches_meta_context(
            strcmp(segment->segment_id, meta_context->segment_id) == 0;
 }
 
-static bool river_cloud_xiaozhi_playback_mark_reached_expected_duration(
+static bool __attribute__((unused))
+river_cloud_xiaozhi_playback_mark_reached_expected_duration(
     uint32_t last_mark_ms,
     uint32_t expected_duration_ms)
 {
@@ -180,7 +183,8 @@ static bool river_cloud_xiaozhi_playback_tail_drain_grace_elapsed(
     return now_ms >= deadline_ms;
 }
 
-static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
+static bool __attribute__((unused))
+river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
     const river_xiaozhi_event_t *event)
 {
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
@@ -235,7 +239,8 @@ static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
     return true;
 }
 
-static bool river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail(
+static bool __attribute__((unused))
+river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail(
     const river_xiaozhi_event_t *event)
 {
     river_cloud_xiaozhi_playback_truth_view_t truth_view;
@@ -412,18 +417,6 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
     meta_truth->prefetch_target_ms = prefetch_target_ms;
     meta_truth->last_meta_ms = now_ms;
-    if (river_cloud_xiaozhi_playback_segment_context_valid()) {
-        if (event->is_last_segment) {
-            river_cloud_xiaozhi_clear_playback_wait_context();
-            river_cloud_xiaozhi_store_playback_last_segment_context();
-        } else {
-            river_cloud_xiaozhi_store_playback_wait_context();
-        }
-    } else {
-        river_cloud_xiaozhi_clear_playback_wait_context();
-    }
-    river_cloud_xiaozhi_sync_playback_terminal_report_flags();
-
     for (index = 0U;
          index < g_river_cloud.xiaozhi_playback_segment_queue_truth.count;
          ++index) {
@@ -441,11 +434,6 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     }
 
     if (segment == NULL) {
-        if (river_cloud_xiaozhi_fold_late_last_segment_meta_for_fully_heard_tail(
-                event)) {
-            river_cloud_xiaozhi_refresh_playback_phase("late_last_meta");
-            return;
-        }
         if (g_river_cloud.xiaozhi_playback_segment_queue_truth.count >=
             RIVER_CLOUD_XIAOZHI_PLAYBACK_SEGMENTS_MAX) {
             RIVER_LOGW("xiaozhi playback segment queue full: playback_id=%s segment_id=%s queued=%lu",
@@ -468,36 +456,18 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         memset(segment, 0, sizeof(*segment));
     }
 
-    /*
-     * Same response/playback/segment may be re-published only to promote the
-     * original segment from non-last to last. Treat that as in-place metadata
-     * upgrade instead of new-segment arrival, otherwise stale tails can re-arm
-     * prefetch/recover/gap-hold after playback already reached the final mark.
-     */
     if (segment->valid &&
         river_cloud_xiaozhi_playback_segment_matches_meta_context(segment,
-                                                                  meta_context) &&
-        event->is_last_segment &&
-        !segment->is_last_segment) {
-        if (river_cloud_xiaozhi_fold_late_last_segment_meta_for_current_tail(
-                event)) {
+                                                                  meta_context)) {
+        if (segment->is_last_segment) {
+            river_cloud_xiaozhi_clear_playback_wait_context();
             river_cloud_xiaozhi_store_playback_last_segment_context();
-            river_cloud_xiaozhi_sync_playback_terminal_report_flags();
-            river_cloud_xiaozhi_refresh_playback_phase("late_last_meta_upgrade");
-            return;
+        } else {
+            river_cloud_xiaozhi_clear_playback_last_segment_context();
+            river_cloud_xiaozhi_store_playback_wait_context();
         }
-
-        river_cloud_xiaozhi_copy_optional_text(segment->text,
-                                               sizeof(segment->text),
-                                               meta_truth->text);
-        if (event->expected_duration_ms != 0U) {
-            segment->expected_duration_ms = event->expected_duration_ms;
-        }
-        segment->is_last_segment = true;
-        river_cloud_xiaozhi_clear_playback_wait_context();
-        river_cloud_xiaozhi_store_playback_last_segment_context();
         river_cloud_xiaozhi_sync_playback_terminal_report_flags();
-        RIVER_LOGI("xiaozhi playback same-segment last-meta promotion: response_id=%s playback_id=%s segment_id=%s started=%s mark_ms=%lu expected_ms=%lu",
+        RIVER_LOGI("xiaozhi playback duplicate same-segment meta ignored: response_id=%s playback_id=%s segment_id=%s started=%s mark_ms=%lu expected_ms=%lu existing_last=%s event_last=%s",
                    meta_context->response_id[0] != '\0' ? meta_context->response_id :
                                                           "-",
                    meta_context->playback_id[0] != '\0' ? meta_context->playback_id :
@@ -506,7 +476,9 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
                                                          "-",
                    segment->started ? "yes" : "no",
                    (unsigned long)segment->last_mark_ms,
-                   (unsigned long)segment->expected_duration_ms);
+                   (unsigned long)segment->expected_duration_ms,
+                   segment->is_last_segment ? "yes" : "no",
+                   event->is_last_segment ? "yes" : "no");
         return;
     }
 
@@ -534,6 +506,14 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         segment->valid = true;
         g_river_cloud.xiaozhi_playback_segment_queue_truth.count++;
     }
+    if (segment->is_last_segment) {
+        river_cloud_xiaozhi_clear_playback_wait_context();
+        river_cloud_xiaozhi_store_playback_last_segment_context();
+    } else {
+        river_cloud_xiaozhi_clear_playback_last_segment_context();
+        river_cloud_xiaozhi_store_playback_wait_context();
+    }
+    river_cloud_xiaozhi_sync_playback_terminal_report_flags();
     start_gate = river_cloud_xiaozhi_refresh_start_gate();
 
     RIVER_LOGI("xiaozhi playback prefetch: segment_id=%s expected_ms=%lu meta_gap_ms=%lu target_ms=%lu policy=%s cautious=%s start=%u queued=%lu rebuffer=%s/%s rebuffer_total=%lu streak=%lu",

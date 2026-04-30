@@ -565,6 +565,14 @@ static void river_cloud_xiaozhi_store_playback_wait_context(void)
         &g_river_cloud.xiaozhi_playback_lineage_truth.meta_context);
 }
 
+static void river_cloud_xiaozhi_clear_playback_last_segment_context(void)
+{
+    river_cloud_xiaozhi_clear_playback_context_truth(
+        &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context);
+    river_cloud_xiaozhi_clear_playback_context_truth(
+        &g_river_cloud.xiaozhi_playback_terminal_truth.last_segment_context);
+}
+
 static void river_cloud_xiaozhi_store_playback_last_segment_context(void)
 {
     river_cloud_xiaozhi_copy_playback_context_truth(

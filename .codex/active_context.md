@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.558 XiaoZhi wake 首轮抑制 + 长段起播限幅 + 短 gap rebuffer 放宽（待上板验证）`
+  - `5.559 XiaoZhi same-segment duplicate meta 忽略 + playback ACK 改按首个 segment 事实收口（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.559 对齐服务侧新的 segment 合同：
+      - 服务侧不再对同一 `segment_id` 二次补发 `audio.out.meta` 修正 `is_last_segment`
+      - 端侧 `playback_note_meta()` 不再等待 same-segment `false -> true` promotion，也不再用 duplicate same-segment meta 驱动 terminal fold
+      - duplicate same-segment meta 现在只打印观察日志，不再改写 `wait_context / last_segment_context` 以外的 playback 状态机
+    - 下一步上板验证：
+      - 同一 `segment_id` 重复 meta 只出现 `duplicate same-segment meta ignored`
+      - completed/cleared 按首个 segment 事实闭环，不再等 second meta
+      - 播放尾态结束后，后续一句话能重新进入 ASR
   - newest landed runtime bug-fix slice:
     - Step 5.558 收当前最差体验三连：
       - 首轮 wakeword 会话不再把第一段 pre-roll 原样重放给服务端，降低 wake residual 空轮次

@@ -1,3 +1,53 @@
+## Step 5.559 Verification
+
+Confirm same-segment duplicate `audio.out.meta` no longer acts as a late `is_last_segment` promotion path:
+```bash
+cd /root/ameba-river
+rg -n "duplicate same-segment meta ignored|same-segment last-meta promotion|late last meta" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- `river_cloud_xiaozhi_playback_terminal_ack.inc` contains `xiaozhi playback duplicate same-segment meta ignored`
+- `river_cloud_xiaozhi_playback_note_meta()` no longer has the old `same-segment last-meta promotion` active path
+- no same-segment late-last fold path is referenced from `note_meta()`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the new service-side segment contract:
+```text
+复现一轮多段或单段 TTS 回复，重点确认：
+- 同一 `segment_id` 若又收到重复 `audio.out.meta`，只出现 `xiaozhi playback duplicate same-segment meta ignored: ...`，不会再触发新的 prefetch/recover/gap hold
+- completed/cleared 继续按第一次收到的 segment 事实正常上报，不再等待“同段第二条 meta 补 last”
+- 播放结束后能尽快退出 output-turn，后续一句话可重新进入 ASR，而不是卡在 `barge_in_listening`
+```
+
+Expected result:
+- same-segment duplicate meta 只作为观察事实，不再参与 terminal 修正
+- playback ACK 继续沿真实播放进度闭环
+- follow-up reopen 不再因为等待同段 late-last-meta 而悬挂
+
 ## Step 5.558 Verification
 
 Confirm wakeword startup no longer replays the first preroll once, long single-segment TTS startup is capped, and short upstream gaps do not trigger overly eager rebuffer recover:

@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.559
+- 服务侧已改为“不再对同一 `segment_id` 二次补发 `audio.out.meta` 修正 `is_last_segment`”，端侧相应去掉了这条旧兼容假设，避免 playback 尾态继续等一个不会再来的 same-segment promotion。
+- 本轮只做 playback meta/ACK 收口，不碰 wake / uplink / session 协议：
+  - `river_cloud_xiaozhi_playback_note_meta()` 不再把同一 `response_id + playback_id + segment_id` 的后续 `audio.out.meta` 当成 `false -> true` last 升级处理；
+  - duplicate same-segment meta 现在只打印 `xiaozhi playback duplicate same-segment meta ignored: ...` 观察日志，不再驱动 prefetch / recover / waiting_next_segment / terminal fold；
+  - `wait_context / last_segment_context` 只按首次入队的 segment 事实更新，不再被同段后续 meta 改写。
+- 目标是和服务侧新语义对齐：
+  - 端侧只按第一次收到的 segment 元数据继续上报真实 `started / mark / completed / cleared`
+  - 不再等待同一 `segment_id` 的第二条 `audio.out.meta`
+  - 收掉由 same-segment late-meta 兼容路径残留出来的 playback/output-turn 卡滞空间
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.558
 - 根据 2026-04-29 10:17 新日志，当前体验差的主因已经不是“尾段被提前 pop”单点，而是三条链路叠加：
   - 唤醒后首轮把 wakeword 尾音当成真实命令开流，服务侧连续 accepted 出多个空轮次；
