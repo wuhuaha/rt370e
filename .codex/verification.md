@@ -1,3 +1,51 @@
+## Step 5.561 Verification
+
+Confirm empty-turn recovery no longer leaves dialog runtime in stale ASR streaming and transport-close recovery is deferred out of the websocket event callback:
+```bash
+cd /root/ameba-river
+rg -n "Cloud snapshot is authoritative|empty turn followup recover|transport_closed_recover_deferred|Reopen outside" \
+  components/river_core/river_dialog_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `river_dialog_runtime_reconcile_facts_locked()` assigns `asr_session_active` from `cloud_round_active` when the cloud runtime snapshot is available
+- `river_cloud_xiaozhi_run_io_tick_housekeeping()` can run `empty_turn_followup_recover`
+- transport/session closed handling logs `transport_closed_recover_deferred` instead of synchronously reopening inside the event callback
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 15:04 no-TTS path:
+```text
+复现一轮服务端 accepted 后返回 active/idle 的 empty-turn 场景，随后在 follow-up 窗口内继续说话。
+```
+
+Expected result:
+- empty-turn 后不再长期保持 `interaction_state=asr_streaming` 且没有 `asr round begin`
+- 日志出现 `xiaozhi empty turn followup recover: action=reopen_listen` 或后续正常 follow-up reopen
+- 下一句用户语音重新进入 `xiaozhi asr round begin` / `asr stream active`，而不是只剩 VAD 日志
+
 ## Step 5.560 Verification
 
 Confirm preview warmup catch-up now triggers even when exactly one queued frame remains behind the frame currently being sent:

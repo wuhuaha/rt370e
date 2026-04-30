@@ -1894,13 +1894,18 @@ static void river_dialog_runtime_apply_local_playback_import_plan_locked(
 
 static void river_dialog_runtime_reconcile_facts_locked(void)
 {
-    if (river_dialog_runtime_cloud_runtime_available_locked()) {
+    bool cloud_runtime_available = river_dialog_runtime_cloud_runtime_available_locked();
+    bool cloud_round_active;
+
+    cloud_round_active = river_dialog_runtime_cloud_round_active_locked();
+    if (cloud_runtime_available) {
         g_river_dialog_runtime.local_playback_error_recovering = false;
-    }
-    river_dialog_runtime_refresh_error_recovering_locked();
-    if (river_dialog_runtime_cloud_round_active_locked()) {
+        /* Cloud snapshot is authoritative; do not keep stale ASR active after empty turns. */
+        g_river_dialog_runtime.control_facts.asr_session_active = cloud_round_active;
+    } else if (cloud_round_active) {
         g_river_dialog_runtime.control_facts.asr_session_active = true;
     }
+    river_dialog_runtime_refresh_error_recovering_locked();
     river_dialog_runtime_refresh_playback_locked();
     if (river_dialog_runtime_output_turn_quiesced_locked()) {
         g_river_dialog_runtime.control_facts.tts_interrupt_requested = false;

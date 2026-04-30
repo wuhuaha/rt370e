@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.560 XiaoZhi uplink warmup backlog=1 也追平，修首轮半速上行无TTS（待上板验证）`
+  - `5.561 empty turn followup recover now runs on IO tick, stale ASR active cleared from cloud truth（待验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.561 收空响应后无 TTS 的真正状态机脱节：
+      - 云端返回 `state=active input_state=active output_state=idle` 后，端侧不应长期停在 `asr_streaming` 但没有任何新的 `listen_start/asr round begin`
+      - dialog runtime 现在在 cloud snapshot 可用时把 `asr_session_active` 直接收敛到 `cloud_round_active`
+      - XiaoZhi 的 empty-turn follow-up recover 改为在 IO tick 中统一执行，避免在 websocket 事件回调里同步 reopen
+    - 下一步上板验证：
+      - empty-turn active-return 后不再卡住 `interaction_state=asr_streaming`
+      - IO tick 会看到 `xiaozhi empty turn followup recover: action=reopen_listen`
+      - 下一句用户语音应重新进入 `asr round begin` / `asr stream active`
   - newest landed runtime bug-fix slice:
     - Step 5.560 收首轮无 TTS 的半速 uplink：
       - 15:04 新日志显示 `audio_ms=1380 / duration_ms=2812 / pace_pct=49 / packets=69`
@@ -4652,15 +4661,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-28 / branch `agent-server-v2`: Step 5.543 broadens XiaoZhi late-last-meta tail closure for the `已帮你打开灯光。` reproduction:
-  - same-segment late `is_last_segment=yes` meta can now reuse a synthesized `fully_heard_context` when the segment already reached its final playback mark but lineage had only latched `marked_context`
-  - this keeps the late-last-meta fold path from reopening or preserving a paused tail after the spoken answer already finished
-  - the fold path now emits an explicit `xiaozhi playback late last meta synthesized fully-heard` log when it has to promote `marked_context` into terminal truth before closing the tail
+- 2026-04-30 / branch `agent-server-v2`: Step 5.561 fixes the empty-turn follow-up dead path behind the 15:04 no-TTS log:
+  - dialog runtime now clears stale `asr_session_active` from cloud runtime truth when no cloud round is active
+  - XiaoZhi empty-turn follow-up recovery now runs from the IO tick and calls `open_session_and_listen()` inside the valid recovery window
+  - transport/session closed handling defers recover out of the websocket event callback to avoid reentrant sends
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
 - Board expectation:
-  - after the final mark for `已帮你打开灯光。`, a late duplicate same-segment `is_last_segment=yes` no longer leaves playback in `prefetching/backend=owned_paused`
-  - logs show `xiaozhi playback late last meta folded: ...`; if `fully_heard_context` was still missing, they also show `xiaozhi playback late last meta synthesized fully-heard: ...`
+  - empty-turn active-return no longer leaves interaction stuck in `asr_streaming` without a real ASR round
+  - logs show `xiaozhi empty turn followup recover: action=reopen_listen` when recovery is needed
   - the next spoken sentence reopens ASR before idle-timeout instead of leaving only VAD logs

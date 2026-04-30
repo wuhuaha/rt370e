@@ -20,6 +20,7 @@
 static void river_cloud_xiaozhi_clear_empty_turn_returned_active_state(void);
 static void river_cloud_xiaozhi_clear_accepted_response_watchdog(void);
 static bool river_cloud_xiaozhi_response_start_pending(void);
+static bool river_cloud_xiaozhi_try_recover_empty_turn_followup(void);
 
 bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void)
 {
@@ -674,6 +675,9 @@ static void river_cloud_xiaozhi_check_accepted_response_watchdog(void)
 
 void river_cloud_xiaozhi_run_io_tick_housekeeping(void)
 {
+    if (river_cloud_xiaozhi_try_recover_empty_turn_followup()) {
+        return;
+    }
     river_cloud_xiaozhi_refresh_turn_semantics("io_tick");
     river_cloud_xiaozhi_check_accepted_response_watchdog();
     river_cloud_xiaozhi_check_window_timeout();
@@ -1428,49 +1432,87 @@ void river_cloud_xiaozhi_apply_post_stop_result_round_policy(void)
     }
 }
 
-static bool river_cloud_xiaozhi_try_recover_transport_closed_followup(void)
+static bool river_cloud_xiaozhi_empty_turn_followup_recover_pending(
+    uint64_t now_ms,
+    uint64_t *recover_left_ms)
 {
-    river_status_t status;
-    uint64_t now_ms;
-    uint64_t recover_left_ms;
-
     if (!g_river_cloud.xiaozhi_session_window_truth.window_active ||
         g_river_cloud.xiaozhi_session_window_truth.empty_turn_recover_deadline_ms == 0U ||
         g_river_cloud.stream_active || river_cloud_xiaozhi_playback_turn_active() ||
+        river_cloud_xiaozhi_listen_stop_pending() ||
+        river_cloud_xiaozhi_local_close_pending() ||
         !river_wifi_station_is_connected()) {
         return false;
     }
 
-    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     if (now_ms >=
         g_river_cloud.xiaozhi_session_window_truth.empty_turn_recover_deadline_ms) {
         river_cloud_xiaozhi_clear_empty_turn_returned_active_state();
         return false;
     }
-    recover_left_ms =
-        g_river_cloud.xiaozhi_session_window_truth.empty_turn_recover_deadline_ms -
-        now_ms;
 
-    RIVER_LOGW("xiaozhi transport closed followup recover: action=reopen_listen window_left_ms=%lu sid=%s",
+    if (recover_left_ms != NULL) {
+        *recover_left_ms =
+            g_river_cloud.xiaozhi_session_window_truth.empty_turn_recover_deadline_ms -
+            now_ms;
+    }
+    return true;
+}
+
+static bool river_cloud_xiaozhi_defer_transport_closed_followup_recover(void)
+{
+    uint64_t now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    uint64_t recover_left_ms = 0U;
+
+    if (!river_cloud_xiaozhi_empty_turn_followup_recover_pending(
+            now_ms,
+            &recover_left_ms)) {
+        return false;
+    }
+
+    RIVER_LOGW("xiaozhi transport closed followup recover deferred: action=reopen_on_io_tick window_left_ms=%lu sid=%s",
                (unsigned long)recover_left_ms,
                river_cloud_xiaozhi_current_sid() != NULL ?
                    river_cloud_xiaozhi_current_sid() :
                    "-");
-    river_cloud_xiaozhi_round_finish("transport_closed_recover");
+    river_cloud_request_state_sync("transport_closed_recover_deferred");
+    return true;
+}
+
+static bool river_cloud_xiaozhi_try_recover_empty_turn_followup(void)
+{
+    river_status_t status;
+    uint64_t now_ms;
+    uint64_t recover_left_ms = 0U;
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (!river_cloud_xiaozhi_empty_turn_followup_recover_pending(
+            now_ms,
+            &recover_left_ms)) {
+        return false;
+    }
+
+    RIVER_LOGW("xiaozhi empty turn followup recover: action=reopen_listen window_left_ms=%lu sid=%s",
+               (unsigned long)recover_left_ms,
+               river_cloud_xiaozhi_current_sid() != NULL ?
+                   river_cloud_xiaozhi_current_sid() :
+                   "-");
+    river_cloud_xiaozhi_round_finish("empty_turn_followup_recover");
     river_xiaozhi_clear_session_update_cache();
     river_cloud_xiaozhi_clear_preview_state();
     river_cloud_xiaozhi_clear_turn_semantics_state();
     river_cloud_xiaozhi_reset_transport_state(false);
     status = river_cloud_xiaozhi_open_session_and_listen();
     if (status != RIVER_OK) {
-        RIVER_LOGW("xiaozhi transport closed followup recover failed: status=%d window_left_ms=%lu",
+        RIVER_LOGW("xiaozhi empty turn followup recover failed: status=%d window_left_ms=%lu",
                    (int)status,
                    (unsigned long)recover_left_ms);
-        river_cloud_xiaozhi_window_close("transport_recover_open_failed");
+        river_cloud_xiaozhi_window_close("empty_turn_followup_recover_failed");
+        river_cloud_request_state_sync("empty_turn_followup_recover_failed");
         return true;
     }
 
-    RIVER_LOGI("xiaozhi transport closed followup recovered: window_left_ms=%lu sid=%s",
+    RIVER_LOGI("xiaozhi empty turn followup recovered: window_left_ms=%lu sid=%s",
                (unsigned long)recover_left_ms,
                river_cloud_xiaozhi_current_sid() != NULL ?
                    river_cloud_xiaozhi_current_sid() :
@@ -1480,7 +1522,8 @@ static bool river_cloud_xiaozhi_try_recover_transport_closed_followup(void)
 
 void river_cloud_xiaozhi_apply_transport_closed_terminal_policy(void)
 {
-    if (river_cloud_xiaozhi_try_recover_transport_closed_followup()) {
+    /* Reopen outside the websocket event callback to avoid reentrant sends. */
+    if (river_cloud_xiaozhi_defer_transport_closed_followup_recover()) {
         return;
     }
 

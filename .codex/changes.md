@@ -1,5 +1,23 @@
 # Change Log
 
+## Step 5.561
+- 复查 Step 5.560 后，确认 15:04 “没任何 TTS”的日志不能只用半速 uplink 解释；更关键的异常链路是：
+  - 服务端返回 `state=active input_state=active output_state=idle` 后，端侧发布成 `thinking -> asr_streaming reason=empty_turn_returned_active`
+  - 但没有新的 `listen_start` / `asr round begin`
+  - 后续用户说话只剩 VAD 日志，说明端侧交互状态和云端真实 listen/round 状态脱节
+- 本轮收口两个状态机问题：
+  - dialog runtime 在云端 runtime 可用时，把 cloud round snapshot 作为 `asr_session_active` 的权威来源；当云端 round 已经不活跃时主动清掉 stale ASR active，避免 empty turn 后继续投影成 `asr_streaming`
+  - XiaoZhi empty-turn recover 不再只等 transport close；IO tick 会在恢复窗口内主动执行 `empty_turn_followup_recover -> open_session_and_listen()`，重新准备 follow-up listen
+  - transport/session closed 事件里不再同步重开 websocket/session，而是只标记 `transport_closed_recover_deferred`，把 reopen 放到下一轮 IO tick，避免在 websocket poll 回调中重入发送导致卡在 collaboration negotiation 日志后
+- 目标日志变化：
+  - empty turn 后应先回到 follow-up/可恢复状态，不再长期卡 `asr_streaming` 但没有实际 ASR round
+  - 若需要恢复，应看到 `xiaozhi empty turn followup recover: action=reopen_listen`
+  - 后续用户语音应重新出现 `asr round begin` / `asr stream active`，而不是只有 VAD `speech/silence`
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.560
 - 根据 2026-04-30 15:04 新日志，当前“没任何 TTS”不是 playback ACK/尾态问题，而是 uplink 在首轮 ASR 里只跑到了约半速：
   - `xiaozhi asr round finish` 显示 `audio_ms=1380 duration_ms=2812 pace_pct=49`
