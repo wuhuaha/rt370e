@@ -1,5 +1,20 @@
 # Change Log
 
+## Step 5.560
+- 根据 2026-04-30 15:04 新日志，当前“没任何 TTS”不是 playback ACK/尾态问题，而是 uplink 在首轮 ASR 里只跑到了约半速：
+  - `xiaozhi asr round finish` 显示 `audio_ms=1380 duration_ms=2812 pace_pct=49`
+  - `packets=69` 恰好等于 `69 * 20 ms = 1380 ms`
+  - 同时 `preview_warmup ... bypass=0 backlog_max=2`，说明端侧虽然存在 1~2 帧 backlog，但 warmup catch-up 门槛过严，根本没进入追平路径
+- 这轮只修 uplink warmup 门槛，不碰服务端协议和 playback：
+  - `river_cloud_xiaozhi_uplink_drain_burst_limit()` 从 `ready_frames > 1` 放宽到 `ready_frames > 0`
+  - `river_cloud_xiaozhi_uplink_should_bypass_frame_pacing()` 也同步改成 `ready_frames > 0`
+  - 并补注释说明：`ready_frames` 统计发生在当前帧已经从 ring 读出之后，因此值为 `1` 就已经代表“当前发送帧后面还压着 1 帧 backlog”
+- 目标是让 preview warmup 在最常见的 `backlog=1~2` 场景也能立即追平，不再卡在 `bypass=0 / pace_pct≈50`，避免服务端因为只收到半速音频而把这轮收成 empty turn。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.559
 - 服务侧已改为“不再对同一 `segment_id` 二次补发 `audio.out.meta` 修正 `is_last_segment`”，端侧相应去掉了这条旧兼容假设，避免 playback 尾态继续等一个不会再来的 same-segment promotion。
 - 本轮只做 playback meta/ACK 收口，不碰 wake / uplink / session 协议：

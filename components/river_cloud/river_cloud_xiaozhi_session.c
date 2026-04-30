@@ -265,7 +265,7 @@ static bool river_cloud_xiaozhi_uplink_preview_warmup_active(void)
 static uint32_t river_cloud_xiaozhi_uplink_drain_burst_limit(void)
 {
     if (river_cloud_xiaozhi_uplink_preview_warmup_active() &&
-        river_cloud_xiaozhi_uplink_ready_frames() > 1U &&
+        river_cloud_xiaozhi_uplink_ready_frames() > 0U &&
         RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX >
             RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX) {
         return RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_BURST_MAX;
@@ -276,7 +276,14 @@ static uint32_t river_cloud_xiaozhi_uplink_drain_burst_limit(void)
 
 static bool river_cloud_xiaozhi_uplink_should_bypass_frame_pacing(uint32_t ready_frames)
 {
-    return river_cloud_xiaozhi_uplink_preview_warmup_active() && ready_frames > 1U;
+    /*
+     * `ready_frames` is sampled after the current frame has already been read
+     * out of the ring into `retry_valid`. So a value of 1 already means "one
+     * more 20 ms frame is queued behind the frame we are sending now". Treat
+     * that as backlog during preview warmup, otherwise the catch-up path only
+     * triggers at 3+ frames and the uplink can get stuck near half-rate.
+     */
+    return river_cloud_xiaozhi_uplink_preview_warmup_active() && ready_frames > 0U;
 }
 
 static void river_cloud_xiaozhi_log_uplink_backpressure(uint64_t now_ms, uint32_t backoff_ms)

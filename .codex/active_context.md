@@ -15,11 +15,20 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.559 XiaoZhi same-segment duplicate meta 忽略 + playback ACK 改按首个 segment 事实收口（待上板验证）`
+  - `5.560 XiaoZhi uplink warmup backlog=1 也追平，修首轮半速上行无TTS（待上板验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.560 收首轮无 TTS 的半速 uplink：
+      - 15:04 新日志显示 `audio_ms=1380 / duration_ms=2812 / pace_pct=49 / packets=69`
+      - `preview_warmup ... bypass=0 backlog_max=2` 说明 warmup catch-up 门槛过严，`backlog=1~2` 时根本不追平
+      - 现在把 warmup burst/bypass 触发门槛从 `>1` 放宽到 `>0`
+    - 下一步上板验证：
+      - `pace_pct` 不再卡在 49~50
+      - `preview_warmup ... bypass=` 开始大于 0
+      - 首轮不再直接 `empty turn returned active`，而是进入正常 `response.start/audio.out.meta`
   - newest landed runtime bug-fix slice:
     - Step 5.559 对齐服务侧新的 segment 合同：
       - 服务侧不再对同一 `segment_id` 二次补发 `audio.out.meta` 修正 `is_last_segment`

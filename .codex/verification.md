@@ -1,3 +1,53 @@
+## Step 5.560 Verification
+
+Confirm preview warmup catch-up now triggers even when exactly one queued frame remains behind the frame currently being sent:
+```bash
+cd /root/ameba-river
+rg -n "uplink_drain_burst_limit|uplink_should_bypass_frame_pacing|ready_frames > 0U|half-rate" \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_uplink_drain_burst_limit()` uses `river_cloud_xiaozhi_uplink_ready_frames() > 0U`
+- `river_cloud_xiaozhi_uplink_should_bypass_frame_pacing()` uses `ready_frames > 0U`
+- the adjacent comment explains that `ready_frames` is sampled after the current frame has already been read out of the ring
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for half-rate uplink:
+```text
+复现一轮“唤醒后立即说一句完整命令”的场景，重点确认：
+- `xiaozhi asr round finish` 的 `pace_pct` 不再卡在 `49~50`
+- `preview_warmup ... bypass=` 应大于 `0`，至少在 `backlog_max=1~2` 的轮次开始出现
+- 该轮不再直接走 `empty turn returned active`，而是进入 `response.start` / `audio.out.meta` / TTS 播放
+```
+
+Expected result:
+- warmup catch-up 在轻微 backlog 下也会触发
+- uplink `send_interval_p50/p95` 回落到接近 20 ms
+- 服务端能收到完整实时音频并返回正常 TTS
+
 ## Step 5.559 Verification
 
 Confirm same-segment duplicate `audio.out.meta` no longer acts as a late `is_last_segment` promotion path:
