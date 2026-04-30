@@ -1,5 +1,24 @@
 # Change Log
 
+## Step 5.563
+- 根据上板反馈“TTS 只有前半段、没有后半段”，复查 Step 5.562 后确认新的截断风险：
+  - Step 5.562 会在服务端 `output_state=idle` 后合成 terminal tail，解决缺少 `is_last_segment=yes` 的卡死
+  - 但 terminal segment 的完成仍主要按 `expected_duration_ms` 墙钟推进；若后续 audio binary 迟到，端侧可能先 pop last segment、发送/进入 completed，再把迟到帧当成 `late completed audio` 丢弃
+  - 这会表现为前半段能播，后半段被 stop/completed 路径截掉
+- 本轮把 terminal tail 完成条件收紧：
+  - last segment 达到 expected duration 后，还必须等待 downlink ring 为空、retry frame 为空
+  - 最近一次 downlink audio supply 必须静默至少 `RIVER_CLOUD_XIAOZHI_PLAYBACK_DRAIN_MS`
+  - playback backend 已短暂 inactive 时，只有满足同样严格的 terminal-tail drain 条件才允许推进 ACK/fully-heard，避免修复后反向卡死
+  - `output_state=idle` 下的 fully-heard 合成也必须等 downlink supply 静默，避免把仍在路上的尾部音频提前视为已听完
+- 目标日志变化：
+  - 不应再出现 terminal completed/stop 后继续大量 `late completed audio dropped` 或后半段缺失
+  - 若服务端音频尾包迟到，terminal tail 会继续保持 current segment，直到队列与供给都 drain 后再 completed/cleared
+- Verification for this step:
+  - Step 5.563 `rg` verification matched the terminal-tail quiet-supply guard paths
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.562
 - 根据 2026-04-30 17:01 新日志，前一轮“完全无 TTS”已变成“TTS 起播后段间/尾态卡死”：
   - `_0001` 与 `_0002` 的 `audio.out.meta` 都是 `is_last_segment=no`

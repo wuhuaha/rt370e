@@ -15,11 +15,21 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.562 synthesize playback terminal on output idle and recover stuck wait segment（待验证）`
+  - `5.563 delay terminal playback completion until downlink tail drains（待验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.563 收 TTS “只有前半段没有后半段”：
+      - Step 5.562 合成 terminal tail 后，last segment 仍可能只按 `expected_duration_ms` 墙钟推进
+      - 若 audio binary 尾包迟到，端侧会先 completed/stop，再把尾包当 `late completed audio` 丢弃，造成后半段缺失
+      - terminal tail 现在必须同时满足 expected-duration drain、downlink queue 空、retry frame 空、last supply 静默一个 playback drain 窗口，才允许 pop/completed
+      - backend inactive 时也只在同样严格的 terminal-tail drain 条件下推进 ACK，避免卡死和截断二选一
+    - 下一步上板验证：
+      - ack 与主回答后半段都能完整听到
+      - terminal completed/stop 不早于最后一批 audio binary drain
+      - 不应出现 completed 后继续丢尾包导致的 `late completed audio dropped`
   - newest landed runtime bug-fix slice:
     - Step 5.562 收 17:01 TTS 起播后的段间/尾态卡死：
       - 新日志显示 `_0001/_0002` 都是 `is_last_segment=no`，服务端随后回到 `state=active output_state=idle`，端侧却停在 `waiting_next_segment` 并把 downlink ring 堆满
@@ -4673,17 +4683,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-30 / branch `agent-server-v2`: Step 5.562 fixes the playback stall behind the 17:01 TTS log where service output returned idle without a last-segment meta:
-  - paused/recovering playback no longer advances ACK progress by wall clock unless real output is active or a stop drain is pending
-  - queued downlink audio can recover the missing current segment from wait/meta context when the wait segment was not fully heard
-  - `state=active output_state=idle` after playback meta can synthesize the last observed meta as the terminal tail and drive completed/cleared
-  - active/idle updates with an already-known terminal tail are treated as playback terminal progress, not empty-turn recovery
+- 2026-04-30 / branch `agent-server-v2`: Step 5.563 fixes truncated TTS after terminal-tail synthesis:
+  - terminal last-segment completion no longer relies only on `expected_duration_ms`
+  - last segment pop/completed now waits for expected-duration drain, empty downlink queue, no retry frame, and quiet downlink supply
+  - output-idle fully-heard synthesis also waits for downlink supply quiet so late audio frames are not treated as already heard
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` -> `Build done`
 - Board expectation:
-  - `_0001` 播完后不再持续 `waiting_next_segment` / `downlink ring overflow`
-  - 若段队列丢失但下行帧已到达，应看到 `xiaozhi playback wait segment recovered`
-  - 缺少 `is_last_segment=yes` 时，active/idle 后应看到 `xiaozhi playback terminal synthesized from output idle`
-  - `audio.out.completed` / `audio.out.cleared` 应在 transport idle timeout 前完成或排队
+  - ack 与主回答后半段都能完整听到
+  - terminal completed/stop 不早于最后一批 audio binary drain
+  - 不应出现 completed 后继续丢尾包导致的 `late completed audio dropped`

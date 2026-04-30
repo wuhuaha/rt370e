@@ -1,3 +1,52 @@
+## Step 5.563 Verification
+
+Confirm terminal playback cannot complete while late downlink audio may still arrive:
+```bash
+cd /root/ameba-river
+rg -n "downlink_tail_supply_quiet|terminal_tail_ready_to_pop|late completed audio dropped|playback_finalize_output_idle|mark_terminal_tail_fully_heard" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- terminal last-segment pop requires expected-duration drain, empty downlink queue, no retry frame, and quiet downlink supply
+- inactive-backend ACK progress is allowed only for a terminal tail that satisfies the same strict drain condition
+- output-idle fully-heard synthesis waits for downlink supply quiet before treating the last segment as heard
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for truncated TTS:
+```text
+唤醒后执行会产生 fast_launch ack + main_dialogue 主回答的命令，例如“把空调设到 26 度”。
+```
+
+Expected result:
+- 能听到完整 ack 与主回答后半段
+- terminal completed/stop 不应早于最后一批 audio binary drain
+- 不应出现 completed 后继续丢尾包导致的 `late completed audio dropped`
+
 ## Step 5.562 Verification
 
 Confirm playback no longer waits forever for a missing terminal meta after service output returns idle:
