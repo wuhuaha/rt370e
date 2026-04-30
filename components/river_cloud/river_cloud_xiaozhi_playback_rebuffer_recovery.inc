@@ -104,7 +104,8 @@ static bool river_cloud_xiaozhi_segment_gap_hold_already_paused(
            view->truth_view.backend_state ==
                RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_PAUSED &&
            view->truth_view.supply_kind ==
-               RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT;
+               RIVER_CLOUD_PLAYBACK_SUPPLY_WAITING_NEXT_SEGMENT &&
+           view->queued_frames <= view->hold_frames;
 }
 
 static bool river_cloud_xiaozhi_maybe_pause_for_segment_gap(void)

@@ -209,6 +209,11 @@ river_cloud_xiaozhi_prepare_downlink_cycle_plan(void)
     river_cloud_xiaozhi_update_playback_ack_progress();
     river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
         "downlink_cycle");
+    if (queued_frames != 0U &&
+        river_cloud_xiaozhi_recover_wait_context_segment_if_needed(
+            "downlink_wait_segment_audio")) {
+        queued_frames = river_cloud_xiaozhi_playback_queued_frames();
+    }
     if (river_cloud_xiaozhi_maybe_rebuffer_starved(queued_frames, now_ms)) {
         plan.wait_kind = RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_STARVED;
         return plan;

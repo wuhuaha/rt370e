@@ -1,3 +1,56 @@
+## Step 5.562 Verification
+
+Confirm playback no longer waits forever for a missing terminal meta after service output returns idle:
+```bash
+cd /root/ameba-river
+rg -n "playback_finalize_output_idle|wait segment recovered|terminal synthesized from output idle|segment_gap_hold_already_paused|output_active" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- `river_cloud_xiaozhi_update_playback_ack_progress()` is gated by real output activity or pending stop drain
+- downlink cycle can recover a missing current segment from wait/meta context when queued audio arrives
+- segment-gap hold does not remain paused once queued frames exceed the hold threshold
+- `state=active output_state=idle` can synthesize a terminal tail from the last observed playback meta
+- already-known terminal tails also keep active/idle in the playback terminal path instead of falling back to empty-turn recovery
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the 17:01 playback stall:
+```text
+唤醒后下发一条会产生 fast_launch ack + main_dialogue 主回答的智能家居命令，例如“把空调设到 26 度”。
+```
+
+Expected result:
+- `_0001` 播完后不再长期停在 `waiting_next_segment` / `owned_paused` 并持续 `downlink ring overflow`
+- 若段队列丢失但下行帧已到达，应看到 `xiaozhi playback wait segment recovered`
+- 若服务端没有发送 `is_last_segment=yes`，active/idle session.update 后应看到 `xiaozhi playback terminal synthesized from output idle`
+- 在服务端 idle timeout 前完成真实播放尾态，`audio.out.completed` / `audio.out.cleared` 不应再因 `transport_closed` 才失败
+
 ## Step 5.561 Verification
 
 Confirm empty-turn recovery no longer leaves dialog runtime in stale ASR streaming and transport-close recovery is deferred out of the websocket event callback:

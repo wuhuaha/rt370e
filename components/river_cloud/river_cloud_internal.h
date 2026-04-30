@@ -615,6 +615,7 @@ river_status_t river_cloud_xiaozhi_control_request_async(
 void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_event_t *event);
 bool river_cloud_xiaozhi_note_response_audio_abandoned(const char *reason);
+bool river_cloud_xiaozhi_playback_finalize_output_idle(const char *trigger);
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);

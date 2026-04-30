@@ -1,5 +1,29 @@
 # Change Log
 
+## Step 5.562
+- 根据 2026-04-30 17:01 新日志，前一轮“完全无 TTS”已变成“TTS 起播后段间/尾态卡死”：
+  - `_0001` 与 `_0002` 的 `audio.out.meta` 都是 `is_last_segment=no`
+  - `_0001` 播完后端侧进入 `waiting_next_segment` / segment-gap hold，但后续 `_0002` 下行音频没有继续消费
+  - ring 最终堆到 `queued=96 capacity=96` 并持续 `downlink ring overflow`，服务端随后 `session.end idle_timeout`，`audio.out.cleared` 因 transport closed 发送失败
+- 本轮优化 playback 状态机的三个卡点：
+  - ACK 进度不再在 paused/recovering 且没有 stop drain 的状态下按墙钟推进，避免未实际播放的段被误 mark/pop
+  - 当 wait-context 指向的非 last 段还未 fully-heard、段队列为空但下行帧已经到达时，从 wait/meta 上下文恢复当前 segment，让 worker 继续消费 queued audio；segment-gap hold 已暂停后也不再在 queued 超过 hold 水位时永久保持 paused
+  - 服务端返回 `state=active output_state=idle` 且端侧已见 playback meta 时，把最后观测的 meta 本地提升为 terminal tail，驱动后续 drain/completed，而不是继续等待服务端不会再补发的 `is_last_segment=yes`
+  - 若服务端已走正常 terminal meta 路径，active/idle 也按 playback tail 处理，不再回落到 empty-turn 分支
+- 保持 Step 5.559 的合同约束：
+  - 不恢复“等待同一 `segment_id` 第二条 meta 修正 last”的旧逻辑
+  - 只在服务端明确 output idle 或端侧 wait-context 与 queued audio 明确冲突时做本地收口/恢复
+- 目标日志变化：
+  - 段间不再持续 `downlink ring overflow`
+  - 必要时出现 `xiaozhi playback wait segment recovered`
+  - 服务端 active/idle 后出现 `xiaozhi playback terminal synthesized from output idle`
+  - 尾态应在 transport close 前完成 `audio.out.completed` / `audio.out.cleared` 队列或发送
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - Step 5.562 `rg` verification matched the output-idle terminal and wait-segment recovery paths
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`
+
 ## Step 5.561
 - 复查 Step 5.560 后，确认 15:04 “没任何 TTS”的日志不能只用半速 uplink 解释；更关键的异常链路是：
   - 服务端返回 `state=active input_state=active output_state=idle` 后，端侧发布成 `thinking -> asr_streaming reason=empty_turn_returned_active`

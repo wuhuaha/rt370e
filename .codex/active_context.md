@@ -15,11 +15,23 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.561 empty turn followup recover now runs on IO tick, stale ASR active cleared from cloud truth（待验证）`
+  - `5.562 synthesize playback terminal on output idle and recover stuck wait segment（待验证）`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest landed runtime bug-fix slice:
+    - Step 5.562 收 17:01 TTS 起播后的段间/尾态卡死：
+      - 新日志显示 `_0001/_0002` 都是 `is_last_segment=no`，服务端随后回到 `state=active output_state=idle`，端侧却停在 `waiting_next_segment` 并把 downlink ring 堆满
+      - ACK 进度现在只在真实输出 active 或 stop drain pending 时推进，避免 paused backend 用墙钟误 pop 未播放段
+      - wait-context 未 fully-heard 且 queued audio 已到达时，可从 wait/meta 上下文恢复当前 segment 继续播放
+      - 服务端 output idle 后，端侧可把最后观测 meta 本地提升为 terminal tail，驱动 completed/cleared，不再等同段 late last meta
+      - 正常已知 terminal tail 的 active/idle 也留在 playback terminal 路径，不回落为 empty-turn
+    - 下一步上板验证：
+      - 不再持续 `xiaozhi downlink ring overflow`
+      - 必要时出现 `xiaozhi playback wait segment recovered`
+      - 缺少 `is_last_segment=yes` 时出现 `xiaozhi playback terminal synthesized from output idle`
+      - transport idle_timeout 前完成播放 ACK 尾态
   - newest landed runtime bug-fix slice:
     - Step 5.561 收空响应后无 TTS 的真正状态机脱节：
       - 云端返回 `state=active input_state=active output_state=idle` 后，端侧不应长期停在 `asr_streaming` 但没有任何新的 `listen_start/asr round begin`
@@ -4661,15 +4673,17 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Step
 
-- 2026-04-30 / branch `agent-server-v2`: Step 5.561 fixes the empty-turn follow-up dead path behind the 15:04 no-TTS log:
-  - dialog runtime now clears stale `asr_session_active` from cloud runtime truth when no cloud round is active
-  - XiaoZhi empty-turn follow-up recovery now runs from the IO tick and calls `open_session_and_listen()` inside the valid recovery window
-  - transport/session closed handling defers recover out of the websocket event callback to avoid reentrant sends
+- 2026-04-30 / branch `agent-server-v2`: Step 5.562 fixes the playback stall behind the 17:01 TTS log where service output returned idle without a last-segment meta:
+  - paused/recovering playback no longer advances ACK progress by wall clock unless real output is active or a stop drain is pending
+  - queued downlink audio can recover the missing current segment from wait/meta context when the wait segment was not fully heard
+  - `state=active output_state=idle` after playback meta can synthesize the last observed meta as the terminal tail and drive completed/cleared
+  - active/idle updates with an already-known terminal tail are treated as playback terminal progress, not empty-turn recovery
 - Verify with latest SDK `/root/ameba-rtos`:
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
-  - `python3 /root/ameba-rtos/ameba.py build -p` -> `Build done`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` -> `Build done`
 - Board expectation:
-  - empty-turn active-return no longer leaves interaction stuck in `asr_streaming` without a real ASR round
-  - logs show `xiaozhi empty turn followup recover: action=reopen_listen` when recovery is needed
-  - the next spoken sentence reopens ASR before idle-timeout instead of leaving only VAD logs
+  - `_0001` 播完后不再持续 `waiting_next_segment` / `downlink ring overflow`
+  - 若段队列丢失但下行帧已到达，应看到 `xiaozhi playback wait segment recovered`
+  - 缺少 `is_last_segment=yes` 时，active/idle 后应看到 `xiaozhi playback terminal synthesized from output idle`
+  - `audio.out.completed` / `audio.out.cleared` 应在 transport idle timeout 前完成或排队
