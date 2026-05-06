@@ -1,3 +1,68 @@
+## Step A.home-ai.2 Verification
+
+Confirm the default home_ai_server endpoint now targets the deployed service:
+```bash
+cd /root/ameba-river
+rg -n "101\\.33\\.235\\.154:8082|RIVER_XIAOZHI_URL|PORT=8082|:8082/v1/realtime/ws" \
+  include/river/river_xiaozhi_credentials.h \
+  doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md \
+  .codex/verification.md \
+  .codex/changes.md \
+  .codex/active_context.md
+```
+
+Expected result:
+- the default WebSocket URL is `ws://101.33.235.154:8082/v1/realtime/ws`
+- the current board validation command uses `101.33.235.154:8082`
+
+Probe the deployed realtime endpoint:
+```bash
+cd /root/ameba-river
+python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 8082 --schemes ws http
+```
+
+Expected result:
+- TCP connect succeeds on `101.33.235.154:8082`
+- `ws://101.33.235.154:8082/v1/realtime/ws` returns `101 Switching Protocols`
+- `http://101.33.235.154:8082/v1/realtime` returns `200 OK`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation against the deployed home_ai_server:
+```text
+板端：
+  river xiaozhi set ws://101.33.235.154:8082/v1/realtime/ws -
+  river xiaozhi status
+  唤醒后说“打开厨房灯”。
+```
+
+Expected result:
+- status/discovery shows smart-home subprotocol, client commit, preview/server endpoint disabled, playback ACK `started_completed_v1`
+- board connects to `ws://101.33.235.154:8082/v1/realtime/ws`
+- service returns `accept_reason=client_audio_in_commit`, `audio.out.meta duration_ms`, and PCM audio
+- board sends `audio.out.started` and `audio.out.completed` or `audio.out.cleared`, with no `audio.out.mark` wire event
+
 ## Step A.home-ai.1 Verification
 
 Confirm the client-side M1 realtime contract switch:
@@ -47,10 +112,10 @@ Post-flash board validation against home_ai_server:
 ```text
 服务端：
   cd /root/home_ai_server
-  HOST=0.0.0.0 PORT=8080 bash scripts/run-local.sh
+  HOST=0.0.0.0 PORT=8082 bash scripts/run-local.sh
 
 板端：
-  river xiaozhi set ws://<server-ip>:8080/v1/realtime/ws -
+  river xiaozhi set ws://101.33.235.154:8082/v1/realtime/ws -
   river xiaozhi status
   唤醒后说“打开厨房灯”。
 ```

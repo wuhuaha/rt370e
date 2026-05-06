@@ -1,5 +1,17 @@
 # Change Log
 
+## Step A.home-ai.2
+- 按当前部署信息更新 `home_ai_server` 默认服务端地址：
+  - 默认 WebSocket URL 从 `ws://101.33.235.154:8080/v1/realtime/ws`
+    改为 `ws://101.33.235.154:8082/v1/realtime/ws`。
+  - 当前 M1 适配计划和板端验证说明同步使用 `101.33.235.154:8082`。
+- Verification for this step:
+  - Step A.home-ai.2 endpoint `rg` 检查通过，默认 URL 和当前板端验证命令均指向 `101.33.235.154:8082`。
+  - `python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 8082 --schemes ws http` passed：TCP connect ok，WebSocket 返回 `101 Switching Protocols`，HTTP discovery 返回 `200 OK`。
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.1
 - 对 `/root/home_ai_server` 做协议走查后，端侧 M1 最小切换已经落到 `home-ai` 分支：
   - 默认 realtime wire profile 改为 `protocol_version=rtos-smart-home-v1`、`subprotocol=agent-server.smart-home.realtime.v1`，并默认关闭旧 MCP。

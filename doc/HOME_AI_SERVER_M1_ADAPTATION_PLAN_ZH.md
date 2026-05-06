@@ -50,7 +50,9 @@ Branch: `home-ai`
 
 ## 6. 风险与未知项
 
-- 板端实际可访问的 `home_ai_server` 部署地址仍需按网络环境通过 `river xiaozhi set <url>` 或默认宏确认。
+- 板端默认连接当前部署的 `home_ai_server`：
+  `ws://101.33.235.154:8082/v1/realtime/ws`；若网络环境不同，可通过
+  `river xiaozhi set <url>` 覆盖。
 - `home_ai_server` M1 当前是单 turn 连接；端侧现有 follow-up 多轮窗口需要按“每轮重新 session.start/commit”方式观察，若服务端拒绝同连接二轮，需要后续独立切片改为每次唤醒新建连接。
 - 服务端当前默认可能 text-only 或依赖本地 TTS cache；板端联调需要确认服务端已启用可下发 PCM 的 TTS/cache 路径。
 
@@ -139,10 +141,10 @@ python3 /root/ameba-rtos/ameba.py build -p
 ```text
 服务端运行 /root/home_ai_server：
   cd /root/home_ai_server
-  HOST=0.0.0.0 PORT=8080 bash scripts/run-local.sh
+  HOST=0.0.0.0 PORT=8082 bash scripts/run-local.sh
 
 板端配置目标：
-  river xiaozhi set ws://<server-ip>:8080/v1/realtime/ws -
+  river xiaozhi set ws://101.33.235.154:8082/v1/realtime/ws -
   river xiaozhi status
 
 唤醒后说一句 M1 智能家居命令，例如“打开厨房灯”。

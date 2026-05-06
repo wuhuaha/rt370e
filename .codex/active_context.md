@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.1 home_ai_server M1 realtime protocol adaptation（本地 build 通过，待上板）`
+  - `Step A.home-ai.2 home_ai_server deployed endpoint update（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -43,6 +43,9 @@ or top-of-tree verification target changes.
         `accept_reason=client_audio_in_commit`、`audio_segment_meta`、
         `playback_ack`
       - 板端不应发送 `audio.out.mark`
+    - Step A.home-ai.2 默认服务端地址同步为当前部署：
+      - `ws://101.33.235.154:8082/v1/realtime/ws`
+      - 板端可继续通过 `river xiaozhi set <url> -` 覆盖运行时目标
   - newest landed runtime bug-fix slice:
     - Step 5.563 收 TTS “只有前半段没有后半段”：
       - Step 5.562 合成 terminal tail 后，last segment 仍可能只按 `expected_duration_ms` 墙钟推进
