@@ -40,7 +40,14 @@
  * - current MCP response envelopes
  */
 #define RIVER_XIAOZHI_WS_TX_MAX                 1024
-#define RIVER_XIAOZHI_WS_RX_MAX                 12288
+/*
+ * home_ai_server returns each cached-response audio clip as one websocket
+ * binary message. The 2026-05-06 board run observed a 23040 B PCM payload for
+ * a 720 ms "已打开" response, and current M1 cache candidates include clips up
+ * to roughly 1.5 s. Keep RX large enough for about 2 s of 16 kHz mono pcm16le
+ * while leaving send buffers small.
+ */
+#define RIVER_XIAOZHI_WS_RX_MAX                 65536
 /*
  * Keep enough headroom that brief WLAN / TLS send stalls do not immediately
  * push realtime audio into queue-full churn. The queue is still intentionally

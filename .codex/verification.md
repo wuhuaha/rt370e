@@ -1,3 +1,51 @@
+## Step A.home-ai.4 Verification
+
+Confirm XiaoZhi websocket RX capacity now covers cached-response binary clips:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_XIAOZHI_WS_RX_MAX|65536|create_wsclient\\(|cached-response audio clip" \
+  include/river/river_xiaozhi_credentials.h \
+  components/river_cloud/river_xiaozhi_ws_session_api.inc \
+  /root/ameba-rtos/component/network/websocket/wsclient_api.c
+```
+
+Expected result:
+- `RIVER_XIAOZHI_WS_RX_MAX` is `65536`.
+- XiaoZhi session creation still wires that value into `create_wsclient(..., RIVER_XIAOZHI_WS_RX_MAX, ...)`.
+- The SDK receive path still uses the per-client `max_rx_len` limit, so the larger buffer directly raises the accepted binary message size.
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+```
+
+Expected result:
+- no whitespace errors
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-06 cached-response overflow:
+```text
+板端连接 101.33.235.154:8082 后，说“打开厨房灯”或触发 cached_response 短句缓存音频。
+```
+
+Expected result:
+- `xiaozhi audio.out.meta ... segment_kind=cached_response expected_duration_ms=... is_last_segment=yes`
+- no `WSCLIENT WARN ... exceed the max rx buf` and no `Discard the long websocket message from server`
+- board receives binary audio and playback leaves `prefetching` to normal start/completion
+- `xiaozhi followup reopen blocked: reason=output_turn_guard ...` 不应因为丢失整段 cached-response 音频而长期停留
+
 ## Step A.home-ai.3 Verification
 
 Confirm M1 text-only audio meta is parsed and closed without waiting for PCM:

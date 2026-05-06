@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.3 M1 文本响应播放尾态处理（本地 build 通过，待上板）`
+  - `Step A.home-ai.4 M1 cached-response 下行音频接收缓冲放宽（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -59,6 +59,17 @@ or top-of-tree verification target changes.
       - 应出现 `xiaozhi playback text-only segment completed ... completed_queued=yes`
       - 不应再出现 `idle -> prefetching ... segments=1 queued=0` 文本段等待循环
       - 不应持续刷 `response output idle treated as playback terminal`
+    - Step A.home-ai.4 放宽 M1 cached-response 下行音频接收缓冲：
+      - 2026-05-06 新日志显示服务端会把 `cached_response` 音频整段作为单个 websocket binary 发送，
+        样例 `已打开` 已达 23044 B
+      - 旧端侧 `RIVER_XIAOZHI_WS_RX_MAX=12288`，SDK 在 River 回调前直接按
+        `exceed the max rx buf` 丢弃整条消息
+      - 端侧现在把 XiaoZhi 专用 RX buffer 提到 64 KB，以覆盖约 2 s 的
+        16 kHz mono pcm16le cached clip
+    - 下一步上板验证：
+      - 不应再出现 `WSCLIENT WARN ... exceed the max rx buf`
+      - 不应再出现 `Discard the long(total length: ...) websocket message from server`
+      - cached-response 应正常收到 binary audio 并完成播放/ACK
   - newest landed runtime bug-fix slice:
     - Step 5.563 收 TTS “只有前半段没有后半段”：
       - Step 5.562 合成 terminal tail 后，last segment 仍可能只按 `expected_duration_ms` 墙钟推进

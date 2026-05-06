@@ -1,5 +1,19 @@
 # Change Log
 
+## Step A.home-ai.4
+- 根据 2026-05-06 14:45 新上板日志修复 M1 cached-response 音频被 WebSocket SDK 丢弃的问题：
+  - 服务端返回 `segment_kind=cached_response`、`expected_duration_ms=720` 的可播放段后，随后发送单个 23044 B binary PCM 消息。
+  - 旧端侧 `RIVER_XIAOZHI_WS_RX_MAX=12288`，Ameba wsclient 在 `ws_dispatchBinary/ws_poll` 阶段直接打印 `exceed the max rx buf` 并丢弃整条音频消息，River 播放层完全收不到 binary。
+  - 结果是 playback 卡在 `prefetching` / `output_turn_guard`，后续 follow-up reopen 也被长期挡住。
+- 本轮端侧适配：
+  - 将 XiaoZhi 专用 WebSocket RX buffer 从 12 KB 提升到 64 KB。
+  - 注释同步记录问题来源：当前 `/root/home_ai_server` 会把 cached-response 音频整段作为单条 websocket binary 发送，现有 M1 cache 候选长度可到约 1.5 s，因此端侧按约 2 s 的 16 kHz mono pcm16le 预算预留 RX。
+  - 保持 TX buffer 和发送队列配置不变，只扩大下行接收上限。
+- Verification for this step:
+  - Step A.home-ai.4 `rg` verification matched the 64 KB XiaoZhi RX buffer constant and the `create_wsclient(..., RIVER_XIAOZHI_WS_RX_MAX, ...)` wiring.
+  - `git diff --check` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.3
 - 根据 2026-05-06 上板日志修复 M1 文本响应播放尾态：
   - 服务端对纯文本动作结果发送 `audio.out.meta`，其中 `segment_kind=text_only`、`expected_duration_ms=0`、`is_last_segment=yes`，且不会跟随 PCM binary。
