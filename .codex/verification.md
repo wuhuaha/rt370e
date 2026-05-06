@@ -1,3 +1,59 @@
+## Step A.home-ai.3 Verification
+
+Confirm M1 text-only audio meta is parsed and closed without waiting for PCM:
+```bash
+cd /root/ameba-river
+rg -n "segment_kind|buffered_duration_ms|playback text-only segment completed|text_only_meta|playback_terminal_closed|response output idle already terminal|stream_tts_empty|stream_tts_error" \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_message_handlers.inc \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- WebSocket `audio.out.meta` carries `segment_kind` into the cloud event.
+- `buffered_duration_ms` remains an audio-bearing duration fallback for streaming TTS.
+- `text_only` / `stream_tts_empty` / `stream_tts_error` last 0ms segments complete locally and queue `audio.out.completed`.
+- active/idle after a closed text-only terminal logs `response output idle already terminal` instead of repeatedly finalizing playback.
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-06 text-only response loop:
+```text
+板端连接 101.33.235.154:8082 后，说“打开厨房灯”或触发只返回动作确认文本的命令。
+```
+
+Expected result:
+- `xiaozhi audio.out.meta ... segment_kind=text_only expected_duration_ms=0 is_last_segment=yes`
+- `xiaozhi playback text-only segment completed ... completed_queued=yes`
+- service receives `audio.out.completed`
+- no `idle -> prefetching ... segments=1 queued=0` loop for the text-only segment
+- no repeated `response output idle treated as playback terminal` spam; at most one `response output idle already terminal`
+
 ## Step A.home-ai.2 Verification
 
 Confirm the default home_ai_server endpoint now targets the deployed service:

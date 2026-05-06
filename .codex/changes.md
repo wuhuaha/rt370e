@@ -1,5 +1,20 @@
 # Change Log
 
+## Step A.home-ai.3
+- 根据 2026-05-06 上板日志修复 M1 文本响应播放尾态：
+  - 服务端对纯文本动作结果发送 `audio.out.meta`，其中 `segment_kind=text_only`、`expected_duration_ms=0`、`is_last_segment=yes`，且不会跟随 PCM binary。
+  - 旧端侧没有识别 `segment_kind`，仍把该 meta 当成待播放音频段进入 prefetch，随后持续打印 `response output idle treated as playback terminal`，形成无音频等待/尾态刷屏。
+- 本轮端侧适配：
+  - WebSocket 事件新增并传递 `segment_kind`。
+  - `audio.out.meta` 解析兼容 `buffered_duration_ms`，避免流式 TTS 在 `duration_ms=null` 但有 buffered audio 时被误判为文本段。
+  - `text_only`、`stream_tts_empty`、`stream_tts_error` 且 last/0ms 的 meta 走文本段快速完成路径：不入播放队列，直接本地闭合播放尾态并排队 `audio.out.completed`。
+  - session active/idle 回报若播放尾态已经关闭，只清理等待/看门狗并打印 `response output idle already terminal`，不再落到 empty-turn 恢复或反复 finalize。
+- Verification for this step:
+  - Step A.home-ai.3 `rg` verification matched `segment_kind` parsing, text-only fast completion, and already-terminal active/idle guard.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.2
 - 按当前部署信息更新 `home_ai_server` 默认服务端地址：
   - 默认 WebSocket URL 从 `ws://101.33.235.154:8080/v1/realtime/ws`

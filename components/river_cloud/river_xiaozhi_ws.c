@@ -53,6 +53,7 @@
 #define RIVER_XIAOZHI_LAST_OUTPUT_LANE_MAX 32U
 #define RIVER_XIAOZHI_LAST_OUTPUT_ROLE_MAX 32U
 #define RIVER_XIAOZHI_LAST_PHRASE_ID_MAX   64U
+#define RIVER_XIAOZHI_LAST_SEGMENT_KIND_MAX 32U
 #define RIVER_XIAOZHI_TURN_MODE_MAX        48U
 #define RIVER_XIAOZHI_COLLAB_MODE_MAX      32U
 #define RIVER_XIAOZHI_WIRE_PROFILE_MAX     64U
@@ -202,6 +203,7 @@ typedef struct {
     char last_playback_output_lane[RIVER_XIAOZHI_LAST_OUTPUT_LANE_MAX];
     char last_playback_output_role[RIVER_XIAOZHI_LAST_OUTPUT_ROLE_MAX];
     char last_playback_phrase_id[RIVER_XIAOZHI_LAST_PHRASE_ID_MAX];
+    char last_playback_segment_kind[RIVER_XIAOZHI_LAST_SEGMENT_KIND_MAX];
     uint32_t last_playback_expected_duration_ms;
     char discovery_protocol_version[RIVER_XIAOZHI_WIRE_PROFILE_MAX];
     char discovery_subprotocol[RIVER_XIAOZHI_WIRE_PROFILE_MAX];
@@ -749,6 +751,7 @@ static void river_xiaozhi_clear_last_playback_fields(void)
     g_river_xiaozhi.last_playback_output_lane[0] = '\0';
     g_river_xiaozhi.last_playback_output_role[0] = '\0';
     g_river_xiaozhi.last_playback_phrase_id[0] = '\0';
+    g_river_xiaozhi.last_playback_segment_kind[0] = '\0';
 }
 
 static bool river_xiaozhi_last_playback_meta_valid(void)
@@ -798,6 +801,13 @@ static void river_xiaozhi_set_last_playback_phrase_id(const char *phrase_id)
     river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_phrase_id,
                                        sizeof(g_river_xiaozhi.last_playback_phrase_id),
                                        phrase_id);
+}
+
+static void river_xiaozhi_set_last_playback_segment_kind(const char *segment_kind)
+{
+    river_xiaozhi_copy_optional_string(g_river_xiaozhi.last_playback_segment_kind,
+                                       sizeof(g_river_xiaozhi.last_playback_segment_kind),
+                                       segment_kind);
 }
 
 static void river_xiaozhi_clear_discovery_profile(void)
@@ -1052,6 +1062,9 @@ static void river_xiaozhi_emit_event(river_xiaozhi_event_type_t type,
         event.phrase_id = g_river_xiaozhi.last_playback_phrase_id[0] != '\0' ?
                               g_river_xiaozhi.last_playback_phrase_id :
                               NULL;
+        event.segment_kind = g_river_xiaozhi.last_playback_segment_kind[0] != '\0' ?
+                                 g_river_xiaozhi.last_playback_segment_kind :
+                                 NULL;
     }
     event.sample_rate = sample_rate;
     event.frame_duration_ms = frame_duration_ms;

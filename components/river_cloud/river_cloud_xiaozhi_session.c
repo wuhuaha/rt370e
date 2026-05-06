@@ -2343,6 +2343,16 @@ static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
         return;
     }
 
+    if (river_cloud_xiaozhi_playback_terminal_closed()) {
+        river_cloud_xiaozhi_clear_empty_turn_returned_active_state();
+        river_cloud_xiaozhi_clear_accepted_response_watchdog();
+        RIVER_LOGI("xiaozhi response output idle already terminal: trigger=%s session_state=%s output_state=%s",
+                   trigger != NULL ? trigger : "-",
+                   session_state,
+                   (state != NULL && state->output_state[0] != '\0') ? state->output_state : "-");
+        return;
+    }
+
     if (river_cloud_xiaozhi_playback_finalize_output_idle(
             trigger != NULL && trigger[0] != '\0' ? trigger : "server_output_idle")) {
         river_cloud_xiaozhi_clear_empty_turn_returned_active_state();

@@ -264,6 +264,12 @@ void river_cloud_xiaozhi_fill_playback_runtime_snapshot(
     snapshot->playback_start_cautious_history = diag_view.start_cautious_history;
 }
 
+bool river_cloud_xiaozhi_playback_terminal_closed(void)
+{
+    return g_river_cloud.xiaozhi_playback_terminal_truth.state_kind !=
+           RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_NONE;
+}
+
 void river_cloud_xiaozhi_clear_playback_meta_state(void)
 {
     river_cloud_xiaozhi_clear_playback_lineage_truth();

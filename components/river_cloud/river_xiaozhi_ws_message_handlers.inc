@@ -152,10 +152,12 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     const cJSON *text_obj;
     const cJSON *expected_duration_ms_obj;
     const cJSON *duration_ms_obj;
+    const cJSON *buffered_duration_ms_obj;
     const cJSON *is_last_segment_obj;
     const cJSON *output_lane_obj;
     const cJSON *output_role_obj;
     const cJSON *phrase_id_obj;
+    const cJSON *segment_kind_obj;
     const char *response_id = NULL;
     const char *playback_id = NULL;
     const char *segment_id = NULL;
@@ -163,6 +165,7 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     const char *output_lane = NULL;
     const char *output_role = NULL;
     const char *phrase_id = NULL;
+    const char *segment_kind = NULL;
     uint64_t now_ms;
     uint32_t expected_duration_ms = 0U;
     bool is_last_segment = false;
@@ -178,11 +181,14 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     expected_duration_ms_obj =
         cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "expected_duration_ms");
     duration_ms_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "duration_ms");
+    buffered_duration_ms_obj =
+        cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "buffered_duration_ms");
     is_last_segment_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload,
                                                            "is_last_segment");
     output_lane_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "output_lane");
     output_role_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "output_role");
     phrase_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "phrase_id");
+    segment_kind_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "segment_kind");
     if (cJSON_IsString(response_id_obj) && response_id_obj->valuestring != NULL &&
         response_id_obj->valuestring[0] != '\0') {
         response_id = response_id_obj->valuestring;
@@ -204,6 +210,9 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
         expected_duration_ms = (uint32_t)expected_duration_ms_obj->valuedouble;
     } else if (cJSON_IsNumber(duration_ms_obj) && duration_ms_obj->valuedouble > 0.0) {
         expected_duration_ms = (uint32_t)duration_ms_obj->valuedouble;
+    } else if (cJSON_IsNumber(buffered_duration_ms_obj) &&
+               buffered_duration_ms_obj->valuedouble > 0.0) {
+        expected_duration_ms = (uint32_t)buffered_duration_ms_obj->valuedouble;
     }
     if (cJSON_IsBool(is_last_segment_obj)) {
         is_last_segment = cJSON_IsTrue(is_last_segment_obj);
@@ -220,6 +229,10 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
         phrase_id_obj->valuestring[0] != '\0') {
         phrase_id = phrase_id_obj->valuestring;
     }
+    if (cJSON_IsString(segment_kind_obj) && segment_kind_obj->valuestring != NULL &&
+        segment_kind_obj->valuestring[0] != '\0') {
+        segment_kind = segment_kind_obj->valuestring;
+    }
 
     now_ms = river_xiaozhi_now_ms();
     river_xiaozhi_set_last_type("audio.out.meta");
@@ -230,15 +243,17 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     river_xiaozhi_set_last_playback_output_lane(output_lane);
     river_xiaozhi_set_last_playback_output_role(output_role);
     river_xiaozhi_set_last_playback_phrase_id(phrase_id);
+    river_xiaozhi_set_last_playback_segment_kind(segment_kind);
     g_river_xiaozhi.last_playback_expected_duration_ms = expected_duration_ms;
     g_river_xiaozhi.last_playback_is_last_segment = is_last_segment;
     g_river_xiaozhi.last_audio_out_meta_at_ms = now_ms;
 
-    RIVER_LOGI("xiaozhi audio.out.meta: sid=%s response_id=%s playback_id=%s segment_id=%s expected_duration_ms=%lu is_last_segment=%s output_lane=%s output_role=%s phrase_id=%s text=%s from_response_start_ms=%s from_accept_ms=%s from_preview_update_ms=%s from_endpoint_ms=%s",
+    RIVER_LOGI("xiaozhi audio.out.meta: sid=%s response_id=%s playback_id=%s segment_id=%s segment_kind=%s expected_duration_ms=%lu is_last_segment=%s output_lane=%s output_role=%s phrase_id=%s text=%s from_response_start_ms=%s from_accept_ms=%s from_preview_update_ms=%s from_endpoint_ms=%s",
                g_river_xiaozhi.session_id[0] != '\0' ? g_river_xiaozhi.session_id : "-",
                river_xiaozhi_dash_if_empty(response_id),
                river_xiaozhi_dash_if_empty(playback_id),
                river_xiaozhi_dash_if_empty(segment_id),
+               river_xiaozhi_dash_if_empty(segment_kind),
                (unsigned long)expected_duration_ms,
                river_xiaozhi_bool_text(is_last_segment),
                river_xiaozhi_dash_if_empty(output_lane),

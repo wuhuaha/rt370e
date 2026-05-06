@@ -96,6 +96,76 @@ static bool river_cloud_xiaozhi_playback_meta_id_changed(const char *old_id,
            strcmp(old_id, new_id) != 0;
 }
 
+static bool river_cloud_xiaozhi_playback_segment_kind_text_only(
+    const char *segment_kind)
+{
+    if (segment_kind == NULL || segment_kind[0] == '\0') {
+        return false;
+    }
+
+    return strcmp(segment_kind, "text_only") == 0 ||
+           strcmp(segment_kind, "stream_tts_empty") == 0 ||
+           strcmp(segment_kind, "stream_tts_error") == 0;
+}
+
+static bool river_cloud_xiaozhi_complete_text_only_segment(
+    const river_xiaozhi_event_t *event,
+    uint64_t now_ms)
+{
+    river_status_t status;
+    const river_cloud_xiaozhi_playback_context_truth_t *meta_context =
+        &g_river_cloud.xiaozhi_playback_lineage_truth.meta_context;
+
+    if (event == NULL || !event->is_last_segment ||
+        event->expected_duration_ms != 0U ||
+        !river_cloud_xiaozhi_playback_segment_kind_text_only(event->segment_kind) ||
+        !river_cloud_xiaozhi_playback_segment_context_valid_from_truth(meta_context) ||
+        meta_context->playback_id[0] == '\0') {
+        return false;
+    }
+
+    river_cloud_xiaozhi_clear_playback_wait_context();
+    river_cloud_xiaozhi_store_playback_last_segment_context();
+    river_cloud_xiaozhi_mark_context_fully_heard(meta_context);
+    river_cloud_xiaozhi_touch_playback_lineage(
+        RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_LOCAL_COMPLETED,
+        meta_context,
+        0U,
+        event->segment_kind);
+    river_cloud_xiaozhi_sync_playback_terminal_report_flags();
+
+    status = river_cloud_xiaozhi_control_request_async(
+        RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED,
+        NULL,
+        meta_context->response_id,
+        meta_context->playback_id,
+        NULL,
+        0U);
+    if (status == RIVER_OK) {
+        river_cloud_xiaozhi_touch_playback_lineage(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_COMPLETED_QUEUED,
+            meta_context,
+            0U,
+            event->segment_kind);
+        river_cloud_xiaozhi_set_playback_terminal_ack("completed",
+                                                      event->segment_kind);
+    } else {
+        river_cloud_xiaozhi_set_playback_terminal_state(
+            RIVER_CLOUD_PLAYBACK_TERMINAL_STATE_LOCAL_COMPLETED,
+            event->segment_kind);
+    }
+    river_cloud_xiaozhi_sync_playback_terminal_report_flags();
+    river_cloud_xiaozhi_refresh_playback_phase("text_only_meta");
+    RIVER_LOGI("xiaozhi playback text-only segment completed: response_id=%s playback_id=%s segment_id=%s segment_kind=%s completed_queued=%s at_ms=%lu",
+               meta_context->response_id[0] != '\0' ? meta_context->response_id : "-",
+               meta_context->playback_id[0] != '\0' ? meta_context->playback_id : "-",
+               meta_context->segment_id[0] != '\0' ? meta_context->segment_id : "-",
+               event->segment_kind != NULL ? event->segment_kind : "-",
+               status == RIVER_OK ? "yes" : "no",
+               (unsigned long)now_ms);
+    return true;
+}
+
 static river_cloud_playback_terminal_wait_kind_t
 river_cloud_xiaozhi_playback_completed_wait_kind(void)
 {
@@ -494,8 +564,17 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     river_cloud_xiaozhi_copy_optional_text(meta_truth->phrase_id,
                                            sizeof(meta_truth->phrase_id),
                                            event->phrase_id);
+    river_cloud_xiaozhi_copy_optional_text(meta_truth->segment_kind,
+                                           sizeof(meta_truth->segment_kind),
+                                           event->segment_kind);
     meta_truth->expected_duration_ms = event->expected_duration_ms;
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    if (river_cloud_xiaozhi_complete_text_only_segment(event, now_ms)) {
+        meta_truth->last_meta_gap_ms = 0U;
+        meta_truth->prefetch_target_ms = 0U;
+        meta_truth->last_meta_ms = now_ms;
+        return;
+    }
     prefetch_target_ms = meta_truth->expected_duration_ms;
     if (prefetch_target_ms == 0U) {
         prefetch_target_ms = frame_ms * RIVER_CLOUD_XIAOZHI_DOWNLINK_START_FRAMES;
@@ -626,10 +705,11 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
     river_cloud_xiaozhi_sync_playback_terminal_report_flags();
     start_gate = river_cloud_xiaozhi_refresh_start_gate();
 
-    RIVER_LOGI("xiaozhi playback prefetch: segment_id=%s expected_ms=%lu meta_gap_ms=%lu target_ms=%lu policy=%s cautious=%s start=%u queued=%lu rebuffer=%s/%s rebuffer_total=%lu streak=%lu",
+    RIVER_LOGI("xiaozhi playback prefetch: segment_id=%s segment_kind=%s expected_ms=%lu meta_gap_ms=%lu target_ms=%lu policy=%s cautious=%s start=%u queued=%lu rebuffer=%s/%s rebuffer_total=%lu streak=%lu",
                meta_context->segment_id[0] != '\0' ?
                    meta_context->segment_id :
                    "-",
+               meta_truth->segment_kind[0] != '\0' ? meta_truth->segment_kind : "-",
                (unsigned long)meta_truth->expected_duration_ms,
                (unsigned long)meta_truth->last_meta_gap_ms,
                (unsigned long)meta_truth->prefetch_target_ms,
@@ -657,10 +737,11 @@ void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_eve
     river_cloud_xiaozhi_window_touch(RIVER_CLOUD_XIAOZHI_WAKE_WINDOW_FOLLOWUP_MS,
                                      "audio_out_meta");
     river_cloud_xiaozhi_playback_note_meta(event);
-    RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s output_lane=%s output_role=%s phrase_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
+    RIVER_LOGI("xiaozhi playback fact observed: response_id=%s playback_id=%s segment_id=%s segment_kind=%s output_lane=%s output_role=%s phrase_id=%s text=%s expected_duration_ms=%lu is_last_segment=%s accepted=%s",
                event->response_id != NULL ? event->response_id : "-",
                event->playback_id != NULL ? event->playback_id : "-",
                event->segment_id != NULL ? event->segment_id : "-",
+               event->segment_kind != NULL ? event->segment_kind : "-",
                event->output_lane != NULL ? event->output_lane : "-",
                event->output_role != NULL ? event->output_role : "-",
                event->phrase_id != NULL ? event->phrase_id : "-",

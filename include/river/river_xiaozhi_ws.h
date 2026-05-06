@@ -58,6 +58,7 @@ typedef struct {
     const char *output_lane;
     const char *output_role;
     const char *phrase_id;
+    const char *segment_kind;
     uint32_t sample_rate;
     uint32_t frame_duration_ms;
     uint32_t timestamp_ms;

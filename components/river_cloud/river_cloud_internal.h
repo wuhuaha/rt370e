@@ -46,6 +46,7 @@
 #define RIVER_CLOUD_XIAOZHI_OUTPUT_LANE_MAX  32U
 #define RIVER_CLOUD_XIAOZHI_OUTPUT_ROLE_MAX  32U
 #define RIVER_CLOUD_XIAOZHI_PHRASE_ID_MAX    64U
+#define RIVER_CLOUD_XIAOZHI_SEGMENT_KIND_MAX 32U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_METRIC_SAMPLES 16U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
@@ -274,6 +275,7 @@ typedef struct {
     char output_lane[RIVER_CLOUD_XIAOZHI_OUTPUT_LANE_MAX];
     char output_role[RIVER_CLOUD_XIAOZHI_OUTPUT_ROLE_MAX];
     char phrase_id[RIVER_CLOUD_XIAOZHI_PHRASE_ID_MAX];
+    char segment_kind[RIVER_CLOUD_XIAOZHI_SEGMENT_KIND_MAX];
     uint32_t expected_duration_ms;
     uint32_t last_meta_gap_ms;
     uint32_t prefetch_target_ms;
@@ -616,6 +618,7 @@ void river_cloud_xiaozhi_note_audio_out_meta_observation(const river_xiaozhi_eve
 void river_cloud_xiaozhi_note_response_start_observation(const river_xiaozhi_event_t *event);
 bool river_cloud_xiaozhi_note_response_audio_abandoned(const char *reason);
 bool river_cloud_xiaozhi_playback_finalize_output_idle(const char *trigger);
+bool river_cloud_xiaozhi_playback_terminal_closed(void);
 void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event);
 void river_cloud_xiaozhi_playback_check_pending_stop(void);
 void river_cloud_xiaozhi_playback_finalize_cleared(const char *reason);

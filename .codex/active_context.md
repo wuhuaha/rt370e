@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.2 home_ai_server deployed endpoint update（本地 build 通过，待上板）`
+  - `Step A.home-ai.3 M1 文本响应播放尾态处理（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -46,6 +46,19 @@ or top-of-tree verification target changes.
     - Step A.home-ai.2 默认服务端地址同步为当前部署：
       - `ws://101.33.235.154:8082/v1/realtime/ws`
       - 板端可继续通过 `river xiaozhi set <url> -` 覆盖运行时目标
+    - Step A.home-ai.3 处理 M1 文本响应播放尾态：
+      - 服务端可发送 `segment_kind=text_only`、`expected_duration_ms=0`、
+        `is_last_segment=yes` 且无 PCM binary 的 `audio.out.meta`
+      - 端侧现在解析并传递 `segment_kind`，同时保留 `buffered_duration_ms`
+        作为流式 TTS 的音频时长 fallback
+      - `text_only` / `stream_tts_empty` / `stream_tts_error` last 0ms 段不再入播放队列，
+        而是直接本地闭合播放尾态并队列 `audio.out.completed`
+      - active/idle 回报若播放尾态已关闭，只清理等待/看门狗，不再反复 finalize
+    - 下一步上板验证：
+      - 文本段 meta 应出现 `segment_kind=text_only expected_duration_ms=0`
+      - 应出现 `xiaozhi playback text-only segment completed ... completed_queued=yes`
+      - 不应再出现 `idle -> prefetching ... segments=1 queued=0` 文本段等待循环
+      - 不应持续刷 `response output idle treated as playback terminal`
   - newest landed runtime bug-fix slice:
     - Step 5.563 收 TTS “只有前半段没有后半段”：
       - Step 5.562 合成 terminal tail 后，last segment 仍可能只按 `expected_duration_ms` 墙钟推进
