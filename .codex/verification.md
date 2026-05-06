@@ -1,3 +1,62 @@
+## Step A.home-ai.7 Verification
+
+Confirm playback completion and committed input can no longer keep the runtime
+stuck in a stale output / ASR turn:
+```bash
+cd /root/ameba-river
+rg -n 'committed` means capture|INPUT_LANE_ACTIVE\)|!river_cloud_xiaozhi_playback_terminal_closed|stale_output_guard_eligible|output_thinking \|\| output_speaking \|\| playback_turn_active' \
+  components/river_core/river_dialog_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime_views.inc \
+  components/river_cloud/river_cloud_xiaozhi_round_runtime.c
+```
+
+Expected result:
+- committed input is not treated as an active cloud ASR round
+- terminal-closed playback response context no longer retains playback turn
+- stale output guard can recover sparse `output_state=thinking/speaking` or
+  residual playback turn once physical playback/rebuffer/response-wait is idle
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-06 one-shot wake /
+post-playback stale-state issue:
+```text
+板端连接 101.33.235.154:8082 后，完成一次唤醒、命令和 TTS 播放。
+等 `xiaozhi playback phase: draining -> idle` 以及 `audio.out.completed sent`
+之后，再次说唤醒词并发一个短命令。
+```
+
+Expected result:
+- playback completion should not transition back to long-lived
+  `interaction_state: barge_in_listening -> asr_streaming reason=cancel_stop`
+- no long-lived
+  `followup reopen blocked: reason=output_turn_guard ... output_state=speaking ... playback_active=no rebuffer=no`
+- if the server leaves sparse `output_state=speaking`, the client should log
+  `xiaozhi stale output guard armed` and then force-clear instead of remaining
+  blocked
+- the next wake/command should be admitted normally after the first TTS turn
+
 ## Step A.home-ai.6 Verification
 
 Confirm the client no longer treats a fully-pushed final cached-response

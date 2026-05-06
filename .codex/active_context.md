@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.6 M1 最后一段已完整下推时禁止误判 upstream_starved（本地 build 通过，待上板）`
+  - `Step A.home-ai.7 修复 M1 播放完成后输出尾态残留阻断再次唤醒（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,24 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.7 修复播放完成后的 stale output / ASR 投影：
+      - 2026-05-06 17:30 日志显示 TTS 已经 `draining -> idle` 并发送
+        `audio.out.completed`，但 dialog runtime 随后进入
+        `barge_in_listening -> asr_streaming reason=cancel_stop terminal_closed=yes`
+      - `input_state=committed` 现在不再算作 active ASR round；它只表示本轮输入
+        已经提交，捕获已经结束
+      - playback terminal 已 closed 时，response context 不再继续保留
+        `playback_turn_active=yes`
+      - stale output guard 现在可覆盖服务端 sparse `output_state=thinking/speaking`
+        或残留 playback turn；只要本地没有真实 playback active、没有 rebuffer、
+        没有等待音频响应，就允许计时后清理 stale output turn
+    - 下一步上板验证：
+      - 播放完成后不应长期停在 `interaction_state=asr_streaming`
+      - `output_turn_guard ... output_state=speaking playback_active=no rebuffer=no`
+        不应长期阻断后续语音
+      - 若服务端未及时发 output idle，应看到 stale output guard armed/forcing
+        clear，而不是永久卡住
+      - 第一轮 TTS 结束后应能再次唤醒或进入正常 follow-up reopen
     - Step A.home-ai.6 修复 cached-response 尾态误判 rebuffer：
       - 当前 720 ms cached-response 已能正常起播，但在 audio 已完整下推到
         本地播放后端后，software ring 很快见底，旧逻辑仍会把它误判成

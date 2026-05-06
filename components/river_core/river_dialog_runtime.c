@@ -1529,8 +1529,12 @@ static bool river_dialog_runtime_cloud_round_active_from_projection(
             projection->cloud_stream_active ||
             projection->cloud_listen_stop_pending ||
             projection->cloud_local_close_pending ||
-            projection->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE ||
-            projection->input_lane == RIVER_DIALOG_INPUT_LANE_COMMITTED);
+            /*
+             * `committed` means capture for this input turn has ended.  Treating
+             * it as an active ASR round keeps wake/post-wake state stuck after
+             * playback completes.
+             */
+            projection->input_lane == RIVER_DIALOG_INPUT_LANE_ACTIVE);
 }
 
 static bool river_dialog_runtime_allows_barge_in_interrupt_from_interaction_eval(

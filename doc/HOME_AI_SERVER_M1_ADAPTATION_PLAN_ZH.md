@@ -135,6 +135,16 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 目标是避免播放尾部出现 `AudioTrack_Flush / tx_close / recreate`
     造成的短促噪音和 output-turn 卡死，并为“首轮播完后再次唤醒”恢复正常
     闭环。
+- 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
+  - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
+    `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`
+    回到 `asr_streaming`，后续唤醒/跟进被输出回合残留挡住。
+  - 端侧现在不再把 `input_state=committed` 当作活跃 ASR round；已
+    terminal-closed 的 playback response context 也不再保留
+    `playback_turn_active`。
+  - stale output guard 可覆盖服务端 sparse `output_state=thinking/speaking`
+    或残留 playback turn；只要本地没有真实 playback active、没有 rebuffer、
+    没有等待音频响应，就允许计时后强制清理 stale output turn。
 
 ### Step B: 板端联调收口
 

@@ -411,6 +411,7 @@ static bool river_cloud_xiaozhi_playback_turn_active_from_truth_view(
 {
     return river_cloud_xiaozhi_playback_lane_engaged_from_truth_view(view) ||
            (river_cloud_xiaozhi_playback_terminal_open() &&
+            !river_cloud_xiaozhi_playback_terminal_closed() &&
             river_cloud_xiaozhi_playback_response_context_valid());
 }
 

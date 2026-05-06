@@ -1,5 +1,24 @@
 # Change Log
 
+## Step A.home-ai.7
+- 根据 2026-05-06 17:30 新上板日志，继续收 M1 播放结束后无法再次唤醒/跟进的尾态残留：
+  - 当前 TTS 已能正常起播并进入 `draining -> idle`，也已经发送 `audio.out.completed`。
+  - 但播放完成后 dialog runtime 仍从 `barge_in_listening -> asr_streaming reason=cancel_stop terminal_closed=yes`，而不是回到可跟进/可唤醒状态。
+  - 同时服务端可能只持续发送 sparse `response_started=yes`，没有及时把 `output_state=speaking` 清成 idle；端侧旧的 output guard 恰好排除了 `output_state=speaking/thinking`，导致残留状态无法自愈。
+- 本轮端侧适配：
+  - dialog runtime 不再把 `input_state=committed` 当作活跃 ASR round；`committed` 只表示本轮输入已提交，捕获已经结束。
+  - playback truth view 不再让已 terminal-closed 的 response context 继续维持 `playback_turn_active=yes`。
+  - stale output guard 放宽到可覆盖 `output_state=thinking/speaking` 或残留 playback turn；只要没有真实 playback active、没有 rebuffer、没有等待音频响应，就允许计时后强制清理 stale output turn。
+- 目标日志变化：
+  - 播放完成后不应再从 `barge_in_listening` 回到长期 stale 的 `asr_streaming`。
+  - `output_turn_guard ... output_state=speaking playback_turn=yes playback_active=no rebuffer=no` 不应长期阻断后续语音。
+  - 第一轮 TTS 完成后，应能再次唤醒或进入正常 follow-up reopen。
+- Verification for this step:
+  - Step A.home-ai.7 `rg` verification matched committed-input exclusion, terminal-closed playback turn exclusion, and stale output guard recovery coverage.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.6
 - 根据 2026-05-06 16:52 新上板日志继续收 M1 `cached_response` 播放尾态异常：
   - 当前 720 ms `cached_response` 在 `audio.out.meta` 后已经成功起播，日志显示 `queued=36`、`playback start`、`audio.out.started sent`，说明“不出声”主问题已从 Step A.home-ai.5 收住。

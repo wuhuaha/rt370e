@@ -93,8 +93,8 @@ static bool river_cloud_xiaozhi_stale_output_guard_eligible(
     return is_speech &&
            g_river_cloud.xiaozhi_session_window_truth.window_active &&
            !g_river_cloud.stream_active &&
-           !output_thinking && !output_speaking && !response_waiting_audio &&
-           playback_turn_active &&
+           !response_waiting_audio &&
+           (output_thinking || output_speaking || playback_turn_active) &&
            !playback_output_active && !playback_rebuffer_pending;
 }
 
