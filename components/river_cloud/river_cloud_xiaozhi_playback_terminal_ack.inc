@@ -841,6 +841,15 @@ static void river_cloud_xiaozhi_try_queue_playback_mark_ack(uint32_t played_dura
             RIVER_CLOUD_XIAOZHI_PLAYBACK_MARK_INTERVAL_MS) {
         return;
     }
+    if (!river_xiaozhi_playback_ack_mark_negotiated()) {
+        segment->last_mark_ms = played_duration_ms;
+        river_cloud_xiaozhi_touch_playback_lineage_from_segment(
+            RIVER_CLOUD_XIAOZHI_PLAYBACK_LINEAGE_MARK_QUEUED,
+            segment,
+            played_duration_ms,
+            "local_progress_no_wire_mark");
+        return;
+    }
 
     status = river_cloud_xiaozhi_control_request_async(
         RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK,

@@ -1316,7 +1316,7 @@ static bool river_xiaozhi_client_supports_playback_ack_started(void)
 
 static bool river_xiaozhi_client_supports_playback_ack_mark(void)
 {
-    return true;
+    return false;
 }
 
 static bool river_xiaozhi_client_supports_playback_ack_cleared(void)
@@ -1331,7 +1331,7 @@ static bool river_xiaozhi_client_supports_playback_ack_completed(void)
 
 static const char *river_xiaozhi_client_supported_playback_ack_mode(void)
 {
-    return "segment_mark_v1";
+    return "started_completed_v1";
 }
 
 static bool river_xiaozhi_discovery_preview_events_supported(void)
@@ -1345,7 +1345,7 @@ static const char *river_xiaozhi_discovery_playback_ack_mode(void)
     if (!g_river_xiaozhi.discovery_playback_ack_enabled) {
         return NULL;
     }
-    if (strcmp(g_river_xiaozhi.discovery_playback_ack_mode, "segment_mark_v1") != 0) {
+    if (strcmp(g_river_xiaozhi.discovery_playback_ack_mode, "started_completed_v1") != 0) {
         return NULL;
     }
     return g_river_xiaozhi.discovery_playback_ack_mode;
@@ -1389,13 +1389,11 @@ static const char *river_xiaozhi_negotiated_playback_ack_mode(void)
         return NULL;
     }
     if (!river_xiaozhi_client_supports_playback_ack_started() ||
-        !river_xiaozhi_client_supports_playback_ack_mark() ||
         !river_xiaozhi_client_supports_playback_ack_cleared() ||
         !river_xiaozhi_client_supports_playback_ack_completed()) {
         return NULL;
     }
     if (!g_river_xiaozhi.discovery_playback_ack_started ||
-        !g_river_xiaozhi.discovery_playback_ack_mark ||
         !g_river_xiaozhi.discovery_playback_ack_cleared ||
         !g_river_xiaozhi.discovery_playback_ack_completed) {
         return NULL;
@@ -1421,13 +1419,11 @@ static const char *river_xiaozhi_playback_ack_negotiation_reason(void)
         return "service_playback_ack_mode_mismatch";
     }
     if (!river_xiaozhi_client_supports_playback_ack_started() ||
-        !river_xiaozhi_client_supports_playback_ack_mark() ||
         !river_xiaozhi_client_supports_playback_ack_cleared() ||
         !river_xiaozhi_client_supports_playback_ack_completed()) {
         return "client_playback_ack_shape_incomplete";
     }
     if (!g_river_xiaozhi.discovery_playback_ack_started ||
-        !g_river_xiaozhi.discovery_playback_ack_mark ||
         !g_river_xiaozhi.discovery_playback_ack_cleared ||
         !g_river_xiaozhi.discovery_playback_ack_completed) {
         return "service_playback_ack_shape_incomplete";
@@ -1480,22 +1476,30 @@ static void river_xiaozhi_log_collaboration_negotiation(const char *trigger)
 
 static bool river_xiaozhi_playback_ack_started_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           river_xiaozhi_client_supports_playback_ack_started() &&
+           g_river_xiaozhi.discovery_playback_ack_started;
 }
 
 static bool river_xiaozhi_playback_ack_mark_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           river_xiaozhi_client_supports_playback_ack_mark() &&
+           g_river_xiaozhi.discovery_playback_ack_mark;
 }
 
 static bool river_xiaozhi_playback_ack_cleared_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           river_xiaozhi_client_supports_playback_ack_cleared() &&
+           g_river_xiaozhi.discovery_playback_ack_cleared;
 }
 
 static bool river_xiaozhi_playback_ack_completed_enabled(void)
 {
-    return river_xiaozhi_negotiated_playback_ack_mode() != NULL;
+    return river_xiaozhi_negotiated_playback_ack_mode() != NULL &&
+           river_xiaozhi_client_supports_playback_ack_completed() &&
+           g_river_xiaozhi.discovery_playback_ack_completed;
 }
 
 static void river_xiaozhi_prepare_preview_window(const char *preview_id)
@@ -1641,9 +1645,8 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
 {
     cJSON *root = NULL;
     cJSON *payload = NULL;
-    cJSON *device = NULL;
-    cJSON *audio = NULL;
-    cJSON *session = NULL;
+    cJSON *input_audio = NULL;
+    cJSON *output_audio = NULL;
     cJSON *capabilities = NULL;
     cJSON *playback_ack = NULL;
     const char *playback_ack_mode = NULL;
@@ -1656,24 +1659,20 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     river_xiaozhi_log_collaboration_negotiation("session_start");
 
     root = river_xiaozhi_create_control_event("session.start", &payload);
-    device = cJSON_CreateObject();
-    audio = cJSON_CreateObject();
-    session = cJSON_CreateObject();
+    input_audio = cJSON_CreateObject();
+    output_audio = cJSON_CreateObject();
     capabilities = cJSON_CreateObject();
     if (playback_ack_mode != NULL) {
         playback_ack = cJSON_CreateObject();
     }
-    if (root == NULL || payload == NULL || device == NULL || audio == NULL ||
-        session == NULL || capabilities == NULL ||
+    if (root == NULL || payload == NULL || input_audio == NULL || output_audio == NULL ||
+        capabilities == NULL ||
         (playback_ack_mode != NULL && playback_ack == NULL)) {
-        if (device != NULL) {
-            cJSON_Delete(device);
+        if (input_audio != NULL) {
+            cJSON_Delete(input_audio);
         }
-        if (audio != NULL) {
-            cJSON_Delete(audio);
-        }
-        if (session != NULL) {
-            cJSON_Delete(session);
+        if (output_audio != NULL) {
+            cJSON_Delete(output_audio);
         }
         if (capabilities != NULL) {
             cJSON_Delete(capabilities);
@@ -1688,39 +1687,42 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     }
 
     cJSON_AddStringToObject(payload, "protocol_version", river_xiaozhi_active_protocol_version());
-
-    cJSON_AddStringToObject(device, "device_id", g_river_xiaozhi.device_id);
-    cJSON_AddStringToObject(device, "client_type", RIVER_XIAOZHI_REALTIME_CLIENT_TYPE);
-    cJSON_AddItemToObject(payload, "device", device);
-
-    cJSON_AddStringToObject(audio, "codec", RIVER_XIAOZHI_UPLINK_FORMAT);
-    cJSON_AddNumberToObject(audio,
-                            "sample_rate_hz",
-                            g_river_xiaozhi.config.uplink_sample_rate);
-    cJSON_AddNumberToObject(audio, "channels", g_river_xiaozhi.config.uplink_channels);
-    cJSON_AddItemToObject(payload, "audio", audio);
-
-    cJSON_AddStringToObject(session, "mode", "voice");
-    cJSON_AddStringToObject(session,
+    cJSON_AddStringToObject(payload, "rtos_device_id", g_river_xiaozhi.device_id);
+    cJSON_AddStringToObject(payload, "client_type", RIVER_XIAOZHI_REALTIME_CLIENT_TYPE);
+    cJSON_AddStringToObject(payload,
                             "wake_reason",
                             (wake_reason != NULL && wake_reason[0] != '\0') ?
                                 wake_reason :
                                 "keyword");
-    cJSON_AddBoolToObject(session, "client_can_end", true);
-    cJSON_AddBoolToObject(session, "server_can_end", true);
-    cJSON_AddItemToObject(payload, "session", session);
+    cJSON_AddStringToObject(payload, "mode_hint", "m1_single_command");
 
-    cJSON_AddBoolToObject(capabilities, "text_input", true);
+    cJSON_AddStringToObject(input_audio, "codec", RIVER_XIAOZHI_UPLINK_FORMAT);
+    cJSON_AddNumberToObject(input_audio,
+                            "sample_rate_hz",
+                            g_river_xiaozhi.config.uplink_sample_rate);
+    cJSON_AddNumberToObject(input_audio, "channels", g_river_xiaozhi.config.uplink_channels);
+    cJSON_AddItemToObject(payload, "input_audio", input_audio);
+
+    cJSON_AddStringToObject(output_audio, "codec", RIVER_XIAOZHI_UPLINK_FORMAT);
+    cJSON_AddNumberToObject(output_audio,
+                            "sample_rate_hz",
+                            g_river_xiaozhi.config.uplink_sample_rate);
+    cJSON_AddNumberToObject(output_audio, "channels", g_river_xiaozhi.config.uplink_channels);
+    cJSON_AddItemToObject(payload, "output_audio", output_audio);
+
+    cJSON_AddBoolToObject(capabilities, "binary_audio", true);
+    cJSON_AddBoolToObject(capabilities, "text_input", false);
     cJSON_AddBoolToObject(capabilities, "image_input", false);
     cJSON_AddBoolToObject(capabilities, "half_duplex", half_duplex);
     cJSON_AddBoolToObject(capabilities, "local_wake_word", true);
-    if (preview_events) {
-        cJSON_AddBoolToObject(capabilities, "preview_events", true);
-    }
+    cJSON_AddBoolToObject(capabilities, "preview_events", preview_events);
+    cJSON_AddBoolToObject(capabilities, "server_endpointing", false);
     if (playback_ack_mode != NULL && playback_ack_mode[0] != '\0') {
         cJSON_AddStringToObject(playback_ack, "mode", playback_ack_mode);
         cJSON_AddItemToObject(capabilities, "playback_ack", playback_ack);
         playback_ack = NULL;
+    } else {
+        cJSON_AddBoolToObject(capabilities, "playback_ack", false);
     }
     cJSON_AddItemToObject(payload, "capabilities", capabilities);
 
@@ -1728,7 +1730,7 @@ static river_status_t river_xiaozhi_send_session_start_internal(const char *wake
     if (status == RIVER_OK) {
         g_river_xiaozhi.dialog_started = true;
         g_river_xiaozhi.response_started = false;
-        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s device_id=%s client_id=%s wire=%s subprotocol=%s product=%s mainline=%s codec=%s duplex=%s half_duplex=%s default_on=%s default_reason=%s preview_events=%s playback_ack=%s discovery_voice_collaboration=%s",
+        RIVER_LOGI("xiaozhi session.start sent: wake_reason=%s mode_hint=m1_single_command device_id=%s client_id=%s wire=%s subprotocol=%s product=%s mainline=%s codec=%s duplex=%s half_duplex=%s default_on=%s default_reason=%s preview_events=%s server_endpointing=no playback_ack=%s discovery_voice_collaboration=%s",
                    (wake_reason != NULL && wake_reason[0] != '\0') ? wake_reason : "keyword",
                    g_river_xiaozhi.device_id,
                    g_river_xiaozhi.client_id,
@@ -1809,8 +1811,13 @@ static river_status_t river_xiaozhi_send_audio_commit_internal(const char *reaso
     }
 
     cJSON_AddStringToObject(payload,
+                            "commit_reason",
+                            (reason != NULL && reason[0] != '\0') ? reason :
+                                                                    "client_endpoint");
+    cJSON_AddStringToObject(payload,
                             "reason",
-                            (reason != NULL && reason[0] != '\0') ? reason : "end_of_speech");
+                            (reason != NULL && reason[0] != '\0') ? reason :
+                                                                    "client_endpoint");
     return river_xiaozhi_send_json_root(root);
 }
 

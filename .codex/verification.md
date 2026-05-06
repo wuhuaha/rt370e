@@ -1,3 +1,66 @@
+## Step A.home-ai.1 Verification
+
+Confirm the client-side M1 realtime contract switch:
+```bash
+cd /root/ameba-river
+rg -n "rtos-smart-home-v1|agent-server.smart-home.realtime.v1|started_completed_v1|server_endpointing|commit_reason|m1_single_command|duration_ms|playback_ack_mark_negotiated|local_progress_no_wire_mark" \
+  include/river/river_xiaozhi_credentials.h \
+  include/river/river_xiaozhi_ws.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_xiaozhi_ws_bootstrap_discovery.inc \
+  components/river_cloud/river_xiaozhi_ws_message_handlers.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- default protocol/subprotocol are `rtos-smart-home-v1` and `agent-server.smart-home.realtime.v1`
+- discovery parses M1 `features` and `started_completed_v1`
+- `session.start` declares `mode_hint=m1_single_command`, `server_endpointing=false`, and M1 playback ACK
+- `audio.in.commit` sends `commit_reason`
+- `audio.out.meta.duration_ms` feeds the existing expected-duration path
+- mark ACK is local progress only when `playback_ack_mark_negotiated()` is false
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation against home_ai_server:
+```text
+服务端：
+  cd /root/home_ai_server
+  HOST=0.0.0.0 PORT=8080 bash scripts/run-local.sh
+
+板端：
+  river xiaozhi set ws://<server-ip>:8080/v1/realtime/ws -
+  river xiaozhi status
+  唤醒后说“打开厨房灯”。
+```
+
+Expected result:
+- status/discovery shows smart-home subprotocol, client commit, preview/server endpoint disabled, playback ACK `started_completed_v1`
+- board sends `session.start`, raw PCM binary audio, and `audio.in.commit`
+- service returns `accept_reason=client_audio_in_commit`, `audio.out.meta duration_ms`, and PCM audio
+- board sends `audio.out.started` and `audio.out.completed` or `audio.out.cleared`, with no `audio.out.mark` wire event
+
 ## Step 5.563 Verification
 
 Confirm terminal playback cannot complete while late downlink audio may still arrive:

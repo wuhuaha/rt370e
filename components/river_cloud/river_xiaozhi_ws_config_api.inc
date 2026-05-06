@@ -293,6 +293,11 @@ const char *river_xiaozhi_playback_ack_mode_negotiated(void)
     return river_xiaozhi_negotiated_playback_ack_mode();
 }
 
+bool river_xiaozhi_playback_ack_mark_negotiated(void)
+{
+    return g_river_xiaozhi.initialized && river_xiaozhi_playback_ack_mark_enabled();
+}
+
 void river_xiaozhi_clear_session_update_cache(void)
 {
     if (!g_river_xiaozhi.initialized) {

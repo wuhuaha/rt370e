@@ -3,29 +3,29 @@
 #define AMEBA_RIVER_XIAOZHI_CREDENTIALS_H
 
 /*
- * Native agent-server realtime websocket configuration.
+ * home_ai_server M1 realtime websocket configuration.
  *
- * This debug branch now targets the self-hosted agent-server native RTOS
- * contract directly. Keep the legacy ota/token fields empty so the old
- * XiaoZhi bootstrap path is effectively disabled while the higher layers are
- * still being renamed.
+ * This branch targets the smart-home M1 RTOS contract exposed by
+ * /root/home_ai_server. Keep the legacy OTA/token fields empty so the old
+ * XiaoZhi bootstrap path is disabled while the higher layers are still being
+ * renamed.
  */
 #define RIVER_XIAOZHI_OTA_URL                   ""
 #define RIVER_XIAOZHI_URL                       "ws://101.33.235.154:8080/v1/realtime/ws"
 #define RIVER_XIAOZHI_TOKEN                     ""
-#define RIVER_XIAOZHI_REALTIME_SUBPROTOCOL      "agent-server.realtime.v0"
-#define RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION "rtos-ws-v0"
+#define RIVER_XIAOZHI_REALTIME_SUBPROTOCOL      "agent-server.smart-home.realtime.v1"
+#define RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION "rtos-smart-home-v1"
 #define RIVER_XIAOZHI_REALTIME_CLIENT_TYPE      "rtos"
 #define RIVER_XIAOZHI_PROTOCOL_VERSION          3U
-#define RIVER_XIAOZHI_ENABLE_MCP                1
+#define RIVER_XIAOZHI_ENABLE_MCP                0
 
 #define RIVER_XIAOZHI_UPLINK_FORMAT             "pcm16le"
 #define RIVER_XIAOZHI_UPLINK_SAMPLE_RATE        16000U
 #define RIVER_XIAOZHI_UPLINK_CHANNELS           1U
 /*
- * The native RTOS websocket profile recommends 20 ms pcm16le chunks for the
- * first bring-up pass. River's local capture path still runs at 16 ms, so the
- * cloud adapter will continue bundling frames into 20 ms uplink packets.
+ * home_ai_server M1 recommends 20 ms raw pcm16le websocket binary frames for
+ * the first bring-up pass. River's local capture path still runs at 16 ms, so
+ * the cloud adapter will continue bundling frames into 20 ms uplink packets.
  */
 #define RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS  20U
 

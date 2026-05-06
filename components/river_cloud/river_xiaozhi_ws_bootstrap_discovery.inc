@@ -490,10 +490,14 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
     const cJSON *product_profile_obj;
     const cJSON *mainline_profile_obj;
     const cJSON *turn_mode_obj;
+    const cJSON *features_obj;
     const cJSON *server_endpoint_obj;
     const cJSON *voice_collaboration_obj;
     const cJSON *preview_events_obj;
     const cJSON *playback_ack_obj;
+    const cJSON *server_endpointing_obj;
+    const cJSON *feature_preview_events_obj;
+    const cJSON *feature_playback_ack_obj;
     const cJSON *available_obj;
     const cJSON *enabled_obj;
     const cJSON *mode_obj;
@@ -550,6 +554,49 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
         river_xiaozhi_copy_optional_string(g_river_xiaozhi.discovery_turn_mode,
                                            sizeof(g_river_xiaozhi.discovery_turn_mode),
                                            turn_mode_obj->valuestring);
+    }
+
+    features_obj = cJSON_GetObjectItemCaseSensitive(root, "features");
+    if (cJSON_IsObject(features_obj)) {
+        server_endpointing_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features_obj,
+                                             "server_endpointing");
+        feature_preview_events_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features_obj, "preview_events");
+        feature_playback_ack_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features_obj, "playback_ack");
+
+        if (cJSON_IsBool(server_endpointing_obj)) {
+            g_river_xiaozhi.discovery_server_endpoint_available = true;
+            g_river_xiaozhi.discovery_server_endpoint_enabled =
+                cJSON_IsTrue(server_endpointing_obj);
+            river_xiaozhi_copy_optional_string(
+                g_river_xiaozhi.discovery_server_endpoint_mode,
+                sizeof(g_river_xiaozhi.discovery_server_endpoint_mode),
+                g_river_xiaozhi.discovery_server_endpoint_enabled ?
+                    "server_endpoint_v1" :
+                    "client_commit");
+        }
+        if (cJSON_IsBool(feature_preview_events_obj)) {
+            g_river_xiaozhi.discovery_preview_events_enabled =
+                cJSON_IsTrue(feature_preview_events_obj);
+            river_xiaozhi_copy_optional_string(
+                g_river_xiaozhi.discovery_preview_events_mode,
+                sizeof(g_river_xiaozhi.discovery_preview_events_mode),
+                g_river_xiaozhi.discovery_preview_events_enabled ? "preview_v1" :
+                                                                  "disabled");
+        }
+        if (cJSON_IsBool(feature_playback_ack_obj)) {
+            g_river_xiaozhi.discovery_playback_ack_enabled =
+                cJSON_IsTrue(feature_playback_ack_obj);
+            if (g_river_xiaozhi.discovery_playback_ack_enabled &&
+                g_river_xiaozhi.discovery_playback_ack_mode[0] == '\0') {
+                river_xiaozhi_copy_optional_string(
+                    g_river_xiaozhi.discovery_playback_ack_mode,
+                    sizeof(g_river_xiaozhi.discovery_playback_ack_mode),
+                    "started_completed_v1");
+            }
+        }
     }
 
     server_endpoint_obj = cJSON_GetObjectItemCaseSensitive(root, "server_endpoint");
@@ -643,6 +690,15 @@ static river_status_t river_xiaozhi_parse_discovery_response(const char *json_te
                                                    mode_obj->valuestring);
             }
         }
+    }
+
+    if (g_river_xiaozhi.discovery_playback_ack_enabled &&
+        strcmp(g_river_xiaozhi.discovery_playback_ack_mode,
+               "started_completed_v1") == 0) {
+        g_river_xiaozhi.discovery_playback_ack_started = true;
+        g_river_xiaozhi.discovery_playback_ack_mark = false;
+        g_river_xiaozhi.discovery_playback_ack_cleared = true;
+        g_river_xiaozhi.discovery_playback_ack_completed = true;
     }
 
     cJSON_Delete(root);

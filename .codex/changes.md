@@ -1,5 +1,24 @@
 # Change Log
 
+## Step A.home-ai.1
+- 对 `/root/home_ai_server` 做协议走查后，端侧 M1 最小切换已经落到 `home-ai` 分支：
+  - 默认 realtime wire profile 改为 `protocol_version=rtos-smart-home-v1`、`subprotocol=agent-server.smart-home.realtime.v1`，并默认关闭旧 MCP。
+  - discovery 解析补齐 M1 顶层 `features`，能从 `features.server_endpointing=false`、`features.preview_events=false` 和 `voice_collaboration.playback_ack.mode=started_completed_v1` 得到正确协商结果。
+  - playback ACK 协商从旧 `segment_mark_v1` 收缩为 `started_completed_v1`，started/cleared/completed 可用，mark 不再作为 wire ACK 协商或排队发送。
+  - `session.start` 从旧 canonical `device/audio/session/capabilities` 形状收缩为 home_ai 简化 payload：`rtos_device_id`、`client_type`、`wake_reason`、`mode_hint=m1_single_command`、`input_audio`、`output_audio`、`capabilities`。
+  - `audio.in.commit` 增加 M1 推荐的 `commit_reason` 字段，同时保留旧 `reason` 兼容字段。
+  - `audio.out.meta` 解析兼容 M1 `duration_ms`，映射到端侧现有 `expected_duration_ms` 播放完成逻辑。
+  - 播放状态机仍维护本地 segment progress；当 mark ACK 未协商时只更新本地进度/lineage，不再队列 `audio.out.mark` 控制请求。
+- 新增并登记 M1 适配执行计划：
+  - `doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md`
+  - `.codex/active_context.md`
+  - `.codex/active_plans.md`
+- Verification for this step:
+  - Step A.home-ai.1 `rg` 协议适配检查通过。
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step 5.563
 - 根据上板反馈“TTS 只有前半段、没有后半段”，复查 Step 5.562 后确认新的截断风险：
   - Step 5.562 会在服务端 `output_state=idle` 后合成 terminal tail，解决缺少 `is_last_segment=yes` 的卡死

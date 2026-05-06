@@ -102,6 +102,7 @@ bool river_xiaozhi_discovery_server_endpoint_available(void);
 bool river_xiaozhi_discovery_server_endpoint_enabled(void);
 bool river_xiaozhi_preview_events_negotiated(void);
 const char *river_xiaozhi_playback_ack_mode_negotiated(void);
+bool river_xiaozhi_playback_ack_mark_negotiated(void);
 void river_xiaozhi_clear_session_update_cache(void);
 const char *river_xiaozhi_last_emotion(void);
 const char *river_xiaozhi_last_error(void);

@@ -151,6 +151,7 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     const cJSON *segment_id_obj;
     const cJSON *text_obj;
     const cJSON *expected_duration_ms_obj;
+    const cJSON *duration_ms_obj;
     const cJSON *is_last_segment_obj;
     const cJSON *output_lane_obj;
     const cJSON *output_role_obj;
@@ -176,6 +177,7 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     text_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "text");
     expected_duration_ms_obj =
         cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "expected_duration_ms");
+    duration_ms_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "duration_ms");
     is_last_segment_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload,
                                                            "is_last_segment");
     output_lane_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "output_lane");
@@ -200,6 +202,8 @@ static void river_xiaozhi_handle_realtime_audio_out_meta(const cJSON *payload)
     if (cJSON_IsNumber(expected_duration_ms_obj) &&
         expected_duration_ms_obj->valuedouble > 0.0) {
         expected_duration_ms = (uint32_t)expected_duration_ms_obj->valuedouble;
+    } else if (cJSON_IsNumber(duration_ms_obj) && duration_ms_obj->valuedouble > 0.0) {
+        expected_duration_ms = (uint32_t)duration_ms_obj->valuedouble;
     }
     if (cJSON_IsBool(is_last_segment_obj)) {
         is_last_segment = cJSON_IsTrue(is_last_segment_obj);

@@ -6,7 +6,7 @@ or top-of-tree verification target changes.
 
 ## Active Working Set
 
-- Current working branch: `agent-server-v2`
+- Current working branch: `home-ai`
 - Active SDK baseline: `/root/ameba-rtos`
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
@@ -15,11 +15,34 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `5.563 delay terminal playback completion until downlink tail drains（待验证）`
+  - `Step A.home-ai.1 home_ai_server M1 realtime protocol adaptation（本地 build 通过，待上板）`
+- Current active objective:
+  - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
+- Active plan:
+  - `doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+  - newest active adaptation slice:
+    - Step A.home-ai.1 对齐 `/root/home_ai_server` M1 当前协议：
+      - 默认协议常量切到 `rtos-smart-home-v1` /
+        `agent-server.smart-home.realtime.v1`
+      - discovery 解析 M1 顶层 `features`，`server_endpointing=false` /
+        `preview_events=false` 不再误判为旧协作能力缺失
+      - playback ACK 协商改为 `started_completed_v1`，只对外发送 started /
+        completed / cleared；mark 只保留为本地 segment progress，不再 wire 发送
+      - `session.start` 使用 home_ai 简化 payload 和
+        `mode_hint=m1_single_command`
+      - `audio.in.commit` 增加 `commit_reason`
+      - `audio.out.meta.duration_ms` 映射到现有 `expected_duration_ms`
+    - 下一步上板验证：
+      - `river xiaozhi status` 显示 smart-home subprotocol、client commit、
+        preview/server endpoint disabled、playback ACK `started_completed_v1`
+      - 服务端日志出现 `session_started`、`commit_received`、
+        `accept_reason=client_audio_in_commit`、`audio_segment_meta`、
+        `playback_ack`
+      - 板端不应发送 `audio.out.mark`
   - newest landed runtime bug-fix slice:
     - Step 5.563 收 TTS “只有前半段没有后半段”：
       - Step 5.562 合成 terminal tail 后，last segment 仍可能只按 `expected_duration_ms` 墙钟推进
