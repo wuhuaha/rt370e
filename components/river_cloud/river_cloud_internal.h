@@ -331,6 +331,7 @@ typedef struct {
     river_status_t last_cycle_status;
     river_cloud_xiaozhi_downlink_wait_kind_t last_wait_kind;
     river_cloud_xiaozhi_downlink_cycle_outcome_t last_cycle_outcome;
+    size_t accum_bytes;
     bool retry_valid;
 } river_cloud_xiaozhi_downlink_runtime_truth_t;
 
@@ -540,6 +541,7 @@ typedef struct {
                                           RIVER_CLOUD_XIAOZHI_DOWNLINK_RING_FRAMES];
     uint8_t xiaozhi_downlink_task_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
     uint8_t xiaozhi_downlink_drop_frame[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
+    uint8_t xiaozhi_downlink_accum[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX];
     int16_t xiaozhi_downlink_mono[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX];
     int16_t xiaozhi_downlink_stereo[RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX * 2U];
     river_cloud_xiaozhi_control_request_t

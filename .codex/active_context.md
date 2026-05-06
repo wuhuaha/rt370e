@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.4 M1 cached-response 下行音频接收缓冲放宽（本地 build 通过，待上板）`
+  - `Step A.home-ai.5 M1 下行裸 PCM 按固定 20 ms 分帧入队（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,21 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.5 修复 M1 “服务端已 speaking 但板端无声”的下行裸 PCM 分帧：
+      - `/root/home_ai_server` 当前在 `audio.out.meta` 后直接下发裸 `pcm16le`
+        websocket binary，chunk 大小可能是整段 cached-response，也可能是任意长度
+        的 streaming-TTS 片段
+      - 旧端侧把“每条 websocket binary”直接当成“一帧播放音频”入队，
+        破坏了 downlink ring 的固定帧语义和起播门槛统计
+      - 端侧现在按协商的 `sample_rate + frame_duration_ms` 重新切成固定帧，
+        未满一帧的尾巴先缓存，等下一批 PCM 拼满
+      - `meta_id_changed` 和 `output_state=idle` 前都会把剩余尾巴补零 flush，
+        避免最后半帧被静默丢掉
+    - 下一步上板验证：
+      - `audio.out.meta` 后应真正起播，并回传 `audio.out.started`
+      - 不应再出现“服务端 `output_state=speaking` 但板端完全无声”
+      - cached-response 和 streaming-TTS 两类音频都应能正常出声
+      - 若尾包不是整帧，允许看到 `xiaozhi downlink accum flushed: reason=...`
     - Step A.home-ai.1 对齐 `/root/home_ai_server` M1 当前协议：
       - 默认协议常量切到 `rtos-smart-home-v1` /
         `agent-server.smart-home.realtime.v1`

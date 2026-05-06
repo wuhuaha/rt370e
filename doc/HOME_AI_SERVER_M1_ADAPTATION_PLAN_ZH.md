@@ -119,6 +119,14 @@ python3 /root/ameba-rtos/ameba.py build -p
 - `audio.out.meta.duration_ms` 已作为 `expected_duration_ms` fallback。
 - 播放状态机保留本地 segment progress，但当 mark ACK 未协商时不再排队
   `audio.out.mark` wire event。
+- 2026-05-06 新增 M1 下行裸 PCM 重分帧适配：
+  - `/root/home_ai_server` 当前在 `audio.out.meta` 后直接发送裸 `pcm16le`
+    websocket binary，chunk 大小不保证等于 20 ms 播放帧。
+  - 端侧下行 worker 现在会按协商的 `sample_rate + frame_duration_ms`
+    把任意大小 binary chunk 重切成固定播放帧逐帧入队。
+  - 不足一帧的尾巴先缓存到本地 accum；在 meta lineage 切换或
+    `output_state=idle` 终态闭合前再补零 flush 成最后一帧，避免“服务端
+    已 speaking 但板端无声”以及 segment 尾包静默丢失。
 
 ### Step B: 板端联调收口
 

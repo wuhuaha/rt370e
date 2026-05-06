@@ -75,6 +75,9 @@ static uint32_t river_cloud_xiaozhi_playback_buffer_frame_budget(void);
 static uint32_t river_cloud_xiaozhi_downlink_attached_resume_threshold_frames(void);
 static uint32_t river_cloud_xiaozhi_downlink_segment_gap_hold_frames(void);
 static uint32_t river_cloud_xiaozhi_downlink_starved_low_water_frames(void);
+static river_status_t river_cloud_xiaozhi_ensure_downlink_ring(size_t frame_bytes);
+static river_status_t river_cloud_xiaozhi_write_downlink_frame_latest(
+    const uint8_t *mono_frame);
 static uint32_t river_cloud_xiaozhi_downlink_start_threshold_for_backend(
     river_cloud_playback_backend_state_t backend_state);
 static river_status_t river_cloud_xiaozhi_write_current_downlink_frame_audio(
@@ -1158,6 +1161,108 @@ static void river_cloud_xiaozhi_note_downlink_supply(void)
         (uint64_t)rtos_time_get_current_system_time_ms();
 }
 
+static void river_cloud_xiaozhi_clear_downlink_accum(void)
+{
+    g_river_cloud.xiaozhi_downlink_runtime_truth.accum_bytes = 0U;
+}
+
+static size_t river_cloud_xiaozhi_downlink_pcm_frame_bytes(uint32_t sample_rate,
+                                                           uint32_t frame_duration_ms)
+{
+    uint64_t frame_bytes;
+
+    if (sample_rate == 0U) {
+        sample_rate = 16000U;
+    }
+    if (frame_duration_ms == 0U) {
+        frame_duration_ms = RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
+    }
+
+    frame_bytes = ((uint64_t)sample_rate * (uint64_t)frame_duration_ms *
+                   sizeof(int16_t)) /
+                  1000U;
+    if (frame_bytes == 0U || frame_bytes > SIZE_MAX) {
+        return 0U;
+    }
+    return (size_t)frame_bytes;
+}
+
+static river_status_t river_cloud_xiaozhi_flush_downlink_accum_if_needed(
+    size_t frame_bytes,
+    const char *reason)
+{
+    river_status_t status;
+    uint32_t sample_rate;
+    uint32_t frame_duration_ms;
+    size_t accum_bytes =
+        g_river_cloud.xiaozhi_downlink_runtime_truth.accum_bytes;
+
+    if (accum_bytes == 0U) {
+        return RIVER_OK;
+    }
+
+    if (frame_bytes == 0U && g_river_cloud.xiaozhi_downlink_ring.initialized) {
+        frame_bytes = g_river_cloud.xiaozhi_downlink_ring.frame_bytes;
+    }
+    if (frame_bytes == 0U) {
+        sample_rate = g_river_cloud.xiaozhi_downlink_stream_truth.sample_rate;
+        if (sample_rate == 0U) {
+            sample_rate =
+                g_river_cloud.xiaozhi_server_audio_format_truth.sample_rate;
+        }
+        frame_duration_ms =
+            g_river_cloud.xiaozhi_downlink_stream_truth.frame_duration_ms;
+        if (frame_duration_ms == 0U) {
+            frame_duration_ms =
+                g_river_cloud.xiaozhi_server_audio_format_truth.frame_duration_ms;
+        }
+        frame_bytes = river_cloud_xiaozhi_downlink_pcm_frame_bytes(sample_rate,
+                                                                   frame_duration_ms);
+    }
+
+    if (frame_bytes == 0U || frame_bytes > RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX ||
+        accum_bytes > frame_bytes) {
+        RIVER_LOGW("xiaozhi downlink accum dropped: reason=%s accum=%lu frame=%lu",
+                   reason != NULL ? reason : "-",
+                   (unsigned long)accum_bytes,
+                   (unsigned long)frame_bytes);
+        river_cloud_xiaozhi_clear_downlink_accum();
+        return RIVER_ERR_ARG;
+    }
+
+    status = river_cloud_xiaozhi_ensure_downlink_ring(frame_bytes);
+    if (status != RIVER_OK) {
+        RIVER_LOGW("xiaozhi downlink accum flush failed: reason=%s ensure_status=%d accum=%lu frame=%lu",
+                   reason != NULL ? reason : "-",
+                   (int)status,
+                   (unsigned long)accum_bytes,
+                   (unsigned long)frame_bytes);
+        river_cloud_xiaozhi_clear_downlink_accum();
+        return status;
+    }
+
+    memset(g_river_cloud.xiaozhi_downlink_accum + accum_bytes,
+           0,
+           frame_bytes - accum_bytes);
+    status = river_cloud_xiaozhi_write_downlink_frame_latest(
+        g_river_cloud.xiaozhi_downlink_accum);
+    if (status == RIVER_OK) {
+        RIVER_LOGI("xiaozhi downlink accum flushed: reason=%s accum=%lu padded=%lu frame=%lu",
+                   reason != NULL ? reason : "-",
+                   (unsigned long)accum_bytes,
+                   (unsigned long)(frame_bytes - accum_bytes),
+                   (unsigned long)frame_bytes);
+    } else {
+        RIVER_LOGW("xiaozhi downlink accum flush failed: reason=%s write_status=%d accum=%lu frame=%lu",
+                   reason != NULL ? reason : "-",
+                   (int)status,
+                   (unsigned long)accum_bytes,
+                   (unsigned long)frame_bytes);
+    }
+    river_cloud_xiaozhi_clear_downlink_accum();
+    return status;
+}
+
 static void river_cloud_xiaozhi_reset_downlink_ring_runtime(void)
 {
     if (g_river_cloud.xiaozhi_downlink_ring.initialized) {
@@ -1168,6 +1273,7 @@ static void river_cloud_xiaozhi_reset_downlink_ring_runtime(void)
     g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_delay_ms = 0U;
     g_river_cloud.xiaozhi_downlink_runtime_truth.last_wait_kind =
         RIVER_CLOUD_XIAOZHI_DOWNLINK_WAIT_NONE;
+    river_cloud_xiaozhi_clear_downlink_accum();
     river_cloud_xiaozhi_clear_downlink_starvation_watch();
 }
 

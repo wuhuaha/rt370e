@@ -273,6 +273,7 @@ bool river_cloud_xiaozhi_playback_terminal_closed(void)
 void river_cloud_xiaozhi_clear_playback_meta_state(void)
 {
     river_cloud_xiaozhi_clear_playback_lineage_truth();
+    river_cloud_xiaozhi_clear_downlink_accum();
     g_river_cloud.xiaozhi_playback_terminal_truth.started_reported = false;
     g_river_cloud.xiaozhi_playback_terminal_truth.cleared_reported = false;
     g_river_cloud.xiaozhi_playback_terminal_truth.completed_reported = false;

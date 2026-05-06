@@ -534,6 +534,9 @@ void river_cloud_xiaozhi_playback_note_meta(const river_xiaozhi_event_t *event)
         river_cloud_xiaozhi_playback_meta_id_changed(
             lineage_truth->meta_context.playback_id,
             event->playback_id)) {
+        (void)river_cloud_xiaozhi_flush_downlink_accum_if_needed(
+            0U,
+            "meta_id_changed");
         river_cloud_xiaozhi_clear_playback_meta_state();
     }
 
@@ -1203,6 +1206,8 @@ bool river_cloud_xiaozhi_playback_finalize_output_idle(const char *trigger)
         return false;
     }
 
+    (void)river_cloud_xiaozhi_flush_downlink_accum_if_needed(0U,
+                                                             "output_idle_finalize");
     recovered = river_cloud_xiaozhi_recover_wait_context_segment_if_needed(
         "server_output_idle_recover_segment");
     promoted = river_cloud_xiaozhi_promote_current_meta_to_terminal_tail(trigger);

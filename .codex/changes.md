@@ -1,5 +1,22 @@
 # Change Log
 
+## Step A.home-ai.5
+- 根据 2026-05-06 16:12 “已收到 `audio.out.meta` / `output_state=speaking` 但板端完全无声”的新日志，继续收 M1 下行裸 PCM 播放链路：
+  - `Step A.home-ai.4` 已经放宽 WebSocket RX buffer，当前不再是 SDK 提前丢包，而是服务端已经开始回音频、端侧仍未真正起播。
+  - 结合 `/root/home_ai_server/src/home_ai_server/realtime_audio_output.py` 现状可确认：M1 服务端在 `audio.out.meta` 之后直接发送裸 `pcm16le` binary，但每条 websocket binary 的大小并不等于端侧播放层的固定 20 ms frame。
+  - 旧端侧把“一条 websocket binary 消息”直接当成“一帧 downlink audio”入队；当服务端发大块 cached-response 或任意大小 streaming-TTS chunk 时，`queued_frames`、ring frame size 和 backend 起播门槛都会被破坏，最终表现为服务端已 `speaking`、板端却听不到任何音频。
+- 本轮端侧适配：
+  - 下行 runtime 新增 `accum_bytes` 和 `xiaozhi_downlink_accum`，专门缓存未对齐到固定播放帧的裸 PCM 尾巴。
+  - 新增按 `sample_rate + frame_duration_ms` 计算固定单声道 PCM frame 字节数的 helper，默认按 M1 当前 `16 kHz / 20 ms / pcm16le` 落到 640 B 一帧。
+  - downlink worker 不再把整条 websocket binary 直接写进 ring，而是把任意大小 chunk 重新切成固定帧逐帧入队；不足一帧的尾巴留在 accum 中，等下一批 binary 拼满。
+  - 在 `response_id/playback_id` 切换和 `output_state=idle` 尾态闭合前，若仍有未满一帧的 accum，会先 zero-pad flush 成最后一帧入队，避免尾包静默丢失。
+  - playback meta 清理时同步清空 accum，避免不同 segment / response 之间串音。
+- Verification for this step:
+  - Step A.home-ai.5 `rg` verification matched `accum_bytes` / `downlink_accum` state, fixed-frame helper, meta-id-change flush, and output-idle flush wiring.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.4
 - 根据 2026-05-06 14:45 新上板日志修复 M1 cached-response 音频被 WebSocket SDK 丢弃的问题：
   - 服务端返回 `segment_kind=cached_response`、`expected_duration_ms=720` 的可播放段后，随后发送单个 23044 B binary PCM 消息。

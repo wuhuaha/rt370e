@@ -1,3 +1,64 @@
+## Step A.home-ai.5 Verification
+
+Confirm M1 naked PCM downlink is reframed into fixed playback frames instead of
+using one websocket binary message as one playback frame:
+```bash
+cd /root/ameba-river
+rg -n "downlink_accum|accum_bytes|downlink_pcm_frame_bytes|meta_id_changed|output_idle_finalize|clear_downlink_accum|flush_downlink_accum" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc
+```
+
+Expected result:
+- downlink runtime contains explicit partial-frame accumulation state
+- playback runtime provides fixed PCM frame sizing and partial-tail flush helpers
+- downlink worker splits arbitrary websocket binary PCM chunks into fixed frames
+- meta-id change and output-idle finalization both flush any remaining partial
+  tail before terminal close
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-06 “connected but silent”
+issue:
+```text
+板端连接 101.33.235.154:8082 后：
+1. 先说一个 cached-response 短命令，例如“打开厨房灯”
+2. 再说一个更容易触发 streaming TTS 的命令，确认非缓存音频也能出声
+```
+
+Expected result:
+- no `WSCLIENT WARN ... exceed the max rx buf`
+- after `xiaozhi audio.out.meta`, playback should actually start instead of长期停在
+  `physical=no` / `backend=detached`
+- board should send `audio.out.started`
+- final segment should send `audio.out.completed` or `audio.out.cleared`
+- if the final PCM chunk is not frame-aligned, logs may show
+  `xiaozhi downlink accum flushed: reason=...`
+
 ## Step A.home-ai.4 Verification
 
 Confirm XiaoZhi websocket RX capacity now covers cached-response binary clips:
