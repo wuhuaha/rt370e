@@ -1,5 +1,23 @@
 # Change Log
 
+## Step A.home-ai.6
+- 根据 2026-05-06 16:52 新上板日志继续收 M1 `cached_response` 播放尾态异常：
+  - 当前 720 ms `cached_response` 在 `audio.out.meta` 后已经成功起播，日志显示 `queued=36`、`playback start`、`audio.out.started sent`，说明“不出声”主问题已从 Step A.home-ai.5 收住。
+  - 但随后仅过约 130 ms，端侧就在 `queued=0` 时误触发 `xiaozhi playback upstream gap rebuffer: cause=upstream_starved`，并立刻进入 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut -> playback recover`。
+  - 这会带来两个直接副作用：
+    - 喇叭还在自然排空本地后端缓冲时被强制 flush/recreate，起播前后容易听到一声短促噪音。
+    - playback runtime 长时间保留 `output_state=speaking` / `playback_turn` / `rebuffer=yes`，follow-up reopen 持续被 `output_turn_guard` 阻断，看起来像“只能唤醒一次”。
+- 本轮端侧适配：
+  - 给每个播放 segment 增加 `pushed_duration_ms`，统计该段已经成功写入本地播放后端的音频时长。
+  - 成功写每个 fixed 20 ms downlink frame 后，先确保当前 segment 已进入 `started`，再把该帧对应的时长累加到 `pushed_duration_ms`。
+  - 对当前已知的最后一段：如果 `expected_duration_ms` 对应的音频已经完整推给本地播放后端，则不再把 software ring 见底误判成 `upstream_starved`，改为只走 terminal drain/ACK 闭合。
+  - 这样可以避免对已完整下推的 cached-response 尾巴执行多余的 `flush/recover`，同时减少起播噪音和输出回合卡死。
+- Verification for this step:
+  - Step A.home-ai.6 `rg` verification matched `pushed_duration_ms`, fully-pushed last-segment guard, and starved-rebuffer skip wiring.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.5
 - 根据 2026-05-06 16:12 “已收到 `audio.out.meta` / `output_state=speaking` 但板端完全无声”的新日志，继续收 M1 下行裸 PCM 播放链路：
   - `Step A.home-ai.4` 已经放宽 WebSocket RX buffer，当前不再是 SDK 提前丢包，而是服务端已经开始回音频、端侧仍未真正起播。

@@ -232,6 +232,7 @@ static bool river_cloud_xiaozhi_recover_wait_context_segment_if_needed(
         river_cloud_xiaozhi_playback_same_segment_context(
             wait_context,
             &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context);
+    segment->pushed_duration_ms = 0U;
     segment->valid = true;
     g_river_cloud.xiaozhi_playback_segment_queue_truth.count = 1U;
     (void)river_cloud_xiaozhi_refresh_start_gate();

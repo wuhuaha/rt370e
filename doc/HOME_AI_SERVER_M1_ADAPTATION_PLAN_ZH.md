@@ -127,6 +127,14 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 不足一帧的尾巴先缓存到本地 accum；在 meta lineage 切换或
     `output_state=idle` 终态闭合前再补零 flush 成最后一帧，避免“服务端
     已 speaking 但板端无声”以及 segment 尾包静默丢失。
+- 2026-05-06 新增 cached-response 终段误判 rebuffer 保护：
+  - 当前 `cached_response` 短句在端侧成功起播后，服务端往往已经把整段音频
+    很快下推完；此时 software ring 见底并不代表“上游还会继续补音频”。
+  - 端侧现在按 segment 统计 `pushed_duration_ms`；若当前最后一段的音频
+    已完整写入本地播放后端，则不再触发 `upstream_starved` recover。
+  - 目标是避免播放尾部出现 `AudioTrack_Flush / tx_close / recreate`
+    造成的短促噪音和 output-turn 卡死，并为“首轮播完后再次唤醒”恢复正常
+    闭环。
 
 ### Step B: 板端联调收口
 

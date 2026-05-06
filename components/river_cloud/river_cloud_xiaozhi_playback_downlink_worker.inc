@@ -18,6 +18,7 @@ static void river_cloud_xiaozhi_try_start_current_playback_segment(uint64_t star
     segment->paused_at_ms = 0U;
     segment->started_ack_reported = false;
     segment->last_mark_ms = 0U;
+    segment->pushed_duration_ms = 0U;
     river_cloud_xiaozhi_try_queue_playback_started_ack();
 }
 

@@ -1,3 +1,64 @@
+## Step A.home-ai.6 Verification
+
+Confirm the client no longer treats a fully-pushed final cached-response
+segment as `upstream_starved` and force-recovers the playback backend:
+```bash
+cd /root/ameba-river
+rg -n "pushed_duration_ms|current_segment_audio_fully_pushed|upstream starvation condition|playback_last_segment_observed\\(\\) &&|segment->pushed_duration_ms" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_worker.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc
+```
+
+Expected result:
+- each playback segment tracks how much audio duration has already been pushed
+  into the local playback backend
+- successful downlink writes accumulate that pushed duration after the segment
+  has started
+- `upstream_starved` rebuffer is skipped when the current last segment has
+  already been fully pushed to the local backend
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-06 cached-response tail
+rebuffer / one-shot wake issue:
+```text
+板端连接 101.33.235.154:8082 后，多次说“打开厨房灯”这类会命中 cached_response 的短命令。
+然后在第一轮播报结束后，再次唤醒并复测。
+```
+
+Expected result:
+- `audio.out.started` 之后不应很快出现
+  `xiaozhi playback upstream gap rebuffer: cause=upstream_starved`
+- 不应紧跟 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut -> playback recover`
+- 起播前的短促噪音应明显收敛；若仍存在，再继续看功放 mute/unmute 时序
+- 第一轮播放结束后，不应长期停在
+  `followup reopen blocked: reason=output_turn_guard ... playback_turn=yes rebuffer=yes`
+- 之后应能再次正常唤醒
+
 ## Step A.home-ai.5 Verification
 
 Confirm M1 naked PCM downlink is reframed into fixed playback frames instead of

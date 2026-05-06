@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.5 M1 下行裸 PCM 按固定 20 ms 分帧入队（本地 build 通过，待上板）`
+  - `Step A.home-ai.6 M1 最后一段已完整下推时禁止误判 upstream_starved（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,22 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.6 修复 cached-response 尾态误判 rebuffer：
+      - 当前 720 ms cached-response 已能正常起播，但在 audio 已完整下推到
+        本地播放后端后，software ring 很快见底，旧逻辑仍会把它误判成
+        `upstream_starved`
+      - 误判后立即执行 `AudioTrack_Flush / tx_close / CreateAudioHwStreamOut /
+        playback recover`，这会制造短促噪音，并让 playback turn /
+        rebuffer 保护态长时间残留
+      - 端侧现在按 segment 统计 `pushed_duration_ms`；若当前最后一段的音频
+        已完整推入本地播放后端，则禁止这条 `upstream_starved` recover，
+        只允许 terminal drain 正常排空
+    - 下一步上板验证：
+      - cached-response 起播后不应很快进入 `upstream_starved` rebuffer
+      - 不应再出现 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut`
+        紧贴短句播放尾部
+      - `output_turn_guard ... playback_turn=yes rebuffer=yes` 不应长期残留
+      - 第一轮结束后应能再次正常唤醒
     - Step A.home-ai.5 修复 M1 “服务端已 speaking 但板端无声”的下行裸 PCM 分帧：
       - `/root/home_ai_server` 当前在 `audio.out.meta` 后直接下发裸 `pcm16le`
         websocket binary，chunk 大小可能是整段 cached-response，也可能是任意长度

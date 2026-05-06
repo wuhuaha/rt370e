@@ -85,6 +85,8 @@ static river_status_t river_cloud_xiaozhi_write_current_downlink_frame_audio(
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void);
 static bool river_cloud_xiaozhi_playback_completed_ready(void);
 static bool river_cloud_xiaozhi_playback_last_segment_observed(void);
+static bool river_cloud_xiaozhi_current_segment_audio_fully_pushed(void);
+static river_cloud_xiaozhi_playback_segment_t *river_cloud_xiaozhi_current_playback_segment(void);
 static void river_cloud_xiaozhi_capture_playback_supply_source(
     river_cloud_xiaozhi_playback_supply_source_t *source);
 static bool river_cloud_xiaozhi_compute_playback_waiting_next_segment_from_source(
@@ -529,6 +531,19 @@ static bool river_cloud_xiaozhi_playback_last_segment_observed(void)
 {
     return river_cloud_xiaozhi_playback_segment_context_valid_from_truth(
         &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context);
+}
+
+static bool river_cloud_xiaozhi_current_segment_audio_fully_pushed(void)
+{
+    river_cloud_xiaozhi_playback_segment_t *segment =
+        river_cloud_xiaozhi_current_playback_segment();
+
+    if (segment == NULL || !segment->valid || !segment->started ||
+        segment->expected_duration_ms == 0U) {
+        return false;
+    }
+
+    return segment->pushed_duration_ms >= segment->expected_duration_ms;
 }
 
 static bool river_cloud_xiaozhi_playback_response_context_valid(void)
@@ -2043,10 +2058,22 @@ river_cloud_xiaozhi_handle_playback_write_failed(
 static void river_cloud_xiaozhi_finish_successful_downlink_frame_write(void)
 {
     uint64_t now_ms;
+    river_cloud_xiaozhi_playback_segment_t *segment;
+    uint32_t frame_duration_ms;
 
     river_cloud_xiaozhi_consume_current_downlink_frame();
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
     river_cloud_xiaozhi_try_start_current_playback_segment(now_ms);
+    segment = river_cloud_xiaozhi_current_playback_segment();
+    frame_duration_ms = river_cloud_xiaozhi_downlink_frame_duration_ms();
+    if (segment != NULL && segment->valid && segment->started &&
+        frame_duration_ms != 0U) {
+        if (segment->pushed_duration_ms <= UINT32_MAX - frame_duration_ms) {
+            segment->pushed_duration_ms += frame_duration_ms;
+        } else {
+            segment->pushed_duration_ms = UINT32_MAX;
+        }
+    }
     river_cloud_xiaozhi_update_playback_ack_progress();
     river_cloud_xiaozhi_maybe_complete_terminal_playback_after_progress(
         "downlink_write");

@@ -204,6 +204,7 @@ typedef struct {
     uint64_t paused_at_ms;
     uint32_t expected_duration_ms;
     uint32_t last_mark_ms;
+    uint32_t pushed_duration_ms;
     char response_id[RIVER_CLOUD_XIAOZHI_RESPONSE_ID_MAX];
     char playback_id[RIVER_CLOUD_XIAOZHI_PLAYBACK_ID_MAX];
     char segment_id[RIVER_CLOUD_XIAOZHI_SEGMENT_ID_MAX];
