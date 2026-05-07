@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.7 修复 M1 播放完成后输出尾态残留阻断再次唤醒（本地 build 通过，待上板）`
+  - `Step A.home-ai.8 临时降低 KWS 唤醒阈值便于调试（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,19 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.8 临时降低本地 KWS 唤醒阈值：
+      - 当前 `student_conv_resnet_ed_nano_v1_fp32_debug` 正常召回档
+        `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008` 在调试阶段偏保守，用户反馈
+        经常无法唤醒
+      - `prj.conf` 现在临时降为 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+      - 只改主触发阈值，不改模型、前端、stride、hold、cooldown、tensor dump
+        或 board/local 对拍路径
+      - 注释中保留 `9008` 作为唤醒词模型质量优化完成后的恢复目标
+    - 下一步上板验证：
+      - boot/profile 日志应显示 `threshold_q15=384`
+      - `river kws status` 应显示 `thresh_pm=11`
+      - 有效唤醒词应更容易触发 `wakeword hit ... mode=threshold`
+      - 若误唤醒明显增多，先逐步上调临时阈值；模型优化完成后恢复到 `9008`
     - Step A.home-ai.7 修复播放完成后的 stale output / ASR 投影：
       - 2026-05-06 17:30 日志显示 TTS 已经 `draining -> idle` 并发送
         `audio.out.completed`，但 dialog runtime 随后进入

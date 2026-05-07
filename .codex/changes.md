@@ -1,5 +1,26 @@
 # Change Log
 
+## Step A.home-ai.8
+- 按当前调试诉求降低本地 KWS 唤醒主阈值：
+  - 当前 `student_conv_resnet_ed_nano_v1_fp32_debug` 的正常召回档为
+    `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008`，约 `thresh_pm=274`。
+  - 调试阶段用户反馈经常无法唤醒，优先保证 wake -> conversation window
+    链路可反复验证。
+  - 本轮只调整 `prj.conf` 的主触发阈值，不改模型、前端、stride、hold、
+    cooldown、tensor dump 或 board/local 对拍路径。
+- 本轮端侧适配：
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从 `9008` 临时降到 `384`。
+  - 注释保留 `9008` 作为后续唤醒词模型质量优化完成后的恢复目标。
+- 目标日志变化：
+  - `kws backend ... threshold_q15=384`
+  - `kws status ... thresh_pm=11`
+  - 弱一些的有效唤醒词输入也更容易触发 `wakeword hit ... mode=threshold`。
+- Verification for this step:
+  - Step A.home-ai.8 `rg` verification matched the debug threshold and restore note in `prj.conf`。
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.7
 - 根据 2026-05-06 17:30 新上板日志，继续收 M1 播放结束后无法再次唤醒/跟进的尾态残留：
   - 当前 TTS 已能正常起播并进入 `draining -> idle`，也已经发送 `audio.out.completed`。

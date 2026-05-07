@@ -1,3 +1,53 @@
+## Step A.home-ai.8 Verification
+
+Confirm the current debug image uses the temporary low KWS wake threshold while
+preserving the normal restore target in comments:
+```bash
+cd /root/ameba-river
+rg -n 'CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384|default_target_recall threshold \(`9008`\)|Temporary debug threshold' prj.conf
+```
+
+Expected result:
+- `prj.conf` sets `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=384`
+- the adjacent comment records `9008` as the normal threshold to restore after
+  wake-word model-quality optimization
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation:
+```text
+刷入固件后重启，观察 boot/profile 日志或执行 `river kws status`。
+连续尝试唤醒词“小欧管家”。
+```
+
+Expected result:
+- boot/profile log contains `threshold_q15=384`
+- `river kws status` contains `thresh_pm=11`
+- valid wake attempts should more readily produce `wakeword hit ... mode=threshold`
+- if false wakes become too frequent, raise the temporary threshold gradually
+  before returning to the normal `9008` target after model optimization
+
 ## Step A.home-ai.7 Verification
 
 Confirm playback completion and committed input can no longer keep the runtime
