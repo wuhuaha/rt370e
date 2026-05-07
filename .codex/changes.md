@@ -15611,3 +15611,17 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.6
+- 收敛 Orvibo 主状态机里的 XiaoZhi-compatible 协议控制帧失败处理：
+  - wake detected、listen start、listen stop、abort speaking 不再忽略协议层返回值。
+  - 自动状态机路径上的关键控制帧发送失败会记录 `last_error`，累加 `protocol_control_fail`，并投递 recoverable error 事件进入恢复路径。
+  - 手动诊断命令仍记录失败计数和错误原因，但不主动触发恢复，避免诊断命令改变主运行态。
+  - app status 新增 `protocol_ctrl=ok/fail`，便于板端确认控制帧是否实际送达协议层。
+- 设计边界：
+  - 失败恢复只在非 `recovering/error` 状态触发，避免错误事件自激循环。
+  - VAD、KWS、KWS tensor dump、alignment replay、板端/本地 parity、AEC/BF 路径未改动。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

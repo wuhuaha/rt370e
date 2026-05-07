@@ -25742,3 +25742,55 @@ Expected result:
   时，不应立刻出现
   `xiaozhi single-turn output idle forced close`
 - 会话应继续停留在录音/上行阶段，直到本地 commit 或后续 accepted-turn
+
+## Step H.xiaozhi-client.6 - protocol control frame failure recovery
+
+Confirm the state-machine control actions no longer ignore protocol send
+failures:
+```bash
+cd /root/ameba-river
+rg -n "record_protocol_control|protocol_ctrl|send_wake_detected|listen_start|listen_stop|abort_speaking" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- automatic wake/listen/abort state-machine actions call
+  `river_orvibo_app_record_protocol_control(..., true)`
+- diagnostic/manual listen/abort commands call
+  `river_orvibo_app_record_protocol_control(..., false)`
+- status output includes `protocol_ctrl=ok/fail`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash the generated RTL8730E image.
+2. Bring Wi-Fi up and bind/activate the device if needed.
+3. Trigger wake, listen start/stop, TTS barge-in, and diag listen/abort commands.
+4. Inspect `orvibo status`.
+```
+
+Expected result:
+- successful turns increment `protocol_ctrl` ok count
+- transient WebSocket/protocol send failure increments fail count and records `last_error`
+- automatic critical control-frame failure enters recoverable recovery instead of silently staying in the old state
