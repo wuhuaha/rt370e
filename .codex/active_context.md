@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.17 按 M1 单轮 client-commit 合同继续收紧播放尾态与缓冲（本地 build 通过，待上板）`
+  - `Step A.home-ai.18 修复 M1 单轮 idle 尾态收口的 pre-accept 误杀（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,23 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
     - newest active adaptation slice:
+    - Step A.home-ai.18 修复 M1 单轮 idle 尾态收口的 pre-accept 误杀：
+      - Step A.home-ai.17 把 `active + output_state=idle` 收成单轮保守尾态后，
+        真实上板日志暴露出一个回归：
+        - 会话刚建立、还没 accepted-turn
+        - 服务端正常回 `state=active input_state=active output_state=idle`
+        - 端侧就误判成 `response_audio_abandoned` 并立即关会话
+      - 本轮把这条单轮收口再收精确：
+        - 必须 `state->accepted == true`
+        - 且 `accepted_response_deadline_ms != 0`
+        - 才允许 `active + output_state=idle` 触发 abandoned recovery
+      - 这样首个 `session.update active/idle` 只会被当作正常初始态，
+        不会再误杀连接
+    - 下一步上板验证：
+      - 刚连接后的第一条
+        `session.update state=active input_state=active output_state=idle`
+        不应再立刻触发 forced close
+      - 会话应继续进入正常录音/commit/accepted 路径
     - Step A.home-ai.17 按 M1 单轮 client-commit 合同继续收紧播放尾态与缓冲：
       - 服务侧当前 M1 规范已经明确：
         - `client_wakeup_client_commit`

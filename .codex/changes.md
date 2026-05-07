@@ -1,5 +1,34 @@
 # Change Log
 
+## Step A.home-ai.18
+- 修复 Step A.home-ai.17 引入的一个会话早退回归：
+  - 最新上板日志已经把问题指清楚了：
+    - WebSocket 刚连上
+    - 服务端先回 `session.update state=active input_state=active output_state=idle`
+    - 此时还没有 `accept_reason`
+    - 端侧却直接走了
+      `xiaozhi single-turn output idle forced close -> response_audio_abandoned`
+    - 于是刚建好的 session 被立刻关闭
+- 根因：
+  - `active + output_state=idle` 在 M1 下确实可作为“accepted 后等待响应异常”的
+    收口信号
+  - 但它**不能**在 pre-accept 阶段生效；刚建立会话时服务端处于
+    `input_state=active / output_state=idle` 本来就是正常初始态
+- 本轮修复：
+  - `river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active()` 现在增加
+    双门槛：
+    - `state->accepted == true`
+    - `accepted_response_deadline_ms != 0`
+  - 只有 accepted-turn 已经成立，并且确实进入“等待响应音频”窗口之后，
+    才允许 `active + output_state=idle` 触发 abandoned 收口
+- 目标效果：
+  - 刚连接成功后的首个 `session.update active/idle` 不再误杀会话
+  - 仍保留 accepted 后真正无响应时的单轮保守收口
+- Verification for this step:
+  - `git diff --check` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.17
 - 按最新服务侧 M1 文档把板端再收紧一轮，明确优先级是“先别错，再谈快”：
   - 服务侧当前主线已经明确是：

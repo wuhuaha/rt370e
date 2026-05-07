@@ -25024,3 +25024,51 @@ Expected result:
 - `xiaozhi asr round finish` shows `burst_max=1` on a normal healthy round; backlog pressure is reflected only in `backlog_p95/max`
 - `send_interval_p50/p95/max` no longer stay inflated by accumulated due-time drift after one late send
 - the same `response_id/playback_id/segment_id/played_duration_ms` no longer produces duplicate `xiaozhi playback ack mark sent`
+## Step A.home-ai.18 Verification
+
+Confirm the single-turn idle-tail cleanup no longer fires before accepted-turn
+truth exists:
+```bash
+cd /root/ameba-river
+rg -n "accepted_response_deadline_ms == 0U|state->accepted|single-turn output idle forced close" \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- the `active + output_state=idle` cleanup path now requires both:
+  - `state->accepted`
+  - `accepted_response_deadline_ms != 0`
+- the forced-close log still exists, but only behind the accepted-turn gate
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation for the pasted regression:
+```text
+重新上板后，只触发一次唤醒并观察刚连上的第一批日志。
+```
+
+Expected result:
+- 出现 `session.update state=active input_state=active output_state=idle`
+  时，不应立刻出现
+  `xiaozhi single-turn output idle forced close`
+- 会话应继续停留在录音/上行阶段，直到本地 commit 或后续 accepted-turn

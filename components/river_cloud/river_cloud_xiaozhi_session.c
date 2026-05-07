@@ -2317,6 +2317,10 @@ static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
     if (state == NULL || strcmp(state->output_state, "idle") != 0) {
         return;
     }
+    if (!state->accepted ||
+        g_river_cloud.xiaozhi_session_window_truth.accepted_response_deadline_ms == 0U) {
+        return;
+    }
 
     if (river_cloud_xiaozhi_note_response_audio_abandoned("server_returned_active_no_audio")) {
         RIVER_LOGI("xiaozhi response audio wait cleared: trigger=%s session_state=%s output_state=%s",
