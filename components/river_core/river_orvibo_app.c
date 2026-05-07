@@ -38,7 +38,7 @@
 #define RIVER_ORVIBO_APP_WIFI_LOG_MS       3000U
 #define RIVER_ORVIBO_APP_ACCESS_RETRY_MS   10000U
 #define RIVER_ORVIBO_APP_TTS_DRAIN_MS      900U
-#define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  768U
+#define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  1536U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MIN_MS 1000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS 30000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_STREAK_CAP 6U
@@ -85,9 +85,11 @@ typedef struct {
     uint32_t handled;
     uint32_t uplink_sent;
     uint32_t uplink_busy;
+    uint32_t uplink_oversize;
     uint32_t downlink_ok;
     uint32_t downlink_fail;
     uint32_t downlink_dropped;
+    uint32_t downlink_oversize;
     uint32_t access_refresh_ok;
     uint32_t access_refresh_fail;
     uint32_t protocol_control_ok;
@@ -282,8 +284,14 @@ static void river_orvibo_audio_event_handler(const river_orvibo_audio_event_t *e
         river_orvibo_app_copy_text(msg.reason, sizeof(msg.reason), "vad_end");
         break;
     case RIVER_ORVIBO_AUDIO_EVENT_UPLINK_PACKET:
-        if (event->packet == NULL || event->packet_bytes == 0U ||
-            event->packet_bytes > sizeof(msg.data)) {
+        if (event->packet == NULL || event->packet_bytes == 0U) {
+            return;
+        }
+        if (event->packet_bytes > sizeof(msg.data)) {
+            g_river_orvibo_app.uplink_oversize++;
+            RIVER_LOGW("drop oversize uplink opus packet: bytes=%lu max=%lu",
+                       (unsigned long)event->packet_bytes,
+                       (unsigned long)sizeof(msg.data));
             return;
         }
         msg.type = RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK;
@@ -339,8 +347,14 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
         river_orvibo_app_copy_text(msg.reason, sizeof(msg.reason), "tts_stop");
         break;
     case RIVER_ORVIBO_PROTOCOL_EVENT_AUDIO_PACKET:
-        if (event->audio_data == NULL || event->audio_bytes == 0U ||
-            event->audio_bytes > sizeof(msg.data)) {
+        if (event->audio_data == NULL || event->audio_bytes == 0U) {
+            return;
+        }
+        if (event->audio_bytes > sizeof(msg.data)) {
+            g_river_orvibo_app.downlink_oversize++;
+            RIVER_LOGW("drop oversize downlink opus packet: bytes=%lu max=%lu",
+                       (unsigned long)event->audio_bytes,
+                       (unsigned long)sizeof(msg.data));
             return;
         }
         msg.type = RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO;
@@ -781,9 +795,10 @@ void river_orvibo_app_print_status(void)
                                    g_river_orvibo_app.audio_queue) :
                                0U;
 
-    RIVER_LOGI("orvibo app: state=%s wifi=%s ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
                river_wifi_station_status_name(),
+               (unsigned int)RIVER_ORVIBO_APP_AUDIO_PACKET_MAX,
                (unsigned long)control_depth,
                (unsigned int)RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH,
                (unsigned long)audio_depth,
@@ -801,6 +816,8 @@ void river_orvibo_app_print_status(void)
                (unsigned long)g_river_orvibo_app.downlink_ok,
                (unsigned long)g_river_orvibo_app.downlink_fail,
                (unsigned long)g_river_orvibo_app.downlink_dropped,
+               (unsigned long)g_river_orvibo_app.uplink_oversize,
+               (unsigned long)g_river_orvibo_app.downlink_oversize,
                g_river_orvibo_app.last_event[0] != '\0' ?
                    g_river_orvibo_app.last_event :
                    "-",

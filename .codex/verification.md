@@ -25995,3 +25995,74 @@ Expected result:
 - `river orvibo refresh` logs `access refresh ok: reason=diag_refresh` after binding completes
 - access transitions to ready without needing another reboot or wake
 - subsequent wake/connect enters WebSocket hello/listen path instead of being gated by pending activation
+
+## Step H.xiaozhi-client.11 - larger Orvibo Opus payload envelope
+
+Confirm XiaoZhi-compatible OTA and hello currently advertise 24 kHz / 60 ms TTS
+audio:
+```bash
+cd /root/ameba-river
+curl -sS -D - -o /tmp/orvibo_ota_probe.json -m 15 \
+  -X POST 'https://api.tenclass.net/xiaozhi/ota/' \
+  -H 'Activation-Version: 1' \
+  -H 'Device-Id: 00:11:22:33:44:55' \
+  -H 'Client-Id: 00000000-0000-4000-8000-000000000000' \
+  -H 'User-Agent: orvibo-rtl8730e/0.1.0' \
+  -H 'Accept-Language: zh-CN' \
+  -H 'Content-Type: application/json' \
+  --data '{"version":2,"language":"zh-CN","mac_address":"00:11:22:33:44:55","uuid":"00000000-0000-4000-8000-000000000000","chip_model_name":"rtl8730e","application":{"name":"ameba-river","version":"0.1.0"},"board":{"type":"wifi","name":"orvibo-rtl8730e","ssid":"probe","mac":"00:11:22:33:44:55"}}'
+head -c 1024 /tmp/orvibo_ota_probe.json
+```
+
+Expected result:
+- HTTP status is `200`
+- body includes `websocket.url` and `websocket.token`
+
+Confirm the local payload envelope and oversize diagnostics:
+```bash
+cd /root/ameba-river
+rg -n "PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max" \
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_core/river_orvibo_app.c \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- protocol binary payload, app audio packet payload, and audio-service Opus packet limits are `1536U`
+- status logs expose `payload_max`, `audio_max`, and `oversize=up/down`
+- oversize uplink/downlink packets are counted and logged instead of being silently dropped
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Boot the board and wait for `orvibo access: ready=yes`.
+2. Trigger wake or run `river orvibo connect`.
+3. Confirm server hello reports `server_audio=24000Hz/1ch/60ms` if the current service keeps the same contract.
+4. Play a long TTS response and run `river orvibo status` plus `river audio status`.
+```
+
+Expected result:
+- no `drop oversize downlink opus packet` appears during normal TTS
+- `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
+- `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics

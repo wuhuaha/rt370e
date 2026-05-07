@@ -15681,3 +15681,21 @@
   - `rg -n "ACCESS_REFRESH|access_refresh|diag_refresh|orvibo <status|connect|refresh" include components` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.11
+- 根据主机侧 XiaoZhi-compatible OTA/WebSocket 探测结果扩容 Orvibo Opus payload：
+  - OTA/config 探测返回 `wss://api.tenclass.net/xiaozhi/v1/` 与 `test-token`。
+  - 按当前固件 hello/auth 字段完成 WebSocket upgrade 与 hello，服务端返回 `opus/24000Hz/1ch/60ms`。
+  - 将协议二进制 payload、app 音频消息 payload、Orvibo audio service Opus packet 上限从 768B 扩到 1536B，避免 24k/60ms TTS 高码率下行包被静默丢弃。
+  - app 层新增 uplink/downlink oversized packet 计数和日志，status 输出 `audio_max` 与 `oversize=up/down`。
+  - protocol status 输出 `payload_max`，audio open 日志输出 `packet_max`。
+- 设计边界：
+  - 不改变当前 VAD、KWS、KWS tensor dump、alignment replay、板端/本地 parity、AEC/BF 路径。
+  - 不改变 XiaoZhi-compatible JSON/Opus wire format，只放宽本地缓冲容量和诊断。
+  - MCP 仍保持 volume-only。
+- Verification for this step:
+  - OTA POST probe to `https://api.tenclass.net/xiaozhi/ota/` returned HTTP 200 with websocket config.
+  - Host-side WebSocket handshake to `wss://api.tenclass.net/xiaozhi/v1/` sent current hello shape and received server hello with `sample_rate=24000` / `frame_duration=60`.
+  - `rg -n "PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max" components/river_cloud/river_orvibo_protocol.c components/river_core/river_orvibo_app.c components/river_voice/river_orvibo_audio_service.c` passed.
+  - `git diff --check` passed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`.

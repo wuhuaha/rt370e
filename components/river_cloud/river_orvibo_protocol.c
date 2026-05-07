@@ -34,7 +34,7 @@
 #define RIVER_ORVIBO_LAST_TEXT_MAX     192U
 #define RIVER_ORVIBO_LAST_ERROR_MAX    128U
 #define RIVER_ORVIBO_MCP_RESPONSE_MAX  768U
-#define RIVER_ORVIBO_BINARY_PAYLOAD_MAX 768U
+#define RIVER_ORVIBO_BINARY_PAYLOAD_MAX 1536U
 #define RIVER_ORVIBO_POLL_LOCK_SLICE_MS 5U
 #define RIVER_ORVIBO_WS_RECV_TIMEOUT_MS 10000U
 #define RIVER_ORVIBO_WS_SEND_TIMEOUT_MS 200U
@@ -1384,7 +1384,7 @@ void river_orvibo_protocol_dump_status(void)
                                     g_river_orvibo_protocol.uplink_queue) :
                                 0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1392,6 +1392,7 @@ void river_orvibo_protocol_dump_status(void)
                    "-",
                g_river_orvibo_protocol.url,
                (unsigned int)g_river_orvibo_protocol.config.protocol_version,
+               (unsigned int)RIVER_ORVIBO_BINARY_PAYLOAD_MAX,
                (unsigned long)g_river_orvibo_protocol.text_tx,
                (unsigned long)g_river_orvibo_protocol.text_rx,
                (unsigned long)g_river_orvibo_protocol.audio_tx,

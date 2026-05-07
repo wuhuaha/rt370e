@@ -35,7 +35,7 @@
 #define RIVER_ORVIBO_CAPTURE_VOLUME            0x24U
 #define RIVER_ORVIBO_CAPTURE_HPF_FC            0U
 #define RIVER_ORVIBO_OPUS_FRAME_MS             60U
-#define RIVER_ORVIBO_OPUS_PACKET_MAX           768U
+#define RIVER_ORVIBO_OPUS_PACKET_MAX           1536U
 #define RIVER_ORVIBO_PCM_ACCUM_MAX             (RIVER_ORVIBO_OPUS_FRAME_MS * 16U * sizeof(int16_t))
 #define RIVER_ORVIBO_DOWNLINK_PCM_MAX          (1920U * sizeof(int16_t))
 #define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_PCM_MAX * 2U)
@@ -358,13 +358,14 @@ static river_status_t river_orvibo_audio_open(void)
                                 16000) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
     }
-    RIVER_LOGI("audio open: capture=%luHz/%luch/%lums preproc=%s detector=%s opus=%lums",
+    RIVER_LOGI("audio open: capture=%luHz/%luch/%lums preproc=%s detector=%s opus=%lums packet_max=%u",
                (unsigned long)g_river_orvibo_audio.capture.sample_rate,
                (unsigned long)g_river_orvibo_audio.capture.channels,
                (unsigned long)g_river_orvibo_audio.capture.frame_ms,
                river_voice_preproc_backend_name(),
                river_voice_detector_backend_name(),
-               (unsigned long)RIVER_ORVIBO_OPUS_FRAME_MS);
+               (unsigned long)RIVER_ORVIBO_OPUS_FRAME_MS,
+               (unsigned int)RIVER_ORVIBO_OPUS_PACKET_MAX);
     return RIVER_OK;
 }
 
