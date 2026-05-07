@@ -1,3 +1,46 @@
+## Step H.xiaozhi-client.13 Verification
+
+Confirm Orvibo TTS downlink adapts server audio to a playback-supported sample
+rate:
+```bash
+cd /root/ameba-river
+rg -n "PLAYBACK_FALLBACK_RATE|DOWNLINK_MAX_RATE|downlink_playback_pcm|select_playback_sample_rate|resample_mono|downlink playback rate|rs=|rate=%lu->%lu|orvibo_tts_format_change" \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- 24 kHz server audio is routed through an Orvibo-owned playback sample-rate adapter.
+- decoded mono PCM is converted before stereo expansion and before reference export.
+- playback starts with the selected playback sample rate, not the unsupported server 24 kHz rate.
+- diagnostics expose resample converted/bypass/fail counters and server-to-playback rate.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后完成 Wi-Fi / access ready / WebSocket hello，触发一次会产生 TTS 的交互，然后观察串口与 `river orvibo status` / `river audio status`。
+```
+
+Expected result:
+- server hello 可继续显示 `server_audio=24000Hz/1ch/60ms`。
+- TTS 首包播放前出现 `downlink playback rate: server=24000Hz playback=48000Hz frame=60ms`。
+- playback start 日志显示 `stream=orvibo_tts rate=48000Hz`。
+- `river audio status` 中 `rs` converted 计数增加，`rate=24000->48000`。
+- 未出现 `AudioTrack_Init failed`、reference frame-size mismatch 或持续 playback write failure。
+
 ## Step H.xiaozhi-client.12 Verification
 
 Confirm Orvibo WebSocket subprotocol is explicit and visible:

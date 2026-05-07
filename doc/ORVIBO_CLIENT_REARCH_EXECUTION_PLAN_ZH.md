@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.13` 已补齐 Orvibo TTS 下行播放采样率适配：
+  - 服务端 Opus 仍按 hello 给定的 `sample_rate` / `frame_duration` 解码。
+  - 解码后的 mono PCM 会在 Orvibo audio service 内转换到选定的播放采样率后再扩成 stereo。
+  - 当前 XiaoZhi-compatible 服务端 `24000Hz/60ms` TTS 会进入 `48000Hz/60ms` 播放路径，因为 Ameba 输出 policy 不列 24 kHz。
+  - audio diag/status 现在暴露 `rs=converted/bypass/fail` 和 `rate=server->playback`。
+  - VAD、KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF 保护区不变。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.12` 已显式设置 Orvibo WebSocket 握手子协议。
 - 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，默认 `chat`，避免继续依赖 Ameba SDK 内置 `chat, superchat`。
 - `river_orvibo_protocol_open_audio_channel()` 在连接前调用 `ws_handshake_header_set_protocol()`；调用长度包含 `NUL`，规避 SDK setter 不自动补终止符的问题。
@@ -1095,12 +1102,22 @@ python3 /root/ameba-rtos/ameba.py build -p
   - protocol binary payload、app audio message payload、audio service Opus packet 上限从 768B 扩到 1536B。
   - app 层 oversized uplink/downlink packet 不再静默丢弃，改为计数并打印日志。
   - protocol/app/audio 诊断输出 `payload_max`、`audio_max`、`packet_max` 和 `oversize=up/down`。
+- `Step H.xiaozhi-client.12`：
+  - 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，默认 `chat`。
+  - `river_orvibo_protocol_open_audio_channel()` 在 `ws_connect_url()` 前显式设置 WebSocket subprotocol。
+  - 对 Ameba SDK setter 使用包含 `NUL` 的长度，避免握手头读取未终止字符串。
+  - connect/status 日志输出 `ws_subprotocol`。
+- `Step H.xiaozhi-client.13`：
+  - 下行 Opus 按 server hello 解码后，本地 PCM 会适配到 Ameba 播放支持的采样率。
+  - 当前服务端 `24000Hz/60ms` TTS 会转为 `48000Hz/60ms` 播放/reference 帧。
+  - playback 活跃期间如果下行格式变化，会停止并用新格式重启 `orvibo_tts` stream。
+  - audio diag/status 输出 `rs=converted/bypass/fail` 和 `rate=server->playback`。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1111,9 +1128,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口和 24k/60ms TTS payload envelope 扩容，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol 和 24k->48k 播放采样率适配，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。

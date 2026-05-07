@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.13
+- 补齐 Orvibo TTS 下行采样率适配：
+  - 下行 Opus 仍按 server hello 的 `sample_rate` / `frame_duration` 解码。
+  - 解码后的 mono PCM 进入 Orvibo-owned 本地采样率适配器；Ameba policy 未列出的 24 kHz 等采样率会转为 48 kHz 播放。
+  - 实际写入 `river_playback_service` 的 stereo PCM 和 reference mono PCM 使用同一份播放采样率数据，避免 AudioTrack 与 reference feed 格式不一致。
+  - 下行 PCM/播放缓冲扩到覆盖 48 kHz / 60 ms，当前实测 `24000Hz/60ms` 服务端 TTS 会输出 48 kHz / 60 ms 播放帧。
+  - playback 活跃期间如果服务端音频格式发生变化，会停止并按新播放格式重启 `orvibo_tts` stream。
+- 增强板端可观测性：
+  - 首次/变化时日志输出 `downlink playback rate: server=... playback=... frame=...`。
+  - audio diag/status 输出 `rs=converted/bypass/fail` 与 `rate=server->playback`。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo audio 下行解码后的播放采样率适配和诊断输出。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo downlink playback sample-rate adapter grep passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.12
 - 显式收敛 Orvibo WebSocket 握手子协议：
   - 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL` 配置，默认 `chat`。
