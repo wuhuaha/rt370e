@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.14 补齐 Orvibo listening 复入与唤醒打断闭环（SDK 构建通过）`
+  - `Step H.xiaozhi-client.15 补齐 Orvibo WebSocket 入站超时恢复（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.15` adds XiaoZhi-compatible inbound channel timeout handling:
+  - protocol tracks the last inbound WebSocket message timestamp.
+  - `river_orvibo_protocol_poll()` closes channels that have no inbound messages for 120 seconds and emits `AUDIO_CHANNEL_CLOSED`.
+  - protocol status reports `timeout` and `incoming_age=age/limit`.
+  - VAD, KWS, KWS parity tooling, AEC, and BF paths are unchanged.
 - `Step H.xiaozhi-client.14` aligns Orvibo listening re-entry and abort semantics with the XiaoZhi-compatible reference:
   - `tts_stop` now drains playback, returns to listening, and sends a fresh `listen start` for the next turn.
   - VAD speech-start barge-in sends generic `abort` without a reason, then re-enters listening.
@@ -138,6 +143,7 @@ or top-of-tree verification target changes.
   - Orvibo WebSocket subprotocol grep
   - Orvibo downlink playback sample-rate adapter grep
   - Orvibo listen re-entry / abort reason / speaking KWS gate grep
+  - Orvibo channel timeout grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`

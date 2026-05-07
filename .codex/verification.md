@@ -1,3 +1,42 @@
+## Step H.xiaozhi-client.15 Verification
+
+Confirm Orvibo protocol tracks and recovers from stale WebSocket channels:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS|last_incoming_ms|channel_timeouts|channel_timeout|incoming_age|close_channel_on_timeout|channel_timeout_reached" \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- protocol records the last inbound WebSocket message timestamp.
+- `river_orvibo_protocol_poll()` checks the 120-second timeout and closes stale channels.
+- timeout closure emits `AUDIO_CHANNEL_CLOSED` and protocol status reports timeout counters and incoming age.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后进入 listening/speaking 通道，断开服务器响应或让通道长时间无入站消息超过 120 秒，观察串口与 `river orvibo status`。
+```
+
+Expected result:
+- 出现 `channel timeout: age=... limit=120000ms`。
+- protocol status 中 `timeout=` 增加，`last_error=channel_timeout`。
+- app 收到 audio channel closed 后不继续停在僵尸 listening/speaking 状态。
+
 ## Step H.xiaozhi-client.14 Verification
 
 Confirm Orvibo re-enters listening after TTS stop and barge-in:

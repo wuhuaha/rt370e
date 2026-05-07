@@ -42,6 +42,7 @@
 #define RIVER_ORVIBO_WS_CONNECT_TIMEOUT_MS 15000U
 #define RIVER_ORVIBO_WS_HELLO_TIMEOUT_MS 10000U
 #define RIVER_ORVIBO_WS_HELLO_POLL_MS 20U
+#define RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS 120000U
 #define RIVER_ORVIBO_WS_SEND_BLOCK_MS 0U
 #define RIVER_ORVIBO_UPLINK_QUEUE_DEPTH 24U
 #define RIVER_ORVIBO_UPLINK_TASK_STACK (1024U * 6U)
@@ -103,6 +104,8 @@ typedef struct {
     uint32_t audio_send_fail;
     uint32_t poll_cycles;
     uint32_t close_events;
+    uint32_t channel_timeouts;
+    uint32_t last_incoming_ms;
     uint32_t sessions_opened;
     uint32_t sessions_closed;
     uint32_t errors;
@@ -123,6 +126,7 @@ typedef struct {
 static river_orvibo_protocol_context_t g_river_orvibo_protocol;
 
 static void river_orvibo_uplink_task(void *param);
+static bool river_orvibo_channel_open_locked(void);
 
 static void river_orvibo_copy_text(char *dst, size_t dst_size, const char *src)
 {
@@ -702,6 +706,8 @@ static void river_orvibo_ws_message_cb(wsclient_context **wsclient,
         data_len <= 0) {
         return;
     }
+    g_river_orvibo_protocol.last_incoming_ms =
+        (uint32_t)rtos_time_get_current_system_time_ms();
     data = (const uint8_t *)g_river_orvibo_protocol.wsclient->receivedData;
     if (opcode == BINARY_FRAME) {
         river_orvibo_handle_binary_message(data, (size_t)data_len);
@@ -720,6 +726,7 @@ static void river_orvibo_ws_close_cb(wsclient_context *wsclient, void *user_data
     g_river_orvibo_protocol.ws_closed = true;
     g_river_orvibo_protocol.session_open = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.last_incoming_ms = 0U;
     g_river_orvibo_protocol.close_events++;
     g_river_orvibo_protocol.sessions_closed++;
     river_orvibo_set_last_error("transport_closed");
@@ -739,12 +746,15 @@ static void river_orvibo_ws_close_cb(wsclient_context *wsclient, void *user_data
                             0U);
 }
 
-static void river_orvibo_close_context(void)
+static bool river_orvibo_close_context(void)
 {
     bool locked;
+    bool was_open = false;
 
     locked = river_orvibo_transport_lock();
     if (locked && g_river_orvibo_protocol.wsclient != NULL) {
+        was_open = g_river_orvibo_protocol.session_open ||
+                   g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN;
         river_ws_dispatch_unregister(g_river_orvibo_protocol.wsclient);
         if (g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN) {
             ws_close(&g_river_orvibo_protocol.wsclient);
@@ -759,8 +769,10 @@ static void river_orvibo_close_context(void)
     }
     g_river_orvibo_protocol.session_open = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.last_incoming_ms = 0U;
     g_river_orvibo_protocol.session_epoch++;
     river_orvibo_transport_unlock(locked);
+    return was_open;
 }
 
 static river_status_t river_orvibo_poll_once(uint32_t timeout_ms)
@@ -826,6 +838,61 @@ static river_status_t river_orvibo_wait_server_hello(void)
     }
 
     return RIVER_OK;
+}
+
+static bool river_orvibo_channel_timeout_reached(uint32_t now_ms, uint32_t *age_ms_out)
+{
+    bool locked;
+    bool timed_out = false;
+    uint32_t age_ms = 0U;
+
+    locked = river_orvibo_transport_lock();
+    if (locked &&
+        river_orvibo_channel_open_locked() &&
+        g_river_orvibo_protocol.last_incoming_ms != 0U) {
+        age_ms = now_ms - g_river_orvibo_protocol.last_incoming_ms;
+        timed_out = age_ms >= RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS;
+    }
+    river_orvibo_transport_unlock(locked);
+    if (age_ms_out != NULL) {
+        *age_ms_out = age_ms;
+    }
+    return timed_out;
+}
+
+static river_status_t river_orvibo_close_channel_on_timeout(void)
+{
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    uint32_t age_ms = 0U;
+    bool was_open;
+
+    if (!river_orvibo_channel_timeout_reached(now_ms, &age_ms)) {
+        return RIVER_OK;
+    }
+
+    g_river_orvibo_protocol.channel_timeouts++;
+    river_orvibo_set_last_error("channel_timeout");
+    RIVER_LOGE("channel timeout: age=%lums limit=%ums sid=%s",
+               (unsigned long)age_ms,
+               (unsigned int)RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS,
+               g_river_orvibo_protocol.session_id[0] != '\0' ?
+                   g_river_orvibo_protocol.session_id :
+                   "-");
+    was_open = river_orvibo_close_context();
+    if (was_open) {
+        g_river_orvibo_protocol.sessions_closed++;
+        river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_AUDIO_CHANNEL_CLOSED,
+                                NULL,
+                                NULL,
+                                "channel_timeout",
+                                NULL,
+                                NULL,
+                                0U,
+                                0U,
+                                0U,
+                                0U);
+    }
+    return RIVER_ERR_IO;
 }
 
 river_status_t river_orvibo_protocol_init(void)
@@ -1060,6 +1127,8 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     g_river_orvibo_protocol.session_open = true;
     g_river_orvibo_protocol.ws_closed = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.last_incoming_ms =
+        (uint32_t)rtos_time_get_current_system_time_ms();
     g_river_orvibo_protocol.session_epoch++;
     g_river_orvibo_protocol.sessions_opened++;
     river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_CONNECTED,
@@ -1092,6 +1161,11 @@ void river_orvibo_protocol_close_audio_channel(void)
 
 bool river_orvibo_protocol_audio_channel_open(void)
 {
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+
+    if (river_orvibo_channel_timeout_reached(now_ms, NULL)) {
+        return false;
+    }
     return g_river_orvibo_protocol.session_open &&
            g_river_orvibo_protocol.wsclient != NULL &&
            g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN;
@@ -1121,6 +1195,9 @@ river_status_t river_orvibo_protocol_poll(uint32_t timeout_ms)
             break;
         }
         remaining_ms -= slice_ms;
+    }
+    if (last_status == RIVER_OK) {
+        last_status = river_orvibo_close_channel_on_timeout();
     }
     return last_status;
 }
@@ -1408,8 +1485,12 @@ void river_orvibo_protocol_dump_status(void)
                                 rtos_queue_message_waiting(
                                     g_river_orvibo_protocol.uplink_queue) :
                                 0U;
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    uint32_t incoming_age_ms = g_river_orvibo_protocol.last_incoming_ms != 0U ?
+                                   now_ms - g_river_orvibo_protocol.last_incoming_ms :
+                                   0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1437,6 +1518,9 @@ void river_orvibo_protocol_dump_status(void)
                (unsigned long)g_river_orvibo_protocol.audio_send_fail,
                (unsigned long)g_river_orvibo_protocol.poll_cycles,
                (unsigned long)g_river_orvibo_protocol.close_events,
+               (unsigned long)g_river_orvibo_protocol.channel_timeouts,
+               (unsigned long)incoming_age_ms,
+               (unsigned int)RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS,
                (unsigned long)g_river_orvibo_protocol.sessions_opened,
                (unsigned long)g_river_orvibo_protocol.sessions_closed,
                (unsigned long)g_river_orvibo_protocol.errors,

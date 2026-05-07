@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.15
+- 补齐 Orvibo WebSocket 入站超时恢复：
+  - 协议层新增 `RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS=120000U`，对齐 `~/xiaozhi-esp32` 参考客户端 120 秒 channel timeout 语义。
+  - 每次收到 text/binary WebSocket 消息都会刷新 `last_incoming_ms`。
+  - steady-state `river_orvibo_protocol_poll()` 在无入站消息超过阈值后主动关闭僵尸 channel，并投递 `AUDIO_CHANNEL_CLOSED` 事件让 Orvibo app 回到 idle/recovery 路径。
+- 增强超时诊断：
+  - protocol status 输出 `timeout=` 和 `incoming_age=age/limit`。
+  - 超时时记录 `channel_timeout`，累计 `channel_timeouts`，并把 session closed 计数补齐。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo protocol 连接活性检测与状态导出。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo channel timeout grep passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.14
 - 补齐 Orvibo listening 复入控制帧闭环：
   - `speaking -> listening` 的 `tts_stop` 路径在 playback drain 后会重新发送 `listen start`，对齐参考客户端每次回到 listening 都通知服务端继续收音的行为。
