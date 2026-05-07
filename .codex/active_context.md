@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.13 收口 M1 TTS completed 双发与重复尾态（本地 build 通过，待上板）`
+  - `Step A.home-ai.14 回退不兼容的 M1 TTS deferred-write 起播（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,21 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.14 回退不兼容的 M1 TTS deferred-write 起播：
+      - 2026-05-07 13:50 最新上板日志中
+        `playback start: ... deferred=yes` 后第一次下行写入就报
+        `AudioTrack-E] write: invalid state(1)`
+      - 这已经证明当前 Ameba SDK 这条 AudioTrack 路径不支持“先 write 再真正
+        start”的预填充假设
+      - XiaoZhi M1 TTS 现在取消 `defer_start_until_prefilled`，恢复
+        `AudioTrack_Start()` 先发生的路径，优先把“完全没声音”纠正回可播放基线
+      - 后续若还要继续收短句首尾异常，方向应转为“start 后快速灌入后端”或
+        下行 worker burst 喂数，而不是再次回到 deferred-write 假设
+    - 下一步上板验证：
+      - `playback start: ... deferred=no`
+      - 不应再出现 `AudioTrack-E] write: invalid state(1)`
+      - 不应再在起播第一帧就掉进 `write_failed -> stop_rebuffer` 死循环
+      - 先确认声音恢复，再继续判断短句首尾质量
     - Step A.home-ai.13 收口 M1 TTS completed 双发与重复尾态：
       - 2026-05-07 11:43 日志中同一 `response_id/playback_id` 出现两次
         `xiaozhi playback ack completed queued/sent`

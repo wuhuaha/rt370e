@@ -178,6 +178,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 预期板端对同一 `playback_id` 只会出现一次
     `xiaozhi playback ack completed queued` 和一次
     `xiaozhi playback ack completed sent`。
+- 2026-05-07 回退不兼容的 M1 TTS deferred-write 起播：
+  - 13:50 最新上板日志中，`playback start: ... deferred=yes` 后第一次真正往
+    AudioTrack 写下行音频就报
+    `AudioTrack-E] write: invalid state(1)`，随后进入持续
+    `write_failed -> service_recover -> stop_rebuffer` 死循环，表现为完全无声。
+  - 这已经直接证明当前 Ameba SDK 这条 AudioTrack 路径不支持“先 write 再
+    start”的预填充假设；继续沿这个方向只会反复制造无声，不会解决短句质量。
+  - XiaoZhi M1 TTS 现在取消 `defer_start_until_prefilled`，恢复
+    `AudioTrack_Start()` 先发生的路径，优先把声音恢复回可播放基线。
+  - 后续若仍要继续收 cached-response 的首尾质量，应该转向“start 后快速灌入
+    后端”或 downlink worker burst 喂数，而不是再回到 deferred-write 假设。
 - 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
   - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
     `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`

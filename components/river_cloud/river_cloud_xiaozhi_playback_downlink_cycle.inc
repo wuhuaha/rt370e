@@ -17,7 +17,7 @@ static river_status_t river_cloud_xiaozhi_try_start_playback(uint32_t sample_rat
     config.playback_frame_bytes = mono_bytes * 2U;
     config.buffer_frame_count = buffer_frame_count;
     config.disable_track_reuse = true;
-    config.defer_start_until_prefilled = true;
+    config.defer_start_until_prefilled = false;
     config.volume_left = 1.0f;
     config.volume_right = 1.0f;
     config.reference_export = reference_export;

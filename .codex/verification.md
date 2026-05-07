@@ -1,3 +1,52 @@
+## Step A.home-ai.14 Verification
+
+Confirm XiaoZhi TTS no longer uses the unsupported deferred-write startup path
+that produced `AudioTrack-E] write: invalid state(1)`:
+```bash
+cd /root/ameba-river
+rg -n "defer_start_until_prefilled = false|disable_track_reuse = true" \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc
+```
+
+Expected result:
+- XiaoZhi M1 TTS keeps `disable_track_reuse = true`
+- XiaoZhi M1 TTS now sets `config.defer_start_until_prefilled = false`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-07 13:50 silent TTS case:
+```text
+重启后再次触发 `好的，空调已调到26度。` 这类 cached_response。
+```
+
+Expected result:
+- `playback start: ... deferred=no`
+- no `AudioTrack-E] write: invalid state(1)`
+- no immediate `write_failed -> stop_rebuffer` loop before any audible playback
+- board should first recover audible TTS, then any remaining short-clip quality
+  issue can be diagnosed from the new logs
+
 ## Step A.home-ai.13 Verification
 
 Confirm XiaoZhi playback completion is idempotent across terminal/drain/stop

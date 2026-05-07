@@ -1,5 +1,35 @@
 # Change Log
 
+## Step A.home-ai.14
+- 根据 2026-05-07 13:50 最新上板日志收口“完全没声音”：
+  - 日志已经明确给出根因，不再需要猜测：
+    - `playback start: ... deferred=yes`
+    - 紧接着第一次写下行音频就报 `AudioTrack-E] write: invalid state(1)`
+  - 这说明当前 Ameba SDK 这条 AudioTrack 路径并不支持“先 write 再真正 start”
+    的预填充假设；上一轮把 XiaoZhi TTS 改成 deferred-write 虽然意图是绕开
+    `underrun`，但在这块板子的真实状态机上反而直接把 TTS 变成无声。
+- 本轮端侧适配：
+  - XiaoZhi M1 TTS 取消 `defer_start_until_prefilled`，恢复 `AudioTrack_Start()`
+    先发生的路径，先把可播放声音恢复成正确基线。
+  - 保留前面已验证有效的两项修复：
+    - `disable_track_reuse = true`
+    - completed ACK 幂等 / 队列去重
+  - 结论更新：
+    - 这块 SDK 上“预填充后再 start”不是可行策略；
+    - 后续若还要继续收短句首尾异常，应改为“start 后快速灌入后端”或下行
+      worker burst 喂数，而不是再次回到 deferred-write 假设。
+- 目标日志变化：
+  - 不应再出现 `playback start: ... deferred=yes`
+  - 不应再出现 `AudioTrack-E] write: invalid state(1)`
+  - 应先恢复到“能出声”的基线，再继续观察是否还存在短句重复/截断
+- Verification for this step:
+  - Step A.home-ai.14 `rg` verification matched
+    `config.defer_start_until_prefilled = false` for XiaoZhi TTS.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.13
 - 在 Step A.home-ai.12 的“预填充后启动”基础上，再次按 2026-05-07 11:43/11:44
   日志收口容易反复出现的同类问题，而不是继续只追单点现象：
