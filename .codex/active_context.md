@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.15 补齐 Orvibo WebSocket 入站超时恢复（SDK 构建通过）`
+  - `Step H.xiaozhi-client.16 硬化 Orvibo access 真实设备身份 ready 判定（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.16` hardens Orvibo access identity before XiaoZhi-compatible auth:
+  - access `ready` now requires both websocket config and a valid refreshed STA MAC identity.
+  - `river_orvibo_access_refresh()` refreshes Device-Id/Client-Id from the runtime STA MAC before OTA/config.
+  - unavailable or invalid STA MAC records `sta_mac_unavailable` and blocks access refresh instead of using an all-zero identity for OTA/WebSocket auth.
+  - access status reports `identity=ready|waiting_mac`.
+  - VAD, KWS, KWS parity tooling, AEC, and BF paths are unchanged.
 - `Step H.xiaozhi-client.15` adds XiaoZhi-compatible inbound channel timeout handling:
   - protocol tracks the last inbound WebSocket message timestamp.
   - `river_orvibo_protocol_poll()` closes channels that have no inbound messages for 120 seconds and emits `AUDIO_CHANNEL_CLOSED`.
@@ -144,6 +150,7 @@ or top-of-tree verification target changes.
   - Orvibo downlink playback sample-rate adapter grep
   - Orvibo listen re-entry / abort reason / speaking KWS gate grep
   - Orvibo channel timeout grep
+  - Orvibo access identity grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`

@@ -1,3 +1,44 @@
+## Step H.xiaozhi-client.16 Verification
+
+Confirm Orvibo access does not use a placeholder MAC identity for server auth:
+```bash
+cd /root/ameba-river
+rg -n "identity_ready|sta_mac_unavailable|access identity refreshed|refresh_identity|read_sta_mac|ready = .*websocket_configured|identity=|Device-Id|Client-Id" \
+  components/river_cloud/river_orvibo_access.c \
+  include/river/river_orvibo_access.h
+```
+
+Expected result:
+- access `ready` is gated by both `websocket_configured` and `identity_ready`.
+- `river_orvibo_access_refresh()` refreshes STA MAC identity before OTA/config.
+- unavailable/invalid STA MAC records `sta_mac_unavailable` and blocks access refresh.
+- access status reports `identity=ready|waiting_mac`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后观察启动、Wi-Fi 连接、OTA/config 刷新和 `river orvibo status`。
+```
+
+Expected result:
+- Wi-Fi 未提供有效 STA MAC 前 access 不进入 ready，日志可见 `identity=waiting_mac` 或 `sta_mac_unavailable`。
+- Wi-Fi 可用后日志出现 `access identity refreshed: device_id=... client_id=...`。
+- 后续 OTA/config 与 WebSocket 握手使用非全零 `Device-Id` / `Client-Id`。
+
 ## Step H.xiaozhi-client.15 Verification
 
 Confirm Orvibo protocol tracks and recovers from stale WebSocket channels:

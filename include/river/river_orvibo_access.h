@@ -9,6 +9,7 @@
 
 typedef struct {
     bool ready;
+    bool identity_ready;
     bool websocket_configured;
     bool used_ota;
     bool activation_required;

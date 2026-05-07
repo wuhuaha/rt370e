@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.16` 已硬化 Orvibo access 真实设备身份 ready 判定：
+  - access `ready` 现在要求 `websocket_configured` 与有效 STA MAC 身份同时成立。
+  - `river_orvibo_access_refresh()` 在 OTA/config 前刷新真实 STA MAC 生成的 `Device-Id` / `Client-Id`。
+  - 若 Wi-Fi/netif 仍未提供有效 STA MAC，则记录 `sta_mac_unavailable` 并阻止 OTA/WS 鉴权使用全零身份。
+  - access status 输出 `identity=ready|waiting_mac`，便于板端确认烧录后使用的真实身份。
+  - VAD、KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF 保护区不变。
+  - 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.15` 已补齐 Orvibo WebSocket 入站超时恢复：
   - 协议层记录最近一次入站 WebSocket text/binary 消息时间。
   - `river_orvibo_protocol_poll()` 对 120 秒无入站消息的僵尸通道主动关闭，并投递 `AUDIO_CHANNEL_CLOSED`。
@@ -1135,12 +1142,16 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 协议层记录最近一次入站 WebSocket 消息时间，对齐参考客户端 120 秒 channel timeout。
   - `river_orvibo_protocol_poll()` 会关闭超时通道并投递 `AUDIO_CHANNEL_CLOSED`，避免本地停在僵尸 listening/speaking。
   - protocol status 输出 `timeout=` 与 `incoming_age=age/limit`。
+- `Step H.xiaozhi-client.16`：
+  - access ready 增加真实 STA MAC 身份门控，避免启动早期全零 MAC 进入 OTA/WS 鉴权。
+  - OTA/config 刷新前重新生成 `Device-Id` / `Client-Id`；无有效 STA MAC 时记录 `sta_mac_unavailable` 并返回 busy。
+  - access status 输出 `identity=ready|waiting_mac`。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout|identity_ready|sta_mac_unavailable|access identity refreshed" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1151,9 +1162,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环和 WebSocket 入站超时恢复，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/多轮 listening/channel timeout/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复和 access 真实身份门控。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/多轮 listening/channel timeout/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。

@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.16
+- 硬化 Orvibo access 身份生成与 ready 判定：
+  - access 层新增 `identity_ready`，`ready` 现在要求 WebSocket 配置已存在且 STA MAC 已刷新为有效真实值。
+  - 启动早期如果 LwIP netif 尚未提供有效 MAC，会保留占位身份但不允许进入 OTA/WS 鉴权 ready。
+  - `river_orvibo_access_refresh()` 在发起 OTA/config 前重新读取 STA MAC；若仍拿不到有效 MAC，返回 busy 并记录 `sta_mac_unavailable`，避免使用全零 `Device-Id` / `Client-Id` 绑定服务器身份。
+- 增强板端诊断：
+  - access status 输出 `identity=ready|waiting_mac`。
+  - MAC 从占位刷新为真实身份时输出 `access identity refreshed`，便于烧录后确认 OTA/WS 使用的实际设备身份。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo access 鉴权身份前置条件和诊断输出。
+- Verification for this step:
+  - Orvibo access identity grep passed.
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` SDK build completed with `Build done`.
+
 ## Step H.xiaozhi-client.15
 - 补齐 Orvibo WebSocket 入站超时恢复：
   - 协议层新增 `RIVER_ORVIBO_WS_CHANNEL_TIMEOUT_MS=120000U`，对齐 `~/xiaozhi-esp32` 参考客户端 120 秒 channel timeout 语义。

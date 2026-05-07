@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
     bool initialized;
     bool ready;
+    bool identity_ready;
     bool websocket_configured;
     bool used_ota;
     bool activation_required;
@@ -100,15 +101,49 @@ static uint32_t river_orvibo_access_fnv1a32(const uint8_t *data, size_t bytes, u
     return hash;
 }
 
-static void river_orvibo_access_build_device_id(char *buffer, size_t buffer_size)
+static bool river_orvibo_access_mac_valid(const uint8_t *mac)
 {
-    uint8_t *mac;
+    bool any_nonzero = false;
+    bool any_not_ff = false;
+    size_t index;
 
+    if (mac == NULL) {
+        return false;
+    }
+    for (index = 0U; index < 6U; ++index) {
+        if (mac[index] != 0U) {
+            any_nonzero = true;
+        }
+        if (mac[index] != 0xFFU) {
+            any_not_ff = true;
+        }
+    }
+    return any_nonzero && any_not_ff;
+}
+
+static bool river_orvibo_access_read_sta_mac(uint8_t mac[6])
+{
+    uint8_t *netif_mac;
+
+    if (mac == NULL) {
+        return false;
+    }
+    netif_mac = LwIP_GetMAC(NETIF_WLAN_STA_INDEX);
+    if (!river_orvibo_access_mac_valid(netif_mac)) {
+        return false;
+    }
+    memcpy(mac, netif_mac, 6U);
+    return true;
+}
+
+static void river_orvibo_access_format_device_id(const uint8_t mac[6],
+                                                 char *buffer,
+                                                 size_t buffer_size)
+{
     if (buffer == NULL || buffer_size == 0U) {
         return;
     }
-    mac = LwIP_GetMAC(NETIF_WLAN_STA_INDEX);
-    if (mac == NULL) {
+    if (!river_orvibo_access_mac_valid(mac)) {
         snprintf(buffer, buffer_size, "%s", "00:00:00:00:00:00");
         return;
     }
@@ -123,9 +158,10 @@ static void river_orvibo_access_build_device_id(char *buffer, size_t buffer_size
              mac[5]);
 }
 
-static void river_orvibo_access_build_client_id(char *buffer, size_t buffer_size)
+static void river_orvibo_access_build_client_id_from_mac(const uint8_t mac[6],
+                                                         char *buffer,
+                                                         size_t buffer_size)
 {
-    uint8_t *mac;
     uint8_t uuid[16];
     uint32_t hash_words[4];
     size_t index;
@@ -133,8 +169,7 @@ static void river_orvibo_access_build_client_id(char *buffer, size_t buffer_size
     if (buffer == NULL || buffer_size == 0U) {
         return;
     }
-    mac = LwIP_GetMAC(NETIF_WLAN_STA_INDEX);
-    if (mac == NULL) {
+    if (!river_orvibo_access_mac_valid(mac)) {
         static uint8_t zero_mac[6] = {0U, 0U, 0U, 0U, 0U, 0U};
         mac = zero_mac;
     }
@@ -169,6 +204,48 @@ static void river_orvibo_access_build_client_id(char *buffer, size_t buffer_size
              uuid[13],
              uuid[14],
              uuid[15]);
+}
+
+static bool river_orvibo_access_refresh_identity(void)
+{
+    uint8_t mac[6];
+    char device_id[RIVER_ORVIBO_ACCESS_DEVICE_ID_MAX];
+    char client_id[RIVER_ORVIBO_ACCESS_CLIENT_ID_MAX];
+
+    if (!river_orvibo_access_read_sta_mac(mac)) {
+        if (g_river_orvibo_access.device_id[0] == '\0') {
+            static const uint8_t zero_mac[6] = {0U, 0U, 0U, 0U, 0U, 0U};
+
+            river_orvibo_access_format_device_id(zero_mac,
+                                                 g_river_orvibo_access.device_id,
+                                                 sizeof(g_river_orvibo_access.device_id));
+            river_orvibo_access_build_client_id_from_mac(
+                zero_mac,
+                g_river_orvibo_access.client_id,
+                sizeof(g_river_orvibo_access.client_id));
+        }
+        g_river_orvibo_access.identity_ready = false;
+        g_river_orvibo_access.ready = false;
+        river_orvibo_access_set_error("sta_mac_unavailable");
+        return false;
+    }
+
+    river_orvibo_access_format_device_id(mac, device_id, sizeof(device_id));
+    river_orvibo_access_build_client_id_from_mac(mac, client_id, sizeof(client_id));
+    if (strcmp(g_river_orvibo_access.device_id, device_id) != 0 ||
+        strcmp(g_river_orvibo_access.client_id, client_id) != 0) {
+        RIVER_LOGI("access identity refreshed: device_id=%s client_id=%s",
+                   device_id,
+                   client_id);
+        river_orvibo_access_copy(g_river_orvibo_access.device_id,
+                                 sizeof(g_river_orvibo_access.device_id),
+                                 device_id);
+        river_orvibo_access_copy(g_river_orvibo_access.client_id,
+                                 sizeof(g_river_orvibo_access.client_id),
+                                 client_id);
+    }
+    g_river_orvibo_access.identity_ready = true;
+    return true;
 }
 
 static river_status_t river_orvibo_access_parse_http_url(const char *url,
@@ -458,7 +535,8 @@ static void river_orvibo_access_update_ready(void)
         g_river_orvibo_access.ready = false;
         return;
     }
-    g_river_orvibo_access.ready = g_river_orvibo_access.websocket_configured;
+    g_river_orvibo_access.ready = g_river_orvibo_access.websocket_configured &&
+                                  g_river_orvibo_access.identity_ready;
 }
 
 static river_status_t river_orvibo_access_check_version_once(void)
@@ -597,10 +675,7 @@ river_status_t river_orvibo_access_init(void)
     river_orvibo_access_copy(g_river_orvibo_access.ota_url,
                              sizeof(g_river_orvibo_access.ota_url),
                              RIVER_ORVIBO_OTA_URL);
-    river_orvibo_access_build_device_id(g_river_orvibo_access.device_id,
-                                        sizeof(g_river_orvibo_access.device_id));
-    river_orvibo_access_build_client_id(g_river_orvibo_access.client_id,
-                                        sizeof(g_river_orvibo_access.client_id));
+    (void)river_orvibo_access_refresh_identity();
     g_river_orvibo_access.websocket_configured = river_orvibo_access_static_config_usable();
     river_orvibo_access_update_ready();
     if (!g_river_orvibo_access.ready) {
@@ -624,6 +699,10 @@ river_status_t river_orvibo_access_refresh(void)
     }
     if (!river_wifi_station_is_connected()) {
         river_orvibo_access_set_error("wifi_not_connected");
+        return RIVER_ERR_BUSY;
+    }
+    if (!river_orvibo_access_refresh_identity()) {
+        RIVER_LOGW("access refresh blocked: valid STA MAC unavailable");
         return RIVER_ERR_BUSY;
     }
     g_river_orvibo_access.attempts++;
@@ -684,6 +763,7 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
     (void)river_orvibo_access_init();
     memset(status, 0, sizeof(*status));
     status->ready = g_river_orvibo_access.ready;
+    status->identity_ready = g_river_orvibo_access.identity_ready;
     status->websocket_configured = g_river_orvibo_access.websocket_configured;
     status->used_ota = g_river_orvibo_access.used_ota;
     status->activation_required = g_river_orvibo_access.activation_required;
@@ -704,8 +784,9 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
 void river_orvibo_access_dump_status(void)
 {
     (void)river_orvibo_access_init();
-    RIVER_LOGI("orvibo access: ready=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
+    RIVER_LOGI("orvibo access: ready=%s identity=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
                g_river_orvibo_access.ready ? "yes" : "no",
+               g_river_orvibo_access.identity_ready ? "ready" : "waiting_mac",
                g_river_orvibo_access.websocket_configured ? "yes" : "no",
                g_river_orvibo_access.used_ota ? "yes" : "no",
                g_river_orvibo_access.activation_required ? "required" : "none",
