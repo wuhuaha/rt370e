@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.8 收敛 Orvibo 音频通道打开失败 backoff（SDK 构建通过）`
+  - `Step H.xiaozhi-client.9 收敛 Orvibo TTS 下行播放 backpressure（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.9` hardens Orvibo TTS downlink playback backpressure:
+  - TTS playback buffer uses 16 frames to absorb common bursty downlink.
+  - each decoded downlink frame checks playback SDK buffer occupancy before writing.
+  - frames that would exceed 85% high-water are dropped with `bp_drop` diagnostics instead of blocking the app task.
+  - audio status reports backpressure drops, high-water, and playback buffer occupancy.
 - `Step H.xiaozhi-client.8` backs off failed Orvibo audio-channel opens:
   - failed `open_audio_channel` schedules capped exponential backoff and keeps one pending wake retry.
   - backoff suppresses immediate repeated open attempts and returns the app through recoverable recovery.
@@ -101,6 +106,7 @@ or top-of-tree verification target changes.
   - Orvibo protocol control failure grep
   - Orvibo WebSocket poll/send serialization grep
   - Orvibo connect retry/backoff grep
+  - Orvibo TTS playback backpressure grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -110,7 +116,6 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
-  - downlink playback/backpressure board validation
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - wake/listen/speak/barge-in state-machine verification

@@ -15652,3 +15652,16 @@
 - Verification for this step:
   - `git diff --check` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.9
+- 收敛 Orvibo TTS 下行播放 backpressure：
+  - TTS playback buffer 从 12 帧提高到 16 帧，利用当前板端更充足内存吸收常见服务端下行 burst。
+  - 每个 downlink Opus 包解码后、写入 playback 前读取 `river_playback_service` SDK buffer 状态。
+  - 当写入下一帧会超过 playback buffer 85% 高水位时，丢弃该下行帧并返回 busy，而不是让 app 任务阻塞在 AudioTrack 写入。
+  - audio diag/status 新增 `bp_drop`、`bp_high`、`buf=buffered/size`，用于上板观察播放侧背压。
+- 设计边界：
+  - 不修改当前 VAD、KWS、AEC/BF，也不改 Opus 协议帧格式。
+  - 只在 playback 高水位时丢弃下行帧；正常缓冲区余量充足时仍按原路径写入 playback/reference。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

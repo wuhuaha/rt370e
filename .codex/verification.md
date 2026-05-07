@@ -25895,3 +25895,52 @@ Expected result:
 - retry backoff grows instead of tight-looping WebSocket open attempts
 - no retry is posted before Wi-Fi and access are ready
 - once the server is reachable, the pending wake retries, opens the channel, clears streak, and continues into hello/listen
+
+## Step H.xiaozhi-client.9 - playback backpressure on TTS downlink
+
+Confirm TTS playback uses a larger buffer and drops only when playback is near
+the high-water mark:
+```bash
+cd /root/ameba-river
+rg -n "DOWNLINK_BUFFER_HIGH_WATER|TTS_BUFFER_FRAMES|downlink_backpressure|drop downlink by playback backpressure|bp_drop" \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- TTS buffer frame count is owned by `RIVER_ORVIBO_TTS_BUFFER_FRAMES`
+- backpressure is checked before `river_playback_service_write(...)`
+- audio status includes `bp_drop`, `bp_high`, and playback buffer occupancy
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Trigger a long TTS response and a server-side bursty response if available.
+2. Run `orvibo status` during playback.
+3. Interrupt with wake/barge-in while TTS is still receiving downlink audio.
+```
+
+Expected result:
+- app control remains responsive during TTS bursts
+- normal playback has `bp_drop=0` or low
+- if server outruns playback, `bp_drop` increments and `drop downlink by playback backpressure` appears without wedging state/control queues

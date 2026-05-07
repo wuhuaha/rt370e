@@ -1075,12 +1075,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - pending retry 只在 `idle + Wi-Fi connected + access ready` 时到期触发。
   - 成功打开通道或 Wi-Fi lost 会清空 retry/backoff 状态。
   - app status 输出 `orvibo connect: ok/fail retry/streak/next/posted/suppressed`。
+- `Step H.xiaozhi-client.9`：
+  - TTS playback buffer 从 12 帧提升到 16 帧，吸收常见服务端下行 burst。
+  - 每个 downlink Opus 包解码后、写入 playback 前检查 playback SDK buffer occupancy。
+  - 当下一帧会超过 85% 高水位时丢弃该下行帧并返回 busy，避免 app 任务被 AudioTrack 写入阻塞。
+  - audio diag/status 输出 `bp_drop`、`bp_high`、`buf=buffered/size`。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1091,9 +1096,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化和连接失败 backoff，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理下行播放背压和板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff 和 TTS 播放背压防护，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
