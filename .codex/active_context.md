@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.16 收口 XiaoZhi 音频链路的稳定性优先策略（本地 build 通过，待上板）`
+  - `Step A.home-ai.17 按 M1 单轮 client-commit 合同继续收紧播放尾态与缓冲（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,33 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
     - newest active adaptation slice:
+    - Step A.home-ai.17 按 M1 单轮 client-commit 合同继续收紧播放尾态与缓冲：
+      - 服务侧当前 M1 规范已经明确：
+        - `client_wakeup_client_commit`
+        - `preview_events=false`
+        - `server_endpointing=false`
+        - 单连接单 turn
+      - 板端此前仍保留 empty-turn followup reopen / transport-closed
+        followup recover 这类多轮恢复旁路；在短 TTS 尾态不干净时，容易把
+        问题放大成 stale output / followup reopen blocked
+      - 端侧本轮改为：
+        - 在 `no preview + no server endpoint` 的当前 discovery 组合下，
+          明确进入 M1 单轮保守模式
+        - 禁用 empty-turn followup recover
+        - 服务端若回到 `active + output_state=idle` 且本地没有形成播放闭环，
+          直接按 `response_audio_abandoned` 单轮收口，不再 reopen listen
+        - 同时把 downlink poll、起播门槛、startup burst、rebuffer 门槛、
+          starved 容忍和 backend buffer 全部往稳定优先方向上调
+      - 这一步的目标是继续压掉：
+        - 起播头噪
+        - 尾部 underrun / 尾音被切
+        - 播放已结束但会话残留在 active/speaking 的假状态
+    - 下一步上板验证：
+      - `playback start: ... start=20 ... buffer=24`
+      - 若服务端尾态仍有 `active + output_state=idle`，板端应直接单轮收口，
+        不应再继续 empty-turn followup reopen
+      - 不应再反复出现 `followup reopen blocked`
+      - 短 cached-response 句尾不应再出现裸 `underrun`
     - Step A.home-ai.16 收口 XiaoZhi 音频链路的稳定性优先策略：
       - 当前最容易反复制造假象的两个不稳点不在服务端，而在板端策略本身：
         - uplink 在拥塞时会主动 trim stale audio，并在 ring 满后覆盖掉最老帧

@@ -1,3 +1,59 @@
+## Step A.home-ai.17 Verification
+
+Confirm M1 now treats the current service contract as a strict single-turn
+client-commit path, and that playback startup / tail handling is tuned for
+stability over latency:
+```bash
+cd /root/ameba-river
+rg -n "DOWNLINK_POLL_MS|DOWNLINK_START_FRAMES|DOWNLINK_STARTUP_BURST_MAX|DOWNLINK_REBUFFER_START_FRAMES|DOWNLINK_STARVED_REBUFFER_MS|PLAYBACK_BUFFER_FRAMES|single-turn output idle forced close|m1_single_turn_followup_disabled" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- downlink poll / start / rebuffer / buffer thresholds are all raised toward
+  continuity-first values
+- the session path has explicit M1 single-turn gating
+- M1 output-idle tail cleanup can log
+  `xiaozhi single-turn output idle forced close: ...`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the current short-response TTS cases:
+```text
+1. 触发 `你想让我帮你控制什么设备？`
+2. 再触发 `好的，空调已调到26度。`
+```
+
+Expected result:
+- 起播前日志会显示更保守的 `start=20` 和更大的 `buffer=24`
+- 若尾态没有真实可播音频，不应再进入 empty-turn followup reopen
+- 不应再反复出现 `followup reopen blocked`
+- 尾部不应再出现裸 `underrun` 导致句尾被切掉
+- 若服务端尾态仍回 `active + output_state=idle`，板端应直接单轮收口，
+  而不是继续 reopen listen
+
 ## Step A.home-ai.16 Verification
 
 Confirm the XiaoZhi audio path now prefers continuity over silent dropping and

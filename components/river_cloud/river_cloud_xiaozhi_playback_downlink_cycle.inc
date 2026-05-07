@@ -98,8 +98,10 @@ static river_status_t river_cloud_xiaozhi_start_playback_if_needed(uint32_t samp
         g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left =
             start_gate.start_frames;
     }
-    if (g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left > 4U) {
-        g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left = 4U;
+    if (g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left >
+        RIVER_CLOUD_XIAOZHI_DOWNLINK_STARTUP_BURST_MAX) {
+        g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left =
+            RIVER_CLOUD_XIAOZHI_DOWNLINK_STARTUP_BURST_MAX;
     }
     RIVER_LOGI("xiaozhi playback start: %luHz frame=%lums mono=%luB queued=%lu start=%u policy=%s cautious=%s target_ms=%u prefetch_frames=%u mode=%s buffer=%u gain=%d/%d from_backend=%s rebuffer=%s/%s",
                (unsigned long)sample_rate,

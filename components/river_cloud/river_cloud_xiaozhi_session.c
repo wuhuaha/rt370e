@@ -21,6 +21,7 @@ static void river_cloud_xiaozhi_clear_empty_turn_returned_active_state(void);
 static void river_cloud_xiaozhi_clear_accepted_response_watchdog(void);
 static bool river_cloud_xiaozhi_response_start_pending(void);
 static bool river_cloud_xiaozhi_try_recover_empty_turn_followup(void);
+static bool river_cloud_xiaozhi_m1_single_turn_followup_disabled(void);
 
 bool river_cloud_xiaozhi_full_duplex_experiment_enabled(void)
 {
@@ -1409,6 +1410,10 @@ static bool river_cloud_xiaozhi_empty_turn_followup_recover_pending(
     uint64_t now_ms,
     uint64_t *recover_left_ms)
 {
+    if (river_cloud_xiaozhi_m1_single_turn_followup_disabled()) {
+        return false;
+    }
+
     if (!g_river_cloud.xiaozhi_session_window_truth.window_active ||
         g_river_cloud.xiaozhi_session_window_truth.empty_turn_recover_deadline_ms == 0U ||
         g_river_cloud.stream_active || river_cloud_xiaozhi_playback_turn_active() ||
@@ -2177,6 +2182,12 @@ const char *river_cloud_xiaozhi_current_sid(void)
                river_xiaozhi_session_id();
 }
 
+static bool river_cloud_xiaozhi_m1_single_turn_followup_disabled(void)
+{
+    return !river_xiaozhi_discovery_server_endpoint_enabled() &&
+           !river_xiaozhi_preview_events_negotiated();
+}
+
 static bool river_cloud_xiaozhi_input_state_server_committed(const char *input_state)
 {
     return input_state != NULL && strcmp(input_state, "committed") == 0;
@@ -2333,6 +2344,17 @@ static void river_cloud_xiaozhi_clear_response_audio_wait_if_returned_active(
                    trigger != NULL ? trigger : "-",
                    session_state,
                    (state != NULL && state->output_state[0] != '\0') ? state->output_state : "-");
+        return;
+    }
+
+    if (river_cloud_xiaozhi_m1_single_turn_followup_disabled()) {
+        RIVER_LOGW("xiaozhi single-turn output idle forced close: trigger=%s session_state=%s output_state=%s",
+                   trigger != NULL ? trigger : "-",
+                   session_state,
+                   (state != NULL && state->output_state[0] != '\0') ?
+                       state->output_state :
+                       "-");
+        river_cloud_xiaozhi_recover_response_audio_abandoned(trigger, state);
         return;
     }
 

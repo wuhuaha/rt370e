@@ -1,5 +1,40 @@
 # Change Log
 
+## Step A.home-ai.17
+- 按最新服务侧 M1 文档把板端再收紧一轮，明确优先级是“先别错，再谈快”：
+  - 服务侧当前主线已经明确是：
+    - `client_wakeup_client_commit`
+    - `preview_events=false`
+    - `server_endpointing=false`
+    - 单连接单 turn
+  - 板端若还保留 empty-turn followup reopen、transport-closed followup recover
+    这类多轮恢复旁路，就会在尾态残留时把问题放大成：
+    - stale output guard
+    - followup reopen blocked
+    - 播放已结束但会话还卡在 active / speaking
+- 本轮收口两件事：
+  - M1 单轮保守化：
+    - 新增本地判断：当 discovery 仍是 `no preview + no server endpoint` 时，
+      视为 M1 单轮 client-commit 模式
+    - 在该模式下禁用 empty-turn followup recover
+    - 若服务端回到 `active + output_state=idle` 但本地又没有形成可闭环播放，
+      直接按 `response_audio_abandoned` 收口，而不是继续 reopen listen
+  - TTS 下行缓冲改成更保守的稳定优先配置：
+    - downlink poll 从 `5ms` 收到 `2ms`
+    - 起播门槛从 `16` 帧提高到 `20` 帧
+    - startup burst 上限从 `8` 提到 `10` 帧
+    - rebuffer 重起播门槛从 `28` 提到 `36` 帧
+    - starved rebuffer 等待从 `240ms` 提到 `320ms`
+    - playback backend buffer 从 `16/12` 提到 `24/16`
+- 这一步的目标不是追最低起播时延，而是优先压掉：
+  - 起播头噪
+  - 尾部 underrun
+  - 播放结束后的 stale/followup 乱状态
+- Verification for this step:
+  - `git diff --check` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.16
 - 按“稳定可靠 > 实时性 > CPU > 内存”的优先级，对 XiaoZhi 整条音频链路做一轮系统性收敛，先收两条最会反复制造假象的高风险路径，而不是继续在单点日志上来回补丁：
   - 上行 ASR 音频链路此前默认偏“低延迟优先”：
