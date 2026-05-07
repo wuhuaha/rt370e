@@ -1,3 +1,30 @@
+## Step A.xiaozhi-client.2 Verification
+
+Confirm the clean-slate plan now protects only the current VAD and KWS
+implementations, while allowing the rest of the branch to be rebuilt:
+```bash
+cd /root/ameba-river
+rg -n "硬保护边界|可推倒边界|river_voice_detector|river_voice_kws|river_cloud_adapter.c|river_dialog_runtime.c|session_coordinator|volume-only|Clean-Slate" \
+  doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/changes.md
+```
+
+Expected result:
+- the plan names VAD and KWS as the protected implementation boundary
+- the plan names old cloud/provider/dialog modules as removable live code
+- the next implementation step is to decouple VAD/KWS before rebuilding the
+  XiaoZhi-only mainline
+
+Run Codex harness validation because repo-level planning files changed:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits with `check_codex_harness: all checks passed`
+
 ## Step A.xiaozhi-client.1 Verification
 
 Confirm the repository now tracks a XiaoZhi-only aggressive rearchitecture plan

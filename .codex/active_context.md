@@ -15,15 +15,31 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.xiaozhi-client.1 建立 XiaoZhi-only 激进重构执行计划（规划/harness 校验通过）`
+  - `Step A.xiaozhi-client.2 强化 clean-slate 重构计划，仅保护当前 VAD/KWS 实现（规划/harness 校验通过）`
 - Current active objective:
-  - Re-architect this branch into a XiaoZhi-only device client aligned with `~/xiaozhi-esp32`, while reusing the current local VAD/AEC/KWS/BF stack.
+  - Rebuild this branch as a XiaoZhi-only device client aligned with `~/xiaozhi-esp32`; the only protected voice implementations are the current VAD and wake-word recognition paths.
 - Active plan:
   - `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active rearchitecture refinement:
+    - Step A.xiaozhi-client.2 强化 clean-slate 重构计划：
+      - 用户进一步明确：
+        - 当前 VAD 必须保留
+        - 当前唤醒词识别必须保留
+        - 其他内容都可以在该分支彻底推倒重来
+      - 本轮已把执行计划从“激进重构”收紧成 clean-slate 合同：
+        - 硬保护边界只包含：
+          - `river_voice_detector*`
+          - `generated/river_silero_vad_model_data.*`
+          - `river_voice_kws*`
+          - KWS tensor dump / alignment replay / parity 工具链
+        - AEC、BF、playback service、cloud、dialog、online_control 不再是保护对象
+        - 后续 live CMake 需要移除旧
+          `cloud_adapter / provider / dialog_runtime / session_coordinator`
+        - 下一步应先解耦 VAD/KWS 对旧对话运行时的依赖，再建立新的最小 XiaoZhi 主干
     - newest active rearchitecture slice:
     - Step A.xiaozhi-client.1 建立 XiaoZhi-only 激进重构执行计划：
       - 这次分支目标已经改变，不再以 `/root/home_ai_server` M1 适配为主线

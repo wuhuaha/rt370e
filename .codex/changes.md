@@ -1,5 +1,30 @@
 # Change Log
 
+## Step A.xiaozhi-client.2
+- 根据新的约束重新审视并强化 XiaoZhi 专用重构计划：
+  - 用户明确要求保留当前项目的 VAD 和唤醒词识别实现
+  - 其他内容都可以在该分支彻底推倒重来
+- 本轮把计划从“激进重构”改成更硬的 clean-slate 合同：
+  - 硬保护边界只保留：
+    - `river_voice_detector*`
+    - `generated/river_silero_vad_model_data.*`
+    - `river_voice_kws*`
+    - KWS tensor dump / alignment replay / parity 工具链
+  - AEC、BF、播放服务、cloud、dialog、online_control 都不再作为保护对象
+  - 如果后续保留其中某些实现，只能是因为它们适合新主干，而不是因为迁移成本
+- 计划新增了彻底重构的负向验收：
+  - live CMake 不再编译 `river_cloud_adapter.c`
+  - live CMake 不再编译 Iflytek/provider 源文件
+  - live CMake 不再编译旧 `dialog_runtime/session_coordinator`
+  - 新主干不再依赖旧 `river_dialog_runtime.h / river_dialog_cloud_port.h /
+    river_interaction_state.h`
+- 后续执行顺序也调整为：
+  - 先解耦受保护 VAD/KWS
+  - 再建立新的最小 XiaoZhi 编译主干
+  - 然后重建 protocol、AudioService 风格音频链路和 volume-only MCP
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed。
+
 ## Step A.xiaozhi-client.1
 - 为当前 `xiaozhi-client` 分支建立新的主目标，不再把现有工作定义成
   `/root/home_ai_server` M1 兼容收口，而是明确切到：
