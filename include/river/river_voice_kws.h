@@ -24,6 +24,9 @@ river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                                             size_t bytes,
                                             bool vad_valid,
                                             bool is_speech);
+void river_voice_kws_set_detection_gate(bool allowed, const char *block_reason);
+bool river_voice_kws_detection_gate_allowed(void);
+const char *river_voice_kws_detection_gate_block_reason(void);
 void river_voice_kws_set_local_debug_mode(bool enabled);
 bool river_voice_kws_local_debug_mode_enabled(void);
 const char *river_voice_kws_wake_handoff_block_reason(void);

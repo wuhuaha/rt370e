@@ -23,8 +23,6 @@ extern "C" {
 #include "os_wrapper.h"
 #include "real_fft.h"
 #include "river/river_audio_frame_ring.h"
-#include "river/river_dialog_runtime.h"
-#include "river/river_interaction_state.h"
 #include "river/river_log.h"
 #include "river/river_voice.h"
 #include "river/river_voice_kws.h"
@@ -785,6 +783,8 @@ typedef struct {
 static river_voice_kws_context_t *g_river_voice_kws;
 static void *g_river_voice_kws_allocation;
 static bool g_river_voice_kws_allocation_from_heap_types;
+static bool g_river_voice_kws_detection_gate_allowed = true;
+static char g_river_voice_kws_detection_gate_reason[32] = "allowed";
 static const char g_river_voice_kws_text[] = "小欧管家";
 
 static inline uint8_t river_voice_kws_clamp_u8(int value)
@@ -2477,7 +2477,18 @@ static void river_voice_kws_reset_frontend(river_voice_kws_context_t *context)
 
 static bool river_voice_kws_detection_allowed(void)
 {
-    return river_dialog_runtime_allows_wakeword_detection();
+    return g_river_voice_kws_detection_gate_allowed;
+}
+
+static const char *river_voice_kws_detection_block_reason(void)
+{
+    if (g_river_voice_kws_detection_gate_allowed) {
+        return NULL;
+    }
+    if (g_river_voice_kws_detection_gate_reason[0] == '\0') {
+        return "blocked";
+    }
+    return g_river_voice_kws_detection_gate_reason;
 }
 
 static bool river_voice_kws_needs_disarm_for_detection_block(
@@ -4251,6 +4262,37 @@ extern "C" bool river_voice_kws_active(void)
     return g_river_voice_kws != NULL && g_river_voice_kws->initialized;
 }
 
+extern "C" void river_voice_kws_set_detection_gate(bool allowed,
+                                                   const char *block_reason)
+{
+    g_river_voice_kws_detection_gate_allowed = allowed;
+    if (allowed) {
+        strncpy(g_river_voice_kws_detection_gate_reason,
+                "allowed",
+                sizeof(g_river_voice_kws_detection_gate_reason) - 1U);
+    } else if (block_reason != NULL && block_reason[0] != '\0') {
+        strncpy(g_river_voice_kws_detection_gate_reason,
+                block_reason,
+                sizeof(g_river_voice_kws_detection_gate_reason) - 1U);
+    } else {
+        strncpy(g_river_voice_kws_detection_gate_reason,
+                "orvibo_post_wake",
+                sizeof(g_river_voice_kws_detection_gate_reason) - 1U);
+    }
+    g_river_voice_kws_detection_gate_reason
+        [sizeof(g_river_voice_kws_detection_gate_reason) - 1U] = '\0';
+}
+
+extern "C" bool river_voice_kws_detection_gate_allowed(void)
+{
+    return river_voice_kws_detection_allowed();
+}
+
+extern "C" const char *river_voice_kws_detection_gate_block_reason(void)
+{
+    return river_voice_kws_detection_block_reason();
+}
+
 extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                                                        size_t bytes,
                                                        bool vad_valid,
@@ -4599,8 +4641,6 @@ extern "C" river_status_t river_voice_kws_dump_tensor_chunk(
 
 extern "C" void river_voice_kws_dump_alignment_status(void)
 {
-    river_interaction_state_t interaction_state = river_interaction_state_get();
-
     RIVER_LOGI("kws align sample: source=compiled_pcm frame_samples=%u frames=%u duration_ms=%lu pre_silence_frames=%u tail_silence_frames=%u",
                (unsigned int)RIVER_KWS_ALIGNMENT_FRAME_SAMPLES,
                (unsigned int)RIVER_KWS_ALIGNMENT_PCM_FRAMES,
@@ -4608,11 +4648,13 @@ extern "C" void river_voice_kws_dump_alignment_status(void)
                                 RIVER_KWS_INPUT_FRAME_MS)),
                (unsigned int)RIVER_KWS_ALIGNMENT_PRE_SILENCE_FRAMES,
                (unsigned int)RIVER_KWS_ALIGNMENT_TAIL_SILENCE_FRAMES);
-    RIVER_LOGI("kws align guard: kws=%s probe=%s interaction=%s detection=%s worker=%s snapshot=%s local_only=%s",
+    RIVER_LOGI("kws align guard: kws=%s probe=%s detection=%s reason=%s worker=%s snapshot=%s local_only=%s",
                river_voice_kws_active() ? "ready" : "closed",
                river_voice_vad_probe_status_name(),
-               river_interaction_state_name(interaction_state),
                river_voice_kws_detection_allowed() ? "ready" : "blocked",
+               river_voice_kws_detection_block_reason() != NULL ?
+                   river_voice_kws_detection_block_reason() :
+                   "-",
                river_voice_kws_worker_idle(g_river_voice_kws) ? "idle" : "busy",
                (g_river_voice_kws != NULL &&
                 g_river_voice_kws->tensor_dump_snapshot_ready) ?
@@ -4659,7 +4701,7 @@ extern "C" river_status_t river_voice_kws_run_alignment_sample(bool emit_dump)
         return RIVER_ERR_BUSY;
     }
     if (!river_voice_kws_detection_allowed()) {
-        const char *block_reason = river_dialog_runtime_wakeword_detection_block_reason();
+        const char *block_reason = river_voice_kws_detection_block_reason();
 
         RIVER_LOGW("kws align requires idle wake monitoring: reason=%s",
                    block_reason != NULL ? block_reason : "-");

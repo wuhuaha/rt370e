@@ -1,3 +1,46 @@
+## Step B.xiaozhi-client.1 Verification
+
+Confirm KWS no longer depends directly on old dialog/interaction runtime
+headers while preserving protected dump/alignment APIs:
+```bash
+cd /root/ameba-river
+rg -n "river_dialog_runtime|river_interaction_state|river_dialog|river_interaction" \
+  components/river_voice/river_voice_kws.cc include/river/river_voice_kws.h
+rg -n "river_voice_kws_request_tensor_dump_next|river_voice_kws_dump_tensor_chunk|river_voice_kws_run_alignment_sample|river_voice_kws_dump_alignment_status|river_voice_kws_set_detection_gate" \
+  include/river/river_voice_kws.h components/river_voice/river_voice_kws.cc components/river_diag/river_diag_cmd.c
+rg -n "river_voice_detector_open|river_voice_detector_process|river_voice_detector_backend_name" \
+  include/river/river_voice_detector.h components/river_voice
+```
+
+Expected result:
+- the first `rg` returns no matches
+- KWS tensor dump / alignment APIs still exist
+- VAD public API still exists
+- the new independent KWS detection gate API exists
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
 ## Step A.xiaozhi-client.4 Verification
 
 Confirm the active rearchitecture plan now uses Orvibo as the internal naming

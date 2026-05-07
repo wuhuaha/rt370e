@@ -1,5 +1,28 @@
 # Change Log
 
+## Step B.xiaozhi-client.1
+- 先完成受保护 KWS 的旧对话运行时解耦，保持 VAD/KWS 算法与诊断能力不变：
+  - `river_voice_kws.cc` 不再 include `river_dialog_runtime.h` 或
+    `river_interaction_state.h`
+  - 新增独立 KWS detection gate：
+    - `river_voice_kws_set_detection_gate()`
+    - `river_voice_kws_detection_gate_allowed()`
+    - `river_voice_kws_detection_gate_block_reason()`
+  - 默认 gate 为允许，后续 `orvibo_audio_service` 可在 post-wake/listening/speaking
+    阶段显式关闭 KWS 监测并提供 block reason
+  - KWS alignment status 现在输出独立 detection gate 状态，不再读取旧
+    interaction state
+- 未改动内容：
+  - KWS 模型、frontend、阈值、trigger 语义
+  - tensor dump / chunk dump / alignment replay API
+  - VAD public API 和 Silero 实现
+- Verification for this step:
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - VAD/KWS API grep passed。
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`。
+
 ## Step A.xiaozhi-client.4
 - 按用户新的命名要求，把活跃重构计划从 XiaoZhi 专用命名切换为 Orvibo
   内部主干命名：

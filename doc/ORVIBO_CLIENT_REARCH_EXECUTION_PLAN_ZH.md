@@ -753,6 +753,15 @@ python3 tools/diag/check_codex_harness.py
 
 ### Step B: 解耦受保护的 VAD/KWS
 
+状态：
+
+- 已完成 KWS 对旧 `dialog_runtime / interaction_state` 的直接 include
+  解耦。
+- VAD public API 未触碰，Silero VAD 仍按原实现保留。
+- 后续 `orvibo_audio_service` 应使用
+  `river_voice_kws_set_detection_gate()` 显式控制 idle/post-wake 阶段 KWS
+  是否接收检测。
+
 目标：
 
 - 让当前 VAD/KWS 能被新 `orvibo_audio_service` 调用，而不依赖旧

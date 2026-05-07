@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.xiaozhi-client.4 将活跃重构命名切换为 Orvibo 主干（规划/harness 校验通过）`
+  - `Step B.xiaozhi-client.1 解耦 KWS 旧对话运行时门控（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline; the first external wire contract is XiaoZhi-compatible, and the only protected voice implementations are the current VAD and wake-word recognition paths.
 - Active plan:
@@ -24,6 +24,15 @@ or top-of-tree verification target changes.
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active implementation slice:
+    - Step B.xiaozhi-client.1 解耦受保护 KWS 的旧对话运行时依赖：
+      - `river_voice_kws.cc` 不再 include `river_dialog_runtime.h` /
+        `river_interaction_state.h`
+      - 新增独立 KWS detection gate，后续由 `orvibo_audio_service` 按
+        idle/listening/speaking 状态控制
+      - KWS tensor dump、alignment replay、parity 路径保持存在
+      - VAD public API 和 Silero 实现未修改
+      - latest SDK build 已通过
     - newest active naming refinement:
     - Step A.xiaozhi-client.4 将活跃重构命名切换为 Orvibo 主干：
       - 用户明确后续会继续演进，内部文件名和函数定义不应以 xiaozhi 为关键词
