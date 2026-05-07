@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.9 收敛 Orvibo TTS 下行播放 backpressure（SDK 构建通过）`
+  - `Step H.xiaozhi-client.10 补齐 Orvibo 绑定刷新诊断入口（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,10 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.10` adds an app-owned manual access refresh path for board-side binding validation:
+  - `river orvibo refresh` posts a control message to the Orvibo app thread.
+  - app handling calls the existing access refresh path with reason `diag_refresh`.
+  - this allows OTA/config and activation polling to be refreshed immediately after server-side binding without rebooting or waiting for the periodic refresh.
 - `Step H.xiaozhi-client.9` hardens Orvibo TTS downlink playback backpressure:
   - TTS playback buffer uses 16 frames to absorb common bursty downlink.
   - each decoded downlink frame checks playback SDK buffer occupancy before writing.
@@ -107,6 +111,7 @@ or top-of-tree verification target changes.
   - Orvibo WebSocket poll/send serialization grep
   - Orvibo connect retry/backoff grep
   - Orvibo TTS playback backpressure grep
+  - Orvibo manual access refresh grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`

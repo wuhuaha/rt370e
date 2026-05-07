@@ -1080,12 +1080,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 每个 downlink Opus 包解码后、写入 playback 前检查 playback SDK buffer occupancy。
   - 当下一帧会超过 85% 高水位时丢弃该下行帧并返回 busy，避免 app 任务被 AudioTrack 写入阻塞。
   - audio diag/status 输出 `bp_drop`、`bp_high`、`buf=buffered/size`。
+- `Step H.xiaozhi-client.10`：
+  - 新增 `river_orvibo_app_request_access_refresh()`，诊断入口仍通过 Orvibo app 控制队列执行。
+  - app 消息 `RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH` 调用既有 access refresh 路径并标记 reason=`diag_refresh`。
+  - `river orvibo refresh` 可在烧录后手动触发 OTA/config 或 activation polling 刷新，便于绑定完成后立即验证 access ready。
+  - 诊断 help/usage 同步加入 `refresh`。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1096,9 +1101,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff 和 TTS 播放背压防护，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护和手动 access refresh 诊断入口，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。

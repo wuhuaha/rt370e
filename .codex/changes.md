@@ -15665,3 +15665,19 @@
 - Verification for this step:
   - `git diff --check` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.10
+- 补齐 Orvibo 绑定/OTA access 刷新的板端诊断入口：
+  - 新增 `river_orvibo_app_request_access_refresh()`，诊断命令只向 Orvibo app 投递控制消息，不直接绕过 app/access ownership。
+  - app 控制消息新增 `RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH`，由 app 线程调用既有 `river_orvibo_app_refresh_access("diag_refresh")`。
+  - `river orvibo refresh` 现在可在烧录后手动触发 OTA/config 或 activation polling 刷新，用于绑定码输入后立即验证 access ready 状态。
+  - 诊断 help/usage 同步加入 `refresh`。
+- 设计边界：
+  - 不新增 XiaoZhi 命名 public API；新增接口仍使用 Orvibo 命名。
+  - 不改变当前 VAD、KWS、KWS tensor dump、alignment replay、板端/本地 parity、AEC/BF 路径。
+  - 不扩大 MCP 范围，仍保持 volume-only。
+- Verification for this step:
+  - `git diff --check` passed
+  - `rg -n "ACCESS_REFRESH|access_refresh|diag_refresh|orvibo <status|connect|refresh" include components` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

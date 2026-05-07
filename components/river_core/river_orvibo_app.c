@@ -49,6 +49,7 @@ typedef enum {
     RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK,
     RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO,
     RIVER_ORVIBO_APP_MSG_CONNECT,
+    RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH,
     RIVER_ORVIBO_APP_MSG_LISTEN_START,
     RIVER_ORVIBO_APP_MSG_LISTEN_STOP,
     RIVER_ORVIBO_APP_MSG_ABORT
@@ -575,6 +576,9 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
     case RIVER_ORVIBO_APP_MSG_CONNECT:
         river_orvibo_app_handle_state_event(RIVER_ORVIBO_EVENT_WAKE_DETECTED, "diag_connect");
         break;
+    case RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH:
+        (void)river_orvibo_app_refresh_access("diag_refresh");
+        break;
     case RIVER_ORVIBO_APP_MSG_LISTEN_START:
         status = river_orvibo_protocol_send_start_listening("manual");
         river_orvibo_app_record_protocol_control("diag_listen_start", status, false);
@@ -835,6 +839,15 @@ void river_orvibo_app_request_connect(void)
 
     memset(&msg, 0, sizeof(msg));
     msg.type = RIVER_ORVIBO_APP_MSG_CONNECT;
+    (void)river_orvibo_app_post(&msg);
+}
+
+void river_orvibo_app_request_access_refresh(void)
+{
+    river_orvibo_app_msg_t msg;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.type = RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH;
     (void)river_orvibo_app_post(&msg);
 }
 

@@ -21,7 +21,7 @@
 static void river_diag_help(void)
 {
     printf("\triver status\n");
-    printf("\triver orvibo <status|connect|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+    printf("\triver orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
     printf("\triver audio <status>\n");
     printf("\triver playback <status|stop|interrupt|flush|duck <gain>|unduck>\n");
     printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
@@ -158,7 +158,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
 static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
 {
     if (argc < 2) {
-        printf("[river][diag] usage: river orvibo <status|connect|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+        printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
         return 0;
     }
 
@@ -168,6 +168,10 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
     }
     if (strcmp((const char *)argv[1], "connect") == 0) {
         river_orvibo_app_request_connect();
+        return 0;
+    }
+    if (strcmp((const char *)argv[1], "refresh") == 0) {
+        river_orvibo_app_request_access_refresh();
         return 0;
     }
     if (strcmp((const char *)argv[1], "listen") == 0) {
@@ -217,7 +221,7 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
         return 0;
     }
 
-    printf("[river][diag] usage: river orvibo <status|connect|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+    printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
     return 0;
 }
 

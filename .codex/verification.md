@@ -25944,3 +25944,54 @@ Expected result:
 - app control remains responsive during TTS bursts
 - normal playback has `bp_drop=0` or low
 - if server outruns playback, `bp_drop` increments and `drop downlink by playback backpressure` appears without wedging state/control queues
+
+## Step H.xiaozhi-client.10 - manual Orvibo access refresh
+
+Confirm the board diagnostic command refreshes Orvibo access through the app
+control plane:
+```bash
+cd /root/ameba-river
+rg -n "ACCESS_REFRESH|access_refresh|diag_refresh|orvibo <status|connect|refresh" \
+  include components
+```
+
+Expected result:
+- public request API is named `river_orvibo_app_request_access_refresh`
+- diag command includes `river orvibo refresh`
+- app handler calls `river_orvibo_app_refresh_access("diag_refresh")`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Boot the board and wait for Wi-Fi to connect.
+2. Run `river orvibo status` and record access ready / activation fields.
+3. If the server shows a binding code, complete binding on the server side.
+4. Run `river orvibo refresh`, then run `river orvibo status` again.
+5. Trigger wake or run `river orvibo connect`.
+```
+
+Expected result:
+- `river orvibo refresh` logs `access refresh ok: reason=diag_refresh` after binding completes
+- access transitions to ready without needing another reboot or wake
+- subsequent wake/connect enters WebSocket hello/listen path instead of being gated by pending activation
