@@ -1,5 +1,28 @@
 # Change Log
 
+## Step A.home-ai.9
+- 根据当前服务侧实际部署端口修正 M1 默认连接地址：
+  - 直接探测 `101.33.235.154:8081` 通过：
+    - TCP connect ok
+    - `ws://101.33.235.154:8081/v1/realtime/ws` 返回
+      `101 Switching Protocols`，并协商
+      `Sec-WebSocket-Protocol: agent-server.smart-home.realtime.v1`
+    - `http://101.33.235.154:8081/v1/realtime` 返回 `200 OK`
+  - 对比探测 `101.33.235.154:8082` 当前失败：
+    - TCP / WS / HTTP 均为 `Connection refused`
+  - 项目默认固件地址仍停在
+    `ws://101.33.235.154:8082/v1/realtime/ws`，这会导致板端按旧端口连接失败。
+- 本轮端侧适配：
+  - `RIVER_XIAOZHI_URL` 改为
+    `ws://101.33.235.154:8081/v1/realtime/ws`。
+  - M1 计划、活动上下文和最新验证说明同步使用 `8081`。
+- Verification for this step:
+  - Step A.home-ai.9 endpoint `rg` 检查通过，默认 URL 和当前板端验证命令均指向 `101.33.235.154:8081`。
+  - `python3 tools/agent_server_debug/probe_realtime.py --host 101.33.235.154 --ports 8081 --schemes ws http --subprotocol agent-server.smart-home.realtime.v1` passed：TCP connect ok，WebSocket 返回 `101 Switching Protocols` 且 subprotocol 正确，HTTP discovery 返回 `200 OK`。
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.8
 - 按当前调试诉求降低本地 KWS 唤醒主阈值：
   - 当前 `student_conv_resnet_ed_nano_v1_fp32_debug` 的正常召回档为

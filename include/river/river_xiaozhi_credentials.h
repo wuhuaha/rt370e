@@ -11,7 +11,7 @@
  * renamed.
  */
 #define RIVER_XIAOZHI_OTA_URL                   ""
-#define RIVER_XIAOZHI_URL                       "ws://101.33.235.154:8082/v1/realtime/ws"
+#define RIVER_XIAOZHI_URL                       "ws://101.33.235.154:8081/v1/realtime/ws"
 #define RIVER_XIAOZHI_TOKEN                     ""
 #define RIVER_XIAOZHI_REALTIME_SUBPROTOCOL      "agent-server.smart-home.realtime.v1"
 #define RIVER_XIAOZHI_REALTIME_PROTOCOL_VERSION "rtos-smart-home-v1"

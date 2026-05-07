@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.8 临时降低 KWS 唤醒阈值便于调试（本地 build 通过，待上板）`
+  - `Step A.home-ai.9 同步 M1 默认服务端端口到 8081（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,16 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.9 同步 M1 默认服务端端口：
+      - 直接探测 `101.33.235.154:8081` 的 TCP、HTTP discovery 与 WebSocket
+        M1 subprotocol 均通过
+      - 对比 `101.33.235.154:8082` 当前 `Connection refused`
+      - `RIVER_XIAOZHI_URL` 现在为
+        `ws://101.33.235.154:8081/v1/realtime/ws`
+    - 下一步上板验证：
+      - `xiaozhi connecting: url=...` 应指向 `101.33.235.154:8081`
+      - `river xiaozhi status` 中默认连接地址应为 8081
+      - 不应再因为连接 `8082` 出现连接失败
     - Step A.home-ai.8 临时降低本地 KWS 唤醒阈值：
       - 当前 `student_conv_resnet_ed_nano_v1_fp32_debug` 正常召回档
         `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9008` 在调试阶段偏保守，用户反馈
@@ -106,7 +116,7 @@ or top-of-tree verification target changes.
         `playback_ack`
       - 板端不应发送 `audio.out.mark`
     - Step A.home-ai.2 默认服务端地址同步为当前部署：
-      - `ws://101.33.235.154:8082/v1/realtime/ws`
+      - `ws://101.33.235.154:8081/v1/realtime/ws`
       - 板端可继续通过 `river xiaozhi set <url> -` 覆盖运行时目标
     - Step A.home-ai.3 处理 M1 文本响应播放尾态：
       - 服务端可发送 `segment_kind=text_only`、`expected_duration_ms=0`、

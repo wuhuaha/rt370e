@@ -1,3 +1,70 @@
+## Step A.home-ai.9 Verification
+
+Confirm the default M1 realtime endpoint uses the currently deployed `8081`
+service port:
+```bash
+cd /root/ameba-river
+rg -n "101\\.33\\.235\\.154:8081|RIVER_XIAOZHI_URL|PORT=8081|:8081/v1/realtime/ws" \
+  include/river/river_xiaozhi_credentials.h \
+  doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md \
+  .codex/active_context.md
+```
+
+Expected result:
+- the default WebSocket URL is `ws://101.33.235.154:8081/v1/realtime/ws`
+- the current board validation command uses `101.33.235.154:8081`
+
+Probe the deployed service:
+```bash
+cd /root/ameba-river
+python3 tools/agent_server_debug/probe_realtime.py \
+  --host 101.33.235.154 \
+  --ports 8081 \
+  --schemes ws http \
+  --subprotocol agent-server.smart-home.realtime.v1
+```
+
+Expected result:
+- TCP connect succeeds on `101.33.235.154:8081`
+- `ws://101.33.235.154:8081/v1/realtime/ws` returns `101 Switching Protocols`
+  with `Sec-WebSocket-Protocol: agent-server.smart-home.realtime.v1`
+- `http://101.33.235.154:8081/v1/realtime` returns `200 OK`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation:
+```text
+重启后观察 `xiaozhi connecting: url=...` 或执行 `river xiaozhi status`。
+唤醒后发起一轮 M1 命令。
+```
+
+Expected result:
+- board connects to `ws://101.33.235.154:8081/v1/realtime/ws`
+- no connection failure caused by attempting `101.33.235.154:8082`
+- discovery/session logs should continue to show
+  `agent-server.smart-home.realtime.v1` and `rtos-smart-home-v1`
+
 ## Step A.home-ai.8 Verification
 
 Confirm the current debug image uses the temporary low KWS wake threshold while
