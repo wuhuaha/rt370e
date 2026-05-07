@@ -15638,3 +15638,17 @@
 - Verification for this step:
   - `git diff --check` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.8
+- 收敛 Orvibo 打开音频通道失败后的重复重连行为：
+  - `open_audio_channel` 失败后进入指数退避，1s 起步，30s 封顶，并保留一次待重试 wake。
+  - 退避期间新的 open action 会被抑制并回到 recoverable recovery，不会立即反复打 WebSocket/OTA/access。
+  - 自动重试只在 `idle + Wi-Fi connected + access ready` 条件满足且退避到期后触发，避免未绑定/无网状态下自激。
+  - 成功打开音频通道后清空 retry/backoff streak；Wi-Fi lost 时清空 pending retry。
+  - app status 新增 `orvibo connect: ok/fail retry/streak/next/posted/suppressed`。
+- 设计边界：
+  - 不对已完成交互后的远端 close 自动重开，避免服务端正常收口时误开新一轮 listen。
+  - 不改变当前 VAD、KWS、AEC/BF、MCP volume-only 和 Opus 上下行格式。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

@@ -25844,3 +25844,54 @@ Expected result:
 - normal traffic still replies to MCP volume requests without deadlock
 - uplink remains real-time while status `poll` increases during the active channel
 - remote close increments `close_evt`, records `transport_closed`, and drives Orvibo state back through `AUDIO_CHANNEL_CLOSED`
+
+## Step H.xiaozhi-client.8 - back off failed audio-channel opens
+
+Confirm failed audio-channel open attempts are backoff-gated and retried only
+from a safe runtime state:
+```bash
+cd /root/ameba-river
+rg -n "CONNECT_BACKOFF|connect_retry|connect_open|connect_backoff|orvibo connect|check_connect_retry" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- failed `open_audio_channel` calls schedule a retry with capped exponential backoff
+- retry is only posted from `river_orvibo_app_check_connect_retry()`
+- retry requires `IDLE`, Wi-Fi connected, and access ready
+- status output includes `orvibo connect:`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Boot with Wi-Fi connected but XiaoZhi-compatible WebSocket temporarily unreachable, or block server egress.
+2. Trigger wake once.
+3. Watch `connect retry scheduled`, `connect suppressed by backoff`, and `orvibo connect:` status.
+4. Restore server reachability before the next retry window expires.
+```
+
+Expected result:
+- retry backoff grows instead of tight-looping WebSocket open attempts
+- no retry is posted before Wi-Fi and access are ready
+- once the server is reachable, the pending wake retries, opens the channel, clears streak, and continues into hello/listen

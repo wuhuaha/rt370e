@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.7 序列化 Orvibo WebSocket poll/send 访问（SDK 构建通过）`
+  - `Step H.xiaozhi-client.8 收敛 Orvibo 音频通道打开失败 backoff（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.8` backs off failed Orvibo audio-channel opens:
+  - failed `open_audio_channel` schedules capped exponential backoff and keeps one pending wake retry.
+  - backoff suppresses immediate repeated open attempts and returns the app through recoverable recovery.
+  - retry only posts from `idle` when Wi-Fi is connected and access is ready.
+  - successful open or Wi-Fi loss clears the pending retry/backoff state.
 - `Step H.xiaozhi-client.7` serializes Orvibo WebSocket poll/send access:
   - protocol transport lock is a recursive mutex so `ws_poll()` callbacks can synchronously send MCP volume replies without self-deadlock.
   - hello wait and steady-state poll call `ws_poll()` through the same transport lock used by uplink sender task.
@@ -95,6 +100,7 @@ or top-of-tree verification target changes.
   - Orvibo app control/audio queue grep
   - Orvibo protocol control failure grep
   - Orvibo WebSocket poll/send serialization grep
+  - Orvibo connect retry/backoff grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -105,7 +111,6 @@ or top-of-tree verification target changes.
 
 - Continue Orvibo mainline behavior hardening:
   - downlink playback/backpressure board validation
-  - reconnect/backoff behavior during repeated transport failures
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - wake/listen/speak/barge-in state-machine verification

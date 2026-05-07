@@ -39,6 +39,9 @@
 #define RIVER_ORVIBO_APP_ACCESS_RETRY_MS   10000U
 #define RIVER_ORVIBO_APP_TTS_DRAIN_MS      900U
 #define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  768U
+#define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MIN_MS 1000U
+#define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS 30000U
+#define RIVER_ORVIBO_APP_CONNECT_BACKOFF_STREAK_CAP 6U
 #define RIVER_ORVIBO_RTOS_OK               0
 
 typedef enum {
@@ -67,6 +70,7 @@ typedef struct {
     bool booted;
     bool task_running;
     bool wifi_ready_reported;
+    bool connect_retry_pending;
     rtos_task_t task;
     rtos_queue_t control_queue;
     rtos_queue_t audio_queue;
@@ -87,6 +91,12 @@ typedef struct {
     uint32_t access_refresh_fail;
     uint32_t protocol_control_ok;
     uint32_t protocol_control_fail;
+    uint32_t connect_open_ok;
+    uint32_t connect_open_fail;
+    uint32_t connect_fail_streak;
+    uint32_t connect_retry_posted;
+    uint32_t connect_backoff_suppressed;
+    uint32_t next_connect_retry_ms;
     uint32_t last_wifi_log_ms;
     uint32_t last_access_retry_ms;
     char wake_text[64];
@@ -179,6 +189,65 @@ static void river_orvibo_app_post_state(river_orvibo_event_t event, const char *
     msg.event = event;
     river_orvibo_app_copy_text(msg.reason, sizeof(msg.reason), reason);
     (void)river_orvibo_app_post(&msg);
+}
+
+static bool river_orvibo_app_time_reached(uint32_t now_ms, uint32_t target_ms)
+{
+    return (int32_t)(now_ms - target_ms) >= 0;
+}
+
+static uint32_t river_orvibo_app_connect_backoff_ms(uint32_t fail_streak)
+{
+    uint32_t backoff_ms = RIVER_ORVIBO_APP_CONNECT_BACKOFF_MIN_MS;
+    uint32_t steps = fail_streak > 0U ? fail_streak - 1U : 0U;
+
+    while (steps > 0U && backoff_ms < RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS) {
+        backoff_ms *= 2U;
+        if (backoff_ms > RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS) {
+            backoff_ms = RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS;
+        }
+        steps--;
+    }
+    return backoff_ms;
+}
+
+static void river_orvibo_app_clear_connect_retry(const char *reason)
+{
+    if (g_river_orvibo_app.connect_retry_pending ||
+        g_river_orvibo_app.connect_fail_streak != 0U) {
+        RIVER_LOGI("connect retry cleared: reason=%s streak=%lu",
+                   reason != NULL ? reason : "-",
+                   (unsigned long)g_river_orvibo_app.connect_fail_streak);
+    }
+    g_river_orvibo_app.connect_retry_pending = false;
+    g_river_orvibo_app.connect_fail_streak = 0U;
+    g_river_orvibo_app.next_connect_retry_ms = 0U;
+}
+
+static void river_orvibo_app_schedule_connect_retry(const char *reason, river_status_t status)
+{
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    uint32_t backoff_ms;
+
+    g_river_orvibo_app.connect_open_fail++;
+    if (g_river_orvibo_app.connect_fail_streak <
+        RIVER_ORVIBO_APP_CONNECT_BACKOFF_STREAK_CAP) {
+        g_river_orvibo_app.connect_fail_streak++;
+    }
+    backoff_ms = river_orvibo_app_connect_backoff_ms(
+        g_river_orvibo_app.connect_fail_streak);
+    g_river_orvibo_app.connect_retry_pending = true;
+    g_river_orvibo_app.next_connect_retry_ms = now_ms + backoff_ms;
+    snprintf(g_river_orvibo_app.last_error,
+             sizeof(g_river_orvibo_app.last_error),
+             "%s:%d",
+             reason != NULL ? reason : "connect",
+             (int)status);
+    RIVER_LOGW("connect retry scheduled: reason=%s status=%d streak=%lu backoff=%lums",
+               reason != NULL ? reason : "-",
+               (int)status,
+               (unsigned long)g_river_orvibo_app.connect_fail_streak,
+               (unsigned long)backoff_ms);
 }
 
 static void river_orvibo_audio_event_handler(const river_orvibo_audio_event_t *event,
@@ -356,16 +425,39 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
         river_status_t status = river_orvibo_access_ready() ?
                                     RIVER_OK :
                                     river_orvibo_app_refresh_access("open_audio_channel");
+        uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+        bool backoff_suppressed = false;
+
+        if (g_river_orvibo_app.connect_retry_pending &&
+            g_river_orvibo_app.next_connect_retry_ms != 0U &&
+            !river_orvibo_app_time_reached(now_ms,
+                                           g_river_orvibo_app.next_connect_retry_ms)) {
+            uint32_t wait_ms = g_river_orvibo_app.next_connect_retry_ms - now_ms;
+            g_river_orvibo_app.connect_backoff_suppressed++;
+            snprintf(g_river_orvibo_app.last_error,
+                     sizeof(g_river_orvibo_app.last_error),
+                     "connect_backoff:%lu",
+                     (unsigned long)wait_ms);
+            RIVER_LOGW("connect suppressed by backoff: wait=%lums streak=%lu",
+                       (unsigned long)wait_ms,
+                       (unsigned long)g_river_orvibo_app.connect_fail_streak);
+            river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_ERROR_RECOVERABLE,
+                                        "connect_backoff");
+            backoff_suppressed = true;
+            status = RIVER_ERR_BUSY;
+        }
         if (status == RIVER_OK) {
             status = river_orvibo_protocol_open_audio_channel();
         }
         if (status != RIVER_OK) {
-            snprintf(g_river_orvibo_app.last_error,
-                     sizeof(g_river_orvibo_app.last_error),
-                     "open_audio_channel:%d",
-                     (int)status);
-            river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_ERROR_RECOVERABLE,
-                                        "open_audio_channel_failed");
+            if (!backoff_suppressed) {
+                river_orvibo_app_schedule_connect_retry("open_audio_channel", status);
+                river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_ERROR_RECOVERABLE,
+                                            "open_audio_channel_failed");
+            }
+        } else {
+            g_river_orvibo_app.connect_open_ok++;
+            river_orvibo_app_clear_connect_retry("open_audio_channel_ok");
         }
     }
     if ((actions & RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL) != 0U) {
@@ -523,6 +615,7 @@ static void river_orvibo_app_check_wifi(void)
     }
     if (g_river_orvibo_app.wifi_ready_reported) {
         g_river_orvibo_app.wifi_ready_reported = false;
+        river_orvibo_app_clear_connect_retry("wifi_lost");
         river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_NETWORK_LOST, "wifi_lost");
     }
     now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
@@ -533,6 +626,41 @@ static void river_orvibo_app_check_wifi(void)
                    river_wifi_station_status_name(),
                    river_wifi_station_ssid());
     }
+}
+
+static void river_orvibo_app_check_connect_retry(void)
+{
+    uint32_t now_ms;
+
+    if (!g_river_orvibo_app.connect_retry_pending ||
+        g_river_orvibo_app.next_connect_retry_ms == 0U) {
+        return;
+    }
+    if (river_orvibo_state_machine_current() != RIVER_ORVIBO_STATE_IDLE ||
+        !river_wifi_station_is_connected() ||
+        !river_orvibo_access_ready()) {
+        return;
+    }
+
+    now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    if (!river_orvibo_app_time_reached(now_ms,
+                                       g_river_orvibo_app.next_connect_retry_ms)) {
+        return;
+    }
+
+    g_river_orvibo_app.connect_retry_pending = false;
+    g_river_orvibo_app.next_connect_retry_ms = 0U;
+    g_river_orvibo_app.connect_retry_posted++;
+    RIVER_LOGI("connect retry due: streak=%lu wake=%s",
+               (unsigned long)g_river_orvibo_app.connect_fail_streak,
+               g_river_orvibo_app.wake_text[0] != '\0' ?
+                   g_river_orvibo_app.wake_text :
+                   "-");
+    river_orvibo_app_post_state(
+        RIVER_ORVIBO_EVENT_WAKE_DETECTED,
+        g_river_orvibo_app.wake_text[0] != '\0' ?
+            g_river_orvibo_app.wake_text :
+            "connect_retry");
 }
 
 static void river_orvibo_app_drain_queues(void)
@@ -566,6 +694,7 @@ static void river_orvibo_app_task(void *param)
     river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_BOOT, "task_start");
     while (true) {
         river_orvibo_app_check_wifi();
+        river_orvibo_app_check_connect_retry();
         (void)river_orvibo_protocol_poll(RIVER_ORVIBO_APP_POLL_MS);
         river_orvibo_app_drain_queues();
         rtos_time_delay_ms(RIVER_ORVIBO_APP_POLL_MS);
@@ -680,6 +809,14 @@ void river_orvibo_app_print_status(void)
                (unsigned long)g_river_orvibo_app.protocol_control_ok,
                (unsigned long)g_river_orvibo_app.protocol_control_fail,
                g_river_orvibo_app.wake_text[0] != '\0' ? g_river_orvibo_app.wake_text : "-");
+    RIVER_LOGI("orvibo connect: ok=%lu fail=%lu retry=%s streak=%lu next=%lu posted=%lu suppressed=%lu",
+               (unsigned long)g_river_orvibo_app.connect_open_ok,
+               (unsigned long)g_river_orvibo_app.connect_open_fail,
+               g_river_orvibo_app.connect_retry_pending ? "pending" : "idle",
+               (unsigned long)g_river_orvibo_app.connect_fail_streak,
+               (unsigned long)g_river_orvibo_app.next_connect_retry_ms,
+               (unsigned long)g_river_orvibo_app.connect_retry_posted,
+               (unsigned long)g_river_orvibo_app.connect_backoff_suppressed);
     RIVER_LOGI("local_preproc=%s profile=%s detector=%s board=%s",
                river_voice_preproc_backend_name(),
                river_voice_preproc_profile_name(),
