@@ -1,5 +1,24 @@
 # Change Log
 
+## Step A.home-ai.11
+- 根据 2026-05-07 11:02 上板日志继续收短 cached-response 播放重复开头和尾部截断：
+  - 本轮日志中 `cached_response expected_duration_ms=1440 is_last_segment=yes`，起播时已有 `queued=72` 帧，说明完整短句已经进入本地播放队列。
+  - 前一轮 `upstream_starved` 重缓冲风暴已经消失；这次异常日志的关键变化是 `playback start backend call ... reuse=yes`，随后出现裸 `underrun`。
+  - Ameba 当前 `AudioTrack_Flush` 明确打印 `NOT SUPPORTED`，复用同一个 AudioTrack 容易把上一轮未真正清空的硬件/SDK 缓冲带到下一轮短 TTS，表现为开头重复、尾部被挤掉或截断。
+- 本轮端侧适配：
+  - `river_playback_stream_config_t` 新增 `disable_track_reuse` 开关。
+  - 播放服务在该开关打开且已有 cached track 时，先销毁旧 AudioTrack，再重新 create/init，避免依赖不支持的 flush 清空旧播放实例。
+  - XiaoZhi M1 TTS 播放固定启用该开关；其它播放入口保持原有默认复用策略。
+- 目标日志变化：
+  - M1 `xiaozhi_tts` 起播应显示 `reuse=no` 和 `playback_start_new`，不再显示 `reuse=yes` / `playback_start_reuse`。
+  - 短 cached response 不应再先重复播放上一轮残留的“抱歉”。
+  - 若后续仍出现裸 `underrun`，下一步应收口 AudioTrack 起播前预灌，而不是再调 `upstream_starved` rebuffer。
+- Verification for this step:
+  - Step A.home-ai.11 `rg` verification matched `disable_track_reuse` in the playback config, fresh-track path, and XiaoZhi TTS wiring.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.10
 - 根据 2026-05-07 10:11 上板日志修复 cached-response 只播出“你想”后无声的问题：
   - 服务端返回 `cached_response expected_duration_ms=1360 is_last_segment=yes`。

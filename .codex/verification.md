@@ -1,3 +1,59 @@
+## Step A.home-ai.11 Verification
+
+Confirm XiaoZhi TTS requests a fresh AudioTrack instead of reusing a cached
+track:
+```bash
+cd /root/ameba-river
+rg -n "disable_track_reuse|playback_start_reuse|playback_start_new|xiaozhi_tts" \
+  include/river/river_playback_service.h \
+  components/river_voice/river_playback_service.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc
+```
+
+Expected result:
+- `river_playback_stream_config_t` exposes `disable_track_reuse`
+- the playback service releases any prepared cached track before compatibility
+  reuse when that flag is true
+- XiaoZhi M1 TTS sets `config.disable_track_reuse = true`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-07 11:02 duplicate
+`抱歉` / truncation case:
+```text
+重启后触发服务端返回 `抱歉，我刚刚没听清，请再说一遍。` 这类短
+cached_response。
+```
+
+Expected result:
+- `playback start backend call: stream=xiaozhi_tts ... reuse=no`
+- `playback_start_new`, not `playback_start_reuse`
+- no repeated leading `抱歉` from a stale cached AudioTrack
+- no tail truncation caused by old track contents leaking into the next short TTS
+- if a plain `underrun` still appears with `reuse=no`, the next fix should
+  target pre-filling AudioTrack before hardware start
+
 ## Step A.home-ai.10 Verification
 
 Confirm the cached-response tail no longer enters upstream rebuffer when the

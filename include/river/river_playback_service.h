@@ -36,6 +36,8 @@ typedef struct {
     size_t playback_frame_bytes;
     /* Target application-side queued frames, not a multiplier on SDK minBuffer. */
     uint32_t buffer_frame_count;
+    /* Some short streams need a clean AudioTrack because SDK flush is unsupported. */
+    bool disable_track_reuse;
     float volume_left;
     float volume_right;
     bool reference_export;

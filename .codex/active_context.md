@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.10 修复 M1 cached-response 尾音误判重缓冲截断（本地 build 通过，待上板）`
+  - `Step A.home-ai.11 禁用 M1 TTS AudioTrack 复用避免短句残留重复（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,22 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.11 禁用 M1 TTS AudioTrack 复用：
+      - 2026-05-07 11:02 日志中服务端返回
+        `cached_response expected_duration_ms=1440 is_last_segment=yes`
+      - 起播时 `queued=72`，按 20 ms/帧正好覆盖 1440 ms，说明完整短句
+        已经进入本地队列
+      - 这次没有再次出现 `upstream_starved` 重缓冲风暴；关键异常是
+        `playback start backend call ... reuse=yes` 后出现裸 `underrun`
+      - Ameba `AudioTrack_Flush` 当前不支持，复用 cached AudioTrack 可能把
+        上一轮未清掉的短 TTS 残留带到下一轮，造成“抱歉”重复和尾部被挤掉
+      - 端侧新增 `disable_track_reuse`，并让 XiaoZhi M1 TTS 每轮都销毁旧
+        track 后重新 create/init
+    - 下一步上板验证：
+      - M1 `xiaozhi_tts` 起播应显示 `reuse=no` 和 `playback_start_new`
+      - 不应再显示 `reuse=yes` / `playback_start_reuse`
+      - 不应再听到上一轮残留导致的重复“抱歉”
+      - 若仍出现裸 `underrun` 且 `reuse=no`，下一步收 AudioTrack 起播前预灌
     - Step A.home-ai.10 修复 cached-response 只播“你想”后无声：
       - 2026-05-07 10:11 日志显示服务端返回
         `cached_response expected_duration_ms=1360 is_last_segment=yes`

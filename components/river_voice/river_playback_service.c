@@ -347,6 +347,14 @@ static river_status_t river_playback_service_prepare_track_locked(
         return status;
     }
 
+    if (config->disable_track_reuse && g_river_playback_service.track_ready) {
+        river_playback_service_release_track_locked();
+        status = river_playback_service_ensure_track_handle_locked();
+        if (status != RIVER_OK) {
+            return status;
+        }
+    }
+
     if (river_playback_service_track_compatible_locked(category_type,
                                                        config,
                                                        required_track_buffer_bytes)) {

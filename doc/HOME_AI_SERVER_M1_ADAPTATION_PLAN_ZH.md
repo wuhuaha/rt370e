@@ -1,7 +1,7 @@
 # home_ai_server M1 端侧适配计划
 
 Status: active
-Last Updated: 2026-05-06
+Last Updated: 2026-05-07
 Branch: `home-ai`
 
 ## 1. 当前背景
@@ -137,6 +137,14 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 目标是避免播放尾部出现 `AudioTrack_Flush / tx_close / recreate`
     造成的短促噪音、后半句截断和 output-turn 卡死，并为“首轮播完后再次
     唤醒”恢复正常闭环。
+- 2026-05-07 禁用 M1 TTS AudioTrack 复用：
+  - 11:02 上板日志显示前一轮 rebuffer 风暴已经消失，但短
+    cached-response 起播仍显示 `reuse=yes`，随后出现裸 `underrun`，用户
+    体感为“抱歉”重复播放且后面内容被截断。
+  - Ameba 当前 `AudioTrack_Flush` 明确不支持；端侧若复用同一个
+    AudioTrack，就不能证明上一轮短 TTS 的 SDK/硬件缓冲已经被清干净。
+  - 播放配置新增 `disable_track_reuse`，XiaoZhi M1 TTS 固定请求新
+    AudioTrack，预期板端日志变为 `reuse=no` / `playback_start_new`。
 - 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
   - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
     `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`
