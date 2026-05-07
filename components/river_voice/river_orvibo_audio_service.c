@@ -49,6 +49,7 @@ typedef struct {
     bool vad_state_initialized;
     bool vad_is_speech;
     bool playback_started;
+    bool barge_in_enabled;
     river_orvibo_audio_mode_t mode;
     rtos_task_t task;
     rtos_mutex_t lock;
@@ -215,10 +216,16 @@ static void river_orvibo_audio_handle_vad(const river_voice_detector_result_t *r
     g_river_orvibo_audio.vad_probability_q15 = result->speech_probability_q15;
     if (result->is_speech && !previous) {
         g_river_orvibo_audio.vad_speech_start++;
-        river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_SPEECH_STARTED);
+        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING ||
+            (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_SPEAKING &&
+             g_river_orvibo_audio.barge_in_enabled)) {
+            river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_SPEECH_STARTED);
+        }
     } else if (!result->is_speech && previous) {
         g_river_orvibo_audio.vad_speech_end++;
-        river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_SPEECH_ENDED);
+        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING) {
+            river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_SPEECH_ENDED);
+        }
     }
 }
 
@@ -521,6 +528,12 @@ river_status_t river_orvibo_audio_service_set_mode(river_orvibo_audio_mode_t mod
     }
     rtos_mutex_give(g_river_orvibo_audio.lock);
     return RIVER_OK;
+}
+
+void river_orvibo_audio_service_set_barge_in_enabled(bool enabled)
+{
+    g_river_orvibo_audio.barge_in_enabled = enabled;
+    RIVER_LOGI("audio barge-in: %s", enabled ? "enabled" : "disabled");
 }
 
 river_orvibo_audio_mode_t river_orvibo_audio_service_mode(void)

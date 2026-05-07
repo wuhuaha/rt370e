@@ -98,6 +98,230 @@ exit:
     return status;
 }
 
+static river_status_t river_orvibo_mcp_build_raw_result(const cJSON *id_obj,
+                                                        cJSON *result,
+                                                        char *response_json,
+                                                        size_t response_json_size)
+{
+    cJSON *root = NULL;
+    char *printed = NULL;
+    river_status_t status = RIVER_ERR_IO;
+
+    if (result == NULL || response_json == NULL || response_json_size == 0U) {
+        if (result != NULL) {
+            cJSON_Delete(result);
+        }
+        return RIVER_ERR_ARG;
+    }
+    response_json[0] = '\0';
+    root = cJSON_CreateObject();
+    if (root == NULL) {
+        cJSON_Delete(result);
+        return RIVER_ERR_NO_MEMORY;
+    }
+    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
+    river_orvibo_mcp_add_id(root, id_obj);
+    cJSON_AddItemToObject(root, "result", result);
+    printed = cJSON_PrintUnformatted(root);
+    if (printed != NULL &&
+        snprintf(response_json, response_json_size, "%s", printed) < (int)response_json_size) {
+        status = RIVER_OK;
+    }
+    if (printed != NULL) {
+        cJSON_free(printed);
+    }
+    cJSON_Delete(root);
+    if (status != RIVER_OK) {
+        response_json[0] = '\0';
+    }
+    return status;
+}
+
+static river_status_t river_orvibo_mcp_build_error(const cJSON *id_obj,
+                                                   const char *message,
+                                                   char *response_json,
+                                                   size_t response_json_size)
+{
+    cJSON *root = NULL;
+    cJSON *error = NULL;
+    char *printed = NULL;
+    river_status_t status = RIVER_ERR_IO;
+
+    if (response_json == NULL || response_json_size == 0U) {
+        return RIVER_ERR_ARG;
+    }
+    response_json[0] = '\0';
+    root = cJSON_CreateObject();
+    error = cJSON_CreateObject();
+    if (root == NULL || error == NULL) {
+        goto exit;
+    }
+    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
+    river_orvibo_mcp_add_id(root, id_obj);
+    cJSON_AddStringToObject(error, "message", message != NULL ? message : "error");
+    cJSON_AddItemToObject(root, "error", error);
+    error = NULL;
+    printed = cJSON_PrintUnformatted(root);
+    if (printed != NULL &&
+        snprintf(response_json, response_json_size, "%s", printed) < (int)response_json_size) {
+        status = RIVER_OK;
+    }
+
+exit:
+    if (printed != NULL) {
+        cJSON_free(printed);
+    }
+    if (error != NULL) {
+        cJSON_Delete(error);
+    }
+    if (root != NULL) {
+        cJSON_Delete(root);
+    }
+    if (status != RIVER_OK) {
+        response_json[0] = '\0';
+    }
+    return status;
+}
+
+static river_status_t river_orvibo_mcp_handle_initialize(const cJSON *id_obj,
+                                                         char *response_json,
+                                                         size_t response_json_size)
+{
+    cJSON *result = cJSON_CreateObject();
+    cJSON *capabilities = cJSON_CreateObject();
+    cJSON *tools = cJSON_CreateObject();
+    cJSON *server = cJSON_CreateObject();
+
+    if (result == NULL || capabilities == NULL || tools == NULL || server == NULL) {
+        if (server != NULL) {
+            cJSON_Delete(server);
+        }
+        if (tools != NULL) {
+            cJSON_Delete(tools);
+        }
+        if (capabilities != NULL) {
+            cJSON_Delete(capabilities);
+        }
+        if (result != NULL) {
+            cJSON_Delete(result);
+        }
+        return RIVER_ERR_NO_MEMORY;
+    }
+    cJSON_AddStringToObject(result, "protocolVersion", "2024-11-05");
+    cJSON_AddItemToObject(capabilities, "tools", tools);
+    tools = NULL;
+    cJSON_AddItemToObject(result, "capabilities", capabilities);
+    capabilities = NULL;
+    cJSON_AddStringToObject(server, "name", "orvibo-rtl8730e");
+    cJSON_AddStringToObject(server, "version", "0.1.0");
+    cJSON_AddItemToObject(result, "serverInfo", server);
+    server = NULL;
+    return river_orvibo_mcp_build_raw_result(id_obj, result, response_json, response_json_size);
+}
+
+static cJSON *river_orvibo_mcp_build_tool(const char *name,
+                                          const char *description,
+                                          bool with_volume_property)
+{
+    cJSON *tool = cJSON_CreateObject();
+    cJSON *schema = cJSON_CreateObject();
+    cJSON *properties = cJSON_CreateObject();
+    cJSON *volume = NULL;
+    cJSON *required = NULL;
+
+    if (tool == NULL || schema == NULL || properties == NULL) {
+        goto fail;
+    }
+    cJSON_AddStringToObject(tool, "name", name);
+    cJSON_AddStringToObject(tool, "description", description);
+    cJSON_AddStringToObject(schema, "type", "object");
+    if (with_volume_property) {
+        volume = cJSON_CreateObject();
+        required = cJSON_CreateArray();
+        if (volume == NULL || required == NULL) {
+            goto fail;
+        }
+        cJSON_AddStringToObject(volume, "type", "integer");
+        cJSON_AddNumberToObject(volume, "minimum", 0);
+        cJSON_AddNumberToObject(volume, "maximum", 100);
+        cJSON_AddItemToObject(properties, "volume", volume);
+        volume = NULL;
+        cJSON_AddItemToArray(required, cJSON_CreateString("volume"));
+        cJSON_AddItemToObject(schema, "required", required);
+        required = NULL;
+    }
+    cJSON_AddItemToObject(schema, "properties", properties);
+    properties = NULL;
+    cJSON_AddItemToObject(tool, "inputSchema", schema);
+    schema = NULL;
+    return tool;
+
+fail:
+    if (required != NULL) {
+        cJSON_Delete(required);
+    }
+    if (volume != NULL) {
+        cJSON_Delete(volume);
+    }
+    if (properties != NULL) {
+        cJSON_Delete(properties);
+    }
+    if (schema != NULL) {
+        cJSON_Delete(schema);
+    }
+    if (tool != NULL) {
+        cJSON_Delete(tool);
+    }
+    return NULL;
+}
+
+static river_status_t river_orvibo_mcp_handle_tools_list(const cJSON *id_obj,
+                                                         char *response_json,
+                                                         size_t response_json_size)
+{
+    cJSON *result = cJSON_CreateObject();
+    cJSON *tools = cJSON_CreateArray();
+    cJSON *status_tool = NULL;
+    cJSON *volume_tool = NULL;
+
+    if (result == NULL || tools == NULL) {
+        goto fail;
+    }
+    status_tool = river_orvibo_mcp_build_tool(
+        "self.get_device_status",
+        "Get current device status. The volume field is the speaker volume percentage.",
+        false);
+    volume_tool = river_orvibo_mcp_build_tool(
+        "self.audio_speaker.set_volume",
+        "Set speaker volume. Argument volume must be an integer from 0 to 100.",
+        true);
+    if (status_tool == NULL || volume_tool == NULL) {
+        goto fail;
+    }
+    cJSON_AddItemToArray(tools, status_tool);
+    status_tool = NULL;
+    cJSON_AddItemToArray(tools, volume_tool);
+    volume_tool = NULL;
+    cJSON_AddItemToObject(result, "tools", tools);
+    tools = NULL;
+    return river_orvibo_mcp_build_raw_result(id_obj, result, response_json, response_json_size);
+
+fail:
+    if (volume_tool != NULL) {
+        cJSON_Delete(volume_tool);
+    }
+    if (status_tool != NULL) {
+        cJSON_Delete(status_tool);
+    }
+    if (tools != NULL) {
+        cJSON_Delete(tools);
+    }
+    if (result != NULL) {
+        cJSON_Delete(result);
+    }
+    return RIVER_ERR_NO_MEMORY;
+}
+
 void river_orvibo_mcp_volume_set(uint8_t volume_percent)
 {
     float gain;
@@ -142,13 +366,31 @@ river_status_t river_orvibo_mcp_volume_handle(const cJSON *payload,
                    NULL;
     id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)payload, "id");
 
-    if (!cJSON_IsString(method_obj) || method_obj->valuestring == NULL ||
-        strcmp(method_obj->valuestring, "tools/call") != 0) {
-        return river_orvibo_mcp_build_result(id_obj,
-                                             true,
-                                             "unsupported method",
-                                             response_json,
-                                             response_json_size);
+    if (!cJSON_IsString(method_obj) || method_obj->valuestring == NULL) {
+        return river_orvibo_mcp_build_error(id_obj,
+                                            "missing method",
+                                            response_json,
+                                            response_json_size);
+    }
+
+    if (strcmp(method_obj->valuestring, "notifications/initialized") == 0) {
+        response_json[0] = '\0';
+        return RIVER_OK;
+    }
+
+    if (strcmp(method_obj->valuestring, "initialize") == 0) {
+        return river_orvibo_mcp_handle_initialize(id_obj, response_json, response_json_size);
+    }
+
+    if (strcmp(method_obj->valuestring, "tools/list") == 0) {
+        return river_orvibo_mcp_handle_tools_list(id_obj, response_json, response_json_size);
+    }
+
+    if (strcmp(method_obj->valuestring, "tools/call") != 0) {
+        return river_orvibo_mcp_build_error(id_obj,
+                                            "method not implemented",
+                                            response_json,
+                                            response_json_size);
     }
 
     if (!cJSON_IsString(name_obj) || name_obj->valuestring == NULL) {

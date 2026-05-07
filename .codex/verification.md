@@ -1,3 +1,73 @@
+## Step H.xiaozhi-client.1 Verification
+
+Confirm Orvibo access and XiaoZhi-compatible wire-contract pieces exist:
+```bash
+cd /root/ameba-river
+rg -n "Activation-Version|Authorization|Protocol-Version|Device-Id|Client-Id|type.*hello|server_hello_timeout|listen|abort|payload_size|RIVER_ORVIBO_OTA_URL|river_orvibo_access_refresh" \
+  include components Kconfig
+```
+
+Expected result:
+- OTA/config and websocket auth headers are present.
+- hello/listen/abort JSON paths are present.
+- binary audio payload-size framing is present.
+- `server_hello_timeout` shows open now waits for server hello.
+
+Confirm MCP is still volume-only:
+```bash
+cd /root/ameba-river
+rg -n "self\\.get_device_status|self\\.audio_speaker\\.set_volume|tools/list|initialize" \
+  components/river_cloud/river_orvibo_mcp_volume.c
+```
+
+Expected result:
+- only the device-status and speaker-volume tool names are exposed.
+
+Confirm the protected VAD/KWS capabilities still exist:
+```bash
+cd /root/ameba-river
+rg -n "river_voice_kws_request_tensor_dump_next|river_voice_kws_dump_tensor_chunk|river_voice_kws_run_alignment_sample|river_voice_kws_dump_alignment_status" \
+  include/river/river_voice_kws.h \
+  components/river_voice/river_voice_kws.cc \
+  components/river_diag/river_diag_cmd.c
+rg -n "river_voice_detector_open|river_voice_detector_process|river_voice_detector_backend_name" \
+  include/river/river_voice_detector.h \
+  components/river_voice/river_voice_detector.c \
+  components/river_voice/river_voice_detector_silero.cc \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- KWS tensor dump / alignment APIs are present.
+- VAD public API and Orvibo audio-service usage are present.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后配好 Wi-Fi，触发一次当前唤醒词，观察 Orvibo access/protocol/app 日志。
+```
+
+Expected result:
+- Wi-Fi ready 后首轮唤醒会先刷新 OTA/config；如需激活，会打印 activation code 并轮询 `/activate`。
+- access ready 后 websocket handshake 带 Authorization / Protocol-Version / Device-Id / Client-Id。
+- `server hello` 到达后才进入 listening 并发送 listen detect/start。
+- 说话后有 binary opus uplink；服务端 TTS start 后进入 speaking，下行 opus 播放；TTS stop 后回 listening。
+- 服务端 volume MCP call 只触发 `self.audio_speaker.set_volume`。
+
 ## Step G.xiaozhi-client.1 Verification
 
 Confirm deleted old mainline headers are no longer included by live source:

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step G.xiaozhi-client.1 删除旧主干残留并收窄 Orvibo-only 配置面（SDK 构建通过）`
+  - `Step H.xiaozhi-client.1 补齐 Orvibo 接入鉴权、OTA 激活、WebSocket 握手和语音交互闭环（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -48,14 +48,19 @@ or top-of-tree verification target changes.
   - `components/river_voice/river_voice_webrtc_aecm_adapter.*`
   - `third_party/webrtc_aecm/`
 
-## Latest Cleanup Slice
+## Latest Verified Slice
 
-- `Step G.xiaozhi-client.1` deleted old `dialog / session coordinator / cloud adapter / split ASR-TTS / legacy xiaozhi transport / online_control` sources and headers.
-- `Kconfig` and `prj.conf` no longer expose deleted provider/backend options.
+- `Step H.xiaozhi-client.1` makes the Orvibo-owned mainline flash-connectable against the XiaoZhi-compatible server contract:
+  - OTA/config POST uses `Activation-Version` / `Device-Id` / `Client-Id` headers and applies server websocket url/token/version.
+  - activation polling supports the no-serial-number payload flow used by the reference client.
+  - WebSocket open sends auth/protocol/device/client headers, sends hello, and waits for server hello before reporting success.
+  - wake/listen/abort/TTS/barge-in state transitions are closed around the Orvibo state machine.
+  - MCP remains volume-only (`self.get_device_status`, `self.audio_speaker.set_volume`).
+- Current VAD, KWS, KWS tensor dump, alignment replay, and board/local parity paths remain preserved.
 - Verification passed:
-  - deleted-header include grep
-  - old backend/runtime grep
-  - VAD/KWS protected API grep
+  - Orvibo/XiaoZhi-compatible protocol/access grep
+  - MCP volume-only grep
+  - protected VAD/KWS API grep
   - `git diff --check`
   - `python3 tools/diag/check_codex_harness.py`
   - `/root/ameba-rtos` SDK build with `Build done`
@@ -63,10 +68,10 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
-  - protocol reconnect/error recovery
   - audio uplink/downlink backpressure
   - board-visible Orvibo status logs
-  - MCP volume-only end-to-end validation
+  - OTA activation UX/log capture on real board
+  - MCP volume-only end-to-end validation on server call
   - wake/listen/speak/barge-in state-machine verification
 
 ## Workflow Notes

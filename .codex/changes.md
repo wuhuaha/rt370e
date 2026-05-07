@@ -1,5 +1,36 @@
 # Change Log
 
+## Step H.xiaozhi-client.1
+- 补齐 Orvibo-owned 接入层，使当前分支不再依赖空 token 静态 fallback：
+  - 新增 `river_orvibo_access`，负责 device/client identity、OTA/config POST、websocket url/token/version 应用和 activation 轮询。
+  - OTA/config 默认端点为 `https://api.tenclass.net/xiaozhi/ota/`，配置名仍使用 `RIVER_ORVIBO_*`。
+  - HTTP 请求对齐参考端侧鉴权头：`Activation-Version`、`Device-Id`、`Client-Id`、`User-Agent`、`Accept-Language`。
+  - 静态 websocket fallback 只有在 url 和 token 都存在时才视为可直接使用，否则必须先完成 OTA/config。
+- 收敛 WebSocket 协议到参考行为：
+  - handshake header 由 access 层统一提供 `Device-Id` 和 `Client-Id`。
+  - `Authorization` 支持裸 token 自动加 `Bearer `，也支持已带 scheme 的 token。
+  - `open_audio_channel()` 连接后发送 hello，并在函数内等待 server hello；超时或通道关闭会立即关闭连接并返回错误。
+  - 保留 protocol v1/v2/v3 binary audio framing，并处理 server `system/reboot`、`alert`、`error`。
+- 收紧 Orvibo 语音交互状态机：
+  - wake text 使用当前 KWS 事件传入文本，fallback 为 `小欧管家`。
+  - wake -> open -> server hello -> listen detect/start -> TTS start/stop -> speaking/listening 的状态动作闭合。
+  - speaking 下只在 barge-in enabled 时把当前 VAD speech-start 作为打断；listening 下不再用本地 VAD speech-end 直接发送 `listen stop`，避免和服务端 auto endpointing 抢控制权。
+  - recoverable error 后自动派发 `recovery_done` 回到 idle，避免一次连接失败后卡在 recovering。
+- MCP 继续保持初期最小面：
+  - 支持 `initialize`、`notifications/initialized`、`tools/list` 和 `tools/call`。
+  - 工具只暴露 `self.get_device_status` 和 `self.audio_speaker.set_volume`。
+- 受保护能力未弱化：
+  - 当前 Silero VAD API/实现仍被 Orvibo audio service 使用。
+  - 当前 KWS、tensor dump、chunk dump、alignment replay、board/local parity API 均保留。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - Orvibo/XiaoZhi-compatible access/protocol grep passed.
+  - MCP volume-only grep passed.
+  - VAD/KWS protected API grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step G.xiaozhi-client.1
 - 删除旧主干源码和头文件残留，仓库 live tree 收敛为 Orvibo-only 主干：
   - 删除旧 split ASR/TTS provider：

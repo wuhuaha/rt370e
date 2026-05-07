@@ -34,6 +34,7 @@ ameba_list_append(private_sources
     river_wifi_station.c
     river_ws_dispatch.c
     river_opus_codec.c
+    river_orvibo_access.c
     river_orvibo_protocol.c
     river_orvibo_mcp_volume.c
 )
@@ -41,6 +42,7 @@ ameba_list_append(private_sources
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
     ${c_CMPT_AUDIO_DIR}/interfaces
+    ${c_CMPT_NETWORK_DIR}
 )
 
 ameba_list_append(private_includes

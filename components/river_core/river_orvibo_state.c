@@ -144,7 +144,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                 new_state = RIVER_ORVIBO_STATE_LISTENING;
                 actions = RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
                           RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED |
-                          RIVER_ORVIBO_ACTION_START_LISTENING;
+                          RIVER_ORVIBO_ACTION_START_LISTENING |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             }
             break;
         case RIVER_ORVIBO_STATE_CONNECTING:
@@ -153,7 +154,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                 new_state = RIVER_ORVIBO_STATE_LISTENING;
                 actions = RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
                           RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED |
-                          RIVER_ORVIBO_ACTION_START_LISTENING;
+                          RIVER_ORVIBO_ACTION_START_LISTENING |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
                 actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE;
@@ -162,9 +164,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
         case RIVER_ORVIBO_STATE_LISTENING:
             if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED) {
                 new_state = RIVER_ORVIBO_STATE_SPEAKING;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_SPEAKING;
-            } else if (event == RIVER_ORVIBO_EVENT_USER_SPEECH_ENDED) {
-                actions = RIVER_ORVIBO_ACTION_STOP_LISTENING;
+                actions = RIVER_ORVIBO_ACTION_AUDIO_SPEAKING |
+                          RIVER_ORVIBO_ACTION_ENABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
                 actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE;
@@ -175,14 +176,17 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                 new_state = RIVER_ORVIBO_STATE_LISTENING;
                 actions = RIVER_ORVIBO_ACTION_ABORT_SPEAKING |
                           RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
-                          RIVER_ORVIBO_ACTION_STOP_PLAYBACK;
+                          RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED) {
                 new_state = RIVER_ORVIBO_STATE_LISTENING;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_LISTENING;
+                actions = RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
                 actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE |
-                          RIVER_ORVIBO_ACTION_STOP_PLAYBACK;
+                          RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             }
             break;
         case RIVER_ORVIBO_STATE_RECOVERING:

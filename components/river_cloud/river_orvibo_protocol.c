@@ -13,6 +13,7 @@
 #include "websocket/wsclient_api.h"
 
 #include "river/river_log.h"
+#include "river/river_orvibo_access.h"
 #include "river/river_orvibo_credentials.h"
 #include "river/river_orvibo_mcp_volume.h"
 #include "river/river_orvibo_protocol.h"
@@ -38,6 +39,8 @@
 #define RIVER_ORVIBO_WS_RECV_TIMEOUT_MS 10000U
 #define RIVER_ORVIBO_WS_SEND_TIMEOUT_MS 200U
 #define RIVER_ORVIBO_WS_CONNECT_TIMEOUT_MS 15000U
+#define RIVER_ORVIBO_WS_HELLO_TIMEOUT_MS 10000U
+#define RIVER_ORVIBO_WS_HELLO_POLL_MS 20U
 #define RIVER_ORVIBO_WS_SEND_BLOCK_MS 0U
 #define RIVER_ORVIBO_RTOS_OK 0
 
@@ -163,89 +166,6 @@ static void river_orvibo_emit_event(river_orvibo_protocol_event_type_t type,
                                           g_river_orvibo_protocol.event_handler_user);
 }
 
-static uint32_t river_orvibo_fnv1a32(const uint8_t *data, size_t bytes, uint32_t seed)
-{
-    uint32_t hash = 2166136261UL ^ seed;
-    size_t index;
-
-    for (index = 0U; index < bytes; ++index) {
-        hash ^= (uint32_t)data[index];
-        hash *= 16777619UL;
-    }
-    return hash;
-}
-
-static void river_orvibo_build_device_id(char *buffer, size_t buffer_size)
-{
-    uint8_t *mac;
-
-    if (buffer == NULL || buffer_size == 0U) {
-        return;
-    }
-    mac = LwIP_GetMAC(NETIF_WLAN_STA_INDEX);
-    if (mac == NULL) {
-        snprintf(buffer, buffer_size, "%s", "00:00:00:00:00:00");
-        return;
-    }
-    snprintf(buffer,
-             buffer_size,
-             "%02x:%02x:%02x:%02x:%02x:%02x",
-             mac[0],
-             mac[1],
-             mac[2],
-             mac[3],
-             mac[4],
-             mac[5]);
-}
-
-static void river_orvibo_build_client_id(char *buffer, size_t buffer_size)
-{
-    uint8_t *mac;
-    uint8_t uuid[16];
-    uint32_t hash_words[4];
-    size_t index;
-
-    if (buffer == NULL || buffer_size == 0U) {
-        return;
-    }
-    mac = LwIP_GetMAC(NETIF_WLAN_STA_INDEX);
-    if (mac == NULL) {
-        static uint8_t zero_mac[6] = {0U, 0U, 0U, 0U, 0U, 0U};
-        mac = zero_mac;
-    }
-    hash_words[0] = river_orvibo_fnv1a32(mac, 6U, 0x13579BDFUL);
-    hash_words[1] = river_orvibo_fnv1a32(mac, 6U, 0x2468ACE0UL);
-    hash_words[2] = river_orvibo_fnv1a32(mac, 6U, 0x55AA11EEUL);
-    hash_words[3] = river_orvibo_fnv1a32(mac, 6U, 0xA5A55A5AUL);
-    for (index = 0U; index < 4U; ++index) {
-        uuid[index * 4U + 0U] = (uint8_t)((hash_words[index] >> 24) & 0xFFU);
-        uuid[index * 4U + 1U] = (uint8_t)((hash_words[index] >> 16) & 0xFFU);
-        uuid[index * 4U + 2U] = (uint8_t)((hash_words[index] >> 8) & 0xFFU);
-        uuid[index * 4U + 3U] = (uint8_t)(hash_words[index] & 0xFFU);
-    }
-    uuid[6] = (uint8_t)((uuid[6] & 0x0FU) | 0x40U);
-    uuid[8] = (uint8_t)((uuid[8] & 0x3FU) | 0x80U);
-    snprintf(buffer,
-             buffer_size,
-             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-             uuid[0],
-             uuid[1],
-             uuid[2],
-             uuid[3],
-             uuid[4],
-             uuid[5],
-             uuid[6],
-             uuid[7],
-             uuid[8],
-             uuid[9],
-             uuid[10],
-             uuid[11],
-             uuid[12],
-             uuid[13],
-             uuid[14],
-             uuid[15]);
-}
-
 static river_status_t river_orvibo_parse_url(const char *url,
                                              char *base_url,
                                              size_t base_url_size,
@@ -308,10 +228,12 @@ static river_status_t river_orvibo_build_headers(void)
     char auth_header[320];
     int written;
 
-    river_orvibo_build_device_id(g_river_orvibo_protocol.device_id,
-                                 sizeof(g_river_orvibo_protocol.device_id));
-    river_orvibo_build_client_id(g_river_orvibo_protocol.client_id,
-                                 sizeof(g_river_orvibo_protocol.client_id));
+    river_orvibo_copy_text(g_river_orvibo_protocol.device_id,
+                           sizeof(g_river_orvibo_protocol.device_id),
+                           river_orvibo_access_device_id());
+    river_orvibo_copy_text(g_river_orvibo_protocol.client_id,
+                           sizeof(g_river_orvibo_protocol.client_id),
+                           river_orvibo_access_client_id());
     auth_header[0] = '\0';
     if (g_river_orvibo_protocol.token[0] != '\0') {
         if (strchr(g_river_orvibo_protocol.token, ' ') == NULL) {
@@ -622,6 +544,37 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                    text != NULL ? text : "-");
     } else if (strcmp(type, "mcp") == 0) {
         river_orvibo_handle_mcp_message(root);
+    } else if (strcmp(type, "system") == 0) {
+        const cJSON *command_obj = cJSON_GetObjectItemCaseSensitive(root, "command");
+        const char *command = cJSON_IsString(command_obj) ? command_obj->valuestring : NULL;
+        RIVER_LOGW("system command: %s", command != NULL ? command : "-");
+        if (command != NULL && strcmp(command, "reboot") == 0) {
+            river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_REBOOT_REQUEST,
+                                    NULL,
+                                    NULL,
+                                    "server_reboot",
+                                    NULL,
+                                    NULL,
+                                    0U,
+                                    0U,
+                                    0U,
+                                    0U);
+        }
+    } else if (strcmp(type, "alert") == 0) {
+        RIVER_LOGW("server alert: state=%s text=%s",
+                   state != NULL ? state : "-",
+                   text != NULL ? text : "-");
+    } else if (strcmp(type, "error") == 0) {
+        river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_ERROR,
+                                text,
+                                state,
+                                "server_error",
+                                NULL,
+                                NULL,
+                                0U,
+                                0U,
+                                0U,
+                                0U);
     } else {
         RIVER_LOGI("ignore message: type=%s state=%s", type, state != NULL ? state : "-");
     }
@@ -778,6 +731,31 @@ static void river_orvibo_close_context(void)
     river_orvibo_transport_unlock(locked);
 }
 
+static river_status_t river_orvibo_wait_server_hello(void)
+{
+    uint32_t start_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+
+    while (!g_river_orvibo_protocol.server_hello_received) {
+        uint32_t now_ms;
+
+        if (g_river_orvibo_protocol.wsclient == NULL ||
+            g_river_orvibo_protocol.wsclient->readyState != WSC_OPEN ||
+            g_river_orvibo_protocol.ws_closed) {
+            river_orvibo_set_last_error("server_hello_channel_closed");
+            return RIVER_ERR_IO;
+        }
+
+        ws_poll((int)RIVER_ORVIBO_WS_HELLO_POLL_MS, &g_river_orvibo_protocol.wsclient);
+        now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+        if (now_ms - start_ms >= RIVER_ORVIBO_WS_HELLO_TIMEOUT_MS) {
+            river_orvibo_set_last_error("server_hello_timeout");
+            return RIVER_ERR_IO;
+        }
+    }
+
+    return RIVER_OK;
+}
+
 river_status_t river_orvibo_protocol_init(void)
 {
     if (g_river_orvibo_protocol.initialized) {
@@ -883,6 +861,10 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
         river_orvibo_set_last_error("wifi_not_connected");
         return RIVER_ERR_BUSY;
     }
+    if (!river_orvibo_access_ready()) {
+        river_orvibo_set_last_error("access_not_ready");
+        return RIVER_ERR_BUSY;
+    }
     if (g_river_orvibo_protocol.session_open &&
         g_river_orvibo_protocol.wsclient != NULL &&
         g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN) {
@@ -961,6 +943,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     }
     g_river_orvibo_protocol.session_open = true;
     g_river_orvibo_protocol.ws_closed = false;
+    g_river_orvibo_protocol.server_hello_received = false;
     g_river_orvibo_protocol.sessions_opened++;
     river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_CONNECTED,
                             NULL,
@@ -975,6 +958,11 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     status = river_orvibo_send_hello();
     if (status != RIVER_OK) {
         river_orvibo_set_last_error("hello_send_failed");
+        return status;
+    }
+    status = river_orvibo_wait_server_hello();
+    if (status != RIVER_OK) {
+        river_orvibo_close_context();
         return status;
     }
     return RIVER_OK;

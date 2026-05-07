@@ -1,10 +1,33 @@
-/* Orvibo voice client default realtime server credentials. */
+/* Orvibo voice client default server access configuration. */
 #ifndef AMEBA_RIVER_ORVIBO_CREDENTIALS_H
 #define AMEBA_RIVER_ORVIBO_CREDENTIALS_H
 
-#define RIVER_ORVIBO_WS_URL              "ws://101.33.235.154:8081/xiaozhi/v1/"
-#define RIVER_ORVIBO_WS_TOKEN            ""
-#define RIVER_ORVIBO_PROTOCOL_VERSION    3U
+#include "platform_autoconf.h"
+
+#ifdef CONFIG_RIVER_ORVIBO_OTA_URL
+#define RIVER_ORVIBO_OTA_URL CONFIG_RIVER_ORVIBO_OTA_URL
+#else
+#define RIVER_ORVIBO_OTA_URL "https://api.tenclass.net/xiaozhi/ota/"
+#endif
+
+#ifdef CONFIG_RIVER_ORVIBO_WS_URL
+#define RIVER_ORVIBO_WS_URL CONFIG_RIVER_ORVIBO_WS_URL
+#else
+#define RIVER_ORVIBO_WS_URL "ws://101.33.235.154:8081/xiaozhi/v1/"
+#endif
+
+#ifdef CONFIG_RIVER_ORVIBO_WS_TOKEN
+#define RIVER_ORVIBO_WS_TOKEN CONFIG_RIVER_ORVIBO_WS_TOKEN
+#else
+#define RIVER_ORVIBO_WS_TOKEN ""
+#endif
+
+#ifdef CONFIG_RIVER_ORVIBO_PROTOCOL_VERSION
+#define RIVER_ORVIBO_PROTOCOL_VERSION CONFIG_RIVER_ORVIBO_PROTOCOL_VERSION
+#else
+#define RIVER_ORVIBO_PROTOCOL_VERSION 3U
+#endif
+
 #define RIVER_ORVIBO_ENABLE_MCP          1
 
 #define RIVER_ORVIBO_AUDIO_SAMPLE_RATE        16000U

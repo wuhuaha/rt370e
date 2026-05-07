@@ -12,6 +12,36 @@ config RIVER_ORVIBO_CLIENT_EN
       contract is compatible with the XiaoZhi websocket protocol, but the
       firmware architecture is Orvibo-owned.
 
+config RIVER_ORVIBO_OTA_URL
+    string "Orvibo access OTA/config URL"
+    default "https://api.tenclass.net/xiaozhi/ota/"
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      XiaoZhi-compatible OTA endpoint used to fetch websocket url/token/version
+      and activation instructions before opening the realtime audio channel.
+
+config RIVER_ORVIBO_WS_URL
+    string "Orvibo fallback websocket URL"
+    default "ws://101.33.235.154:8081/xiaozhi/v1/"
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Static fallback websocket endpoint. It is only considered directly usable
+      when RIVER_ORVIBO_WS_TOKEN is also set; otherwise OTA/config is required.
+
+config RIVER_ORVIBO_WS_TOKEN
+    string "Orvibo fallback websocket token"
+    default ""
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Optional static websocket token. If empty, the device must obtain token
+      and endpoint from the OTA/config service.
+
+config RIVER_ORVIBO_PROTOCOL_VERSION
+    int "Orvibo websocket binary protocol version"
+    range 1 3
+    default 3
+    depends on RIVER_ORVIBO_CLIENT_EN
+
 config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y

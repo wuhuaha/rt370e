@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.1` 已补齐 Orvibo-owned 接入层，使端侧具备烧录后直接按 XiaoZhi-compatible contract 连接服务器的必要闭环。
+- 新增 Orvibo access 层负责 OTA/config、无序列号激活轮询、device/client identity 和 websocket url/token/version 应用。
+- WebSocket open 现在对齐参考客户端：发送鉴权/协议/设备头，发送 hello，并在返回成功前等待 server hello；失败立即关闭并交给 Orvibo 状态机恢复。
+- 语音交互闭环已覆盖 wake -> open -> server hello -> listen detect/start -> binary audio -> TTS start/stop -> barge-in abort。
+- MCP 初期仍只暴露 `self.get_device_status` 和 `self.audio_speaker.set_volume`。
+- 当前 VAD、KWS、KWS tensor dump、alignment replay、preproc/AEC/BF 仍保留并参与构建。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step G.xiaozhi-client.1` 已删除旧主干源码/头文件残留并收窄 Orvibo-only 配置面。
 - 旧 `dialog / session coordinator / cloud adapter / split ASR-TTS / legacy xiaozhi transport / online_control` 已从 live tree 删除。
 - Kconfig/prj.conf 不再暴露已删除 backend。

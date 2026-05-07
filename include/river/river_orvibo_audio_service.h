@@ -45,6 +45,7 @@ river_status_t river_orvibo_audio_service_set_event_handler(
     void *user_data);
 river_status_t river_orvibo_audio_service_start(void);
 river_status_t river_orvibo_audio_service_set_mode(river_orvibo_audio_mode_t mode);
+void river_orvibo_audio_service_set_barge_in_enabled(bool enabled);
 river_orvibo_audio_mode_t river_orvibo_audio_service_mode(void);
 river_status_t river_orvibo_audio_service_handle_downlink(
     const uint8_t *packet,
