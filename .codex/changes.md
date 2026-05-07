@@ -1,5 +1,40 @@
 # Change Log
 
+## Step A.home-ai.12
+- 根据 2026-05-07 11:43/11:44 上板日志继续收 M1 cached-response 的短句重复和尾部截断：
+  - Step A.home-ai.11 已经生效，最新日志明确显示
+    `playback start backend call: stream=xiaozhi_tts ref=no reuse=no`，说明旧
+    AudioTrack 复用路径已经被切断。
+  - 但同一批日志继续出现 `AudioTrack_SetStartThresholdBytes not supported`，
+    随后还有裸 `underrun`；而起播前本地其实已经有
+    `queued=72` 帧，足够覆盖 `expected_duration_ms=1440` 的整句短 TTS。
+  - 这说明当前主问题不再是服务端供给不足，也不再是旧 track 残留，而是
+    Ameba AudioTrack 忽略 start-threshold 后，播放服务过早调用
+    `AudioTrack_Start()`，硬件在真正写满前就开始跑，最终把短 cached-response
+    打成重复开头、后半句截断或裸 `underrun`。
+- 本轮端侧适配：
+  - `river_playback_stream_config_t` 新增 `defer_start_until_prefilled` 开关。
+  - 播放服务新增软件侧 start gate：可在 `start_stream()` 阶段先 prepare track
+    但不立刻 `AudioTrack_Start()`，改为统计实际 `AudioTrack_Write()` 成功写入的
+    字节数。
+  - 当预写入达到 track buffer 阈值后，再显式启动底层 track，并打印
+    `playback deferred start: ... prefetched=... threshold=...`。
+  - XiaoZhi M1 TTS 固定启用该预填充起播；其它播放入口保持原有立即起播行为。
+- 目标日志变化：
+  - `playback start: ... reuse=no deferred=yes`
+  - 在看到 `playback deferred start: ... prefetched=15360B threshold=15360B`
+    之后，才出现 `ameba_audio_stream_tx_start`
+  - 不应再出现裸 `underrun`
+  - `抱歉，我刚刚没听清，请再说一遍。`、`好的，已经打开了。` 这类短
+    cached-response 不应再出现重复开头或后续内容被截断
+- Verification for this step:
+  - Step A.home-ai.12 `rg` verification matched `defer_start_until_prefilled`
+    in the playback config, deferred-start gate, and XiaoZhi TTS wiring.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.11
 - 根据 2026-05-07 11:02 上板日志继续收短 cached-response 播放重复开头和尾部截断：
   - 本轮日志中 `cached_response expected_duration_ms=1440 is_last_segment=yes`，起播时已有 `queued=72` 帧，说明完整短句已经进入本地播放队列。

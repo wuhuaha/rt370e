@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.11 禁用 M1 TTS AudioTrack 复用避免短句残留重复（本地 build 通过，待上板）`
+  - `Step A.home-ai.12 改为预填充后启动 M1 TTS 播放（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,27 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.12 改为预填充后启动 M1 TTS 播放：
+      - 2026-05-07 11:43/11:44 最新日志已经明确显示
+        `playback start backend call: stream=xiaozhi_tts ref=no reuse=no`，
+        说明 Step A.home-ai.11 切断旧 AudioTrack 复用已经生效
+      - 同批日志继续出现
+        `AudioTrack_SetStartThresholdBytes not supported`，并在短
+        cached-response 起播后报出裸 `underrun`
+      - 同时起播前本地已有 `queued=72` 帧，足够覆盖
+        `expected_duration_ms=1440`，说明现在的主问题不是服务端供给不足，而是
+        AudioTrack 忽略 start-threshold 后硬件过早起播
+      - 端侧新增 `defer_start_until_prefilled`，XiaoZhi M1 TTS 现在先
+        prepare track、累计成功写入字节，达到 track buffer 阈值后才真正
+        `AudioTrack_Start()`
+    - 下一步上板验证：
+      - M1 `xiaozhi_tts` 起播应显示 `reuse=no` 且 `deferred=yes`
+      - 应先出现
+        `playback deferred start: ... prefetched=15360B threshold=15360B`
+        再出现 `ameba_audio_stream_tx_start`
+      - 不应再出现裸 `underrun`
+      - `抱歉，我刚刚没听清，请再说一遍。`、`好的，已经打开了。` 这类短句
+        不应再重复开头或截断尾部
     - Step A.home-ai.11 禁用 M1 TTS AudioTrack 复用：
       - 2026-05-07 11:02 日志中服务端返回
         `cached_response expected_duration_ms=1440 is_last_segment=yes`
@@ -36,11 +57,6 @@ or top-of-tree verification target changes.
         上一轮未清掉的短 TTS 残留带到下一轮，造成“抱歉”重复和尾部被挤掉
       - 端侧新增 `disable_track_reuse`，并让 XiaoZhi M1 TTS 每轮都销毁旧
         track 后重新 create/init
-    - 下一步上板验证：
-      - M1 `xiaozhi_tts` 起播应显示 `reuse=no` 和 `playback_start_new`
-      - 不应再显示 `reuse=yes` / `playback_start_reuse`
-      - 不应再听到上一轮残留导致的重复“抱歉”
-      - 若仍出现裸 `underrun` 且 `reuse=no`，下一步收 AudioTrack 起播前预灌
     - Step A.home-ai.10 修复 cached-response 只播“你想”后无声：
       - 2026-05-07 10:11 日志显示服务端返回
         `cached_response expected_duration_ms=1360 is_last_segment=yes`

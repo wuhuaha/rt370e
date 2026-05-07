@@ -145,6 +145,25 @@ python3 /root/ameba-rtos/ameba.py build -p
     AudioTrack，就不能证明上一轮短 TTS 的 SDK/硬件缓冲已经被清干净。
   - 播放配置新增 `disable_track_reuse`，XiaoZhi M1 TTS 固定请求新
     AudioTrack，预期板端日志变为 `reuse=no` / `playback_start_new`。
+- 2026-05-07 改为预填充后启动 M1 TTS 播放：
+  - 11:43/11:44 最新上板日志已经显示
+    `playback start backend call: stream=xiaozhi_tts ref=no reuse=no`，说明
+    old-track 复用路径已经被切断。
+  - 但同批日志继续出现
+    `AudioTrack_SetStartThresholdBytes not supported`，随后仍报裸
+    `underrun`；同时起播前本地已有 `queued=72` 帧，足够覆盖
+    `expected_duration_ms=1440` 的整句短 TTS。
+  - 这说明当前主问题不是服务端供给不足，而是播放服务在 Ameba 忽略
+    start-threshold 的情况下仍过早 `AudioTrack_Start()`，硬件在真正写满前
+    就开始跑。
+  - 播放配置新增 `defer_start_until_prefilled`，XiaoZhi M1 TTS 现在先
+    prepare track，再累计 `AudioTrack_Write()` 成功写入字节；达到 track
+    buffer 阈值后才真正 `AudioTrack_Start()`。
+  - 预期板端日志应出现
+    `playback start: ... deferred=yes` 和
+    `playback deferred start: ... prefetched=15360B threshold=15360B`，且
+    `ameba_audio_stream_tx_start` 出现在 deferred-start 日志之后，不再出现裸
+    `underrun`。
 - 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
   - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
     `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`
