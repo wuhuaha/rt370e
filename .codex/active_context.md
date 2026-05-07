@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.9 同步 M1 默认服务端端口到 8081（本地 build 通过，待上板）`
+  - `Step A.home-ai.10 修复 M1 cached-response 尾音误判重缓冲截断（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,22 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.10 修复 cached-response 只播“你想”后无声：
+      - 2026-05-07 10:11 日志显示服务端返回
+        `cached_response expected_duration_ms=1360 is_last_segment=yes`
+      - 起播时 `queued=68`，按 20 ms/帧正好覆盖 1360 ms，说明完整短句
+        已经进入本地队列
+      - 旧逻辑只在“整段已写入播放后端”后跳过 `upstream_starved`，但当前
+        崩溃点发生在还有 `queued=12` 帧尾音留在本地队列时
+      - 端侧现在用 `pushed_duration_ms + queued_frames * frame_ms` 判断当前
+        last segment 是否已经本地完整；若已覆盖 expected duration，则禁止
+        `upstream_starved` recover，让尾音自然 drain
+    - 下一步上板验证：
+      - 对 1360 ms cached response，不应在 `queued=12` 时进入
+        `xiaozhi playback upstream gap rebuffer`
+      - 不应再出现连续 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut`
+        recover loop
+      - 应能完整听到“你想让我帮你控制什么设备？”而不是只播“你想”
     - Step A.home-ai.9 同步 M1 默认服务端端口：
       - 直接探测 `101.33.235.154:8081` 的 TCP、HTTP discovery 与 WebSocket
         M1 subprotocol 均通过

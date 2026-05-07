@@ -1,3 +1,60 @@
+## Step A.home-ai.10 Verification
+
+Confirm the cached-response tail no longer enters upstream rebuffer when the
+known final segment is already fully available locally:
+```bash
+cd /root/ameba-river
+rg -n "current_last_segment_audio_locally_complete|pushed frames plus the still-queued local tail|upstream_starved|local_duration_ms" \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_rebuffer_recovery.inc
+```
+
+Expected result:
+- the final-segment guard counts `pushed_duration_ms + queued_frames * frame_ms`
+  against `expected_duration_ms`
+- the guard verifies the current segment matches the observed last segment
+  context before suppressing rebuffer
+- `river_cloud_xiaozhi_maybe_rebuffer_starved()` skips `upstream_starved`
+  recovery when that local-complete condition is true
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+```
+
+Expected result:
+- no whitespace errors
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-07 cached-response
+truncation:
+```text
+重启后唤醒“小欧管家”，触发服务端返回
+`你想让我帮你控制什么设备？` 这类 cached_response。
+```
+
+Expected result:
+- after `xiaozhi playback start ... queued=68 ... expected_duration_ms=1360`,
+  playback should not enter `xiaozhi playback upstream gap rebuffer` at
+  `queued=12`
+- no rapid repeated `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut`
+  recover loop
+- the full sentence should be audible instead of stopping after “你想”
+- playback should drain/complete and the next wake or follow-up should not be
+  blocked by residual `rebuffer=yes`
+
 ## Step A.home-ai.9 Verification
 
 Confirm the default M1 realtime endpoint uses the currently deployed `8081`

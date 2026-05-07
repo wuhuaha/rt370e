@@ -287,14 +287,14 @@ static bool river_cloud_xiaozhi_maybe_rebuffer_starved(uint32_t queued_frames, u
 
     /*
      * The current M1 service can deliver a whole cached-response clip in a
-     * short burst. After we have already pushed the entire last segment into
-     * the local playback backend, the software ring may drain to zero while the
-     * speaker is still naturally playing out the backend buffer. That is not an
-     * upstream starvation condition and forcing recover/flush here produces an
-     * audible pop and leaves the output-turn guard stuck.
+     * short burst. Once the pushed frames plus the still-queued local tail cover
+     * the expected duration of the known last segment, the client already owns
+     * the complete clip. The software ring may run below the low-water mark
+     * while the speaker is naturally draining that tail; forcing recover/flush
+     * here cuts speech after the first words and can leave the output turn stuck.
      */
-    if (river_cloud_xiaozhi_playback_last_segment_observed() &&
-        river_cloud_xiaozhi_current_segment_audio_fully_pushed()) {
+    if (river_cloud_xiaozhi_current_last_segment_audio_locally_complete(
+            queued_frames)) {
         river_cloud_xiaozhi_clear_downlink_starvation_watch();
         return false;
     }

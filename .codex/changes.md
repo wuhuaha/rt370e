@@ -1,5 +1,25 @@
 # Change Log
 
+## Step A.home-ai.10
+- 根据 2026-05-07 10:11 上板日志修复 cached-response 只播出“你想”后无声的问题：
+  - 服务端返回 `cached_response expected_duration_ms=1360 is_last_segment=yes`。
+  - 端侧起播时已有 `queued=68` 帧，按 20 ms/帧正好覆盖完整 1360 ms 音频，说明完整短句已经进入本地播放队列。
+  - 播放约 240 ms 后队列剩 `queued=12`，旧 `upstream_starved` 逻辑把最后 12 帧尾音误判为上游断流，开始反复 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut -> playback recover`。
+  - 这会直接截断后半句，表现为只听到“你想”，后续没有声音。
+- 本轮端侧适配：
+  - 将最后一段 rebuffer 防护从“已完整写入播放后端”扩展为“已写入播放后端的帧 + 本地队列剩余尾音帧”覆盖 `expected_duration_ms`。
+  - 只有当前播放 segment 与已知 last segment context 完全一致时才启用该保护，避免影响多段流式音频的真实断流恢复。
+  - 对已本地持有完整音频的最后一段，禁止进入 `upstream_starved` recover，让尾音自然 drain 并由 terminal ACK 路径收口。
+- 目标日志变化：
+  - 对 `expected_duration_ms=1360`、起播 `queued=68` 的 cached response，不应在 `queued=12` 时进入 `xiaozhi playback upstream gap rebuffer`。
+  - 不应出现连续几十/上百次 `AudioTrack_Flush -> tx_close -> CreateAudioHwStreamOut -> playback recover`。
+  - 应能完整听到“你想让我帮你控制什么设备？”并正常完成播放尾态。
+- Verification for this step:
+  - Step A.home-ai.10 `rg` verification matched the local-complete last-segment guard and `upstream_starved` skip wiring.
+  - `git diff --check` passed。
+  - 初次 build 发现新增 helper 缺少 `river_cloud_xiaozhi_downlink_frame_duration_ms()` 前置声明，已修复。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'` completed with `Build done`。
+
 ## Step A.home-ai.9
 - 根据当前服务侧实际部署端口修正 M1 默认连接地址：
   - 直接探测 `101.33.235.154:8081` 通过：
