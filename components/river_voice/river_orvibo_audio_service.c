@@ -173,8 +173,14 @@ static void river_orvibo_audio_apply_runtime_policy(river_orvibo_audio_mode_t mo
         river_voice_runtime_set_playback_owner(RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE);
         break;
     case RIVER_ORVIBO_AUDIO_MODE_SPEAKING:
-        river_voice_kws_set_detection_gate(false, "orvibo_speaking");
-        river_voice_runtime_set_interaction_state(RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING);
+        river_voice_kws_set_detection_gate(g_river_orvibo_audio.barge_in_enabled,
+                                           g_river_orvibo_audio.barge_in_enabled ?
+                                               "orvibo_barge_in" :
+                                               "orvibo_speaking");
+        river_voice_runtime_set_interaction_state(
+            g_river_orvibo_audio.barge_in_enabled ?
+                RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING :
+                RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING);
         river_voice_runtime_set_playback_owner(RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_ORVIBO);
         break;
     default:
@@ -547,6 +553,9 @@ river_status_t river_orvibo_audio_service_set_mode(river_orvibo_audio_mode_t mod
         RIVER_LOGI("audio mode: %s -> %s",
                    river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                    river_orvibo_audio_mode_name(mode));
+        if (mode != RIVER_ORVIBO_AUDIO_MODE_SPEAKING) {
+            g_river_orvibo_audio.barge_in_enabled = false;
+        }
         g_river_orvibo_audio.mode = mode;
         g_river_orvibo_audio.pcm_accum_bytes = 0U;
         if (mode == RIVER_ORVIBO_AUDIO_MODE_IDLE) {
@@ -561,6 +570,9 @@ river_status_t river_orvibo_audio_service_set_mode(river_orvibo_audio_mode_t mod
 void river_orvibo_audio_service_set_barge_in_enabled(bool enabled)
 {
     g_river_orvibo_audio.barge_in_enabled = enabled;
+    if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_SPEAKING) {
+        river_orvibo_audio_apply_runtime_policy(RIVER_ORVIBO_AUDIO_MODE_SPEAKING);
+    }
     RIVER_LOGI("audio barge-in: %s", enabled ? "enabled" : "disabled");
 }
 

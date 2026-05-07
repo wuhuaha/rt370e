@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.13 补齐 Orvibo TTS 下行播放采样率适配（SDK 构建通过）`
+  - `Step H.xiaozhi-client.14 补齐 Orvibo listening 复入与唤醒打断闭环（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.14` aligns Orvibo listening re-entry and abort semantics with the XiaoZhi-compatible reference:
+  - `tts_stop` now drains playback, returns to listening, and sends a fresh `listen start` for the next turn.
+  - VAD speech-start barge-in sends generic `abort` without a reason, then re-enters listening.
+  - wake-word barge-in uses a separate `abort_wake_word` action and sends `reason=wake_word_detected`.
+  - speaking + barge-in enabled opens the existing KWS detection gate so current wake-word implementation can participate during TTS.
+  - VAD, KWS model/thresholds/parity tooling, AEC, and BF implementations are unchanged.
 - `Step H.xiaozhi-client.13` adapts XiaoZhi-compatible TTS downlink audio to an Ameba playback-supported rate:
   - server Opus is still decoded with the sample rate and frame duration from server hello.
   - decoded mono PCM is converted to the selected playback rate before stereo expansion and reference export.
@@ -131,6 +137,7 @@ or top-of-tree verification target changes.
   - host-side OTA + WebSocket hello probe
   - Orvibo WebSocket subprotocol grep
   - Orvibo downlink playback sample-rate adapter grep
+  - Orvibo listen re-entry / abort reason / speaking KWS gate grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -142,7 +149,7 @@ or top-of-tree verification target changes.
 - Continue Orvibo mainline behavior hardening:
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
-  - wake/listen/speak/barge-in state-machine verification
+  - board-side multi-turn wake/listen/speak/barge-in verification
 
 ## Workflow Notes
 

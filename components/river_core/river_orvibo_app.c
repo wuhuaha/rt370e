@@ -483,18 +483,22 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
             g_river_orvibo_app.wake_text[0] != '\0' ? g_river_orvibo_app.wake_text : "小欧管家");
         river_orvibo_app_record_protocol_control("send_wake_detected", status, true);
     }
-    if ((actions & RIVER_ORVIBO_ACTION_START_LISTENING) != 0U) {
-        river_status_t status = river_orvibo_protocol_send_start_listening("auto");
-        river_orvibo_app_record_protocol_control("listen_start", status, true);
-    }
     if ((actions & RIVER_ORVIBO_ACTION_STOP_LISTENING) != 0U) {
         river_status_t status = river_orvibo_protocol_send_stop_listening();
         river_orvibo_app_record_protocol_control("listen_stop", status, true);
     }
-    if ((actions & RIVER_ORVIBO_ACTION_ABORT_SPEAKING) != 0U) {
+    if ((actions & RIVER_ORVIBO_ACTION_ABORT_WAKE_WORD) != 0U) {
         river_status_t status =
             river_orvibo_protocol_send_abort_speaking("wake_word_detected");
+        river_orvibo_app_record_protocol_control("abort_wake_word", status, true);
+    }
+    if ((actions & RIVER_ORVIBO_ACTION_ABORT_SPEAKING) != 0U) {
+        river_status_t status = river_orvibo_protocol_send_abort_speaking(NULL);
         river_orvibo_app_record_protocol_control("abort_speaking", status, true);
+    }
+    if ((actions & RIVER_ORVIBO_ACTION_START_LISTENING) != 0U) {
+        river_status_t status = river_orvibo_protocol_send_start_listening("auto");
+        river_orvibo_app_record_protocol_control("listen_start", status, true);
     }
 }
 

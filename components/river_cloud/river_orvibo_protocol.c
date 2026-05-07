@@ -1373,11 +1373,9 @@ river_status_t river_orvibo_protocol_send_abort_speaking(const char *reason)
     }
     river_orvibo_add_session_id(root);
     cJSON_AddStringToObject(root, "type", "abort");
-    cJSON_AddStringToObject(root,
-                            "reason",
-                            reason != NULL && reason[0] != '\0' ?
-                                reason :
-                                "wake_word_detected");
+    if (reason != NULL && reason[0] != '\0') {
+        cJSON_AddStringToObject(root, "reason", reason);
+    }
     return river_orvibo_send_json_root(root);
 }
 

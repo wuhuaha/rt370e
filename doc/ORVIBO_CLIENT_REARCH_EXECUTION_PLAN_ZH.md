@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.14` 已补齐 Orvibo listening 复入与唤醒打断闭环：
+  - `tts_stop` 后先 drain playback，再恢复 listening，并重新发送 `listen start`，确保多轮对话服务端继续收音。
+  - speaking 期间 VAD speech-start barge-in 发送无 reason 的 generic `abort`，随后重新 `listen start`。
+  - wake word barge-in 使用独立 `ABORT_WAKE_WORD` action，发送 `reason=wake_word_detected`。
+  - speaking + barge-in enabled 时放开当前 KWS detection gate，让现有唤醒词实现可参与 TTS 期间打断。
+  - VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF 保护区不变。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.13` 已补齐 Orvibo TTS 下行播放采样率适配：
   - 服务端 Opus 仍按 hello 给定的 `sample_rate` / `frame_duration` 解码。
   - 解码后的 mono PCM 会在 Orvibo audio service 内转换到选定的播放采样率后再扩成 stereo。
@@ -269,9 +276,10 @@ network_wait -> idle              on NETWORK_READY
 idle -> connecting                on WAKE_DETECTED
 connecting -> listening           on AUDIO_CHANNEL_OPENED
 listening -> speaking             on SERVER_TTS_STARTED
-speaking -> listening             on USER_SPEECH_STARTED + abort_sent
-speaking -> idle                  on SERVER_TTS_FINISHED
-listening -> idle                 on LISTEN_TIMEOUT or USER_SPEECH_ENDED + committed
+listening -> listening            on WAKE_DETECTED + wake_abort + listen_start
+speaking -> listening             on USER_SPEECH_STARTED + generic_abort + listen_start
+speaking -> listening             on WAKE_DETECTED + wake_abort + listen_start
+speaking -> listening             on SERVER_TTS_FINISHED + playback_drain + listen_start
 any -> network_wait               on NETWORK_LOST
 any -> recovering                 on recoverable error
 recovering -> idle                on recovery done
@@ -283,7 +291,7 @@ any -> error                      on fatal error
 - `idle`：KWS 应启用；Orvibo audio channel 可关闭。
 - `connecting`：KWS 可暂停；正在打开 Orvibo audio channel。
 - `listening`：VAD 和上行编码开启；下行播放未占用 speaker。
-- `speaking`：下行播放开启；VAD 可用于 barge-in；KWS 不参与重复唤醒。
+- `speaking`：下行播放开启；VAD 可用于 generic barge-in；barge-in enabled 时当前 KWS 可用于 wake-word abort。
 - `recovering`：停止上行、停止播放、关闭或重建协议连接。
 
 质量要求：
@@ -1112,12 +1120,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 当前服务端 `24000Hz/60ms` TTS 会转为 `48000Hz/60ms` 播放/reference 帧。
   - playback 活跃期间如果下行格式变化，会停止并用新格式重启 `orvibo_tts` stream。
   - audio diag/status 输出 `rs=converted/bypass/fail` 和 `rate=server->playback`。
+- `Step H.xiaozhi-client.14`：
+  - `tts_stop` 后重新发送 `listen start`，使下一轮对话不会停在本地 listening 但服务端未重新收音的状态。
+  - VAD speech-start barge-in 使用无 reason 的 generic `abort`；wake-word barge-in 使用 `reason=wake_word_detected`。
+  - speaking + barge-in enabled 时放开当前 KWS detection gate，并把 runtime interaction 标记为 `barge_in_listening`。
+  - 离开 speaking 会关闭 barge-in gate；受保护的 VAD/KWS/AEC/BF 实现不变。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1128,9 +1141,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol 和 24k->48k 播放采样率适配，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配，以及 listening 复入/唤醒词打断闭环，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/多轮 listening/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。

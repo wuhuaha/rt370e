@@ -1,3 +1,58 @@
+## Step H.xiaozhi-client.14 Verification
+
+Confirm Orvibo re-enters listening after TTS stop and barge-in:
+```bash
+cd /root/ameba-river
+rg -n "ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|SERVER_TTS_FINISHED|USER_SPEECH_STARTED|WAKE_DETECTED|RIVER_ORVIBO_ACTION_START_LISTENING" \
+  include/river/river_orvibo_state.h \
+  components/river_core/river_orvibo_state.c \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- `SERVER_TTS_FINISHED` returns to listening with `WAIT_PLAYBACK_IDLE` and `START_LISTENING`.
+- VAD speech-start barge-in sends generic abort and then `listen start`.
+- wake-word barge-in uses `ABORT_WAKE_WORD` so the protocol includes `reason=wake_word_detected`.
+
+Confirm abort JSON reason handling and speaking KWS gate policy:
+```bash
+cd /root/ameba-river
+rg -n "cJSON_AddStringToObject\\(root, \\\"reason\\\"|RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING|orvibo_barge_in|barge_in_enabled|river_voice_kws_set_detection_gate" \
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- `river_orvibo_protocol_send_abort_speaking(NULL)` omits the `reason` field.
+- speaking + barge-in enabled allows the existing KWS detection path.
+- leaving speaking clears barge-in and blocks KWS in listening.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后完成一次唤醒问答，等待服务端 TTS stop 后继续说下一轮；再在 TTS 播放期间用唤醒词或直接插话测试打断。
+```
+
+Expected result:
+- `tts_stop` 后 app/protocol 日志出现新的 `listen_start` 成功计数，下一轮上行音频仍被服务端接收。
+- speaking 期间普通 VAD 打断发送无 reason abort；唤醒词打断发送 `abort_wake_word`。
+- speaking + barge-in enabled 时 KWS status 的 detection gate 不再显示 `orvibo_speaking` 阻塞。
+- 未出现持续 `protocol_ctrl` failure、TTS stop 后卡在 speaking、或下一轮讲话无服务端响应。
+
 ## Step H.xiaozhi-client.13 Verification
 
 Confirm Orvibo TTS downlink adapts server audio to a playback-supported sample

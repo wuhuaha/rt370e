@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.14
+- 补齐 Orvibo listening 复入控制帧闭环：
+  - `speaking -> listening` 的 `tts_stop` 路径在 playback drain 后会重新发送 `listen start`，对齐参考客户端每次回到 listening 都通知服务端继续收音的行为。
+  - speaking 中的 VAD speech-start barge-in 现在发送无 reason 的 generic `abort`，随后重新发送 `listen start`，避免把普通人声误标成唤醒词。
+  - speaking/listening 中的 wake word 事件使用独立 `ABORT_WAKE_WORD` action，发送 `reason=wake_word_detected` 后再重新 `listen start`。
+- 让现有 KWS 能参与 TTS 期间唤醒打断：
+  - Orvibo audio service 在 speaking 且 barge-in enabled 时放开当前 KWS detection gate。
+  - runtime interaction state 在该窗口标记为 `barge_in_listening`，离开 speaking 时自动关闭 barge-in gate。
+  - 未改 KWS 模型、阈值、输入输出、tensor dump、alignment replay 或 board/local parity 代码。
+- 收敛 abort 协议语义：
+  - `river_orvibo_protocol_send_abort_speaking(NULL)` 生成无 reason 的 `{"type":"abort"}`。
+  - 只有明确传入 wake reason 时才带 `reason` 字段，更贴近 `~/xiaozhi-esp32` 的 `AbortReason` 行为。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD 算法、KWS 算法/模型/阈值、AEC/BF 实现。
+  - 本步只改 Orvibo 状态动作、协议控制帧语义和 audio service 对 KWS gate 的运行时策略。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo listen re-entry / abort reason / speaking KWS gate grep passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.13
 - 补齐 Orvibo TTS 下行采样率适配：
   - 下行 Opus 仍按 server hello 的 `sample_rate` / `frame_duration` 解码。
