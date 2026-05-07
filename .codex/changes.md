@@ -1,5 +1,35 @@
 # Change Log
 
+## Step A.home-ai.15
+- 按“更稳的方法”重构 XiaoZhi TTS 的起播保护，不再继续依赖 SDK 的隐含行为：
+  - 当前板子已经被上板日志证明：
+    - 不支持 `AudioTrack_SetStartThresholdBytes`
+    - 也不支持 deferred-write 的“先 write 再 start”
+  - 这意味着稳定方案不能再建立在“也许 SDK 会替我卡住起播”这种假设上，
+    必须把端侧自己的后端约束写清楚。
+- 本轮端侧适配：
+  - 保持 XiaoZhi TTS 走已验证合法的 `Start -> Write` 路径，不再碰 deferred-write。
+  - 在下行 runtime 增加 `startup_burst_frames_left`：
+    - 当后端刚成功启动，且本地队列已经积累了足够的短句音频时，
+      进入一个受控的 startup burst 窗口。
+    - burst 帧数按当前排队深度和起播门槛收敛，并额外上限为 6 帧，避免
+      长流/普通 steady-state 被这个机制拖偏。
+  - 目标是把最容易 underrun 的起播头部快速压进后端，减少“刚起播就空转”
+    的概率，而不再触碰 SDK 不支持的状态机路径。
+- 目标日志变化：
+  - 起播后应看到
+    `xiaozhi playback startup burst armed: queued=... burst_frames=... start=...`
+  - 不应再出现 `AudioTrack-E] write: invalid state(1)`
+  - 在短 cached-response 场景下，应先恢复可听声音，再观察是否还有首尾质量问题
+- Verification for this step:
+  - Step A.home-ai.15 `rg` verification matched
+    `startup_burst_frames_left` state, startup-burst arming log, and
+    `defer_start_until_prefilled = false`.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.14
 - 根据 2026-05-07 13:50 最新上板日志收口“完全没声音”：
   - 日志已经明确给出根因，不再需要猜测：

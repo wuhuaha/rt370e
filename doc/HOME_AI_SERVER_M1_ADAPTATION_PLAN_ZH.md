@@ -189,6 +189,21 @@ python3 /root/ameba-rtos/ameba.py build -p
     `AudioTrack_Start()` 先发生的路径，优先把声音恢复回可播放基线。
   - 后续若仍要继续收 cached-response 的首尾质量，应该转向“start 后快速灌入
     后端”或 downlink worker burst 喂数，而不是再回到 deferred-write 假设。
+- 2026-05-07 增加 M1 TTS 启动后 burst 预灌保护：
+  - 结合前面的两轮验证，当前板子已经被证明：
+    - 不支持 `AudioTrack_SetStartThresholdBytes`
+    - 也不支持 deferred-write 的“先 write 再 start”
+  - 因而更稳的方法不能建立在 SDK 可能代做阈值控制的前提上，而必须把
+    XiaoZhi TTS 的后端约束显式建模。
+  - 端侧现在保持合法的 `AudioTrack_Start() -> AudioTrack_Write()` 路径，同时在
+    后端刚启动、且本地下行队列已经积累了足够短句音频时，额外打开一个受控的
+    startup burst 窗口，连续多写几帧把起播头部压进后端。
+  - burst 帧数会同时受当前排队深度、起播门槛以及 6 帧硬上限约束，避免把
+    长流 steady-state 或其它播放入口拖偏。
+  - 预期日志应出现
+    `xiaozhi playback startup burst armed: queued=... burst_frames=... start=...`，
+    并在不触碰不支持的 deferred-write 路径前提下，降低起播头部再次落入
+    `write_failed / stop_rebuffer` 的概率。
 - 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
   - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
     `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`

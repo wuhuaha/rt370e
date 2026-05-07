@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.14 回退不兼容的 M1 TTS deferred-write 起播（本地 build 通过，待上板）`
+  - `Step A.home-ai.15 增加 M1 TTS 启动后 burst 预灌保护（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,22 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.15 增加 M1 TTS 启动后 burst 预灌保护：
+      - 当前板子已经被上板日志证明同时不支持：
+        - `AudioTrack_SetStartThresholdBytes`
+        - deferred-write 的“先 write 再 start”
+      - 因此稳定方案不能再依赖 SDK 隐含阈值行为，而要把端侧自己的后端约束写清楚
+      - 端侧现在保持合法的 `Start -> Write` 路径，并在播放后端刚成功启动、且
+        本地队列已足够深时，额外打开一个受控的 startup burst 窗口，连续多写几帧
+        把最容易 underrun 的头部压进后端
+      - burst 帧数按当前排队深度、起播门槛和 6 帧硬上限收敛，避免长流 steady
+        state 被干扰
+    - 下一步上板验证：
+      - `playback start: ... deferred=no`
+      - `xiaozhi playback startup burst armed: queued=... burst_frames=... start=...`
+      - 不应再出现 `AudioTrack-E] write: invalid state(1)`
+      - 不应再在起播第一批帧立刻掉进 `write_failed -> stop_rebuffer` 循环
+      - 若还有残余问题，应表现为“有声但头尾质量仍需调”，而不是完全无声
     - Step A.home-ai.14 回退不兼容的 M1 TTS deferred-write 起播：
       - 2026-05-07 13:50 最新上板日志中
         `playback start: ... deferred=yes` 后第一次下行写入就报

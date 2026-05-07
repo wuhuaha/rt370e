@@ -1,3 +1,59 @@
+## Step A.home-ai.15 Verification
+
+Confirm XiaoZhi TTS now uses an explicit startup-burst mechanism on top of the
+legal `Start -> Write` backend path, instead of relying on unsupported SDK
+threshold/deferred-write behavior:
+```bash
+cd /root/ameba-river
+rg -n "startup_burst_frames_left|startup burst armed|defer_start_until_prefilled = false" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_downlink_cycle.inc \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c
+```
+
+Expected result:
+- downlink runtime truth carries `startup_burst_frames_left`
+- XiaoZhi TTS still uses `config.defer_start_until_prefilled = false`
+- playback start arms a bounded startup burst and logs
+  `xiaozhi playback startup burst armed: ...`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the short cached-response TTS path:
+```text
+重启后再次触发 `好的，空调已调到26度。` 或类似短 cached_response。
+```
+
+Expected result:
+- `playback start: ... deferred=no`
+- `xiaozhi playback startup burst armed: queued=... burst_frames=... start=...`
+- no `AudioTrack-E] write: invalid state(1)`
+- no immediate `write_failed -> stop_rebuffer` loop right after startup
+- if a residual quality issue remains, it should now be a head/tail tuning issue
+  on a still-audible clip rather than total silence
+
 ## Step A.home-ai.14 Verification
 
 Confirm XiaoZhi TTS no longer uses the unsupported deferred-write startup path

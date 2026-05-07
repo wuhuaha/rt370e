@@ -527,6 +527,7 @@ void river_cloud_xiaozhi_reset_downlink_state(void)
 {
     river_cloud_xiaozhi_reset_downlink_ring_runtime();
     g_river_cloud.xiaozhi_downlink_runtime_truth.ring_dropped = 0U;
+    g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left = 0U;
     g_river_cloud.xiaozhi_playback_runtime_truth.rebuffer_cause =
         RIVER_CLOUD_PLAYBACK_REBUFFER_CAUSE_NONE;
     g_river_cloud.xiaozhi_playback_runtime_truth.recovery_path =

@@ -2163,6 +2163,9 @@ river_cloud_xiaozhi_write_current_downlink_frame_step(uint32_t queued_frames)
 
     river_cloud_xiaozhi_finish_successful_downlink_frame_write();
     result.frame_consumed = true;
+    if (g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left != 0U) {
+        g_river_cloud.xiaozhi_downlink_runtime_truth.startup_burst_frames_left--;
+    }
     return result;
 }
 

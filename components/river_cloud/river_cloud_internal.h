@@ -333,6 +333,7 @@ typedef struct {
     river_cloud_xiaozhi_downlink_wait_kind_t last_wait_kind;
     river_cloud_xiaozhi_downlink_cycle_outcome_t last_cycle_outcome;
     size_t accum_bytes;
+    uint32_t startup_burst_frames_left;
     bool retry_valid;
 } river_cloud_xiaozhi_downlink_runtime_truth_t;
 
