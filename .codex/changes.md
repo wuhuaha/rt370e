@@ -1,5 +1,40 @@
 # Change Log
 
+## Step A.home-ai.16
+- 按“稳定可靠 > 实时性 > CPU > 内存”的优先级，对 XiaoZhi 整条音频链路做一轮系统性收敛，先收两条最会反复制造假象的高风险路径，而不是继续在单点日志上来回补丁：
+  - 上行 ASR 音频链路此前默认偏“低延迟优先”：
+    - 在 transport 忙或本地 ring 积压时，会主动 trim stale frames
+    - ring 写满后还会直接丢掉最老一帧再写新帧
+    - 这类“静默丢旧音频”会把真实问题伪装成服务端没听清、截断、偶发空识别
+  - 下行 TTS 播放链路此前默认偏“瞬时恢复优先”：
+    - 起播后第一次 `AudioTrack_Write()` 失败就立刻升级成
+      `service_recover -> managed_rebuffer`
+    - 在当前 Ameba AudioTrack 状态机不稳定时，这会把短暂后端抖动放大成整段
+      无声或 `write_failed -> stop_rebuffer` 死循环
+- 本轮端侧硬化：
+  - XiaoZhi uplink 改为“显式拥塞，不再静默裁剪音频”：
+    - 取消 proactive stale trim
+    - 取消 ring 满后“读掉最老帧再重写”的覆盖式策略
+    - ring 满时直接返回 `RIVER_ERR_BUSY`，并记录
+      `xiaozhi uplink ring full: ... enqueue_busy=...`
+    - 同时把 uplink 累积缓冲和 ring 深度上调，给 transport 抖动留更大吸收带宽
+  - XiaoZhi playback 改为“起播窗口容错，再进入恢复”：
+    - 新增 `consecutive_write_failures`
+    - 仅在 startup burst 窗口内，允许前 3 次连续写失败先 sleep/poll，
+      不立即 stop/rebuffer
+    - 一旦任意一帧成功写入，就把连续失败计数清零
+    - 这样能把板端后端刚起播时的瞬时 invalid/busy 抖动和真正持续性故障区分开
+- 目标效果：
+  - 上行不再通过静默丢帧制造“没听清/后半句消失”的假象
+  - 下行不再因为起播第一批帧的瞬态失败直接掉进整段无声恢复风暴
+  - 后续如果仍有问题，日志会更直接暴露是 transport 拥塞、AudioTrack 后端不稳，
+    还是真正的服务侧问题
+- Verification for this step:
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.15
 - 按“更稳的方法”重构 XiaoZhi TTS 的起播保护，不再继续依赖 SDK 的隐含行为：
   - 当前板子已经被上板日志证明：

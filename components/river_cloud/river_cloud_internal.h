@@ -51,7 +51,7 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PACKET_MAX \
     ((RIVER_XIAOZHI_UPLINK_SAMPLE_RATE * RIVER_XIAOZHI_UPLINK_CHANNELS * \
       sizeof(int16_t) * RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS) / 1000U)
-#define RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX 4096U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_ACCUM_MAX 16384U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_SAMPLES_MAX 2048U
 #define RIVER_CLOUD_XIAOZHI_DOWNLINK_PCM_BYTES_MAX \
     (((24000U * 60U) / 1000U) * sizeof(int16_t))
@@ -84,8 +84,7 @@
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_BUFFER_FRAMES_FALLBACK 8U
 #define RIVER_CLOUD_XIAOZHI_PLAYBACK_REF_HISTORY_MS 320U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_POLL_MS    5U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 64U
-#define RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX 5U
+#define RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES 192U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX 1U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_PREVIEW_WARMUP_MS 320U
 /*
@@ -96,6 +95,7 @@
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_BACKOFF_MAX_MS 160U
 #define RIVER_CLOUD_XIAOZHI_UPLINK_BUSY_LOG_INTERVAL_MS 1000U
 #define RIVER_CLOUD_XIAOZHI_CONTROL_QUEUE_DEPTH 8U
+#define RIVER_CLOUD_XIAOZHI_PLAYBACK_STARTUP_WRITE_FAIL_GRACE 3U
 #define RIVER_CLOUD_XIAOZHI_CONTROL_WAIT_MS 0xFFFFFFFFU
 #define RIVER_CLOUD_XIAOZHI_CONTROL_ARG_MAX 64U
 #define RIVER_CLOUD_XIAOZHI_PRE_ROLL_MAX_MS    128U
@@ -334,6 +334,7 @@ typedef struct {
     river_cloud_xiaozhi_downlink_cycle_outcome_t last_cycle_outcome;
     size_t accum_bytes;
     uint32_t startup_burst_frames_left;
+    uint32_t consecutive_write_failures;
     bool retry_valid;
 } river_cloud_xiaozhi_downlink_runtime_truth_t;
 
@@ -355,6 +356,7 @@ typedef struct {
     uint32_t busy_count;
     uint32_t fail_count;
     uint32_t stale_dropped;
+    uint32_t enqueue_busy_count;
     uint32_t busy_streak;
     uint32_t burst_max;
     uint64_t next_send_ms;

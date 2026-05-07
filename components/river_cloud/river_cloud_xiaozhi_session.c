@@ -393,6 +393,7 @@ river_status_t river_cloud_xiaozhi_apply_bridge_open_capture_policy(
     g_river_cloud.xiaozhi_uplink_runtime_truth.busy_count = 0U;
     g_river_cloud.xiaozhi_uplink_runtime_truth.fail_count = 0U;
     g_river_cloud.xiaozhi_uplink_runtime_truth.stale_dropped = 0U;
+    g_river_cloud.xiaozhi_uplink_runtime_truth.enqueue_busy_count = 0U;
     g_river_cloud.xiaozhi_uplink_runtime_truth.timestamp_ms =
         (uint32_t)rtos_time_get_current_system_time_ms();
     g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = 0U;
@@ -739,69 +740,35 @@ uint32_t river_cloud_xiaozhi_uplink_ready_frames(void)
 
 uint32_t river_cloud_xiaozhi_trim_uplink_stale_frames(uint32_t keep_frames)
 {
-    uint32_t dropped = 0U;
+    (void)keep_frames;
 
-    if (!g_river_cloud.xiaozhi_uplink_ring.initialized) {
-        return 0U;
-    }
-
-    while (river_cloud_xiaozhi_uplink_ready_frames() > keep_frames) {
-        if (river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring) == 0U) {
-            break;
-        }
-        if (river_audio_frame_ring_read(&g_river_cloud.xiaozhi_uplink_ring,
-                                        g_river_cloud.xiaozhi_uplink_drop_frame) != RIVER_OK) {
-            break;
-        }
-        dropped++;
-    }
-
-    if (dropped != 0U) {
-        g_river_cloud.xiaozhi_uplink_runtime_truth.stale_dropped += dropped;
-    }
-    return dropped;
+    return 0U;
 }
 
 static river_status_t river_cloud_xiaozhi_queue_uplink_packet(const uint8_t *pcm,
                                                               size_t pcm_bytes)
 {
     river_status_t status;
-    uint32_t keep_before_write;
 
     if (pcm == NULL || pcm_bytes == 0U || !g_river_cloud.xiaozhi_uplink_ring.initialized) {
         return RIVER_ERR_ARG;
     }
 
-    /*
-     * Keep the realtime uplink queue short. Once the transport falls behind,
-     * older audio is less valuable than preserving a low-latency tail for live
-     * ASR. This mirrors the reference xiaozhi client more closely than waiting
-     * for the full 64-frame ring to overflow.
-     */
-    keep_before_write = (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX > 0U) ?
-                            (RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX - 1U) :
-                            0U;
-    (void)river_cloud_xiaozhi_trim_uplink_stale_frames(keep_before_write);
-
     status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_uplink_ring, pcm);
     if (status == RIVER_OK) {
         return RIVER_OK;
     }
-
-    if (river_audio_frame_ring_read(&g_river_cloud.xiaozhi_uplink_ring,
-                                    g_river_cloud.xiaozhi_uplink_drop_frame) != RIVER_OK) {
-        return status;
-    }
-
-    status = river_audio_frame_ring_write(&g_river_cloud.xiaozhi_uplink_ring, pcm);
-    if (status == RIVER_OK) {
+    g_river_cloud.xiaozhi_uplink_runtime_truth.enqueue_busy_count++;
+    if (g_river_cloud.xiaozhi_uplink_runtime_truth.ring_dropped < UINT32_MAX) {
         g_river_cloud.xiaozhi_uplink_runtime_truth.ring_dropped++;
-        RIVER_LOGW("xiaozhi uplink ring overflow: dropped=%lu queued=%lu capacity=%u",
-                   (unsigned long)g_river_cloud.xiaozhi_uplink_runtime_truth.ring_dropped,
-                   (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring),
-                   (unsigned int)RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES);
     }
-    return status;
+    RIVER_LOGW("xiaozhi uplink ring full: queue=%lu/%u enqueue_busy=%lu dropped=%lu accum=%luB",
+               (unsigned long)river_audio_frame_ring_count(&g_river_cloud.xiaozhi_uplink_ring),
+               (unsigned int)RIVER_CLOUD_XIAOZHI_UPLINK_RING_FRAMES,
+               (unsigned long)g_river_cloud.xiaozhi_uplink_runtime_truth.enqueue_busy_count,
+               (unsigned long)g_river_cloud.xiaozhi_uplink_runtime_truth.ring_dropped,
+               (unsigned long)g_river_cloud.xiaozhi_uplink_runtime_truth.accum_bytes);
+    return RIVER_ERR_BUSY;
 }
 
 river_status_t river_cloud_xiaozhi_push_pcm(const uint8_t *pcm, size_t pcm_bytes)
@@ -858,11 +825,6 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
     }
 
     can_send = river_cloud_xiaozhi_uplink_send_ready();
-    if (can_send) {
-        (void)river_cloud_xiaozhi_trim_uplink_stale_frames(
-            RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX);
-    }
-
     frame_ms = RIVER_XIAOZHI_UPLINK_FRAME_DURATION_MS;
     while (true) {
         uint64_t due_ms;
@@ -967,8 +929,6 @@ void river_cloud_xiaozhi_run_uplink_io_once(void)
                 frame_ms,
                 g_river_cloud.xiaozhi_uplink_runtime_truth.busy_streak);
             g_river_cloud.xiaozhi_uplink_runtime_truth.next_send_ms = now_ms + (uint64_t)backoff_ms;
-            (void)river_cloud_xiaozhi_trim_uplink_stale_frames(
-                RIVER_CLOUD_XIAOZHI_UPLINK_STALE_FRAMES_MAX);
             river_cloud_xiaozhi_log_uplink_backpressure(now_ms, backoff_ms);
             break;
         }

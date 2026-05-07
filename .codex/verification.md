@@ -1,3 +1,63 @@
+## Step A.home-ai.16 Verification
+
+Confirm the XiaoZhi audio path now prefers continuity over silent dropping and
+startup overreaction:
+```bash
+cd /root/ameba-river
+rg -n "UPLINK_RING_FRAMES|UPLINK_ACCUM_MAX|PLAYBACK_STARTUP_WRITE_FAIL_GRACE|enqueue_busy_count|consecutive_write_failures|write failed grace|ring full" \
+  components/river_cloud/river_cloud_internal.h \
+  components/river_cloud/river_cloud_xiaozhi_session.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_runtime.c \
+  components/river_cloud/river_cloud_xiaozhi_playback_public_policy.inc
+```
+
+Expected result:
+- uplink ring depth is larger and no longer depends on `UPLINK_STALE_FRAMES_MAX`
+- the session path exposes `enqueue_busy_count` instead of silently trimming
+  old frames
+- downlink runtime truth carries `consecutive_write_failures`
+- startup write failures can log
+  `xiaozhi playback write failed grace: ...`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for both uplink and downlink stability:
+```text
+1. 连续说一条较长指令，确认服务端不再频繁回复“没听清”。
+2. 再触发 `好的，空调已调到26度。` 这类短 cached_response。
+```
+
+Expected result:
+- uplink path should not increase `stale_drop`; if congestion happens, it should
+  log explicit `xiaozhi uplink ring full: ...` or transport backpressure
+- downlink startup should still show `deferred=no`
+- no immediate infinite `write_failed -> stop_rebuffer` loop on the first
+  startup frames
+- if write failures still exist, the first few startup failures should be
+  absorbed by `xiaozhi playback write failed grace: ...` before a managed
+  recover path is attempted
+
 ## Step A.home-ai.15 Verification
 
 Confirm XiaoZhi TTS now uses an explicit startup-burst mechanism on top of the

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.15 增加 M1 TTS 启动后 burst 预灌保护（本地 build 通过，待上板）`
+  - `Step A.home-ai.16 收口 XiaoZhi 音频链路的稳定性优先策略（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -24,7 +24,30 @@ or top-of-tree verification target changes.
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
-  - newest active adaptation slice:
+    - newest active adaptation slice:
+    - Step A.home-ai.16 收口 XiaoZhi 音频链路的稳定性优先策略：
+      - 当前最容易反复制造假象的两个不稳点不在服务端，而在板端策略本身：
+        - uplink 在拥塞时会主动 trim stale audio，并在 ring 满后覆盖掉最老帧
+        - downlink 在起播第一批 `AudioTrack_Write()` 失败后立刻升级成
+          `service_recover -> stop_rebuffer`
+      - 这两条策略都更偏“低时延/立刻恢复”，但会把真实问题扭曲成
+        “服务端没听清”或“整段 TTS 无声”
+      - 端侧本轮改为：
+        - uplink 不再静默裁剪旧音频；ring 满时明确报 busy，并记录
+          `enqueue_busy_count`
+        - uplink ring / accum 放大，让 transport 抖动先被本地缓冲吸收
+        - downlink 增加 `consecutive_write_failures`，只在 startup burst 窗口
+          内允许前 3 次连续写失败先 sleep/poll，不立刻 stop/rebuffer
+      - 这一步的目标不是继续赌某个 AudioTrack 偶然行为，而是先把
+        “稳定可靠”压到高于“最低延迟”
+    - 下一步上板验证：
+      - uplink 正常轮次 `stale_drop` 应保持为 0，不应再靠 silent trim 维持低延迟
+      - 若 transport 拥塞，应直接看到
+        `xiaozhi uplink ring full: ... enqueue_busy=...`
+      - 短 cached-response 起播时仍应 `deferred=no`
+      - 若首批帧还有瞬时失败，应先看到
+        `xiaozhi playback write failed grace: ...`
+        而不是立即陷入 `write_failed -> stop_rebuffer` 无限循环
     - Step A.home-ai.15 增加 M1 TTS 启动后 burst 预灌保护：
       - 当前板子已经被上板日志证明同时不支持：
         - `AudioTrack_SetStartThresholdBytes`
