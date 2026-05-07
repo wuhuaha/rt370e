@@ -1,5 +1,55 @@
 # Change Log
 
+## Step G.xiaozhi-client.1
+- 删除旧主干源码和头文件残留，仓库 live tree 收敛为 Orvibo-only 主干：
+  - 删除旧 split ASR/TTS provider：
+    - `river_asr_iflytek_rtasr.c`
+    - `river_tts_iflytek_ws.c`
+    - provider registry/internal headers
+  - 删除旧 cloud adapter、旧 XiaoZhi transport/session/playback runtime 和 MCP bridge：
+    - `river_cloud_adapter.c`
+    - `river_xiaozhi_ws.c`
+    - `river_cloud_xiaozhi_*`
+    - `river_xiaozhi_mcp_bridge.*`
+  - 删除旧 dialog/session/interaction runtime：
+    - `river_app.c`
+    - `river_dialog_runtime.c`
+    - `river_dialog_cloud_port.c`
+    - `river_dialog_wake_admission.c`
+    - `river_session_coordinator.c`
+    - `river_interaction_state.c`
+    - `river_interaction_diag*`
+    - `river_reset_trace.c`
+  - 删除旧 VAD probe cloud/dialog 分段上传路径：
+    - `river_voice_vad_probe.c`
+    - `river_voice_segment_buffer.c`
+    - `river_voice_segment_sink.c`
+    - `river_voice_experiment.c`
+    - 对应 public headers
+  - 保留当前 Orvibo 主干和受保护本地能力：
+    - `river_orvibo_app / state / protocol / audio_service / mcp_volume`
+    - Wi-Fi / WebSocket dispatch / Opus codec
+    - playback/reference services
+    - Silero VAD detector
+    - KWS、tensor dump、alignment replay、parity tooling
+    - current preproc/AEC/BF implementation
+- 收窄配置面：
+  - `Kconfig` 删除旧 `RIVER_CLOUD_BACKEND_*`、`RIVER_XIAOZHI_*`、`RIVER_ONLINE_CONTROL_EN`、`RIVER_INTERACTION_DIAG_EN`、旧 VAD probe segment 参数和 offline-ASR reservation。
+  - `prj.conf` 删除对应旧配置项，只保留 Orvibo、VAD/KWS、preproc/AEC/BF、音频调试和日志配置。
+  - `components/river_voice/CMakeLists.txt` 不再引用已删除的 `river_voice_segment_buffer.c`。
+- 同步低熵文档和 Codex context：
+  - `README.md` 的 `river_cloud` 描述改为 Orvibo realtime protocol/MCP/Wi-Fi/WebSocket/Opus helpers。
+  - `.codex/active_context.md` 压缩为当前 Orvibo 主干事实，移除已删除旧主干的长历史上下文。
+  - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md` 更新 Step G 状态，并明确旧 cloud/dialog VAD probe 不属于保护对象。
+- Verification for this step:
+  - source-reference grep passed: deleted old headers are not included by `app components include`.
+  - old backend/runtime grep passed: no old backend/runtime names remain in `app components include Kconfig prj.conf`.
+  - VAD/KWS protected API grep passed.
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step C.xiaozhi-client.1
 - 建立并切换到可构建的 Orvibo voice client live graph：
   - `app/app_main.c` 改为启动 `river_orvibo_app_boot()`

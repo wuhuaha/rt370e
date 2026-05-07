@@ -59,7 +59,7 @@ Important note:
 - `app/`: Ameba entrypoint only
 - `components/river_core`: orchestration and runtime state
 - `components/river_voice`: capture, VAD, KWS, and future local speech modules
-- `components/river_cloud`: XiaoZhi / cloud transport and online integrations
+- `components/river_cloud`: Orvibo realtime protocol, MCP volume, Wi-Fi, WebSocket, and Opus helpers
 - `components/river_diag`: monitor commands and diagnostics
 
 User-owned review inputs:

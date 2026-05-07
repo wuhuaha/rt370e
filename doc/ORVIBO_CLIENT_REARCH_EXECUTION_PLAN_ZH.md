@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step G.xiaozhi-client.1` 已删除旧主干源码/头文件残留并收窄 Orvibo-only 配置面。
+- 旧 `dialog / session coordinator / cloud adapter / split ASR-TTS / legacy xiaozhi transport / online_control` 已从 live tree 删除。
+- Kconfig/prj.conf 不再暴露已删除 backend。
+- 当前 VAD、KWS、KWS tensor dump、alignment replay、preproc/AEC/BF 仍保留并参与构建。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step C.xiaozhi-client.1` 已切换到可构建的 Orvibo voice client live graph。
 - live CMake 已移除旧 `dialog_runtime / session_coordinator / cloud_adapter / provider / xiaozhi_ws` 主干。
 - 当前 VAD、KWS、KWS tensor dump、alignment replay 仍保留并参与构建。
@@ -76,7 +81,8 @@ Latest Verified Slice:
   - `components/river_voice/river_voice_detector.c`
   - `components/river_voice/river_voice_detector_silero.cc`
   - `components/river_voice/generated/river_silero_vad_model_data.*`
-  - 必要的 VAD probe / 诊断入口
+  - `components/river_voice/river_orvibo_audio_service.c` 对当前 VAD API 的主干使用
+  - 旧 cloud/dialog VAD probe 不再是保护对象；当前只保留 `river_voice_vad_probe_stub.c`
 - 唤醒词识别：
   - `include/river/river_voice_kws.h`
   - `components/river_voice/river_voice_kws.cc`
@@ -968,9 +974,11 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 完成标准：
 
-- 旧 provider/dialog/cloud adapter 源文件删除或移出 live tree。
-- 旧头文件不再被 include。
-- README/build active context 指向新主干。
+- 旧 provider/dialog/cloud adapter/session coordinator/split ASR-TTS/legacy xiaozhi 源文件已从 live tree 删除。
+- 旧 public 头文件已删除且不再被 include。
+- Kconfig/prj.conf 不再暴露已删除 backend。
+- README/build/active context 指向 Orvibo 主干。
+- VAD/KWS/preproc/AEC/BF 保护区仍在源码树和 live CMake 中。
 
 验证：
 
@@ -992,4 +1000,4 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 ## 14. 下一步
 
-下一步执行 Step G：删除未编译的旧主干源码和头文件残留。当前 live graph 已经切到 Orvibo 主干，但源码树中仍保留历史 `dialog / provider / cloud adapter / legacy xiaozhi / iflytek` 文件，后续必须继续清理，避免新实现再次误依赖旧抽象。
+Step G 已完成并通过构建验证。下一步进入 Orvibo 主干行为收敛：优先补齐板端可观测日志、协议错误恢复、音频上下行背压策略和 MCP volume-only 端到端验证，而不是恢复任何旧 provider/dialog/cloud adapter 抽象。

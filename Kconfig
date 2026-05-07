@@ -12,27 +12,6 @@ config RIVER_ORVIBO_CLIENT_EN
       contract is compatible with the XiaoZhi websocket protocol, but the
       firmware architecture is Orvibo-owned.
 
-config RIVER_ONLINE_CONTROL_EN
-    bool "Enable online home control path"
-    default n
-
-choice RIVER_CLOUD_BACKEND
-    prompt "Cloud voice backend"
-    default RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
-    depends on !RIVER_ORVIBO_CLIENT_EN
-
-config RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
-    bool "Xiaozhi realtime session backend"
-    help
-      Build the XiaoZhi single-session realtime websocket voice path.
-
-config RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT
-    bool "Iflytek split ASR/TTS backend"
-    help
-      Build the legacy split cloud path with Iflytek RTASR + Iflytek TTS.
-
-endchoice
-
 config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
@@ -42,53 +21,9 @@ config RIVER_AUDIO_ECHO_DEBUG_EN
     default n
     help
       Build the standalone board audio echo loopback path and related
-      monitor commands. Keep disabled for the normal wake -> XiaoZhi
+      monitor commands. Keep disabled for the normal wake -> Orvibo
       product flow to avoid carrying extra debug-only code and strings
       in the firmware image.
-
-config RIVER_CLOUD_TEXT_DEBUG_EN
-    bool "Enable cloud text/TTS debug injection"
-    default n
-    help
-      Build the direct text-driven cloud debug path used by commands like
-      `river echo` / `river tts`. Keep disabled for the wake -> XiaoZhi
-      realtime product flow to avoid carrying text/TTS debug helpers in the
-      firmware image.
-
-config RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
-    bool "Advertise XiaoZhi full-duplex experiment capability"
-    default n
-    depends on RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
-    help
-      Build-time gate for the XiaoZhi realtime full-duplex experiment path.
-      This enables the device-side duplex runtime, related diagnostics, and
-      the capability negotiation code paths, but does not by itself force
-      every session to advertise half_duplex=false.
-
-config RIVER_XIAOZHI_FULL_DUPLEX_DEFAULT_ON_EN
-    bool "Default XiaoZhi sessions to full-duplex experiment when ready"
-    default n
-    depends on RIVER_XIAOZHI_FULL_DUPLEX_EXPERIMENT_EN
-    help
-      Allow session.start to advertise half_duplex=false on builds meant for
-      the duplex-ready experimental profile.
-
-      Runtime still falls back to half-duplex unless all of the following are
-      satisfied:
-      - the active board/profile supports playback reference
-      - discovery advertises the required voice-collaboration contract
-      - server endpointing is available and enabled
-      - preview_events and playback_ack negotiation both succeed
-      - the local duplex-ready gate later keeps AEC/reference readiness
-
-config RIVER_INTERACTION_DIAG_EN
-    bool "Enable local interaction diagnostic router"
-    default n
-    help
-      Build the local text intent router, TTS test path, deferred TTS worker,
-      and related monitor commands under `river interaction ...`.
-      This is a debug aid and is not required for the target flow:
-      wake word -> XiaoZhi realtime session, with VAD-assisted audio uplink.
 
 choice RIVER_LOG_DEFAULT_LEVEL
     prompt "Default river log level"
@@ -117,14 +52,6 @@ config RIVER_AUDIO_ECHO_DIAG_DEFAULT_ON
     bool "Enable audio echo diagnostics by default"
     default n
     depends on RIVER_AUDIO_ECHO_DEBUG_EN
-
-config RIVER_VAD_PROBE_AUTOSTART
-    bool "Autostart pure VAD probe at boot"
-    default n
-
-config RIVER_VAD_PROBE_DIAG_DEFAULT_ON
-    bool "Enable VAD probe diagnostics by default"
-    default n
 
 choice RIVER_VOICE_PREPROC_BACKEND
     prompt "Local voice pre-processing backend"
@@ -469,34 +396,5 @@ config RIVER_KWS_DIAG_LOG_EVERY_INFER
       Force a detailed KWS diagnostic line on every inference. Keep this
       disabled for normal debug runs unless the repeated-pattern logs are
       still insufficient.
-
-config RIVER_VAD_PROBE_DIAG_WINDOW_MS
-    int "Pure VAD probe diagnostic window in milliseconds"
-    range 16 1000
-    default 96
-
-config RIVER_VAD_PROBE_PRE_ROLL_MS
-    int "Pure VAD probe segment pre-roll in milliseconds"
-    range 0 2000
-    default 384
-
-config RIVER_VAD_PROBE_POST_ROLL_MS
-    int "Pure VAD probe segment post-roll in milliseconds"
-    range 0 4000
-    default 1000
-
-config RIVER_VAD_PROBE_MAX_SEGMENT_MS
-    int "Pure VAD probe max buffered segment length in milliseconds"
-    range 500 30000
-    default 15000
-
-config RIVER_VAD_PROBE_SEGMENT_MIN_FREE_HEAP_KB
-    int "Pure VAD probe batch segment minimum free heap headroom in KB"
-    range 0 2048
-    default 64
-
-config RIVER_OFFLINE_ASR_RESERVED
-    bool "Reserve offline ASR integration points"
-    default y
 
 endmenu

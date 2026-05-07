@@ -27,7 +27,6 @@ ameba_list_append(private_sources
     river_reference_service.c
     river_voice_vad_probe_stub.c
     river_voice_experiment_stub.c
-    river_voice_segment_buffer.c
     river_voice_segment_sink_stub.c
     river_voice_frame_pool.c
     river_voice_preproc.c

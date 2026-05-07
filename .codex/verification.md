@@ -1,3 +1,58 @@
+## Step G.xiaozhi-client.1 Verification
+
+Confirm deleted old mainline headers are no longer included by live source:
+```bash
+cd /root/ameba-river
+rg -n "#include \"river/(river_app|river_asr_iflytek_credentials|river_cloud|river_dialog_cloud_port|river_dialog_runtime|river_dialog_wake_admission|river_interaction_diag|river_interaction_state|river_online_control|river_reset_trace|river_tts_iflytek_credentials|river_voice_segment_buffer|river_xiaozhi_credentials|river_xiaozhi_ws)\\.h\"" \
+  app components include
+```
+
+Expected result:
+- no matches
+
+Confirm old backend/runtime names are absent from live code/config:
+```bash
+cd /root/ameba-river
+rg -n "river_voice_segment_buffer|river_app\\.c|river_dialog|river_interaction|river_cloud_adapter|river_cloud\\.h|river_xiaozhi|river_asr_iflytek|river_tts_iflytek|river_online_control|RIVER_CLOUD_BACKEND|RIVER_XIAOZHI|RIVER_IFLYTEK|RIVER_ONLINE_CONTROL|RIVER_INTERACTION|RIVER_OFFLINE_ASR|RIVER_VAD_PROBE_" \
+  app components include Kconfig prj.conf
+```
+
+Expected result:
+- no matches
+
+Confirm the protected VAD/KWS capabilities still exist:
+```bash
+cd /root/ameba-river
+rg -n "river_voice_kws_request_tensor_dump_next|river_voice_kws_dump_tensor_chunk|river_voice_kws_run_alignment_sample|river_voice_kws_dump_alignment_status" \
+  include/river/river_voice_kws.h \
+  components/river_voice/river_voice_kws.cc \
+  components/river_diag/river_diag_cmd.c
+rg -n "river_voice_detector_open|river_voice_detector_process|river_voice_detector_backend_name" \
+  include/river/river_voice_detector.h \
+  components/river_voice/river_voice_detector.c \
+  components/river_voice/river_voice_detector_silero.cc \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- KWS tensor dump / alignment APIs are present
+- VAD public API and Orvibo audio-service usage are present
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step C.xiaozhi-client.1 Verification
 
 Confirm the live build graph is now Orvibo-owned and does not compile the old

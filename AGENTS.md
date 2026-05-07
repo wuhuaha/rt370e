@@ -45,11 +45,11 @@
 ## Architecture Guardrails
 - Keep these layers separate:
   - `app/`: Ameba entrypoint only
-  - `components/river_core`: orchestration, state, routing
-  - `components/river_voice`: local VAD / wake word / future offline ASR adapters
-  - `components/river_cloud`: online dialogue and home-control adapters
+  - `components/river_core`: Orvibo orchestration, state, and event routing
+  - `components/river_voice`: local capture, VAD, wake word, preproc, AEC/BF, playback, and reference services
+  - `components/river_cloud`: Orvibo realtime protocol, MCP volume, Wi-Fi, WebSocket, and Opus helpers
   - `components/river_diag`: debug and monitor commands
-- New online features must go behind stable interfaces first, then bind to a concrete provider.
+- New online features must go behind Orvibo-owned interfaces first, then bind to a concrete protocol.
 - Local speech capability must be integrated through `river_voice_*` interfaces rather than directly from `app/`.
 
 ## Coding Style
@@ -66,5 +66,7 @@
 - If a future change truly requires replacing that comparison path, first provide an equivalent or stronger validation path; do not regress this capability without explicit user approval.
 
 ## Current Objective
-- Phase 1: bootable project with monitor-based echo and simulated device control.
-- Future phases: real online control transport, local VAD, wake word, offline ASR, and online/offline fusion.
+- Rebuild this branch as an Orvibo voice client mainline.
+- The first external wire contract is XiaoZhi-compatible, but new files, public functions, runtime ownership, and diagnostics should use Orvibo naming.
+- Current VAD, wake-word/KWS, tensor dump, alignment replay, and board/local parity paths are protected.
+- Legacy dialog/session/cloud-adapter/split-provider/online-control code should not be reintroduced unless explicitly requested.
