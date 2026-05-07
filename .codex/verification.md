@@ -1,3 +1,59 @@
+## Step A.home-ai.13 Verification
+
+Confirm XiaoZhi playback completion is idempotent across terminal/drain/stop
+paths instead of queueing duplicate `audio.out.completed` requests:
+```bash
+cd /root/ameba-river
+rg -n "completed_already_queued_or_reported|CTRL_PLAYBACK_COMPLETED|playback ack completed queued" \
+  components/river_cloud/river_cloud_xiaozhi_playback_terminal_ack.inc \
+  components/river_cloud/river_cloud_xiaozhi_session.c
+```
+
+Expected result:
+- terminal-ack logic skips re-queueing `completed` when the current
+  `last_segment_context` already has completed lineage / terminal ack state
+- the XiaoZhi async control queue deduplicates pending
+  `RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED` requests for the same
+  `response_id + playback_id`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-07 short cached-response
+cases:
+```text
+重启后分别触发 `抱歉，我刚刚没听清，请再说一遍。` 和
+`好的，已经打开了。` 这类短 cached_response。
+```
+
+Expected result:
+- the same `playback_id` should emit only one
+  `xiaozhi playback ack completed queued`
+- the same `playback_id` should emit only one
+  `xiaozhi playback ack completed sent`
+- together with Step A.home-ai.12, the run should not show plain `underrun`,
+  repeated opening words, or tail truncation
+
 ## Step A.home-ai.12 Verification
 
 Confirm XiaoZhi TTS defers hardware start until the fresh AudioTrack has been

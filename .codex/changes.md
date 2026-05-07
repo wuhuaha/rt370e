@@ -1,5 +1,38 @@
 # Change Log
 
+## Step A.home-ai.13
+- 在 Step A.home-ai.12 的“预填充后启动”基础上，再次按 2026-05-07 11:43/11:44
+  日志收口容易反复出现的同类问题，而不是继续只追单点现象：
+  - 现有日志除了 `AudioTrack_SetStartThresholdBytes not supported` 和裸
+    `underrun`，还出现了同一 `response_id/playback_id` 的
+    `xiaozhi playback ack completed queued/sent` 被重复打印。
+  - 这说明当前问题不只是“起播过早”，还包含播放尾态收口的幂等门不够硬；
+    即使听感修复，重复 completed 也会继续让 stop/drain/terminal 路径互相踩。
+- 本轮端侧适配：
+  - `playback completed` 增加更严格的幂等门：
+    - 若当前 `last_segment_context` 对应的 completed 已经进入 lineage /
+      terminal ack，则后续路径不再二次排队。
+  - XiaoZhi control queue 对异步 `PLAYBACK_COMPLETED` 再加一层底层去重：
+    - 对同一 `response_id + playback_id` 的 pending completed 请求直接合并，
+      避免不同收口路径在队列里并发塞入重复 completed。
+  - 这样“预填充后启动”负责收 `underrun`，而“completed 去重”负责收
+    尾态重复 ACK；两层一起才能避免同类问题反复回潮。
+- 目标日志变化：
+  - 同一 `playback_id` 只应出现一次
+    `xiaozhi playback ack completed queued`
+  - 同一 `playback_id` 只应出现一次
+    `xiaozhi playback ack completed sent`
+  - 配合 Step A.home-ai.12，短 cached-response 不应再同时出现
+    `underrun`、重复开头、尾部截断、completed 双发
+- Verification for this step:
+  - Step A.home-ai.13 `rg` verification matched the completed dedupe gate in
+    terminal-ack logic and the pending-request dedupe in the XiaoZhi control
+    queue.
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.12
 - 根据 2026-05-07 11:43/11:44 上板日志继续收 M1 cached-response 的短句重复和尾部截断：
   - Step A.home-ai.11 已经生效，最新日志明确显示

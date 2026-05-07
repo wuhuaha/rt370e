@@ -82,6 +82,22 @@ static bool river_cloud_xiaozhi_playback_completed_ready(void)
         &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context);
 }
 
+static bool river_cloud_xiaozhi_playback_completed_already_queued_or_reported(void)
+{
+    if (!river_cloud_xiaozhi_playback_last_segment_observed()) {
+        return false;
+    }
+
+    if (!river_cloud_xiaozhi_playback_same_segment_context(
+            &g_river_cloud.xiaozhi_playback_lineage_truth.completed_context,
+            &g_river_cloud.xiaozhi_playback_lineage_truth.last_segment_context)) {
+        return false;
+    }
+
+    return river_cloud_xiaozhi_playback_lineage_completed() ||
+           strcmp(g_river_cloud.xiaozhi_playback_terminal_truth.ack, "completed") == 0;
+}
+
 static bool river_cloud_xiaozhi_playback_last_fully_heard_context_valid(void)
 {
     return river_cloud_xiaozhi_playback_segment_context_valid_from_truth(
@@ -1266,7 +1282,8 @@ static bool river_cloud_xiaozhi_try_queue_playback_completed_ack(void)
         river_cloud_xiaozhi_clear_playback_terminal_wait();
         return true;
     }
-    if (g_river_cloud.xiaozhi_playback_terminal_truth.completed_reported) {
+    if (g_river_cloud.xiaozhi_playback_terminal_truth.completed_reported ||
+        river_cloud_xiaozhi_playback_completed_already_queued_or_reported()) {
         river_cloud_xiaozhi_clear_playback_terminal_wait();
         return true;
     }

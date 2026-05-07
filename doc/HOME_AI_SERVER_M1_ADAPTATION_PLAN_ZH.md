@@ -164,6 +164,20 @@ python3 /root/ameba-rtos/ameba.py build -p
     `playback deferred start: ... prefetched=15360B threshold=15360B`，且
     `ameba_audio_stream_tx_start` 出现在 deferred-start 日志之后，不再出现裸
     `underrun`。
+- 2026-05-07 收口 M1 TTS completed 双发与重复尾态：
+  - 11:43 最新日志中同一 `response_id/playback_id` 已出现两次
+    `xiaozhi playback ack completed queued/sent`，说明播放尾态的收口路径仍有
+    重复入口。
+  - 这类重复 completed 即使不直接制造听感问题，也会让 stop/drain/terminal
+    几条路径继续互相踩，后续很容易重新引出尾态截断、跟进轮次脏状态或日志混乱。
+  - terminal-ack 逻辑现在会先检查当前 `last_segment_context` 是否已经进入
+    completed lineage / terminal ack；若已进入，则不再二次排队 completed。
+  - XiaoZhi async control queue 也会对同一
+    `response_id + playback_id` 的 pending `PLAYBACK_COMPLETED` 请求直接去重，
+    避免不同收口路径并发排入重复 completed。
+  - 预期板端对同一 `playback_id` 只会出现一次
+    `xiaozhi playback ack completed queued` 和一次
+    `xiaozhi playback ack completed sent`。
 - 2026-05-06 新增播放完成后的 stale output / ASR 投影收口：
   - 17:30 上板日志显示 TTS 已 `draining -> idle` 且已发送
     `audio.out.completed`，但 dialog runtime 仍从 `barge_in_listening`

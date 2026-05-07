@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.12 改为预填充后启动 M1 TTS 播放（本地 build 通过，待上板）`
+  - `Step A.home-ai.13 收口 M1 TTS completed 双发与重复尾态（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,23 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
   - newest active adaptation slice:
+    - Step A.home-ai.13 收口 M1 TTS completed 双发与重复尾态：
+      - 2026-05-07 11:43 日志中同一 `response_id/playback_id` 出现两次
+        `xiaozhi playback ack completed queued/sent`
+      - 这说明当前问题不只在起播 `underrun`，播放尾态收口也存在重复路径并发
+      - 端侧现在在 terminal-ack 逻辑里对当前 `last_segment_context` 增加
+        completed 幂等门；若该上下文已经 completed queued / reported，则后续
+        stop/drain/terminal 路径直接跳过
+      - XiaoZhi control queue 也对异步 `PLAYBACK_COMPLETED` 增加同
+        `response_id + playback_id` 的 pending 去重，避免不同路径把同一个
+        completed 请求重复塞进队列
+    - 下一步上板验证：
+      - 同一 `playback_id` 只应出现一次
+        `xiaozhi playback ack completed queued`
+      - 同一 `playback_id` 只应出现一次
+        `xiaozhi playback ack completed sent`
+      - 配合 Step A.home-ai.12，不应再同时出现裸 `underrun`、重复开头、尾部
+        截断和 completed 双发
     - Step A.home-ai.12 改为预填充后启动 M1 TTS 播放：
       - 2026-05-07 11:43/11:44 最新日志已经明确显示
         `playback start backend call: stream=xiaozhi_tts ref=no reuse=no`，

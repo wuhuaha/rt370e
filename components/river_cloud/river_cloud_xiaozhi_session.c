@@ -135,6 +135,7 @@ static river_status_t river_cloud_xiaozhi_queue_control_request(
     uint32_t wait_ms)
 {
     uint32_t pending_index;
+    bool dedupe_pending = false;
 
     if (request == NULL) {
         return RIVER_ERR_ARG;
@@ -154,9 +155,11 @@ static river_status_t river_cloud_xiaozhi_queue_control_request(
         return RIVER_ERR_BUSY;
     }
 
-    if (request->op == RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK &&
-        request->completion == NULL &&
-        request->result_out == NULL) {
+    dedupe_pending =
+        request->completion == NULL && request->result_out == NULL &&
+        (request->op == RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK ||
+         request->op == RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED);
+    if (dedupe_pending) {
         pending_index = g_river_cloud.xiaozhi_control_queue_truth.read_index;
         for (uint32_t pending_count = 0U;
              pending_count < g_river_cloud.xiaozhi_control_queue_truth.count;
@@ -165,13 +168,23 @@ static river_status_t river_cloud_xiaozhi_queue_control_request(
                 &g_river_cloud.xiaozhi_control_queue[pending_index];
 
             if (pending->op == request->op &&
-                pending->played_duration_ms == request->played_duration_ms &&
                 strcmp(pending->response_id, request->response_id) == 0 &&
-                strcmp(pending->playback_id, request->playback_id) == 0 &&
-                strcmp(pending->segment_id, request->segment_id) == 0) {
-                river_cloud_xiaozhi_control_unlock();
-                (void)rtos_sema_give(g_river_cloud.xiaozhi_control_space);
-                return RIVER_OK;
+                strcmp(pending->playback_id, request->playback_id) == 0) {
+                bool duplicate = false;
+
+                if (request->op == RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_MARK) {
+                    duplicate = pending->played_duration_ms == request->played_duration_ms &&
+                                strcmp(pending->segment_id, request->segment_id) == 0;
+                } else if (request->op ==
+                           RIVER_CLOUD_XIAOZHI_CTRL_PLAYBACK_COMPLETED) {
+                    duplicate = true;
+                }
+
+                if (duplicate) {
+                    river_cloud_xiaozhi_control_unlock();
+                    (void)rtos_sema_give(g_river_cloud.xiaozhi_control_space);
+                    return RIVER_OK;
+                }
             }
 
             pending_index++;
