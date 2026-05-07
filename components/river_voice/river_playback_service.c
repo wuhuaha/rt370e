@@ -22,6 +22,8 @@
 #define RIVER_PLAYBACK_SERVICE_STATS_WAIT_MS 0U
 #define RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS 0U
 
+static uint8_t g_river_playback_service_silence_frame[4096];
+
 typedef struct {
     bool initialized;
     bool ref_owned;
@@ -236,6 +238,32 @@ static void river_playback_service_prepare_output_locked(void)
     AudioControl_SetAmplifierMute(false);
     AudioControl_SetHardwareVolume(RIVER_PLAYBACK_SERVICE_HW_VOLUME,
                                    RIVER_PLAYBACK_SERVICE_HW_VOLUME);
+}
+
+static void river_playback_service_prime_started_track_locked(void)
+{
+    size_t prime_bytes;
+
+    if (g_river_playback_service.track == NULL || !g_river_playback_service.track_started) {
+        return;
+    }
+
+    prime_bytes = g_river_playback_service.config.playback_frame_bytes;
+    if (prime_bytes == 0U || prime_bytes > sizeof(g_river_playback_service_silence_frame)) {
+        return;
+    }
+
+    memset(g_river_playback_service_silence_frame, 0, prime_bytes);
+    if (AudioTrack_Write(g_river_playback_service.track,
+                         g_river_playback_service_silence_frame,
+                         prime_bytes,
+                         true) > 0) {
+        RIVER_LOGI("playback start prime: stream=%s silence=%luB",
+                   g_river_playback_service.stats.stream_name[0] != '\0' ?
+                       g_river_playback_service.stats.stream_name :
+                       "-",
+                   (unsigned long)prime_bytes);
+    }
 }
 
 static void river_playback_service_reset_stream_locked(void)
@@ -460,6 +488,7 @@ static river_status_t river_playback_service_start_track_locked(void)
 
     g_river_playback_service.track_started = true;
     g_river_playback_service.start_deferred = false;
+    river_playback_service_prime_started_track_locked();
     river_playback_service_apply_volume_locked();
     return RIVER_OK;
 }
