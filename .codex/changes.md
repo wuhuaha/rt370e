@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.5
+- 拆分 Orvibo app 事件队列，避免音频突发挤占控制事件：
+  - `control_queue` 承载 state/connect/listen/abort 等控制消息。
+  - `audio_queue` 承载 uplink/downlink Opus 音频消息。
+  - app 主循环每 tick 先清空 control queue，再按预算处理 audio queue；处理 audio 过程中如果出现新 control 消息，会优先回到控制路径。
+- 增强音频队列背压行为：
+  - audio queue 深度扩到 64，利用当前平台比 ESP32 更充裕的内存换取抖动缓冲。
+  - audio queue 满时 drop-oldest 后再入队新音频，保持实时性和控制消息可达性。
+  - control queue 不再与音频共享容量，TTS stop、channel close、protocol error、barge-in 等关键事件不会被音频包淹没。
+- 增强板端可观测性：
+  - app status 输出 `ctl_q`、`aud_q`、control/audio posted/fail、`aud_drop_oldest`。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo app 事件调度和状态日志。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo app control/audio queue grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.4
 - 增加 Orvibo protocol 层 uplink 发送缓冲，降低 SDK WebSocket 短暂 busy 对实时采集/编码链路的影响：
   - `river_orvibo_protocol_send_audio()` 现在只做非阻塞入队，成功语义为 “queued for send”。

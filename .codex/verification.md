@@ -1,3 +1,43 @@
+## Step H.xiaozhi-client.5 Verification
+
+Confirm Orvibo app control/audio queues are separated:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|RIVER_ORVIBO_APP_AUDIO_QUEUE_DEPTH|RIVER_ORVIBO_APP_AUDIO_BUDGET_PER_TICK|control_queue|audio_queue|river_orvibo_app_post_audio|river_orvibo_app_post_control|river_orvibo_app_drain_queues|aud_drop_oldest|ctl_q|aud_q" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- app boot creates separate control and audio queues.
+- audio messages use `river_orvibo_app_post_audio()` and can drop oldest on queue pressure.
+- control messages use `river_orvibo_app_post_control()` and no longer share queue capacity with audio packets.
+- app task drains control first, then audio with a per-tick budget.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后触发一次完整 TTS 回复，同时观察 Orvibo app status。
+```
+
+Expected result:
+- `ctl_q` 正常保持低水位；`aud_q` 可随 TTS 短暂增长。
+- `tts_stop`、`channel_closed`、`protocol_error` 等控制事件在音频突发时仍能及时处理。
+- 正常网络下 `aud_drop_oldest` 和 audio post fail 应保持 0；压力场景下允许 `aud_drop_oldest` 增长，但 control fail 不应增长。
+
 ## Step H.xiaozhi-client.4 Verification
 
 Confirm Orvibo protocol uplink is buffered and session-safe:

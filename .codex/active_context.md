@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.4 稳定 Orvibo uplink 发送背压与诊断（SDK 构建通过）`
+  - `Step H.xiaozhi-client.5 隔离 Orvibo 控制与音频事件队列（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.5` separates Orvibo app control and audio queues:
+  - state/connect/listen/abort control messages no longer share capacity with uplink/downlink audio packets.
+  - app task drains control first, then audio with a bounded per-tick budget.
+  - audio queue uses drop-oldest on pressure, preserving control-event reachability during TTS/downlink bursts.
+  - app status reports `ctl_q`, `aud_q`, control/audio posted/fail, and `aud_drop_oldest`.
 - `Step H.xiaozhi-client.4` hardens uplink backpressure and diagnostics:
   - `river_orvibo_protocol_send_audio()` now queues Opus uplink frames instead of synchronously entering the SDK WebSocket send queue.
   - `orvibo_uplink` sender task owns actual `ws_sendBinary()` submission with bounded short retry.
@@ -77,6 +82,7 @@ or top-of-tree verification target changes.
   - access activation/periodic-refresh grep
   - Orvibo TTS/downlink/playback-drain grep
   - Orvibo uplink queue/session-epoch grep
+  - Orvibo app control/audio queue grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -87,7 +93,7 @@ or top-of-tree verification target changes.
 
 - Continue Orvibo mainline behavior hardening:
   - downlink playback/backpressure board validation
-  - board-visible Orvibo status logs
+  - protocol error recovery
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - wake/listen/speak/barge-in state-machine verification

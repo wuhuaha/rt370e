@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.5` 已隔离 Orvibo app 控制事件队列与音频事件队列。
+- state/connect/listen/abort 等控制消息不再与 uplink/downlink audio 共享队列容量。
+- app 主循环先处理 control queue，再按预算处理 audio queue；audio queue 满时 drop-oldest 保实时，控制事件不被音频突发淹没。
+- app status 输出 `ctl_q`、`aud_q`、control/audio posted/fail 和 `aud_drop_oldest`。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.4` 已收紧 Orvibo uplink 发送背压和诊断。
 - `river_orvibo_protocol_send_audio()` 现在只做非阻塞入队；`orvibo_uplink` sender task 负责实际 `ws_sendBinary()` 提交和短重试。
 - uplink frame 带 `session_epoch`，WebSocket close/reopen 后旧会话残留音频不会误发到新 session。
@@ -1049,12 +1054,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 新增 `orvibo_uplink` sender task，负责实际 `ws_sendBinary()`、短重试和发送失败统计。
   - uplink frame 使用 `session_epoch` 防止 close/reopen 竞态下旧 session 音频泄漏到新 session。
   - app/protocol status 输出 `uplink_enq`、队列深度、drop/retry/fail 计数。
+- `Step H.xiaozhi-client.5`：
+  - app 内部拆为 control queue 与 audio queue，控制消息不再被音频包挤占。
+  - 主循环优先 drain control queue，再按固定预算处理 audio queue。
+  - audio queue 满时 drop-oldest，保障实时性并避免控制消息丢失。
+  - app status 输出 control/audio queue 深度和 post/drop 计数。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1065,9 +1075,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain 和 uplink queue/session-epoch 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化和 uplink 发送背压保护，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理下行播放背压、协议错误恢复和板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护和 app 控制/音频队列隔离，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理协议错误恢复、下行播放背压和板端诊断可观测性。
