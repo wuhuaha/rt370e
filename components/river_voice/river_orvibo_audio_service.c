@@ -40,6 +40,7 @@
 #define RIVER_ORVIBO_DOWNLINK_PCM_MAX          (1920U * sizeof(int16_t))
 #define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_PCM_MAX * 2U)
 #define RIVER_ORVIBO_DIAG_LOG_INTERVAL_MS      5000U
+#define RIVER_ORVIBO_PLAYBACK_DRAIN_POLL_MS    20U
 #define RIVER_ORVIBO_RTOS_OK                   0
 
 typedef struct {
@@ -663,6 +664,35 @@ river_status_t river_orvibo_audio_service_handle_downlink(
     }
     g_river_orvibo_audio.playback_write_ok++;
     return RIVER_OK;
+}
+
+void river_orvibo_audio_service_prepare_tts_playback(void)
+{
+    river_opus_decoder_close(&g_river_orvibo_audio.decoder);
+    if (g_river_orvibo_audio.playback_started || river_playback_service_active()) {
+        (void)river_playback_service_stop_stream_ex("orvibo_tts_restart");
+    }
+    g_river_orvibo_audio.playback_started = false;
+    RIVER_LOGI("orvibo audio: tts playback prepared");
+}
+
+river_status_t river_orvibo_audio_service_wait_playback_idle(uint32_t timeout_ms)
+{
+    river_status_t status;
+
+    if (!g_river_orvibo_audio.playback_started && !river_playback_service_active()) {
+        return RIVER_OK;
+    }
+
+    status = river_playback_service_wait_idle_ex(timeout_ms,
+                                                RIVER_ORVIBO_PLAYBACK_DRAIN_POLL_MS,
+                                                "orvibo_tts_stop");
+    if (status == RIVER_OK) {
+        river_orvibo_audio_service_stop_playback("orvibo_tts_drain_done");
+    } else {
+        river_orvibo_audio_service_stop_playback("orvibo_tts_drain_forced");
+    }
+    return status;
 }
 
 void river_orvibo_audio_service_stop_playback(const char *reason)

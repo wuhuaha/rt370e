@@ -53,6 +53,8 @@ river_status_t river_orvibo_audio_service_handle_downlink(
     uint32_t sample_rate,
     uint32_t channels,
     uint32_t frame_duration_ms);
+void river_orvibo_audio_service_prepare_tts_playback(void);
+river_status_t river_orvibo_audio_service_wait_playback_idle(uint32_t timeout_ms);
 void river_orvibo_audio_service_stop_playback(const char *reason);
 void river_orvibo_audio_service_dump_status(void);
 const char *river_orvibo_audio_mode_name(river_orvibo_audio_mode_t mode);

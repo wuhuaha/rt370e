@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.2 对齐 XiaoZhi 激活语义并补齐 Wi-Fi ready 接入刷新（SDK 构建通过）`
+  - `Step H.xiaozhi-client.3 收紧 Orvibo TTS 下行状态边界与播放 drain（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.3` hardens TTS/downlink runtime behavior against the XiaoZhi-compatible reference client:
+  - server binary downlink audio is only decoded while Orvibo business state is `speaking`.
+  - `tts start` resets the downlink decoder and stops stale playback before accepting a new response.
+  - `tts stop` waits for a bounded playback drain before returning Orvibo audio mode to listening, then stops playback even on timeout.
+  - playback status now exposes SDK buffer occupancy and drain counters for board-side validation.
 - `Step H.xiaozhi-client.2` hardens first-boot access against the XiaoZhi-compatible server contract:
   - `activation.code` is treated as a user-binding prompt, not as a direct `/activate` trigger.
   - `/activate` polling is gated by `activation.challenge`, matching the reference no-serial-number flow.
@@ -65,6 +70,7 @@ or top-of-tree verification target changes.
 - Verification passed:
   - Orvibo/XiaoZhi-compatible protocol/access grep
   - access activation/periodic-refresh grep
+  - Orvibo TTS/downlink/playback-drain grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`

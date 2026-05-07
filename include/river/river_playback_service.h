@@ -72,6 +72,10 @@ typedef struct {
     uint32_t write_fail;
     uint32_t ref_write_ok;
     uint32_t ref_write_fail;
+    uint32_t drain_count;
+    uint32_t drain_timeout_count;
+    size_t buffered_bytes;
+    size_t buffer_size_bytes;
     float duck_gain;
     char last_epoch_reason[48];
     char last_control[24];
@@ -97,11 +101,15 @@ river_status_t river_playback_service_interrupt_stream_ex(const char *reason);
 river_status_t river_playback_service_flush_stream_ex(const char *reason);
 river_status_t river_playback_service_recover_stream_ex(const char *reason);
 river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason);
+river_status_t river_playback_service_wait_idle_ex(uint32_t timeout_ms,
+                                                   uint32_t poll_ms,
+                                                   const char *reason);
 river_status_t river_playback_service_stop_stream(void);
 river_status_t river_playback_service_interrupt_stream(void);
 river_status_t river_playback_service_flush_stream(void);
 river_status_t river_playback_service_recover_stream(void);
 river_status_t river_playback_service_set_ducking(bool enabled, float gain);
+river_status_t river_playback_service_wait_idle(uint32_t timeout_ms);
 river_playback_state_t river_playback_service_state(void);
 uint32_t river_playback_service_epoch(void);
 const char *river_playback_service_state_name(river_playback_state_t state);

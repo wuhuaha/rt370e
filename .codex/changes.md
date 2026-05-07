@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.3
+- 对照 `~/xiaozhi-esp32` 再次收紧 TTS 下行和播放状态边界：
+  - `tts start` 进入 speaking 前现在会重置 Orvibo 下行 Opus decoder，并停止上一轮残留 TTS playback。
+  - app 层只在 Orvibo 业务状态为 `speaking` 时接收并解码服务端二进制下行音频；非 speaking 状态的迟到音频会被丢弃并计数。
+  - `tts stop` 后先等待 TTS 播放缓存受限 drain，再恢复 Orvibo audio listening；drain 成功、超时或 SDK 查询不可用后都会显式停止 playback，避免 listening 状态下残留 TTS owner。
+- 扩展播放服务可观测性：
+  - 新增 `river_playback_service_wait_idle_ex()` / `river_playback_service_wait_idle()`。
+  - playback stats/status 增加 `buffered_bytes`、`buffer_size_bytes`、`drain_count`、`drain_timeout_count`，便于板端判断尾音是否自然排空或被强制收口。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity。
+  - 本步只改 Orvibo 状态动作、Orvibo audio 下行边界和通用 playback 服务。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo TTS/downlink/playback-drain grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.2
 - 二次对照 `~/xiaozhi-esp32` 后修正 Orvibo access 激活语义：
   - `activation.code` 现在只作为用户绑定提示，不再直接触发 `/activate` POST。

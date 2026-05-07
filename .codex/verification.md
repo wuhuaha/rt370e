@@ -1,3 +1,59 @@
+## Step H.xiaozhi-client.3 Verification
+
+Confirm Orvibo TTS/downlink now follows the reference speaking boundary:
+```bash
+cd /root/ameba-river
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|prepare_tts_playback|wait_playback_idle|drop downlink audio outside speaking|downlink_dropped" \
+  include/river/river_orvibo_state.h \
+  include/river/river_orvibo_audio_service.h \
+  components/river_core/river_orvibo_state.c \
+  components/river_core/river_orvibo_app.c \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- `tts start` action prepares TTS playback before switching Orvibo audio into speaking.
+- `tts stop` action waits for playback idle before switching Orvibo audio back to listening.
+- downlink audio outside `speaking` is dropped and counted.
+
+Confirm playback drain telemetry is available:
+```bash
+cd /root/ameba-river
+rg -n "river_playback_service_wait_idle|drain_count|drain_timeout_count|buffered_bytes|buffer_size_bytes|AudioTrack_GetBufferStatus|AudioTrack_GetBufferSize" \
+  include/river/river_playback_service.h \
+  components/river_voice/river_playback_service.c
+```
+
+Expected result:
+- playback exposes a bounded wait-idle API.
+- playback status reports drain counters and current SDK buffer occupancy.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后触发唤醒并完成一次服务端 TTS 回复，观察 Orvibo app/audio/playback 日志。
+```
+
+Expected result:
+- `tts_start` 后出现 `orvibo audio: tts playback prepared`，随后进入 speaking 并播放下行音频。
+- `tts_stop` 后出现 `playback drain complete` 或 `playback drain timeout`，随后 playback stop，并切回 listening。
+- TTS stop 后迟到的二进制音频被打印为 `drop downlink audio outside speaking`，`orvibo app` status 中 `dropped=` 增加。
+- `playback_service` status 显示 `drains=` 和 `buf=buffered/size/trackB`。
+
 ## Step H.xiaozhi-client.2 Verification
 
 Confirm Orvibo access now separates websocket config from activation-ready state:

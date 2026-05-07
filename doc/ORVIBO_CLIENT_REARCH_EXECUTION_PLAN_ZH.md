@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.3` 已按 `~/xiaozhi-esp32` 的 speaking 边界收紧 TTS 下行链路。
+- 服务端二进制下行音频现在只在 Orvibo 业务态为 `speaking` 时进入解码/播放；非 speaking 状态迟到音频会丢弃并计数。
+- `tts start` 会重置下行 Opus decoder 并清理上一轮残留播放；`tts stop` 会受限等待播放缓存 drain，再把 Orvibo audio mode 切回 listening。
+- playback status 现在输出 SDK buffer occupancy 和 drain 计数，便于板端判断尾音排空还是超时强制收口。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.2` 已按 `~/xiaozhi-esp32` 二次校准 Orvibo access 激活语义。
 - `activation.code` 现在只作为用户绑定提示；只有 `activation.challenge` 存在时才进入 `/activate` 轮询。
 - access `ready` 已与 `websocket_configured` 拆分，待绑定/待激活时不会误开 WebSocket 音频通道。
@@ -1010,6 +1015,49 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 只剩历史文档、删除清单或明确 unsupported 测试命中。
 - 静态检查和 build 成功。
 
+### Step H: 对齐 XiaoZhi-Compatible 接入与语音运行时
+
+目标：
+
+- 补齐烧录后直连 XiaoZhi-compatible 服务器所需的 access、鉴权、WebSocket hello/listen/abort、TTS 下行和最小 MCP。
+- 保持内部命名和运行时 ownership 为 Orvibo。
+- 不替换当前 VAD/KWS/AEC/BF。
+
+已完成：
+
+- `Step H.xiaozhi-client.1`：
+  - Orvibo access 层负责 OTA/config、device/client identity、websocket url/token/version 应用。
+  - WebSocket handshake 带 `Authorization`、`Protocol-Version`、`Device-Id`、`Client-Id`。
+  - open 后发送 hello 并等待 server hello。
+  - MCP 只暴露 `self.get_device_status` 和 `self.audio_speaker.set_volume`。
+- `Step H.xiaozhi-client.2`：
+  - `activation.code` 只作为用户绑定提示。
+  - 只有存在 `activation.challenge` 才进入 `/activate` 轮询。
+  - Wi-Fi ready 后立即刷新 OTA/config，未 ready 时周期重试。
+- `Step H.xiaozhi-client.3`：
+  - TTS start 前 reset decoder/清残留 playback。
+  - 下行二进制音频只在 Orvibo `speaking` 状态解码播放。
+  - TTS stop 后受限等待 playback drain，再恢复 listening；超时也强制停止 playback。
+  - playback 诊断输出 buffer occupancy 与 drain 成功/超时计数。
+
+验证：
+
+```bash
+cd /root/ameba-river
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes" \
+  include components
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+期望结果：
+
+- TTS/downlink/playback drain 关键路径存在。
+- 静态检查、harness 检查和 SDK build 成功。
+
 ## 14. 下一步
 
-Step G 已完成并通过构建验证。下一步进入 Orvibo 主干行为收敛：优先补齐板端可观测日志、协议错误恢复、音频上下行背压策略和 MCP volume-only 端到端验证，而不是恢复任何旧 provider/dialog/cloud adapter 抽象。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP 和 TTS 播放边界硬化，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理上下行背压、协议错误恢复和板端诊断可观测性。

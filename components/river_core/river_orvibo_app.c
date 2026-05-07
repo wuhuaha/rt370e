@@ -35,6 +35,7 @@
 #define RIVER_ORVIBO_APP_POLL_MS           20U
 #define RIVER_ORVIBO_APP_WIFI_LOG_MS       3000U
 #define RIVER_ORVIBO_APP_ACCESS_RETRY_MS   10000U
+#define RIVER_ORVIBO_APP_TTS_DRAIN_MS      900U
 #define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  768U
 #define RIVER_ORVIBO_RTOS_OK               0
 
@@ -73,6 +74,7 @@ typedef struct {
     uint32_t uplink_busy;
     uint32_t downlink_ok;
     uint32_t downlink_fail;
+    uint32_t downlink_dropped;
     uint32_t access_refresh_ok;
     uint32_t access_refresh_fail;
     uint32_t last_wifi_log_ms;
@@ -240,8 +242,14 @@ static river_status_t river_orvibo_app_refresh_access(const char *reason);
 
 static void river_orvibo_app_apply_actions(uint32_t actions)
 {
+    if ((actions & RIVER_ORVIBO_ACTION_PREPARE_TTS_PLAYBACK) != 0U) {
+        river_orvibo_audio_service_prepare_tts_playback();
+    }
     if ((actions & RIVER_ORVIBO_ACTION_STOP_PLAYBACK) != 0U) {
         river_orvibo_audio_service_stop_playback("orvibo_state_action");
+    }
+    if ((actions & RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE) != 0U) {
+        (void)river_orvibo_audio_service_wait_playback_idle(RIVER_ORVIBO_APP_TTS_DRAIN_MS);
     }
     if ((actions & RIVER_ORVIBO_ACTION_AUDIO_IDLE) != 0U) {
         (void)river_orvibo_audio_service_set_mode(RIVER_ORVIBO_AUDIO_MODE_IDLE);
@@ -362,6 +370,14 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
         }
         break;
     case RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO:
+        if (river_orvibo_state_machine_current() != RIVER_ORVIBO_STATE_SPEAKING) {
+            g_river_orvibo_app.downlink_dropped++;
+            RIVER_LOGW("drop downlink audio outside speaking: state=%s bytes=%lu ts=%lu",
+                       river_orvibo_state_name(river_orvibo_state_machine_current()),
+                       (unsigned long)msg->bytes,
+                       (unsigned long)msg->timestamp_ms);
+            break;
+        }
         status = river_orvibo_audio_service_handle_downlink(msg->data,
                                                             msg->bytes,
                                                             msg->sample_rate,
@@ -502,7 +518,7 @@ river_status_t river_orvibo_app_boot(void)
 
 void river_orvibo_app_print_status(void)
 {
-    RIVER_LOGI("orvibo app: state=%s wifi=%s queue=%lu posted=%lu fail=%lu handled=%lu uplink=%lu busy=%lu downlink=%lu/%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s wifi=%s queue=%lu posted=%lu fail=%lu handled=%lu uplink=%lu busy=%lu downlink=%lu/%lu dropped=%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
                river_wifi_station_status_name(),
                (unsigned long)(g_river_orvibo_app.queue != NULL ?
@@ -515,6 +531,7 @@ void river_orvibo_app_print_status(void)
                (unsigned long)g_river_orvibo_app.uplink_busy,
                (unsigned long)g_river_orvibo_app.downlink_ok,
                (unsigned long)g_river_orvibo_app.downlink_fail,
+               (unsigned long)g_river_orvibo_app.downlink_dropped,
                g_river_orvibo_app.last_event[0] != '\0' ?
                    g_river_orvibo_app.last_event :
                    "-",

@@ -21,6 +21,7 @@
 #define RIVER_PLAYBACK_SERVICE_HW_VOLUME 1.0f
 #define RIVER_PLAYBACK_SERVICE_STATS_WAIT_MS 0U
 #define RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS 0U
+#define RIVER_PLAYBACK_SERVICE_DEFAULT_DRAIN_POLL_MS 20U
 
 static uint8_t g_river_playback_service_silence_frame[4096];
 
@@ -232,6 +233,42 @@ static void river_playback_service_apply_volume_locked(void)
     AudioTrack_SetVolume(g_river_playback_service.track, left, right);
 }
 
+static bool river_playback_service_update_buffer_stats_locked(size_t *buffered_bytes_out,
+                                                              size_t *buffer_size_out)
+{
+    int32_t buffered_bytes;
+    uint32_t buffer_size;
+
+    if (buffered_bytes_out != NULL) {
+        *buffered_bytes_out = 0U;
+    }
+    if (buffer_size_out != NULL) {
+        *buffer_size_out = 0U;
+    }
+    if (g_river_playback_service.track == NULL ||
+        !g_river_playback_service.track_started) {
+        g_river_playback_service.stats.buffered_bytes = 0U;
+        g_river_playback_service.stats.buffer_size_bytes = 0U;
+        return true;
+    }
+
+    buffered_bytes = (int32_t)AudioTrack_GetBufferStatus(g_river_playback_service.track);
+    buffer_size = AudioTrack_GetBufferSize(g_river_playback_service.track);
+    if (buffered_bytes < 0 || buffer_size == 0U) {
+        return false;
+    }
+
+    g_river_playback_service.stats.buffered_bytes = (size_t)buffered_bytes;
+    g_river_playback_service.stats.buffer_size_bytes = (size_t)buffer_size;
+    if (buffered_bytes_out != NULL) {
+        *buffered_bytes_out = (size_t)buffered_bytes;
+    }
+    if (buffer_size_out != NULL) {
+        *buffer_size_out = (size_t)buffer_size;
+    }
+    return true;
+}
+
 static void river_playback_service_prepare_output_locked(void)
 {
     AudioControl_SetPlaybackMute(false);
@@ -274,6 +311,8 @@ static void river_playback_service_reset_stream_locked(void)
     g_river_playback_service.stats.ducked = false;
     g_river_playback_service.stats.duck_gain = 1.0f;
     g_river_playback_service.stats.track_buffer_bytes = 0U;
+    g_river_playback_service.stats.buffered_bytes = 0U;
+    g_river_playback_service.stats.buffer_size_bytes = 0U;
     river_playback_service_copy_stream_name(NULL);
 }
 
@@ -907,6 +946,7 @@ river_status_t river_playback_service_write(const uint8_t *playback,
     }
 
     g_river_playback_service.stats.write_ok++;
+    (void)river_playback_service_update_buffer_stats_locked(NULL, NULL);
     if (g_river_playback_service.start_deferred) {
         size_t written_bytes = (size_t)write_result;
 
@@ -1047,6 +1087,71 @@ river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, c
     return status;
 }
 
+river_status_t river_playback_service_wait_idle_ex(uint32_t timeout_ms,
+                                                   uint32_t poll_ms,
+                                                   const char *reason)
+{
+    uint32_t start_ms;
+
+    if (!g_river_playback_service.initialized) {
+        return RIVER_OK;
+    }
+    if (poll_ms == 0U) {
+        poll_ms = RIVER_PLAYBACK_SERVICE_DEFAULT_DRAIN_POLL_MS;
+    }
+
+    start_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    while (true) {
+        size_t buffered_bytes = 0U;
+        size_t buffer_size = 0U;
+
+        if (rtos_mutex_take(g_river_playback_service.lock, MUTEX_WAIT_TIMEOUT) != RTK_SUCCESS) {
+            return RIVER_ERR_BUSY;
+        }
+
+        if (g_river_playback_service.stats.state == RIVER_PLAYBACK_IDLE ||
+            g_river_playback_service.track == NULL ||
+            !g_river_playback_service.track_started) {
+            rtos_mutex_give(g_river_playback_service.lock);
+            return RIVER_OK;
+        }
+
+        if (!river_playback_service_update_buffer_stats_locked(&buffered_bytes,
+                                                               &buffer_size)) {
+            rtos_mutex_give(g_river_playback_service.lock);
+            return RIVER_ERR_UNSUPPORTED;
+        }
+        if (buffered_bytes == 0U) {
+            g_river_playback_service.stats.drain_count++;
+            RIVER_LOGI("playback drain complete: stream=%s reason=%s buffer=%lu/%lu",
+                       g_river_playback_service.stats.stream_name[0] != '\0' ?
+                           g_river_playback_service.stats.stream_name :
+                           "-",
+                       reason != NULL ? reason : "-",
+                       (unsigned long)buffered_bytes,
+                       (unsigned long)buffer_size);
+            rtos_mutex_give(g_river_playback_service.lock);
+            return RIVER_OK;
+        }
+
+        if ((uint32_t)rtos_time_get_current_system_time_ms() - start_ms >= timeout_ms) {
+            g_river_playback_service.stats.drain_timeout_count++;
+            RIVER_LOGW("playback drain timeout: stream=%s reason=%s buffer=%lu/%lu timeout=%lums",
+                       g_river_playback_service.stats.stream_name[0] != '\0' ?
+                           g_river_playback_service.stats.stream_name :
+                           "-",
+                       reason != NULL ? reason : "-",
+                       (unsigned long)buffered_bytes,
+                       (unsigned long)buffer_size,
+                       (unsigned long)timeout_ms);
+            rtos_mutex_give(g_river_playback_service.lock);
+            return RIVER_ERR_BUSY;
+        }
+        rtos_mutex_give(g_river_playback_service.lock);
+        rtos_time_delay_ms(poll_ms);
+    }
+}
+
 river_status_t river_playback_service_stop_stream(void)
 {
     return river_playback_service_stop_stream_ex(NULL);
@@ -1070,6 +1175,13 @@ river_status_t river_playback_service_recover_stream(void)
 river_status_t river_playback_service_set_ducking(bool enabled, float gain)
 {
     return river_playback_service_set_ducking_ex(enabled, gain, NULL);
+}
+
+river_status_t river_playback_service_wait_idle(uint32_t timeout_ms)
+{
+    return river_playback_service_wait_idle_ex(timeout_ms,
+                                              RIVER_PLAYBACK_SERVICE_DEFAULT_DRAIN_POLL_MS,
+                                              NULL);
 }
 
 river_playback_state_t river_playback_service_state(void)
@@ -1139,6 +1251,7 @@ void river_playback_service_get_stats(river_playback_service_stats_t *stats)
         return;
     }
 
+    (void)river_playback_service_update_buffer_stats_locked(NULL, NULL);
     *stats = g_river_playback_service.stats;
     rtos_mutex_give(g_river_playback_service.lock);
 }
@@ -1148,7 +1261,7 @@ void river_playback_service_dump_status(void)
     river_playback_service_stats_t stats;
 
     river_playback_service_get_stats(&stats);
-    RIVER_LOGI("playback_service=%s stream=%s prio=%lu ref=%s duck=%s/%.2f epoch=%lu epoch_adv=%lu writes=%lu/%lu ref_writes=%lu/%lu starts=%lu stops=%lu interrupts=%lu flushes=%lu ducks=%lu track=%lu/%lu/%lu buf=%luB ctrl=%s ctrl_reason=%s epoch_reason=%s int_reason=%s",
+    RIVER_LOGI("playback_service=%s stream=%s prio=%lu ref=%s duck=%s/%.2f epoch=%lu epoch_adv=%lu writes=%lu/%lu ref_writes=%lu/%lu starts=%lu stops=%lu interrupts=%lu flushes=%lu drains=%lu/%lu ducks=%lu track=%lu/%lu/%lu buf=%lu/%lu/%luB ctrl=%s ctrl_reason=%s epoch_reason=%s int_reason=%s",
                river_playback_service_state_name(stats.state),
                stats.stream_name[0] != '\0' ? stats.stream_name : "-",
                (unsigned long)stats.priority,
@@ -1165,10 +1278,14 @@ void river_playback_service_dump_status(void)
                (unsigned long)stats.stop_count,
                (unsigned long)stats.interrupt_count,
                (unsigned long)stats.flush_count,
+               (unsigned long)stats.drain_count,
+               (unsigned long)stats.drain_timeout_count,
                (unsigned long)stats.duck_count,
                (unsigned long)stats.track_create_count,
                (unsigned long)stats.track_reuse_count,
                (unsigned long)stats.track_destroy_count,
+               (unsigned long)stats.buffered_bytes,
+               (unsigned long)stats.buffer_size_bytes,
                (unsigned long)stats.track_buffer_bytes,
                stats.last_control[0] != '\0' ? stats.last_control : "-",
                stats.last_control_reason[0] != '\0' ? stats.last_control_reason : "-",
