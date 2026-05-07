@@ -1,5 +1,36 @@
 # Change Log
 
+## Step A.home-ai.20
+- 按当前收口目标，把本地唤醒词模型从
+  `student_conv_resnet_ed_nano_v1_fp32_debug` 切换到
+  `student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_debug`，同时把
+  `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从调试态 `384` 拉回校准阈值附近。
+- 本轮改动：
+  - `Kconfig`
+    - 新增
+      `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG`
+  - `prj.conf`
+    - 关闭 `...NANO_V1_FP32_DEBUG`
+    - 启用 `...NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG`
+    - 阈值改为 `9517`
+  - `components/river_voice/river_voice_kws.cc`
+    - 新增 teacher-a v2 变体分支
+    - 绑定新的 generated header / symbol / variant name
+  - `components/river_voice/generated/`
+    - 从训练导出 bundle 机械复制
+      `student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_model_data.h`
+- 这样切换后，板端仍保持原来的：
+  - `40x101`
+  - `n_fft=400`
+  - centered log-mel frontend
+  - conv-only resolver path
+  但模型本体切到 teacher-a refresh 候选，阈值也不再停留在误报极高的 debug-low
+  口径。
+- Verification for this step:
+  - `git diff --check` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.19
 - 根据 2026-05-07 16:52 这一轮最新日志，先收一刀最直接导致
   `抱歉，我刚没听清，请再说一遍。` 反复出现的上行拥塞问题：

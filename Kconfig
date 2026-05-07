@@ -316,6 +316,16 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_V1_FP32_DEBUG
       kernel-aware Conv-ResNet-ED route can be deployment-checked
       without replacing the current mainline chain.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG
+    bool "Student Conv-ResNet-ED nano current-teacher-a v2 FP32 debug model"
+    help
+      Use the parallel FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_current_teacher_a_v2.
+      This variant keeps the current `40x101`, `n_fft=400`, centered log-mel
+      frontend and same conv-only resolver path as the deployed nano v1 while
+      promoting the lower-risk teacher-a refresh candidate for board-side A/B
+      validation.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG
     bool "Student Conv-ResNet-ED tiny v1 FP32 debug model"
     help

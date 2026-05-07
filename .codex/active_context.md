@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.19 放宽小智上行音频的 ws 队列头间与追赶能力（本地 build 通过，待上板）`
+  - `Step A.home-ai.20 切换 teacher-a 唤醒词模型并恢复校准阈值（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,23 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
     - newest active adaptation slice:
+    - Step A.home-ai.20 切换 teacher-a 唤醒词模型并恢复校准阈值：
+      - 当前工程原先还停留在
+        `student_conv_resnet_ed_nano_v1_fp32_debug + threshold_q15=384`
+      - 这会把模型对比和现场误报都混在一起，不利于继续收口
+      - 本轮已切到
+        `student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_debug`
+      - 同时把阈值恢复到 deployment bundle 默认 target recall 附近的
+        `9517`
+      - 这一轮保持不变的条件：
+        - 同 `40x101` frontend
+        - 同 conv-only resolver path
+        - 同类 FP32 nano 资源规模
+    - 下一步上板验证：
+      - boot / kws backend 日志确认 variant 已切到
+        `student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_debug`
+      - threshold 不再是 `384`
+      - 对比误唤醒和正常唤醒表现，再决定是否需要继续细调阈值
     - Step A.home-ai.19 放宽小智上行音频的 ws 队列头间与追赶能力：
       - 最新 2026-05-07 16:52 日志里已经出现成组证据：
         - `xiaozhi ws backpressure: kind=audio reason=soft_reserve`

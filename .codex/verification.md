@@ -1,3 +1,58 @@
+## Step A.home-ai.20 Verification
+
+Confirm the active KWS variant and threshold are now bound to the teacher-a
+refresh candidate instead of the debug-low nano v1 setup:
+```bash
+cd /root/ameba-river
+rg -n "NANO_CURRENT_TEACHER_A_V2|NANO_V1_FP32_DEBUG|SCORE_THRESHOLD_Q15=9517|student_conv_resnet_ed_nano_current_teacher_a_v2_fp32" \
+  Kconfig \
+  prj.conf \
+  components/river_voice/river_voice_kws.cc \
+  components/river_voice/generated/student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_model_data.h
+```
+
+Expected result:
+- `prj.conf` enables
+  `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG=y`
+- `prj.conf` no longer enables the old `...NANO_V1_FP32_DEBUG`
+- `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`
+- `river_voice_kws.cc` binds the teacher-a v2 generated symbol and variant name
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation:
+```text
+1. 重启后看 boot / kws init 日志。
+2. 触发一次明确的“ 小欧管家 ”唤醒词。
+```
+
+Expected result:
+- boot/kws backend log should report
+  `variant=student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_debug`
+- threshold log should be around `9517` rather than `384`
+- 误唤醒应显著低于 debug-low `384` 阶段
+
 ## Step A.home-ai.19 Verification
 
 Confirm the latest uplink congestion guard is less conservative on audio send
