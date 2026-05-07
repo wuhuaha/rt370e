@@ -518,7 +518,7 @@ river_status_t river_orvibo_app_boot(void)
 
 void river_orvibo_app_print_status(void)
 {
-    RIVER_LOGI("orvibo app: state=%s wifi=%s queue=%lu posted=%lu fail=%lu handled=%lu uplink=%lu busy=%lu downlink=%lu/%lu dropped=%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s wifi=%s queue=%lu posted=%lu fail=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
                river_wifi_station_status_name(),
                (unsigned long)(g_river_orvibo_app.queue != NULL ?

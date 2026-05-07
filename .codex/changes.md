@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.4
+- 增加 Orvibo protocol 层 uplink 发送缓冲，降低 SDK WebSocket 短暂 busy 对实时采集/编码链路的影响：
+  - `river_orvibo_protocol_send_audio()` 现在只做非阻塞入队，成功语义为 “queued for send”。
+  - 新增 `orvibo_uplink` sender task，负责实际 `ws_sendBinary()` 入 SDK 发送队列。
+  - sender 对单帧做短重试，避免一次 SDK queue 抖动直接丢当前 Opus 帧。
+- 增强会话边界安全：
+  - uplink frame 带 `session_epoch`，WebSocket close/reopen 后旧会话残留帧不会被发到新 session。
+  - app status 将 uplink 计数标为 `uplink_enq`，避免把 “已入队” 误读为 “已发出”。
+- 增强板端可观测性：
+  - protocol status 输出 uplink task、queue depth、入队数、drop oldest、queue full、closed/stale drop、retry 和 send fail。
+  - 队列满时采用 drop-oldest 后再入队新帧，保持实时链路延迟受控。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo protocol uplink 调度和 app 状态日志语义。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo uplink queue/session-epoch grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.3
 - 对照 `~/xiaozhi-esp32` 再次收紧 TTS 下行和播放状态边界：
   - `tts start` 进入 speaking 前现在会重置 Orvibo 下行 Opus decoder，并停止上一轮残留 TTS playback。

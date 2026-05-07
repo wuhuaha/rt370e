@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.3 收紧 Orvibo TTS 下行状态边界与播放 drain（SDK 构建通过）`
+  - `Step H.xiaozhi-client.4 稳定 Orvibo uplink 发送背压与诊断（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.4` hardens uplink backpressure and diagnostics:
+  - `river_orvibo_protocol_send_audio()` now queues Opus uplink frames instead of synchronously entering the SDK WebSocket send queue.
+  - `orvibo_uplink` sender task owns actual `ws_sendBinary()` submission with bounded short retry.
+  - each queued frame carries `session_epoch`, so close/reopen cannot leak old-session audio into a new session.
+  - protocol status reports uplink task, queue depth, enqueue/drop/retry/fail counters; app status labels the app-side count as `uplink_enq`.
 - `Step H.xiaozhi-client.3` hardens TTS/downlink runtime behavior against the XiaoZhi-compatible reference client:
   - server binary downlink audio is only decoded while Orvibo business state is `speaking`.
   - `tts start` resets the downlink decoder and stops stale playback before accepting a new response.
@@ -71,6 +76,7 @@ or top-of-tree verification target changes.
   - Orvibo/XiaoZhi-compatible protocol/access grep
   - access activation/periodic-refresh grep
   - Orvibo TTS/downlink/playback-drain grep
+  - Orvibo uplink queue/session-epoch grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -80,7 +86,7 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
-  - audio uplink/downlink backpressure
+  - downlink playback/backpressure board validation
   - board-visible Orvibo status logs
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call

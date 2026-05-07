@@ -1,3 +1,54 @@
+## Step H.xiaozhi-client.4 Verification
+
+Confirm Orvibo protocol uplink is buffered and session-safe:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|river_orvibo_send_audio_immediate|session_epoch|audio_enqueued|audio_queue_drop_oldest|audio_queue_full|audio_drop_closed|audio_drop_stale|audio_send_retry|audio_send_fail" \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- protocol init creates an `orvibo_uplink` sender task and fixed-depth uplink queue.
+- `river_orvibo_protocol_send_audio()` queues frames instead of directly calling `ws_sendBinary()`.
+- queued frames carry `session_epoch`, and stale frames are dropped across close/reopen.
+- protocol status exposes queue depth, drop, retry, and send-fail counters.
+
+Confirm app status no longer labels queued uplink as direct socket sends:
+```bash
+cd /root/ameba-river
+rg -n "uplink_enq|river_orvibo_protocol_send_audio" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- app log uses `uplink_enq`.
+- actual socket send counters are reported by `river_orvibo_protocol_dump_status()`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后触发一次唤醒和正常讲话，观察 Orvibo app/protocol status。
+```
+
+Expected result:
+- `orvibo protocol` status 显示 `uplink_task=yes`，`q=` 在正常网络下保持低水位。
+- 用户说话期间 `uplink_enq` 和 protocol `audio=tx/rx` 均增长。
+- 正常网络下 `full`、`closed`、`stale`、`fail` 应保持 0 或低值；网络抖动时可看到 `retry` 或 `drop_oldest`，但 app/audio 任务不应被阻塞。
+
 ## Step H.xiaozhi-client.3 Verification
 
 Confirm Orvibo TTS/downlink now follows the reference speaking boundary:

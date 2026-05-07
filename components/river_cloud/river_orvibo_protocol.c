@@ -42,6 +42,11 @@
 #define RIVER_ORVIBO_WS_HELLO_TIMEOUT_MS 10000U
 #define RIVER_ORVIBO_WS_HELLO_POLL_MS 20U
 #define RIVER_ORVIBO_WS_SEND_BLOCK_MS 0U
+#define RIVER_ORVIBO_UPLINK_QUEUE_DEPTH 24U
+#define RIVER_ORVIBO_UPLINK_TASK_STACK (1024U * 6U)
+#define RIVER_ORVIBO_UPLINK_TASK_PRIORITY 4U
+#define RIVER_ORVIBO_UPLINK_RETRY_COUNT 3U
+#define RIVER_ORVIBO_UPLINK_RETRY_DELAY_MS 20U
 #define RIVER_ORVIBO_RTOS_OK 0
 
 typedef struct {
@@ -61,15 +66,26 @@ typedef struct {
 } __attribute__((packed)) river_orvibo_binary_v3_t;
 
 typedef struct {
+    uint32_t session_epoch;
+    uint32_t timestamp_ms;
+    size_t bytes;
+    uint8_t payload[RIVER_ORVIBO_BINARY_PAYLOAD_MAX];
+} river_orvibo_uplink_frame_t;
+
+typedef struct {
     bool initialized;
+    bool uplink_task_running;
     bool session_open;
     bool server_hello_received;
     bool ws_closed;
     river_orvibo_protocol_config_t config;
     wsclient_context *wsclient;
     rtos_mutex_t lock;
+    rtos_queue_t uplink_queue;
+    rtos_task_t uplink_task;
     river_orvibo_protocol_event_handler_t event_handler;
     void *event_handler_user;
+    uint32_t session_epoch;
     uint32_t server_sample_rate;
     uint32_t server_channels;
     uint32_t server_frame_duration_ms;
@@ -77,6 +93,13 @@ typedef struct {
     uint32_t text_tx;
     uint32_t audio_rx;
     uint32_t audio_tx;
+    uint32_t audio_enqueued;
+    uint32_t audio_queue_drop_oldest;
+    uint32_t audio_queue_full;
+    uint32_t audio_drop_closed;
+    uint32_t audio_drop_stale;
+    uint32_t audio_send_retry;
+    uint32_t audio_send_fail;
     uint32_t sessions_opened;
     uint32_t sessions_closed;
     uint32_t errors;
@@ -94,6 +117,8 @@ typedef struct {
 } river_orvibo_protocol_context_t;
 
 static river_orvibo_protocol_context_t g_river_orvibo_protocol;
+
+static void river_orvibo_uplink_task(void *param);
 
 static void river_orvibo_copy_text(char *dst, size_t dst_size, const char *src)
 {
@@ -728,6 +753,7 @@ static void river_orvibo_close_context(void)
     }
     g_river_orvibo_protocol.session_open = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.session_epoch++;
     river_orvibo_transport_unlock(locked);
 }
 
@@ -763,6 +789,25 @@ river_status_t river_orvibo_protocol_init(void)
     }
     memset(&g_river_orvibo_protocol, 0, sizeof(g_river_orvibo_protocol));
     if (rtos_mutex_create(&g_river_orvibo_protocol.lock) != RIVER_ORVIBO_RTOS_OK) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (rtos_queue_create(&g_river_orvibo_protocol.uplink_queue,
+                          RIVER_ORVIBO_UPLINK_QUEUE_DEPTH,
+                          sizeof(river_orvibo_uplink_frame_t)) != RIVER_ORVIBO_RTOS_OK) {
+        rtos_mutex_delete(g_river_orvibo_protocol.lock);
+        g_river_orvibo_protocol.lock = NULL;
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (rtos_task_create(&g_river_orvibo_protocol.uplink_task,
+                         "orvibo_uplink",
+                         river_orvibo_uplink_task,
+                         NULL,
+                         RIVER_ORVIBO_UPLINK_TASK_STACK,
+                         RIVER_ORVIBO_UPLINK_TASK_PRIORITY) != RIVER_ORVIBO_RTOS_OK) {
+        rtos_queue_delete(g_river_orvibo_protocol.uplink_queue);
+        g_river_orvibo_protocol.uplink_queue = NULL;
+        rtos_mutex_delete(g_river_orvibo_protocol.lock);
+        g_river_orvibo_protocol.lock = NULL;
         return RIVER_ERR_NO_MEMORY;
     }
     g_river_orvibo_protocol.initialized = true;
@@ -944,6 +989,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     g_river_orvibo_protocol.session_open = true;
     g_river_orvibo_protocol.ws_closed = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.session_epoch++;
     g_river_orvibo_protocol.sessions_opened++;
     river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_CONNECTED,
                             NULL,
@@ -1001,9 +1047,17 @@ river_status_t river_orvibo_protocol_poll(uint32_t timeout_ms)
     return RIVER_OK;
 }
 
-river_status_t river_orvibo_protocol_send_audio(const uint8_t *payload,
-                                                size_t bytes,
-                                                uint32_t timestamp_ms)
+static bool river_orvibo_channel_open_locked(void)
+{
+    return g_river_orvibo_protocol.session_open &&
+           g_river_orvibo_protocol.wsclient != NULL &&
+           g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN;
+}
+
+static river_status_t river_orvibo_send_audio_immediate(const uint8_t *payload,
+                                                        size_t bytes,
+                                                        uint32_t timestamp_ms,
+                                                        uint32_t session_epoch)
 {
     const uint8_t *send_payload = payload;
     size_t send_bytes = bytes;
@@ -1014,9 +1068,12 @@ river_status_t river_orvibo_protocol_send_audio(const uint8_t *payload,
         return RIVER_ERR_ARG;
     }
     locked = river_orvibo_transport_lock();
-    if (!locked || g_river_orvibo_protocol.wsclient == NULL ||
-        g_river_orvibo_protocol.wsclient->readyState != WSC_OPEN) {
+    if (!locked || !river_orvibo_channel_open_locked()) {
         status = RIVER_ERR_BUSY;
+        goto exit;
+    }
+    if (g_river_orvibo_protocol.session_epoch != session_epoch) {
+        status = RIVER_ERR_INVALID_STATE;
         goto exit;
     }
     if (g_river_orvibo_protocol.config.protocol_version == 2U) {
@@ -1055,12 +1112,130 @@ river_status_t river_orvibo_protocol_send_audio(const uint8_t *payload,
         g_river_orvibo_protocol.audio_tx++;
         status = RIVER_OK;
     } else {
-        river_orvibo_set_last_error("audio_send_failed");
+        status = RIVER_ERR_BUSY;
     }
 
 exit:
     river_orvibo_transport_unlock(locked);
     return status;
+}
+
+river_status_t river_orvibo_protocol_send_audio(const uint8_t *payload,
+                                                size_t bytes,
+                                                uint32_t timestamp_ms)
+{
+    river_orvibo_uplink_frame_t frame;
+    bool locked;
+    bool channel_open = false;
+    uint32_t session_epoch = 0U;
+
+    if (payload == NULL || bytes == 0U || bytes > sizeof(frame.payload)) {
+        return RIVER_ERR_ARG;
+    }
+    if (!g_river_orvibo_protocol.initialized || g_river_orvibo_protocol.uplink_queue == NULL) {
+        return RIVER_ERR_INVALID_STATE;
+    }
+
+    locked = river_orvibo_transport_lock();
+    if (locked) {
+        channel_open = river_orvibo_channel_open_locked();
+        session_epoch = g_river_orvibo_protocol.session_epoch;
+    }
+    river_orvibo_transport_unlock(locked);
+    if (!channel_open) {
+        g_river_orvibo_protocol.audio_drop_closed++;
+        return RIVER_ERR_BUSY;
+    }
+
+    memset(&frame, 0, sizeof(frame));
+    frame.session_epoch = session_epoch;
+    frame.timestamp_ms = timestamp_ms;
+    frame.bytes = bytes;
+    memcpy(frame.payload, payload, bytes);
+    if (rtos_queue_send(g_river_orvibo_protocol.uplink_queue, &frame, 0U) ==
+        RIVER_ORVIBO_RTOS_OK) {
+        g_river_orvibo_protocol.audio_enqueued++;
+        return RIVER_OK;
+    }
+
+    if (rtos_queue_receive(g_river_orvibo_protocol.uplink_queue, &frame, 0U) ==
+        RIVER_ORVIBO_RTOS_OK) {
+        river_orvibo_uplink_frame_t replacement;
+
+        g_river_orvibo_protocol.audio_queue_drop_oldest++;
+        memset(&replacement, 0, sizeof(replacement));
+        replacement.session_epoch = session_epoch;
+        replacement.timestamp_ms = timestamp_ms;
+        replacement.bytes = bytes;
+        memcpy(replacement.payload, payload, bytes);
+        if (rtos_queue_send(g_river_orvibo_protocol.uplink_queue, &replacement, 0U) ==
+            RIVER_ORVIBO_RTOS_OK) {
+            g_river_orvibo_protocol.audio_enqueued++;
+            return RIVER_OK;
+        }
+    }
+
+    g_river_orvibo_protocol.audio_queue_full++;
+    return RIVER_ERR_BUSY;
+}
+
+static void river_orvibo_uplink_task(void *param)
+{
+    river_orvibo_uplink_frame_t frame;
+
+    (void)param;
+    g_river_orvibo_protocol.uplink_task_running = true;
+    while (true) {
+        bool channel_open = false;
+        uint32_t session_epoch = 0U;
+        bool locked;
+        river_status_t status = RIVER_ERR_BUSY;
+        uint32_t attempt;
+
+        if (rtos_queue_receive(g_river_orvibo_protocol.uplink_queue,
+                               &frame,
+                               0xFFFFFFFFU) != RIVER_ORVIBO_RTOS_OK) {
+            continue;
+        }
+
+        locked = river_orvibo_transport_lock();
+        if (locked) {
+            channel_open = river_orvibo_channel_open_locked();
+            session_epoch = g_river_orvibo_protocol.session_epoch;
+        }
+        river_orvibo_transport_unlock(locked);
+
+        if (!channel_open) {
+            g_river_orvibo_protocol.audio_drop_closed++;
+            continue;
+        }
+        if (frame.session_epoch != session_epoch) {
+            g_river_orvibo_protocol.audio_drop_stale++;
+            continue;
+        }
+
+        for (attempt = 0U; attempt < RIVER_ORVIBO_UPLINK_RETRY_COUNT; ++attempt) {
+            status = river_orvibo_send_audio_immediate(frame.payload,
+                                                       frame.bytes,
+                                                       frame.timestamp_ms,
+                                                       frame.session_epoch);
+            if (status == RIVER_OK) {
+                break;
+            }
+            if (status == RIVER_ERR_INVALID_STATE) {
+                g_river_orvibo_protocol.audio_drop_stale++;
+                break;
+            }
+            if ((attempt + 1U) < RIVER_ORVIBO_UPLINK_RETRY_COUNT) {
+                g_river_orvibo_protocol.audio_send_retry++;
+                rtos_time_delay_ms(RIVER_ORVIBO_UPLINK_RETRY_DELAY_MS);
+            }
+        }
+        if (status != RIVER_OK && status != RIVER_ERR_INVALID_STATE) {
+            g_river_orvibo_protocol.audio_send_fail++;
+            river_orvibo_set_last_error("audio_send_failed");
+        }
+    }
 }
 
 static void river_orvibo_add_session_id(cJSON *root)
@@ -1153,7 +1328,12 @@ river_status_t river_orvibo_protocol_send_mcp_message(const char *payload_json)
 
 void river_orvibo_protocol_dump_status(void)
 {
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u text=%lu/%lu audio=%lu/%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
+    uint32_t uplink_depth = g_river_orvibo_protocol.uplink_queue != NULL ?
+                                rtos_queue_message_waiting(
+                                    g_river_orvibo_protocol.uplink_queue) :
+                                0U;
+
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1165,6 +1345,16 @@ void river_orvibo_protocol_dump_status(void)
                (unsigned long)g_river_orvibo_protocol.text_rx,
                (unsigned long)g_river_orvibo_protocol.audio_tx,
                (unsigned long)g_river_orvibo_protocol.audio_rx,
+               g_river_orvibo_protocol.uplink_task_running ? "yes" : "no",
+               (unsigned long)uplink_depth,
+               (unsigned int)RIVER_ORVIBO_UPLINK_QUEUE_DEPTH,
+               (unsigned long)g_river_orvibo_protocol.audio_enqueued,
+               (unsigned long)g_river_orvibo_protocol.audio_queue_drop_oldest,
+               (unsigned long)g_river_orvibo_protocol.audio_queue_full,
+               (unsigned long)g_river_orvibo_protocol.audio_drop_closed,
+               (unsigned long)g_river_orvibo_protocol.audio_drop_stale,
+               (unsigned long)g_river_orvibo_protocol.audio_send_retry,
+               (unsigned long)g_river_orvibo_protocol.audio_send_fail,
                (unsigned long)g_river_orvibo_protocol.sessions_opened,
                (unsigned long)g_river_orvibo_protocol.sessions_closed,
                (unsigned long)g_river_orvibo_protocol.errors,
