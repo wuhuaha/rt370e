@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.18 修复 M1 单轮 idle 尾态收口的 pre-accept 误杀（本地 build 通过，待上板）`
+  - `Step A.home-ai.19 放宽小智上行音频的 ws 队列头间与追赶能力（本地 build 通过，待上板）`
 - Current active objective:
   - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
 - Active plan:
@@ -25,6 +25,24 @@ or top-of-tree verification target changes.
     descriptions by default
 - Latest planning sync:
     - newest active adaptation slice:
+    - Step A.home-ai.19 放宽小智上行音频的 ws 队列头间与追赶能力：
+      - 最新 2026-05-07 16:52 日志里已经出现成组证据：
+        - `xiaozhi ws backpressure: kind=audio reason=soft_reserve`
+        - `xiaozhi uplink backpressure ... streak=7 backoff=40ms`
+        - `xiaozhi asr round finish ... audio_ms=1760 pace_pct=49 partial=0 final=0`
+      - 这说明当前“反复抱歉没听清”更像是 uplink 在轻微拥塞下被节流成半速，
+        服务端拿不到完整命令，而不是单纯 TTS 文案或下行状态机问题
+      - 本轮只做最小参数收口：
+        - ws queue `16 -> 24`
+        - audio reserve `2 -> 1`
+        - uplink drain burst `1 -> 2`
+      - 目标是把 uplink `pace_pct` 从当前日志的 `49` 拉回接近实时，减少
+        `m1_did_not_hear` cached-response
+    - 下一步上板验证：
+      - 关注 `xiaozhi ws backpressure` 是否明显减少
+      - 关注 `xiaozhi uplink backpressure` 的 `streak/backoff`
+      - 关注 `xiaozhi asr round finish` 的 `pace_pct`
+      - 若 `pace_pct` 回升但 TTS 仍有 `underrun`，下一刀继续收 downlink 尾段
     - Step A.home-ai.18 修复 M1 单轮 idle 尾态收口的 pre-accept 误杀：
       - Step A.home-ai.17 把 `active + output_state=idle` 收成单轮保守尾态后，
         真实上板日志暴露出一个回归：

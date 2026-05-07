@@ -1,5 +1,34 @@
 # Change Log
 
+## Step A.home-ai.19
+- 根据 2026-05-07 16:52 这一轮最新日志，先收一刀最直接导致
+  `抱歉，我刚没听清，请再说一遍。` 反复出现的上行拥塞问题：
+  - 同一轮日志里已经出现明确证据：
+    - `xiaozhi ws backpressure: kind=audio reason=soft_reserve ... free=2`
+    - `xiaozhi uplink backpressure: ... streak=7 backoff=40ms`
+    - `xiaozhi asr round finish: ... audio_ms=1760 ... pace_pct=49 ... partial=0 final=0`
+  - 这说明当前板端在 websocket 轻微发送拥塞时，音频上行会被保守节流到接近
+    半速；服务端拿不到完整命令，就会稳定落回 cached-response 的
+    “没听清”兜底句，看起来像 TTS 在反复道歉，实质是上一段 ASR 没送完整。
+- 本轮只改三处最小头间/追赶参数，不动协议和状态机：
+  - `RIVER_XIAOZHI_WS_QUEUE_MAX: 16 -> 24`
+    - 给 wsclient send queue 多留一些瞬时 headroom，减少音频在 soft-reserve
+      阶段频繁被判 busy。
+  - `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE: 2 -> 1`
+    - 继续保留控制消息插队空间，但不再让音频在还剩 2 个空槽时就被过早卡住。
+  - `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX: 1 -> 2`
+    - backlog 形成后，uplink worker 每轮允许多追一帧，避免一直卡在
+      “发一帧、退避、再发一帧”的半速状态。
+- 这一刀的目标很明确：
+  - 先把 `pace_pct` 从当前日志里的 `49` 拉回接近实时
+  - 减少 `xiaozhi ws backpressure: kind=audio reason=soft_reserve`
+  - 降低服务端回 cached-response “没听清” 的频率
+  - 这一步主要收 uplink；TTS 下行的 `underrun` 还需要下一轮继续压
+- Verification for this step:
+  - `git diff --check` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+    completed with `Build done`。
+
 ## Step A.home-ai.18
 - 修复 Step A.home-ai.17 引入的一个会话早退回归：
   - 最新上板日志已经把问题指清楚了：

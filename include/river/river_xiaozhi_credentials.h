@@ -54,7 +54,7 @@
  * bounded so the project-side stale-frame trimming remains the freshness guard
  * under sustained congestion.
  */
-#define RIVER_XIAOZHI_WS_QUEUE_MAX              16
+#define RIVER_XIAOZHI_WS_QUEUE_MAX              24
 /*
  * Keep most send buffers warm in the SDK recycle queue so short bursty speech
  * does not repeatedly pay malloc/free churn while still leaving some slack for

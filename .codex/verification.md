@@ -1,3 +1,55 @@
+## Step A.home-ai.19 Verification
+
+Confirm the latest uplink congestion guard is less conservative on audio send
+headroom and can catch up from mild backlog:
+```bash
+cd /root/ameba-river
+rg -n "WS_QUEUE_MAX|WS_STABLE_BUF_NUM|WS_AUDIO_QUEUE_RESERVE|UPLINK_DRAIN_BURST_MAX" \
+  include/river/river_xiaozhi_credentials.h \
+  components/river_cloud/river_xiaozhi_ws.c \
+  components/river_cloud/river_cloud_internal.h
+```
+
+Expected result:
+- `RIVER_XIAOZHI_WS_QUEUE_MAX` is `24`
+- `RIVER_XIAOZHI_WS_AUDIO_QUEUE_RESERVE` is `1`
+- `RIVER_CLOUD_XIAOZHI_UPLINK_DRAIN_BURST_MAX` is `2`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
+Post-flash board validation for the pasted 2026-05-07 16:52 symptom:
+```text
+1. 唤醒后连续说一条 2~3 秒的控制指令。
+2. 观察同一轮日志里的 websocket backpressure 和 asr round finish 指标。
+```
+
+Expected result:
+- `xiaozhi ws backpressure: kind=audio reason=soft_reserve` 频率应下降
+- `xiaozhi uplink backpressure` 的 `streak` / `backoff` 不应像之前那样迅速涨到 `40ms`
+- `xiaozhi asr round finish` 中的 `pace_pct` 应明显高于此前日志里的 `49`
+- 服务端不应再高频落回 `m1_did_not_hear` 这类 cached-response
+
 ## Step A.home-ai.17 Verification
 
 Confirm M1 now treats the current service contract as a strict single-turn
