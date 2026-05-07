@@ -1,9 +1,10 @@
-# XiaoZhi 专用客户端 Clean-Slate 重构计划
+# Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
 Last Updated: 2026-05-07
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
+External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 ## 0. 文档用途
 
@@ -25,9 +26,9 @@ SDK Baseline: `/root/ameba-rtos`
 
 ## 1. 重构判定
 
-这个分支不再做“在现有 river 架构上兼容 XiaoZhi”的增量接入。当前目标是把固件重建成 XiaoZhi 服务器专用客户端。
+这个分支不再做“在现有 river 架构上兼容某个服务器”的增量接入。当前目标是把固件重建成 Orvibo 语音客户端主干。
 
-参考对象是 `~/xiaozhi-esp32` 的设备端主干：
+第一版外部 wire contract 参考 `~/xiaozhi-esp32` 的设备端主干，但内部文件名、函数名、模块名和诊断命令不得继续使用 `xiaozhi` 或 `xz` 作为新命名前缀：
 
 - `Application`
 - `DeviceStateMachine`
@@ -37,11 +38,21 @@ SDK Baseline: `/root/ameba-rtos`
 
 当前仓库里可保留的不是旧主干，而是少数已经验证过的本地能力和板级适配。后续实现允许替换或删除现有 `river_core / river_cloud / playback / online_control` 里的大部分代码，只要每一步仍可构建、可验证。
 
+命名原则：
+
+- 新 public header 使用 `river_orvibo*.h`。
+- 新 C 源文件使用 `river_orvibo*.c` 或 `orvibo_*.c`，按所在组件现有风格决定。
+- 新 public 函数使用 `river_orvibo_*`。
+- 新 internal static/helper 函数使用 `orvibo_*`。
+- 新 task、queue、status、diag 名称使用 `orvibo_*`。
+- `xiaozhi` 只允许出现在历史文档、兼容协议说明、删除清单或明确的 legacy adapter 名称中。
+- 当前 git 分支名 `xiaozhi-client` 是历史分支名，不作为后续代码命名依据。
+
 ## 2. 不变量
 
 这些规则在所有阶段都生效：
 
-- XiaoZhi 是唯一在线对话协议。
+- Orvibo 主干只保留一个在线对话协议适配器；第一版适配 XiaoZhi-compatible realtime server protocol。
 - 当前 VAD 和当前唤醒词识别是唯一硬保护的语音算法实现。
 - KWS tensor dump、alignment replay、本地/板端 parity 能力不能被弱化。
 - 新主干不能依赖旧 `ASR provider / TTS provider / dialog runtime / session coordinator` 生命周期。
@@ -92,7 +103,7 @@ SDK Baseline: `/root/ameba-rtos`
 - `river_dialog_cloud_port`
 - `river_dialog_wake_admission`
 - `river_interaction_state` 旧状态模型
-- 现有 XiaoZhi playback recovery 大状态机
+- 现有旧实时协议 playback recovery 大状态机
 - 现有 `river_online_control` 中非音量控制能力
 - 旧 light / fan / curtain / socket MCP 工具
 - 为旧多后端架构服务的诊断命令
@@ -105,39 +116,39 @@ AEC、BF、播放服务、引用路径、音频队列可以复用实现片段，
 
 ```text
 app/app_main.c
-  -> xz_app
-       -> xz_state_machine
-       -> xz_audio_service
+  -> orvibo_app
+       -> orvibo_state_machine
+       -> orvibo_audio_service
             -> current KWS
             -> current VAD
             -> Opus encode/decode
             -> board capture/playback adapter
-       -> xz_protocol
+       -> orvibo_protocol
             -> websocket transport
             -> hello/listen/abort/mcp
             -> binary audio
-       -> xz_mcp_volume
-       -> xz_diag
+       -> orvibo_mcp_volume
+       -> orvibo_diag
 ```
 
 建议仍使用现有目录，但改变语义：
 
 - `components/river_core`：
-  - XiaoZhi 专用应用编排和设备状态机
+  - Orvibo 专用应用编排和设备状态机
   - 不再承载旧 provider 派生状态
 - `components/river_voice`：
   - 保留当前 VAD/KWS
-  - 提供 `xz_audio_service` 可直接调用的捕获、检测、唤醒适配
+  - 提供 `orvibo_audio_service` 可直接调用的捕获、检测、唤醒适配
 - `components/river_cloud`：
-  - XiaoZhi 协议、WebSocket transport、MCP volume
+  - Orvibo realtime protocol、WebSocket transport、MCP volume
   - 不再承载多云层、多 provider 或旧对话运行时
 - `components/river_diag`：
   - KWS/VAD 诊断必须保留
-  - 新增面向 `xz_app / xz_audio_service / xz_protocol` 的状态 dump
+  - 新增面向 `orvibo_app / orvibo_audio_service / orvibo_protocol` 的状态 dump
 
 ## 6. 新模块契约
 
-### 6.1 `xz_app`
+### 6.1 `orvibo_app`
 
 职责：
 
@@ -181,11 +192,11 @@ app/app_main.c
 
 质量要求：
 
-- 状态变化必须有单行确定性日志：`xz state: old -> new reason=...`
+- 状态变化必须有单行确定性日志：`orvibo state: old -> new reason=...`
 - 每个外部事件必须能在日志中追踪到一次处理结果。
-- 业务状态只能由 `xz_app` 或 `xz_state_machine` 改变，其他模块只发事件。
+- 业务状态只能由 `orvibo_app` 或 `orvibo_state_machine` 改变，其他模块只发事件。
 
-### 6.2 `xz_state_machine`
+### 6.2 `orvibo_state_machine`
 
 目标状态：
 
@@ -217,8 +228,8 @@ any -> error                      on fatal error
 
 状态不变量：
 
-- `idle`：KWS 应启用；XiaoZhi audio channel 可关闭。
-- `connecting`：KWS 可暂停；正在打开 XiaoZhi audio channel。
+- `idle`：KWS 应启用；Orvibo audio channel 可关闭。
+- `connecting`：KWS 可暂停；正在打开 Orvibo audio channel。
 - `listening`：VAD 和上行编码开启；下行播放未占用 speaker。
 - `speaking`：下行播放开启；VAD 可用于 barge-in；KWS 不参与重复唤醒。
 - `recovering`：停止上行、停止播放、关闭或重建协议连接。
@@ -229,28 +240,28 @@ any -> error                      on fatal error
 - 状态机不得直接执行网络或音频 IO，只返回下一步 action。
 - 后续单测或 host-side 状态表验证应优先覆盖该模块。
 
-### 6.3 `xz_audio_service`
+### 6.3 `orvibo_audio_service`
 
 职责：
 
 - 管理 capture、KWS、VAD、Opus encode、Opus decode、playback。
-- 对 `xz_app` 暴露事件：wake、speech start/end、audio packet ready、playback completed、audio error。
-- 对 `xz_protocol` 暴露上行 Opus packet 队列。
-- 接收 `xz_protocol` 下行 Opus packet 并送播放。
+- 对 `orvibo_app` 暴露事件：wake、speech start/end、audio packet ready、playback completed、audio error。
+- 对 `orvibo_protocol` 暴露上行 Opus packet 队列。
+- 接收 `orvibo_protocol` 下行 Opus packet 并送播放。
 
 内部建议任务：
 
-- `xz_audio_capture_task`
+- `orvibo_audio_capture_task`
   - 读取 board PCM
   - idle 时喂 KWS
   - listening/speaking 时喂 VAD
   - listening 时写 PCM staging queue
-- `xz_audio_codec_task`
+- `orvibo_audio_codec_task`
   - 60ms PCM 聚合
   - Opus encode
   - Opus decode
   - 必须记录 encode/decode 失败计数
-- `xz_audio_playback_task`
+- `orvibo_audio_playback_task`
   - 下行 PCM 播放
   - 记录 underrun、write failure、queue depth
 
@@ -280,30 +291,30 @@ VAD 接入契约：
 - `speech_probability_raw_q15` 和 `speech_probability_q15` 必须进入诊断快照。
 - VAD 判定状态要有去抖策略，但原始 decision 必须可观测。
 
-### 6.4 `xz_protocol`
+### 6.4 `orvibo_protocol`
 
 职责：
 
-- 管理 XiaoZhi WebSocket 连接。
+- 管理 Orvibo realtime WebSocket 连接；第一版 wire contract 兼容 XiaoZhi server。
 - 发送 hello/listen/abort/mcp/audio。
 - 接收 server hello、JSON events、binary audio。
-- 只向 `xz_app` 和 `xz_audio_service` 发事件，不直接改变设备状态。
+- 只向 `orvibo_app` 和 `orvibo_audio_service` 发事件，不直接改变设备状态。
 
 统一接口：
 
-- `xz_protocol_init`
-- `xz_protocol_set_config`
-- `xz_protocol_set_event_handler`
-- `xz_protocol_open_audio_channel`
-- `xz_protocol_close_audio_channel`
-- `xz_protocol_poll`
-- `xz_protocol_send_audio`
-- `xz_protocol_send_wake_word_detected`
-- `xz_protocol_send_start_listening`
-- `xz_protocol_send_stop_listening`
-- `xz_protocol_send_abort_speaking`
-- `xz_protocol_send_mcp_message`
-- `xz_protocol_dump_status`
+- `river_orvibo_protocol_init`
+- `river_orvibo_protocol_set_config`
+- `river_orvibo_protocol_set_event_handler`
+- `river_orvibo_protocol_open_audio_channel`
+- `river_orvibo_protocol_close_audio_channel`
+- `river_orvibo_protocol_poll`
+- `river_orvibo_protocol_send_audio`
+- `river_orvibo_protocol_send_wake_word_detected`
+- `river_orvibo_protocol_send_start_listening`
+- `river_orvibo_protocol_send_stop_listening`
+- `river_orvibo_protocol_send_abort_speaking`
+- `river_orvibo_protocol_send_mcp_message`
+- `river_orvibo_protocol_dump_status`
 
 WebSocket headers：
 
@@ -336,7 +347,7 @@ WebSocket headers：
 - 旧 playback recovery 大状态机
 - 旧 provider callback 适配层
 
-### 6.5 `xz_mcp_volume`
+### 6.5 `orvibo_mcp_volume`
 
 职责：
 
@@ -358,9 +369,9 @@ WebSocket headers：
 
 所有权规则：
 
-- `xz_app` 拥有业务状态。
-- `xz_protocol` 拥有 WebSocket 句柄和 transport lock。
-- `xz_audio_service` 拥有 capture、codec、playback 队列。
+- `orvibo_app` 拥有业务状态。
+- `orvibo_protocol` 拥有 WebSocket 句柄和 transport lock。
+- `orvibo_audio_service` 拥有 capture、codec、playback 队列。
 - VAD/KWS 模块拥有自己的模型上下文和诊断状态。
 
 跨线程通信：
@@ -389,12 +400,12 @@ WebSocket headers：
 
 必须提供：
 
-- `xz app status`
+- `orvibo app status`
   - state
   - last event
   - last error
   - uptime
-- `xz protocol status`
+- `orvibo protocol status`
   - configured/open
   - session_id
   - ws rx/tx counts
@@ -402,7 +413,7 @@ WebSocket headers：
   - audio rx/tx counts
   - backpressure counts
   - last server audio params
-- `xz audio status`
+- `orvibo audio status`
   - capture running
   - kws active
   - vad active
@@ -630,7 +641,7 @@ rg -n "light|fan|curtain|socket|self.audio_speaker.set_volume|set_volume" \
 主要风险：
 
 - VAD/KWS 旧依赖没有先解耦，导致新主干被旧 runtime 反向污染。
-- 协议层照搬了旧 `river_xiaozhi_ws.c` 的复杂 session/playback runtime。
+- 协议层照搬了旧 XiaoZhi legacy adapter 的复杂 session/playback runtime。
 - 音频链路过早追求 full-duplex，导致首版无法稳定闭环。
 - 删除旧文件过早，导致难以定位行为差异。
 
@@ -673,7 +684,7 @@ python3 tools/diag/check_codex_harness.py
 
 范围：
 
-- `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+- `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
 - `.codex/active_context.md`
 - `.codex/changes.md`
 - `.codex/verification.md`
@@ -696,11 +707,55 @@ python3 tools/diag/check_codex_harness.py
 
 - `check_codex_harness: all checks passed`
 
+### Step A3: 切换未来命名为 Orvibo
+
+状态：
+
+- 当前步骤。
+
+目标：
+
+- 把活跃计划文件、未来模块名和未来 public function/header 命名从 `xiaozhi`/`xz`
+  切换为 `orvibo`。
+
+范围：
+
+- `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+- `.codex/active_context.md`
+- `.codex/active_plans.md`
+- `.codex/changes.md`
+- `.codex/verification.md`
+
+完成标准：
+
+- active plan 指向 `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`。
+- 新模块契约使用 `orvibo_app / orvibo_state_machine /
+  orvibo_audio_service / orvibo_protocol / orvibo_mcp_volume`。
+- 未来 public API 命名使用 `river_orvibo_*`。
+- `xiaozhi` 只作为外部兼容协议、历史记录或 legacy adapter 名称出现。
+
+验证：
+
+```bash
+cd /root/ameba-river
+rg -n "ORVIBO_CLIENT_REARCH_EXECUTION_PLAN|Orvibo|orvibo_app|orvibo_state_machine|orvibo_audio_service|orvibo_protocol|orvibo_mcp_volume|river_orvibo|XiaoZhi-compatible" \
+  doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/active_plans.md \
+  .codex/changes.md
+python3 tools/diag/check_codex_harness.py
+```
+
+期望结果：
+
+- active plan 和命名规则均已切到 Orvibo。
+- harness 检查通过。
+
 ### Step B: 解耦受保护的 VAD/KWS
 
 目标：
 
-- 让当前 VAD/KWS 能被新 `xz_audio_service` 调用，而不依赖旧
+- 让当前 VAD/KWS 能被新 `orvibo_audio_service` 调用，而不依赖旧
   `dialog_runtime / session_coordinator / cloud_adapter`。
 
 范围：
@@ -739,8 +794,8 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 目标：
 
-- 新增或替换为 XiaoZhi 专用 `xz_app / xz_state_machine / xz_audio_service /
-  xz_protocol` 骨架，并让 live CMake 先切到新主干。
+- 新增或替换为 Orvibo 专用 `orvibo_app / orvibo_state_machine /
+  orvibo_audio_service / orvibo_protocol` 骨架，并让 live CMake 先切到新主干。
 
 范围：
 
@@ -753,7 +808,7 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 完成标准：
 
-- 固件能构建并启动到新 `xz_app`。
+- 固件能构建并启动到新 `orvibo_app`。
 - 旧 `dialog_runtime / session_coordinator / cloud_adapter / provider` 不再进入 live CMake 编译图。
 - KWS/VAD 仍进入编译图。
 - boot log 出现新设备状态机。
@@ -777,16 +832,17 @@ python3 /root/ameba-rtos/ameba.py build -p
 - 静态检查通过。
 - build 成功。
 
-### Step D: 重建 XiaoZhi 协议层
+### Step D: 重建 Orvibo 协议层
 
 目标：
 
-- 按 `xiaozhi-esp32` 的 `Protocol/WebsocketProtocol` 语义实现 XiaoZhi-only protocol。
+- 按 `xiaozhi-esp32` 的 `Protocol/WebsocketProtocol` wire contract
+  实现 Orvibo realtime protocol adapter。
 
 范围：
 
 - `components/river_cloud/`
-- `include/river/river_xiaozhi*.h`
+- `include/river/river_orvibo*.h`
 
 完成标准：
 
@@ -852,7 +908,7 @@ python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 15000
 
 目标：
 
-- 只保留 XiaoZhi MCP 音量控制。
+- 只保留 Orvibo MCP 音量控制。
 
 范围：
 

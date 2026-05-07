@@ -1,3 +1,31 @@
+## Step A.xiaozhi-client.4 Verification
+
+Confirm the active rearchitecture plan now uses Orvibo as the internal naming
+mainline while preserving XiaoZhi only as the external protocol baseline:
+```bash
+cd /root/ameba-river
+rg -n "ORVIBO_CLIENT_REARCH_EXECUTION_PLAN|Orvibo|orvibo_app|orvibo_state_machine|orvibo_audio_service|orvibo_protocol|orvibo_mcp_volume|river_orvibo|XiaoZhi-compatible" \
+  doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/active_plans.md \
+  .codex/changes.md
+```
+
+Expected result:
+- primary active plan points to `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+- new module/function naming guidance uses Orvibo
+- XiaoZhi appears only as an external protocol compatibility baseline or
+  historical context
+
+Run Codex harness validation because active plan paths changed:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits with `check_codex_harness: all checks passed`
+
 ## Step A.xiaozhi-client.3 Verification
 
 Confirm the clean-slate plan now includes implementation quality controls,

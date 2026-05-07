@@ -15,15 +15,26 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.xiaozhi-client.3 补齐 clean-slate 重构质量控制计划（规划/harness 校验通过）`
+  - `Step A.xiaozhi-client.4 将活跃重构命名切换为 Orvibo 主干（规划/harness 校验通过）`
 - Current active objective:
-  - Rebuild this branch as a XiaoZhi-only device client aligned with `~/xiaozhi-esp32`; the only protected voice implementations are the current VAD and wake-word recognition paths.
+  - Rebuild this branch as an Orvibo voice client mainline; the first external wire contract is XiaoZhi-compatible, and the only protected voice implementations are the current VAD and wake-word recognition paths.
 - Active plan:
-  - `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+  - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active naming refinement:
+    - Step A.xiaozhi-client.4 将活跃重构命名切换为 Orvibo 主干：
+      - 用户明确后续会继续演进，内部文件名和函数定义不应以 xiaozhi 为关键词
+      - 本轮将活跃计划文件重命名为：
+        - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+      - 后续新代码命名规则改为：
+        - public header: `river_orvibo*.h`
+        - public function: `river_orvibo_*`
+        - internal helper/task/queue/status/diag: `orvibo_*`
+      - 外部协议仍可描述为 XiaoZhi-compatible realtime server protocol
+      - 旧历史记录中的 xiaozhi 调试事实不机械改写
     - newest active rearchitecture quality plan:
     - Step A.xiaozhi-client.3 补齐 clean-slate 重构质量控制计划：
       - 用户要求继续更新 plan，使后续实现质量可控

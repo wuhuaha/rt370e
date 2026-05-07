@@ -1,5 +1,33 @@
 # Change Log
 
+## Step A.xiaozhi-client.4
+- 按用户新的命名要求，把活跃重构计划从 XiaoZhi 专用命名切换为 Orvibo
+  内部主干命名：
+  - 计划文件从
+    `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+    重命名为
+    `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+  - 计划标题改为 `Orvibo 语音客户端 Clean-Slate 重构计划`
+  - 新模块契约从 `xz_*` 改为：
+    - `orvibo_app`
+    - `orvibo_state_machine`
+    - `orvibo_audio_service`
+    - `orvibo_protocol`
+    - `orvibo_mcp_volume`
+    - `orvibo_diag`
+  - 未来 public header / public function 命名明确改为：
+    - `river_orvibo*.h`
+    - `river_orvibo_*`
+- 同时保留外部协议事实：
+  - 第一版 wire contract 仍参考 `~/xiaozhi-esp32`
+  - 文档描述为 `XiaoZhi-compatible realtime server protocol`
+  - 旧历史记录中的 xiaozhi 调试事实不机械改写
+- 同步 Codex harness：
+  - `.codex/active_plans.md` primary plan 指向新 Orvibo 计划文件
+  - `.codex/active_context.md` 当前目标改为 Orvibo voice client mainline
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed。
+
 ## Step A.xiaozhi-client.3
 - 按“后续实现质量可控”的要求，继续扩展
   `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`。
