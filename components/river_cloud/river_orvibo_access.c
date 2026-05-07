@@ -51,9 +51,11 @@ typedef struct {
 typedef struct {
     bool initialized;
     bool ready;
+    bool websocket_configured;
     bool used_ota;
     bool activation_required;
     bool activation_done;
+    bool activation_challenge_available;
     uint32_t attempts;
     uint32_t http_status;
     char ota_url[RIVER_ORVIBO_ACCESS_URL_MAX];
@@ -401,7 +403,11 @@ static river_status_t river_orvibo_access_apply_websocket_config(const cJSON *we
     if (cJSON_IsNumber(version_obj) && version_obj->valueint > 0) {
         config.protocol_version = (uint16_t)version_obj->valueint;
     }
-    return river_orvibo_protocol_set_config(&config);
+    if (river_orvibo_protocol_set_config(&config) != RIVER_OK) {
+        return RIVER_ERR_IO;
+    }
+    g_river_orvibo_access.websocket_configured = true;
+    return RIVER_OK;
 }
 
 static bool river_orvibo_access_static_config_usable(void)
@@ -417,6 +423,7 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
     const cJSON *challenge;
 
     g_river_orvibo_access.activation_required = false;
+    g_river_orvibo_access.activation_challenge_available = false;
     g_river_orvibo_access.activation_code[0] = '\0';
     g_river_orvibo_access.activation_message[0] = '\0';
     activation = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "activation");
@@ -438,8 +445,20 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
         g_river_orvibo_access.activation_required = true;
     }
     if (cJSON_IsString(challenge) && challenge->valuestring != NULL) {
+        g_river_orvibo_access.activation_challenge_available = true;
         g_river_orvibo_access.activation_required = true;
+    } else if (g_river_orvibo_access.activation_code[0] != '\0') {
+        river_orvibo_access_set_error("activation_waiting_user");
     }
+}
+
+static void river_orvibo_access_update_ready(void)
+{
+    if (g_river_orvibo_access.activation_required) {
+        g_river_orvibo_access.ready = false;
+        return;
+    }
+    g_river_orvibo_access.ready = g_river_orvibo_access.websocket_configured;
 }
 
 static river_status_t river_orvibo_access_check_version_once(void)
@@ -478,10 +497,12 @@ static river_status_t river_orvibo_access_check_version_once(void)
     websocket = cJSON_GetObjectItemCaseSensitive(root, "websocket");
     if (cJSON_IsObject(websocket) &&
         river_orvibo_access_apply_websocket_config(websocket) == RIVER_OK) {
-        g_river_orvibo_access.ready = true;
         g_river_orvibo_access.used_ota = true;
-        g_river_orvibo_access.last_error[0] = '\0';
         RIVER_LOGI("OTA websocket config applied");
+    }
+    river_orvibo_access_update_ready();
+    if (g_river_orvibo_access.ready) {
+        g_river_orvibo_access.last_error[0] = '\0';
     }
     cJSON_Delete(root);
     river_orvibo_access_free_response(&response);
@@ -532,6 +553,17 @@ static river_status_t river_orvibo_access_run_activation(void)
     if (!g_river_orvibo_access.activation_required) {
         return RIVER_OK;
     }
+    if (!g_river_orvibo_access.activation_challenge_available) {
+        RIVER_LOGW("device activation waiting for user binding: code=%s message=%s",
+                   g_river_orvibo_access.activation_code[0] != '\0' ?
+                       g_river_orvibo_access.activation_code :
+                       "-",
+                   g_river_orvibo_access.activation_message[0] != '\0' ?
+                       g_river_orvibo_access.activation_message :
+                       "-");
+        river_orvibo_access_set_error("activation_waiting_user");
+        return RIVER_ERR_BUSY;
+    }
     RIVER_LOGW("device activation required: code=%s message=%s",
                g_river_orvibo_access.activation_code[0] != '\0' ?
                    g_river_orvibo_access.activation_code :
@@ -569,7 +601,8 @@ river_status_t river_orvibo_access_init(void)
                                         sizeof(g_river_orvibo_access.device_id));
     river_orvibo_access_build_client_id(g_river_orvibo_access.client_id,
                                         sizeof(g_river_orvibo_access.client_id));
-    g_river_orvibo_access.ready = river_orvibo_access_static_config_usable();
+    g_river_orvibo_access.websocket_configured = river_orvibo_access_static_config_usable();
+    river_orvibo_access_update_ready();
     if (!g_river_orvibo_access.ready) {
         river_orvibo_access_set_error("waiting_ota_config");
     }
@@ -616,6 +649,11 @@ river_status_t river_orvibo_access_refresh(void)
         if (status != RIVER_OK) {
             return status;
         }
+        g_river_orvibo_access.activation_required = false;
+        river_orvibo_access_update_ready();
+        if (g_river_orvibo_access.ready) {
+            return RIVER_OK;
+        }
     }
     river_orvibo_access_set_error("activation_check_exhausted");
     return g_river_orvibo_access.ready ? RIVER_OK : RIVER_ERR_BUSY;
@@ -646,13 +684,17 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
     (void)river_orvibo_access_init();
     memset(status, 0, sizeof(*status));
     status->ready = g_river_orvibo_access.ready;
+    status->websocket_configured = g_river_orvibo_access.websocket_configured;
     status->used_ota = g_river_orvibo_access.used_ota;
     status->activation_required = g_river_orvibo_access.activation_required;
     status->activation_done = g_river_orvibo_access.activation_done;
+    status->activation_challenge_available =
+        g_river_orvibo_access.activation_challenge_available;
     status->device_id = g_river_orvibo_access.device_id;
     status->client_id = g_river_orvibo_access.client_id;
     status->ota_url = g_river_orvibo_access.ota_url;
     status->activation_code = g_river_orvibo_access.activation_code;
+    status->activation_message = g_river_orvibo_access.activation_message;
     status->last_error = g_river_orvibo_access.last_error;
     status->attempts = g_river_orvibo_access.attempts;
     status->http_status = g_river_orvibo_access.http_status;
@@ -662,10 +704,12 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
 void river_orvibo_access_dump_status(void)
 {
     (void)river_orvibo_access_init();
-    RIVER_LOGI("orvibo access: ready=%s used_ota=%s activation=%s done=%s attempts=%lu http=%lu device_id=%s client_id=%s ota=%s code=%s last_error=%s",
+    RIVER_LOGI("orvibo access: ready=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
                g_river_orvibo_access.ready ? "yes" : "no",
+               g_river_orvibo_access.websocket_configured ? "yes" : "no",
                g_river_orvibo_access.used_ota ? "yes" : "no",
                g_river_orvibo_access.activation_required ? "required" : "none",
+               g_river_orvibo_access.activation_challenge_available ? "yes" : "no",
                g_river_orvibo_access.activation_done ? "yes" : "no",
                (unsigned long)g_river_orvibo_access.attempts,
                (unsigned long)g_river_orvibo_access.http_status,
@@ -674,6 +718,9 @@ void river_orvibo_access_dump_status(void)
                g_river_orvibo_access.ota_url,
                g_river_orvibo_access.activation_code[0] != '\0' ?
                    g_river_orvibo_access.activation_code :
+                   "-",
+               g_river_orvibo_access.activation_message[0] != '\0' ?
+                   g_river_orvibo_access.activation_message :
                    "-",
                g_river_orvibo_access.last_error[0] != '\0' ?
                    g_river_orvibo_access.last_error :

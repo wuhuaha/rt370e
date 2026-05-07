@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.2` 已按 `~/xiaozhi-esp32` 二次校准 Orvibo access 激活语义。
+- `activation.code` 现在只作为用户绑定提示；只有 `activation.challenge` 存在时才进入 `/activate` 轮询。
+- access `ready` 已与 `websocket_configured` 拆分，待绑定/待激活时不会误开 WebSocket 音频通道。
+- Wi-Fi ready 后会立即刷新 OTA/config；Wi-Fi 已连接但 access 未 ready 时每 10 秒周期性重刷，用户完成绑定后可自动进入 ready。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.1` 已补齐 Orvibo-owned 接入层，使端侧具备烧录后直接按 XiaoZhi-compatible contract 连接服务器的必要闭环。
 - 新增 Orvibo access 层负责 OTA/config、无序列号激活轮询、device/client identity 和 websocket url/token/version 应用。
 - WebSocket open 现在对齐参考客户端：发送鉴权/协议/设备头，发送 hello，并在返回成功前等待 server hello；失败立即关闭并交给 Orvibo 状态机恢复。

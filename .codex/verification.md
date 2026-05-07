@@ -1,3 +1,55 @@
+## Step H.xiaozhi-client.2 Verification
+
+Confirm Orvibo access now separates websocket config from activation-ready state:
+```bash
+cd /root/ameba-river
+rg -n "websocket_configured|activation_challenge_available|activation_waiting_user|activation_required|activation_message" \
+  include/river/river_orvibo_access.h \
+  components/river_cloud/river_orvibo_access.c
+```
+
+Expected result:
+- access status exposes both `websocket_configured` and `ready`-relevant activation state.
+- `activation_waiting_user` appears for code-only binding prompts.
+- `/activate` is guarded by `activation_challenge_available`.
+
+Confirm Wi-Fi ready now primes and retries OTA/config before the first wake:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_APP_ACCESS_RETRY_MS|periodic_wifi_ready|river_orvibo_app_refresh_access|NETWORK_READY" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- network-ready handling calls the access refresh helper.
+- connected-but-not-ready access state retries periodically.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后配好 Wi-Fi，不触发唤醒，先观察 Orvibo access 日志；如服务端返回 activation code，完成绑定后继续观察。
+```
+
+Expected result:
+- Wi-Fi ready 后出现 `access refresh`。
+- code-only 状态打印 activation code/message，并保持 `ready=no ws_config=... activation=required challenge=no`。
+- 完成绑定后，周期刷新拿到激活完成状态并进入 `ready=yes`，之后唤醒可直接开 WebSocket。
+- 只有 challenge 可用时才出现 `/activate` 轮询。
+
 ## Step H.xiaozhi-client.1 Verification
 
 Confirm Orvibo access and XiaoZhi-compatible wire-contract pieces exist:

@@ -34,6 +34,7 @@
 #define RIVER_ORVIBO_APP_QUEUE_DEPTH       32U
 #define RIVER_ORVIBO_APP_POLL_MS           20U
 #define RIVER_ORVIBO_APP_WIFI_LOG_MS       3000U
+#define RIVER_ORVIBO_APP_ACCESS_RETRY_MS   10000U
 #define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  768U
 #define RIVER_ORVIBO_RTOS_OK               0
 
@@ -75,6 +76,7 @@ typedef struct {
     uint32_t access_refresh_ok;
     uint32_t access_refresh_fail;
     uint32_t last_wifi_log_ms;
+    uint32_t last_access_retry_ms;
     char wake_text[64];
     char last_event[48];
     char last_error[96];
@@ -234,6 +236,8 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
     (void)river_orvibo_app_post(&msg);
 }
 
+static river_status_t river_orvibo_app_refresh_access(const char *reason);
+
 static void river_orvibo_app_apply_actions(uint32_t actions)
 {
     if ((actions & RIVER_ORVIBO_ACTION_STOP_PLAYBACK) != 0U) {
@@ -255,16 +259,11 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
         river_orvibo_audio_service_set_barge_in_enabled(false);
     }
     if ((actions & RIVER_ORVIBO_ACTION_OPEN_AUDIO_CHANNEL) != 0U) {
-        river_status_t status = river_orvibo_access_refresh();
+        river_status_t status = river_orvibo_access_ready() ?
+                                    RIVER_OK :
+                                    river_orvibo_app_refresh_access("open_audio_channel");
         if (status == RIVER_OK) {
-            g_river_orvibo_app.access_refresh_ok++;
             status = river_orvibo_protocol_open_audio_channel();
-        } else {
-            g_river_orvibo_app.access_refresh_fail++;
-            snprintf(g_river_orvibo_app.last_error,
-                     sizeof(g_river_orvibo_app.last_error),
-                     "access_refresh:%d",
-                     (int)status);
         }
         if (status != RIVER_OK) {
             snprintf(g_river_orvibo_app.last_error,
@@ -293,6 +292,28 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
     }
 }
 
+static river_status_t river_orvibo_app_refresh_access(const char *reason)
+{
+    river_status_t status = river_orvibo_access_refresh();
+
+    g_river_orvibo_app.last_access_retry_ms =
+        (uint32_t)rtos_time_get_current_system_time_ms();
+    if (status == RIVER_OK) {
+        g_river_orvibo_app.access_refresh_ok++;
+        RIVER_LOGI("access refresh ok: reason=%s", reason != NULL ? reason : "-");
+    } else {
+        g_river_orvibo_app.access_refresh_fail++;
+        snprintf(g_river_orvibo_app.last_error,
+                 sizeof(g_river_orvibo_app.last_error),
+                 "access_refresh:%d",
+                 (int)status);
+        RIVER_LOGW("access refresh failed: reason=%s status=%d",
+                   reason != NULL ? reason : "-",
+                   (int)status);
+    }
+    return status;
+}
+
 static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, const char *reason)
 {
     river_orvibo_transition_t transition;
@@ -306,6 +327,9 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, cons
     river_orvibo_app_copy_text(g_river_orvibo_app.last_event,
                                sizeof(g_river_orvibo_app.last_event),
                                river_orvibo_event_name(event));
+    if (event == RIVER_ORVIBO_EVENT_NETWORK_READY) {
+        (void)river_orvibo_app_refresh_access(reason);
+    }
     river_orvibo_app_apply_actions(transition.actions);
     if (transition.changed && transition.new_state == RIVER_ORVIBO_STATE_RECOVERING) {
         river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_RECOVERY_DONE, "recoverable_error_closed");
@@ -376,6 +400,14 @@ static void river_orvibo_app_check_wifi(void)
         if (!g_river_orvibo_app.wifi_ready_reported) {
             g_river_orvibo_app.wifi_ready_reported = true;
             river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_NETWORK_READY, "wifi_connected");
+            return;
+        }
+        now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+        if (!river_orvibo_access_ready() &&
+            (g_river_orvibo_app.last_access_retry_ms == 0U ||
+             now_ms - g_river_orvibo_app.last_access_retry_ms >=
+                 RIVER_ORVIBO_APP_ACCESS_RETRY_MS)) {
+            (void)river_orvibo_app_refresh_access("periodic_wifi_ready");
         }
         return;
     }

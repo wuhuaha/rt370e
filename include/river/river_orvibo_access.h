@@ -9,13 +9,16 @@
 
 typedef struct {
     bool ready;
+    bool websocket_configured;
     bool used_ota;
     bool activation_required;
     bool activation_done;
+    bool activation_challenge_available;
     const char *device_id;
     const char *client_id;
     const char *ota_url;
     const char *activation_code;
+    const char *activation_message;
     const char *last_error;
     uint32_t attempts;
     uint32_t http_status;

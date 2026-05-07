@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.2
+- 二次对照 `~/xiaozhi-esp32` 后修正 Orvibo access 激活语义：
+  - `activation.code` 现在只作为用户绑定提示，不再直接触发 `/activate` POST。
+  - 只有服务端下发 `activation.challenge` 时才进入 `/activate` 轮询，这与参考客户端的 no-serial-number 激活流程一致。
+  - access 状态拆分为 `websocket_configured` 与 `ready`；存在待激活状态时即使已拿到 websocket 配置也不会误判为可开通道。
+- 强化烧录后首次接入路径：
+  - Wi-Fi ready 后立即刷新 OTA/config，不再等第一次唤醒才做接入准备。
+  - Wi-Fi 保持连接但 access 未 ready 时，每 10 秒周期性刷新 OTA/config；用户完成绑定后，端侧可自动拿到可用 websocket 配置。
+  - access dump/status 新增 `ws_config`、`challenge`、`activation_message`，便于板端确认绑定/激活阶段。
+- 受保护能力未触碰：
+  - 本步只修改 Orvibo access/app 和状态导出，不改 VAD/KWS/AEC/BF、KWS tensor dump、alignment replay 或 board/local parity。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - access activation/periodic-refresh grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.1
 - 补齐 Orvibo-owned 接入层，使当前分支不再依赖空 token 静态 fallback：
   - 新增 `river_orvibo_access`，负责 device/client identity、OTA/config POST、websocket url/token/version 应用和 activation 轮询。
