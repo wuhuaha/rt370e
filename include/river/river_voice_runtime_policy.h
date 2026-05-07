@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "river/river_dialog_runtime.h"
-#include "river/river_interaction_state.h"
 #include "river/river_playback_service.h"
 #include "river/river_reference_service.h"
 #include "river/river_voice_profile.h"
@@ -38,12 +36,33 @@ typedef enum {
     RIVER_VOICE_AEC_GATE_ACTIVE
 } river_voice_aec_gate_reason_t;
 
+typedef enum {
+    RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE = 0,
+    RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_ORVIBO
+} river_voice_runtime_playback_owner_kind_t;
+
+typedef enum {
+    RIVER_VOICE_RUNTIME_ERROR_NONE = 0,
+    RIVER_VOICE_RUNTIME_ERROR_RECOVERABLE,
+    RIVER_VOICE_RUNTIME_ERROR_FATAL
+} river_voice_runtime_error_kind_t;
+
+typedef enum {
+    RIVER_VOICE_RUNTIME_INTERACTION_BOOTING = 0,
+    RIVER_VOICE_RUNTIME_INTERACTION_IDLE,
+    RIVER_VOICE_RUNTIME_INTERACTION_WAKE_MONITORING,
+    RIVER_VOICE_RUNTIME_INTERACTION_LISTENING,
+    RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING,
+    RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING,
+    RIVER_VOICE_RUNTIME_INTERACTION_ERROR_RECOVERING
+} river_voice_runtime_interaction_state_t;
+
 typedef struct {
     river_voice_aec_gate_reason_t reason;
     river_playback_state_t playback_state;
-    river_dialog_playback_owner_kind_t dialog_playback_owner_kind;
-    river_dialog_error_kind_t dialog_error_kind;
-    river_interaction_state_t interaction_state;
+    river_voice_runtime_playback_owner_kind_t playback_owner_kind;
+    river_voice_runtime_error_kind_t error_kind;
+    river_voice_runtime_interaction_state_t interaction_state;
     river_reference_state_t reference_state;
     river_voice_preproc_profile_t profile;
     bool system_ready;
@@ -65,9 +84,9 @@ typedef struct {
     river_voice_duplex_ready_reason_t reason;
     river_voice_aec_gate_reason_t aec_reason;
     river_playback_state_t playback_state;
-    river_dialog_playback_owner_kind_t dialog_playback_owner_kind;
-    river_dialog_error_kind_t dialog_error_kind;
-    river_interaction_state_t interaction_state;
+    river_voice_runtime_playback_owner_kind_t playback_owner_kind;
+    river_voice_runtime_error_kind_t error_kind;
+    river_voice_runtime_interaction_state_t interaction_state;
     river_reference_state_t reference_state;
     river_voice_reference_activity_t reference_activity;
     river_voice_preproc_profile_t profile;
@@ -85,6 +104,11 @@ typedef struct {
     bool ready;
 } river_voice_duplex_ready_eval_t;
 
+void river_voice_runtime_set_interaction_state(
+    river_voice_runtime_interaction_state_t state);
+void river_voice_runtime_set_playback_owner(
+    river_voice_runtime_playback_owner_kind_t owner);
+void river_voice_runtime_set_error_kind(river_voice_runtime_error_kind_t error_kind);
 void river_voice_runtime_native_reference_reset(void);
 void river_voice_runtime_native_reference_publish(
     river_voice_reference_activity_t activity,
@@ -105,6 +129,11 @@ river_voice_stage_t river_voice_runtime_stage(void);
 const char *river_voice_runtime_stage_name(river_voice_stage_t stage);
 bool river_voice_runtime_stage_enabled(river_voice_preproc_profile_t profile,
                                        river_voice_stage_t stage);
+const char *river_voice_runtime_playback_owner_kind_name(
+    river_voice_runtime_playback_owner_kind_t owner);
+const char *river_voice_runtime_error_kind_name(river_voice_runtime_error_kind_t error_kind);
+const char *river_voice_runtime_interaction_state_name(
+    river_voice_runtime_interaction_state_t state);
 const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason_t reason);
 const char *river_voice_runtime_reference_activity_name(river_voice_reference_activity_t activity);
 const char *river_voice_runtime_duplex_ready_reason_name(

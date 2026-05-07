@@ -2651,9 +2651,9 @@ void river_cloud_xiaozhi_note_semantic_fallback(const char *reason)
                duplex_eval.ready ? "yes" : "no",
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_playback_service_state_name(duplex_eval.playback_state),
-               river_dialog_playback_owner_kind_name(
-                   duplex_eval.dialog_playback_owner_kind),
-               river_dialog_error_kind_name(duplex_eval.dialog_error_kind),
+               river_voice_runtime_playback_owner_kind_name(
+                   duplex_eval.playback_owner_kind),
+               river_voice_runtime_error_kind_name(duplex_eval.error_kind),
                river_cloud_xiaozhi_current_sid() != NULL ? river_cloud_xiaozhi_current_sid() : "-");
 }
 

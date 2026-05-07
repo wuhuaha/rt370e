@@ -1,3 +1,45 @@
+## Step B.xiaozhi-client.2 Verification
+
+Confirm voice runtime policy no longer exposes or consumes old dialog/runtime
+types while still preserving the local preproc/AEC evaluation surface:
+```bash
+cd /root/ameba-river
+rg -n "river_dialog|river_interaction|dialog_runtime" \
+  include/river/river_voice_runtime_policy.h \
+  components/river_voice/river_voice_runtime_policy.c \
+  components/river_voice/river_voice_preproc_fixed_dsb.c
+rg -n "river_voice_runtime_set_interaction_state|river_voice_runtime_set_playback_owner|river_voice_runtime_set_error_kind|river_voice_runtime_playback_owner_kind_name|river_voice_runtime_error_kind_name|river_voice_runtime_interaction_state_name" \
+  include/river/river_voice_runtime_policy.h \
+  components/river_voice/river_voice_runtime_policy.c
+```
+
+Expected result:
+- the first `rg` has no old dialog/runtime dependency matches in this slice
+- the new independent state setter/name APIs exist
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- the build uses `/root/ameba-rtos` as the SDK baseline
+
 ## Step B.xiaozhi-client.1 Verification
 
 Confirm KWS no longer depends directly on old dialog/interaction runtime

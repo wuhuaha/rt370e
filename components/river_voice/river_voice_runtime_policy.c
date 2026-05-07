@@ -6,8 +6,6 @@
 #include "os_wrapper.h"
 #include "rtk_status.h"
 
-#include "river/river_dialog_runtime.h"
-
 #define RIVER_VOICE_NATIVE_REFERENCE_HOT_WAIT_MS 0U
 
 typedef struct {
@@ -16,7 +14,72 @@ typedef struct {
     river_voice_native_reference_observation_t observation;
 } river_voice_native_reference_context_t;
 
+typedef struct {
+    bool initialized;
+    rtos_mutex_t lock;
+    river_voice_runtime_interaction_state_t interaction_state;
+    river_voice_runtime_playback_owner_kind_t playback_owner_kind;
+    river_voice_runtime_error_kind_t error_kind;
+} river_voice_runtime_policy_context_t;
+
 static river_voice_native_reference_context_t g_river_voice_native_reference;
+static river_voice_runtime_policy_context_t g_river_voice_runtime_policy;
+
+static bool river_voice_runtime_policy_ensure_init(void)
+{
+    if (g_river_voice_runtime_policy.initialized) {
+        return true;
+    }
+
+    memset(&g_river_voice_runtime_policy, 0, sizeof(g_river_voice_runtime_policy));
+    if (rtos_mutex_create(&g_river_voice_runtime_policy.lock) != RTK_SUCCESS) {
+        return false;
+    }
+
+    g_river_voice_runtime_policy.interaction_state =
+        RIVER_VOICE_RUNTIME_INTERACTION_WAKE_MONITORING;
+    g_river_voice_runtime_policy.playback_owner_kind =
+        RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE;
+    g_river_voice_runtime_policy.error_kind = RIVER_VOICE_RUNTIME_ERROR_NONE;
+    g_river_voice_runtime_policy.initialized = true;
+    return true;
+}
+
+static void river_voice_runtime_policy_snapshot(
+    river_voice_runtime_interaction_state_t *interaction_state,
+    river_voice_runtime_playback_owner_kind_t *playback_owner_kind,
+    river_voice_runtime_error_kind_t *error_kind)
+{
+    river_voice_runtime_policy_ensure_init();
+
+    if (interaction_state != NULL) {
+        *interaction_state = RIVER_VOICE_RUNTIME_INTERACTION_WAKE_MONITORING;
+    }
+    if (playback_owner_kind != NULL) {
+        *playback_owner_kind = RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE;
+    }
+    if (error_kind != NULL) {
+        *error_kind = RIVER_VOICE_RUNTIME_ERROR_NONE;
+    }
+
+    if (!g_river_voice_runtime_policy.initialized ||
+        rtos_mutex_take(g_river_voice_runtime_policy.lock,
+                        RIVER_VOICE_NATIVE_REFERENCE_HOT_WAIT_MS) != RTK_SUCCESS) {
+        return;
+    }
+
+    if (interaction_state != NULL) {
+        *interaction_state = g_river_voice_runtime_policy.interaction_state;
+    }
+    if (playback_owner_kind != NULL) {
+        *playback_owner_kind = g_river_voice_runtime_policy.playback_owner_kind;
+    }
+    if (error_kind != NULL) {
+        *error_kind = g_river_voice_runtime_policy.error_kind;
+    }
+
+    rtos_mutex_give(g_river_voice_runtime_policy.lock);
+}
 
 static bool river_voice_runtime_native_reference_ensure_init(void)
 {
@@ -47,76 +110,12 @@ static uint32_t river_voice_runtime_reference_recent_window_from_frame_ms(uint32
     return window_ms;
 }
 
-static bool river_voice_runtime_interaction_allows_aec(river_interaction_state_t state)
+static bool river_voice_runtime_interaction_allows_aec(
+    river_voice_runtime_interaction_state_t state)
 {
-    return state == RIVER_INTERACTION_SPEAKING ||
-           state == RIVER_INTERACTION_BARGE_IN_LISTENING ||
-           state == RIVER_INTERACTION_ASR_STREAMING;
-}
-
-static bool river_voice_runtime_dialog_policy_view_capture(
-    river_dialog_runtime_voice_policy_view_t *view)
-{
-    return view != NULL && river_dialog_runtime_get_voice_policy_view(view) == RIVER_OK;
-}
-
-static bool river_voice_runtime_dialog_cloud_playback_engaged(
-    const river_dialog_runtime_voice_policy_view_t *view)
-{
-    return view != NULL &&
-           view->playback_owner_kind == RIVER_DIALOG_PLAYBACK_OWNER_KIND_CLOUD &&
-           (view->playback_lane_engaged || view->playback_recovering ||
-            view->playback_turn_active);
-}
-
-static bool river_voice_runtime_dialog_playback_quiet_window(
-    const river_dialog_runtime_voice_policy_view_t *view)
-{
-    if (view == NULL || view->playback_active) {
-        return false;
-    }
-
-    if (view->tts_stop_pending) {
-        return true;
-    }
-    if (view->playback_terminal_waiting &&
-        view->playback_terminal_wait_kind !=
-            RIVER_CLOUD_PLAYBACK_TERMINAL_WAIT_NONE) {
-        return true;
-    }
-    if (view->playback_hold_kind != RIVER_CLOUD_PLAYBACK_HOLD_NONE) {
-        return true;
-    }
-
-    switch (view->playback_backend_state_kind) {
-    case RIVER_CLOUD_PLAYBACK_BACKEND_OWNED_RECOVERING:
-    case RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING:
-        return true;
-    case RIVER_CLOUD_PLAYBACK_BACKEND_DETACHED:
-        return view->playback_supply_kind != RIVER_CLOUD_PLAYBACK_SUPPLY_NONE;
-    default:
-        return false;
-    }
-}
-
-static bool river_voice_runtime_restart_pending_requires_block(
-    const river_dialog_runtime_voice_policy_view_t *view,
-    river_playback_state_t playback_state)
-{
-    if (view == NULL || !view->available) {
-        return playback_state == RIVER_PLAYBACK_RESTART_PENDING;
-    }
-
-    if (!river_voice_runtime_dialog_cloud_playback_engaged(view)) {
-        return false;
-    }
-
-    if (view->playback_backend_state_kind !=
-        RIVER_CLOUD_PLAYBACK_BACKEND_RESTART_PENDING) {
-        return false;
-    }
-
-    return !river_voice_runtime_dialog_playback_quiet_window(view);
+    return state == RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING ||
+           state == RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING ||
+           state == RIVER_VOICE_RUNTIME_INTERACTION_LISTENING;
 }
 
 static bool river_voice_runtime_profile_supports_playback_reference(
@@ -203,6 +202,47 @@ void river_voice_runtime_native_reference_reset(void)
     rtos_mutex_give(g_river_voice_native_reference.lock);
 }
 
+void river_voice_runtime_set_interaction_state(
+    river_voice_runtime_interaction_state_t state)
+{
+    if (!river_voice_runtime_policy_ensure_init()) {
+        return;
+    }
+    if (rtos_mutex_take(g_river_voice_runtime_policy.lock, MUTEX_WAIT_TIMEOUT) !=
+        RTK_SUCCESS) {
+        return;
+    }
+    g_river_voice_runtime_policy.interaction_state = state;
+    rtos_mutex_give(g_river_voice_runtime_policy.lock);
+}
+
+void river_voice_runtime_set_playback_owner(
+    river_voice_runtime_playback_owner_kind_t owner)
+{
+    if (!river_voice_runtime_policy_ensure_init()) {
+        return;
+    }
+    if (rtos_mutex_take(g_river_voice_runtime_policy.lock, MUTEX_WAIT_TIMEOUT) !=
+        RTK_SUCCESS) {
+        return;
+    }
+    g_river_voice_runtime_policy.playback_owner_kind = owner;
+    rtos_mutex_give(g_river_voice_runtime_policy.lock);
+}
+
+void river_voice_runtime_set_error_kind(river_voice_runtime_error_kind_t error_kind)
+{
+    if (!river_voice_runtime_policy_ensure_init()) {
+        return;
+    }
+    if (rtos_mutex_take(g_river_voice_runtime_policy.lock, MUTEX_WAIT_TIMEOUT) !=
+        RTK_SUCCESS) {
+        return;
+    }
+    g_river_voice_runtime_policy.error_kind = error_kind;
+    rtos_mutex_give(g_river_voice_runtime_policy.lock);
+}
+
 void river_voice_runtime_native_reference_publish(
     river_voice_reference_activity_t activity,
     uint16_t peak,
@@ -261,19 +301,18 @@ void river_voice_runtime_native_reference_get(
 
 river_voice_stage_t river_voice_runtime_stage(void)
 {
-    switch (river_interaction_state_get()) {
-    case RIVER_INTERACTION_BOOTING:
-    case RIVER_INTERACTION_IDLE:
-    case RIVER_INTERACTION_WAKE_MONITORING:
+    river_voice_runtime_interaction_state_t state;
+
+    river_voice_runtime_policy_snapshot(&state, NULL, NULL);
+    switch (state) {
+    case RIVER_VOICE_RUNTIME_INTERACTION_BOOTING:
+    case RIVER_VOICE_RUNTIME_INTERACTION_IDLE:
+    case RIVER_VOICE_RUNTIME_INTERACTION_WAKE_MONITORING:
         return RIVER_VOICE_STAGE_WAKE;
-    case RIVER_INTERACTION_WAKE_CONFIRMED:
-    case RIVER_INTERACTION_LISTENING:
-    case RIVER_INTERACTION_ASR_STREAMING:
-    case RIVER_INTERACTION_THINKING:
-    case RIVER_INTERACTION_SPEAKING:
-    case RIVER_INTERACTION_BARGE_IN_LISTENING:
-    case RIVER_INTERACTION_FOLLOW_UP:
-    case RIVER_INTERACTION_ERROR_RECOVERING:
+    case RIVER_VOICE_RUNTIME_INTERACTION_LISTENING:
+    case RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING:
+    case RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING:
+    case RIVER_VOICE_RUNTIME_INTERACTION_ERROR_RECOVERING:
     default:
         return RIVER_VOICE_STAGE_POST_WAKE;
     }
@@ -301,8 +340,6 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
                                             river_voice_aec_gate_eval_t *eval)
 {
     const river_voice_profile_config_t *profile_config;
-    river_dialog_runtime_voice_policy_view_t dialog_view;
-    const river_dialog_runtime_voice_policy_view_t *dialog_view_ptr = NULL;
     bool playback_active;
 
     if (eval == 0) {
@@ -312,38 +349,26 @@ void river_voice_runtime_aec_gate_eval_base(river_voice_preproc_profile_t profil
     profile_config = river_voice_profile_get(profile);
     eval->profile = profile;
     eval->playback_state = river_playback_service_state();
-    eval->dialog_playback_owner_kind = RIVER_DIALOG_PLAYBACK_OWNER_KIND_NONE;
-    eval->dialog_error_kind = RIVER_DIALOG_ERROR_KIND_NONE;
-    eval->interaction_state = river_interaction_state_get();
+    river_voice_runtime_policy_snapshot(&eval->interaction_state,
+                                        &eval->playback_owner_kind,
+                                        &eval->error_kind);
     eval->reference_state = river_reference_service_state();
     eval->uses_native_capture_ref = profile_config->uses_native_capture_ref;
     eval->experimental_profile = profile_config->experimental;
     eval->system_ready = false;
     eval->active = false;
 
-    if (river_voice_runtime_dialog_policy_view_capture(&dialog_view)) {
-        dialog_view_ptr = &dialog_view;
-        eval->dialog_playback_owner_kind = dialog_view.playback_owner_kind;
-        eval->dialog_error_kind = dialog_view.error_kind;
-    }
-
     if (!profile_config->experimental) {
         eval->reason = RIVER_VOICE_AEC_GATE_DISABLED;
         return;
     }
 
-    if (river_voice_runtime_restart_pending_requires_block(dialog_view_ptr,
-                                                           eval->playback_state)) {
+    if (eval->playback_state == RIVER_PLAYBACK_RESTART_PENDING) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK_RESTART_PENDING;
         return;
     }
 
     playback_active = river_playback_service_state_active(eval->playback_state);
-    if (!playback_active &&
-        river_voice_runtime_dialog_cloud_playback_engaged(dialog_view_ptr)) {
-        playback_active = true;
-    }
-
     if (!playback_active) {
         eval->reason = RIVER_VOICE_AEC_GATE_BLOCKED_PLAYBACK;
         return;
@@ -416,8 +441,8 @@ void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
     eval->profile_supports_playback_reference =
         river_voice_runtime_profile_supports_playback_reference(profile);
     eval->playback_state = aec_eval.playback_state;
-    eval->dialog_playback_owner_kind = aec_eval.dialog_playback_owner_kind;
-    eval->dialog_error_kind = aec_eval.dialog_error_kind;
+    eval->playback_owner_kind = aec_eval.playback_owner_kind;
+    eval->error_kind = aec_eval.error_kind;
     eval->interaction_state = aec_eval.interaction_state;
     eval->reference_state = ref_stats.state;
     eval->reference_queue_frames = ref_stats.queue_frames;
@@ -498,6 +523,56 @@ void river_voice_runtime_duplex_ready_eval(bool duplex_experiment_enabled,
     }
 
     eval->reason = RIVER_VOICE_DUPLEX_READY_AEC_BLOCKED;
+}
+
+const char *river_voice_runtime_playback_owner_kind_name(
+    river_voice_runtime_playback_owner_kind_t owner)
+{
+    switch (owner) {
+    case RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE:
+        return "none";
+    case RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_ORVIBO:
+        return "orvibo";
+    default:
+        return "unknown";
+    }
+}
+
+const char *river_voice_runtime_error_kind_name(river_voice_runtime_error_kind_t error_kind)
+{
+    switch (error_kind) {
+    case RIVER_VOICE_RUNTIME_ERROR_NONE:
+        return "none";
+    case RIVER_VOICE_RUNTIME_ERROR_RECOVERABLE:
+        return "recoverable";
+    case RIVER_VOICE_RUNTIME_ERROR_FATAL:
+        return "fatal";
+    default:
+        return "unknown";
+    }
+}
+
+const char *river_voice_runtime_interaction_state_name(
+    river_voice_runtime_interaction_state_t state)
+{
+    switch (state) {
+    case RIVER_VOICE_RUNTIME_INTERACTION_BOOTING:
+        return "booting";
+    case RIVER_VOICE_RUNTIME_INTERACTION_IDLE:
+        return "idle";
+    case RIVER_VOICE_RUNTIME_INTERACTION_WAKE_MONITORING:
+        return "wake_monitoring";
+    case RIVER_VOICE_RUNTIME_INTERACTION_LISTENING:
+        return "listening";
+    case RIVER_VOICE_RUNTIME_INTERACTION_SPEAKING:
+        return "speaking";
+    case RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING:
+        return "barge_in_listening";
+    case RIVER_VOICE_RUNTIME_INTERACTION_ERROR_RECOVERING:
+        return "error_recovering";
+    default:
+        return "unknown";
+    }
 }
 
 const char *river_voice_runtime_aec_gate_reason_name(river_voice_aec_gate_reason_t reason)

@@ -811,9 +811,9 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
                    river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                    river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                    river_playback_service_state_name(duplex_eval.playback_state),
-                   river_dialog_playback_owner_kind_name(
-                       duplex_eval.dialog_playback_owner_kind),
-                   river_dialog_error_kind_name(duplex_eval.dialog_error_kind),
+                   river_voice_runtime_playback_owner_kind_name(
+                       duplex_eval.playback_owner_kind),
+                   river_voice_runtime_error_kind_name(duplex_eval.error_kind),
                    river_reference_service_state_name(duplex_eval.reference_state),
                    river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                    (unsigned int)duplex_eval.native_reference_peak,
@@ -835,9 +835,9 @@ void river_cloud_xiaozhi_apply_tts_start_round_policy(void)
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                river_playback_service_state_name(duplex_eval.playback_state),
-               river_dialog_playback_owner_kind_name(
-                   duplex_eval.dialog_playback_owner_kind),
-               river_dialog_error_kind_name(duplex_eval.dialog_error_kind),
+               river_voice_runtime_playback_owner_kind_name(
+                   duplex_eval.playback_owner_kind),
+               river_voice_runtime_error_kind_name(duplex_eval.error_kind),
                river_reference_service_state_name(duplex_eval.reference_state),
                river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                (unsigned int)duplex_eval.native_reference_peak,
@@ -882,9 +882,9 @@ static void river_cloud_xiaozhi_apply_playback_started_round_policy(void)
                river_voice_runtime_duplex_ready_reason_name(duplex_eval.reason),
                river_voice_runtime_aec_gate_reason_name(duplex_eval.aec_reason),
                river_playback_service_state_name(duplex_eval.playback_state),
-               river_dialog_playback_owner_kind_name(
-                   duplex_eval.dialog_playback_owner_kind),
-               river_dialog_error_kind_name(duplex_eval.dialog_error_kind),
+               river_voice_runtime_playback_owner_kind_name(
+                   duplex_eval.playback_owner_kind),
+               river_voice_runtime_error_kind_name(duplex_eval.error_kind),
                river_reference_service_state_name(duplex_eval.reference_state),
                river_voice_runtime_reference_activity_name(duplex_eval.reference_activity),
                (unsigned int)duplex_eval.native_reference_peak,

@@ -1,5 +1,31 @@
 # Change Log
 
+## Step B.xiaozhi-client.2
+- 继续推进受保护语音链路和旧对话主干解耦：
+  - `river_voice_runtime_policy` 不再 include `river_dialog_runtime.h` /
+    `river_interaction_state.h`
+  - 新增语音运行时独立状态输入：
+    - `river_voice_runtime_set_interaction_state()`
+    - `river_voice_runtime_set_playback_owner()`
+    - `river_voice_runtime_set_error_kind()`
+  - AEC/BF gate 与 duplex ready 评估改为读取独立
+    `river_voice_runtime_*` 状态，不再直接读取旧 dialog runtime 的
+    voice policy view
+  - `river_voice_preproc_fixed_dsb.c` 的 AEC gate 日志改为输出新的
+    playback owner / error / interaction 名称
+  - 旧 XiaoZhi playback/session 调用点仅做编译适配，读取新的
+    `duplex_eval.playback_owner_kind` / `duplex_eval.error_kind`
+- 这一步保持行为收敛：
+  - 没有修改 VAD / KWS 模型、阈值、tensor dump、alignment replay
+  - 旧 cloud/dialog 模块暂未从 live CMake 移除，后续 Orvibo 主干替换阶段处理
+- Verification for this step:
+  - `git diff --check` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - `rg -n "river_dialog|river_interaction|dialog_runtime" include/river/river_voice_runtime_policy.h components/river_voice/river_voice_runtime_policy.c components/river_voice/river_voice_preproc_fixed_dsb.c`
+    shows no old dialog/runtime dependency in the voice runtime policy slice.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`。
+
 ## Step B.xiaozhi-client.1
 - 先完成受保护 KWS 的旧对话运行时解耦，保持 VAD/KWS 算法与诊断能力不变：
   - `river_voice_kws.cc` 不再 include `river_dialog_runtime.h` 或

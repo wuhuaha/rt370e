@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step B.xiaozhi-client.1 解耦 KWS 旧对话运行时门控（SDK 构建通过）`
+  - `Step B.xiaozhi-client.2 解耦语音运行时策略旧状态依赖（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline; the first external wire contract is XiaoZhi-compatible, and the only protected voice implementations are the current VAD and wake-word recognition paths.
 - Active plan:
@@ -24,6 +24,18 @@ or top-of-tree verification target changes.
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active implementation slice:
+    - Step B.xiaozhi-client.2 解耦 AEC/BF 语音运行时策略的旧状态依赖：
+      - `river_voice_runtime_policy` 不再 include 旧
+        `river_dialog_runtime.h` / `river_interaction_state.h`
+      - 新增 `river_voice_runtime_set_interaction_state()` /
+        `river_voice_runtime_set_playback_owner()` /
+        `river_voice_runtime_set_error_kind()`
+      - AEC gate 与 duplex ready 评估改读独立 runtime policy 状态
+      - 旧 XiaoZhi playback/session 调用点只做字段和 name 函数适配，确保
+        SDK 构建继续通过
+      - VAD、KWS、tensor dump、alignment replay 未改动
+      - latest SDK build 已通过
     - newest active implementation slice:
     - Step B.xiaozhi-client.1 解耦受保护 KWS 的旧对话运行时依赖：
       - `river_voice_kws.cc` 不再 include `river_dialog_runtime.h` /
