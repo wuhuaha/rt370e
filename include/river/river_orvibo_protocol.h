@@ -26,6 +26,7 @@ typedef enum {
 typedef struct {
     const char *url;
     const char *token;
+    const char *websocket_subprotocol;
     uint16_t protocol_version;
     bool enable_mcp;
     uint32_t uplink_sample_rate;

@@ -36,6 +36,14 @@ config RIVER_ORVIBO_WS_TOKEN
       Optional static websocket token. If empty, the device must obtain token
       and endpoint from the OTA/config service.
 
+config RIVER_ORVIBO_WS_SUBPROTOCOL
+    string "Orvibo websocket subprotocol"
+    default "chat"
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Explicit Sec-WebSocket-Protocol value for the realtime connection.
+      The Ameba SDK otherwise injects its legacy "chat, superchat" default.
+
 config RIVER_ORVIBO_PROTOCOL_VERSION
     int "Orvibo websocket binary protocol version"
     range 1 3

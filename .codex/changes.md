@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.12
+- 显式收敛 Orvibo WebSocket 握手子协议：
+  - 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL` 配置，默认 `chat`。
+  - `river_orvibo_protocol_config_t` 增加 `websocket_subprotocol` 字段，仍保持 Orvibo public 命名。
+  - `river_orvibo_protocol_open_audio_channel()` 在 `ws_connect_url()` 前调用 `ws_handshake_header_set_protocol()`，不再依赖 Ameba SDK 默认的 `chat, superchat`。
+  - SDK 该 API 不会自动补字符串终止符，本步传入包含 `NUL` 的长度，避免握手头拼接越界读取。
+- 增强板端可观测性：
+  - connect 日志和 `river orvibo status` 的 protocol dump 输出 `ws_subprotocol`。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 本步只改 Orvibo protocol 握手配置和诊断输出。
+- Verification for this step:
+  - `git diff --check` passed.
+  - Orvibo websocket subprotocol grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`.
+
 ## Step H.xiaozhi-client.5
 - 拆分 Orvibo app 事件队列，避免音频突发挤占控制事件：
   - `control_queue` 承载 state/connect/listen/abort 等控制消息。

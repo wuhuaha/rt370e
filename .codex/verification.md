@@ -1,3 +1,46 @@
+## Step H.xiaozhi-client.12 Verification
+
+Confirm Orvibo WebSocket subprotocol is explicit and visible:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_WS_SUBPROTOCOL|websocket_subprotocol|ws_handshake_header_set_protocol|ws_subprotocol" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h \
+  include/river/river_orvibo_protocol.h \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- Kconfig exposes `RIVER_ORVIBO_WS_SUBPROTOCOL` with default `chat`.
+- protocol config stores `websocket_subprotocol`.
+- `river_orvibo_protocol_open_audio_channel()` calls `ws_handshake_header_set_protocol()` before connecting.
+- connect/status logs include `ws_subprotocol`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录后触发 `river orvibo refresh`，access ready 后触发一次唤醒或 `river orvibo connect`，观察 Orvibo protocol 日志。
+```
+
+Expected result:
+- connect 日志显示 `ws_subprotocol=chat`。
+- `river orvibo status` 的 protocol dump 显示 `ws_subprotocol=chat`。
+- WebSocket hello 仍能收到服务端 hello，并进入 listening。
+
 ## Step H.xiaozhi-client.5 Verification
 
 Confirm Orvibo app control/audio queues are separated:

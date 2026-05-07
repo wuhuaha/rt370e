@@ -28,6 +28,7 @@
 #define RIVER_ORVIBO_BASE_URL_MAX      128U
 #define RIVER_ORVIBO_PATH_MAX          192U
 #define RIVER_ORVIBO_HEADERS_MAX       640U
+#define RIVER_ORVIBO_SUBPROTOCOL_MAX   48U
 #define RIVER_ORVIBO_DEVICE_ID_MAX     32U
 #define RIVER_ORVIBO_CLIENT_ID_MAX     48U
 #define RIVER_ORVIBO_SESSION_ID_MAX    96U
@@ -110,6 +111,7 @@ typedef struct {
     char base_url[RIVER_ORVIBO_BASE_URL_MAX];
     char path[RIVER_ORVIBO_PATH_MAX];
     char headers[RIVER_ORVIBO_HEADERS_MAX];
+    char websocket_subprotocol[RIVER_ORVIBO_SUBPROTOCOL_MAX];
     char device_id[RIVER_ORVIBO_DEVICE_ID_MAX];
     char client_id[RIVER_ORVIBO_CLIENT_ID_MAX];
     char session_id[RIVER_ORVIBO_SESSION_ID_MAX];
@@ -861,8 +863,13 @@ river_status_t river_orvibo_protocol_init(void)
     river_orvibo_copy_text(g_river_orvibo_protocol.token,
                            sizeof(g_river_orvibo_protocol.token),
                            RIVER_ORVIBO_WS_TOKEN);
+    river_orvibo_copy_text(g_river_orvibo_protocol.websocket_subprotocol,
+                           sizeof(g_river_orvibo_protocol.websocket_subprotocol),
+                           RIVER_ORVIBO_WS_SUBPROTOCOL);
     g_river_orvibo_protocol.config.url = g_river_orvibo_protocol.url;
     g_river_orvibo_protocol.config.token = g_river_orvibo_protocol.token;
+    g_river_orvibo_protocol.config.websocket_subprotocol =
+        g_river_orvibo_protocol.websocket_subprotocol;
     g_river_orvibo_protocol.config.protocol_version = RIVER_ORVIBO_PROTOCOL_VERSION;
     g_river_orvibo_protocol.config.enable_mcp = RIVER_ORVIBO_ENABLE_MCP != 0;
     g_river_orvibo_protocol.config.uplink_sample_rate = RIVER_ORVIBO_AUDIO_SAMPLE_RATE;
@@ -886,6 +893,7 @@ river_status_t river_orvibo_protocol_get_config(river_orvibo_protocol_config_t *
     *config = g_river_orvibo_protocol.config;
     config->url = g_river_orvibo_protocol.url;
     config->token = g_river_orvibo_protocol.token;
+    config->websocket_subprotocol = g_river_orvibo_protocol.websocket_subprotocol;
     return RIVER_OK;
 }
 
@@ -907,9 +915,16 @@ river_status_t river_orvibo_protocol_set_config(const river_orvibo_protocol_conf
                                sizeof(g_river_orvibo_protocol.token),
                                config->token);
     }
+    if (config->websocket_subprotocol != NULL) {
+        river_orvibo_copy_text(g_river_orvibo_protocol.websocket_subprotocol,
+                               sizeof(g_river_orvibo_protocol.websocket_subprotocol),
+                               config->websocket_subprotocol);
+    }
     g_river_orvibo_protocol.config = *config;
     g_river_orvibo_protocol.config.url = g_river_orvibo_protocol.url;
     g_river_orvibo_protocol.config.token = g_river_orvibo_protocol.token;
+    g_river_orvibo_protocol.config.websocket_subprotocol =
+        g_river_orvibo_protocol.websocket_subprotocol;
     if (g_river_orvibo_protocol.config.protocol_version == 0U) {
         g_river_orvibo_protocol.config.protocol_version = RIVER_ORVIBO_PROTOCOL_VERSION;
     }
@@ -998,6 +1013,15 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
         river_orvibo_set_last_error("wsclient_create_failed");
         return RIVER_ERR_NO_MEMORY;
     }
+    if (g_river_orvibo_protocol.websocket_subprotocol[0] != '\0' &&
+        ws_handshake_header_set_protocol(
+            g_river_orvibo_protocol.wsclient,
+            g_river_orvibo_protocol.websocket_subprotocol,
+            (int)(strlen(g_river_orvibo_protocol.websocket_subprotocol) + 1U)) != 0) {
+        river_orvibo_set_last_error("subprotocol_set_failed");
+        river_orvibo_close_context();
+        return RIVER_ERR_IO;
+    }
     if (ws_handshake_set_header_fields(g_river_orvibo_protocol.wsclient,
                                        g_river_orvibo_protocol.headers,
                                        (int)(strlen(g_river_orvibo_protocol.headers) + 1U)) != 0) {
@@ -1018,11 +1042,14 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
                           RIVER_ORVIBO_WS_CONNECT_TIMEOUT_MS);
     ws_set_senddata_block_time(RIVER_ORVIBO_WS_SEND_BLOCK_MS);
     ws_multisend_opts(g_river_orvibo_protocol.wsclient, RIVER_ORVIBO_WS_STABLE_BUF_NUM);
-    RIVER_LOGI("connecting: url=%s base=%s path=%s protocol=%u device_id=%s client_id=%s",
+    RIVER_LOGI("connecting: url=%s base=%s path=%s protocol=%u ws_subprotocol=%s device_id=%s client_id=%s",
                g_river_orvibo_protocol.url,
                g_river_orvibo_protocol.base_url,
                g_river_orvibo_protocol.path,
                (unsigned int)g_river_orvibo_protocol.config.protocol_version,
+               g_river_orvibo_protocol.websocket_subprotocol[0] != '\0' ?
+                   g_river_orvibo_protocol.websocket_subprotocol :
+                   "-",
                g_river_orvibo_protocol.device_id,
                g_river_orvibo_protocol.client_id);
     if (ws_connect_url(g_river_orvibo_protocol.wsclient) < 0) {
@@ -1384,7 +1411,7 @@ void river_orvibo_protocol_dump_status(void)
                                     g_river_orvibo_protocol.uplink_queue) :
                                 0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1392,6 +1419,9 @@ void river_orvibo_protocol_dump_status(void)
                    "-",
                g_river_orvibo_protocol.url,
                (unsigned int)g_river_orvibo_protocol.config.protocol_version,
+               g_river_orvibo_protocol.websocket_subprotocol[0] != '\0' ?
+                   g_river_orvibo_protocol.websocket_subprotocol :
+                   "-",
                (unsigned int)RIVER_ORVIBO_BINARY_PAYLOAD_MAX,
                (unsigned long)g_river_orvibo_protocol.text_tx,
                (unsigned long)g_river_orvibo_protocol.text_rx,

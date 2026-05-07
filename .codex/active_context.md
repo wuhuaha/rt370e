@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.11 扩容 Orvibo Opus payload 并补 oversized 诊断（SDK 构建通过）`
+  - `Step H.xiaozhi-client.12 显式设置 Orvibo WebSocket 子协议（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.12` removes an SDK-default WebSocket handshake dependency:
+  - `RIVER_ORVIBO_WS_SUBPROTOCOL` defaults to `chat`, the subprotocol already accepted by the current XiaoZhi-compatible server.
+  - `river_orvibo_protocol_open_audio_channel()` explicitly calls `ws_handshake_header_set_protocol()` before `ws_connect_url()`.
+  - the call passes a NUL-inclusive length because the Ameba SDK setter copies bytes without appending a terminator.
+  - protocol connect/status logs now show `ws_subprotocol`.
 - `Step H.xiaozhi-client.11` expands the Orvibo Opus payload envelope for the current XiaoZhi-compatible server contract:
   - host-side OTA/WebSocket probing reached `wss://api.tenclass.net/xiaozhi/v1/` and received server hello with `opus/24000Hz/1ch/60ms`.
   - protocol binary payload, app audio message payload, and audio-service Opus packet limits are now `1536U`.
@@ -118,6 +123,7 @@ or top-of-tree verification target changes.
   - Orvibo manual access refresh grep
   - Orvibo Opus payload envelope / oversize diagnostics grep
   - host-side OTA + WebSocket hello probe
+  - Orvibo WebSocket subprotocol grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`

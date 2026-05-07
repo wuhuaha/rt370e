@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.12` 已显式设置 Orvibo WebSocket 握手子协议。
+- 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，默认 `chat`，避免继续依赖 Ameba SDK 内置 `chat, superchat`。
+- `river_orvibo_protocol_open_audio_channel()` 在连接前调用 `ws_handshake_header_set_protocol()`；调用长度包含 `NUL`，规避 SDK setter 不自动补终止符的问题。
+- connect 日志和 protocol status 输出 `ws_subprotocol`，便于板端确认实际握手配置。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.5` 已隔离 Orvibo app 控制事件队列与音频事件队列。
 - state/connect/listen/abort 等控制消息不再与 uplink/downlink audio 共享队列容量。
 - app 主循环先处理 control queue，再按预算处理 audio queue；audio queue 满时 drop-oldest 保实时，控制事件不被音频突发淹没。
