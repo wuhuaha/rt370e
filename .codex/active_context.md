@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.xiaozhi-client.2 强化 clean-slate 重构计划，仅保护当前 VAD/KWS 实现（规划/harness 校验通过）`
+  - `Step A.xiaozhi-client.3 补齐 clean-slate 重构质量控制计划（规划/harness 校验通过）`
 - Current active objective:
   - Rebuild this branch as a XiaoZhi-only device client aligned with `~/xiaozhi-esp32`; the only protected voice implementations are the current VAD and wake-word recognition paths.
 - Active plan:
@@ -24,6 +24,18 @@ or top-of-tree verification target changes.
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active rearchitecture quality plan:
+    - Step A.xiaozhi-client.3 补齐 clean-slate 重构质量控制计划：
+      - 用户要求继续更新 plan，使后续实现质量可控
+      - 本轮把计划从边界说明扩展为工程控制文档：
+        - 新增 `xz_app / xz_state_machine / xz_audio_service / xz_protocol / xz_mcp_volume` 模块契约
+        - 新增并发与所有权规则，明确跨线程只能通过 queue/event/semaphore
+        - 新增日志和诊断标准，要求状态、协议、音频队列和 VAD/KWS 均可 dump
+        - 新增 live CMake 编译图控制，明确旧 provider/dialog/cloud adapter 退出标准
+        - 新增质量门禁命令和板端验证矩阵
+      - 下一步仍是 Step B：
+        - 先解耦受保护 VAD/KWS 对旧对话运行时的依赖
+        - 再建立新的最小 XiaoZhi 编译主干
     - newest active rearchitecture refinement:
     - Step A.xiaozhi-client.2 强化 clean-slate 重构计划：
       - 用户进一步明确：

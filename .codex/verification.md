@@ -1,3 +1,29 @@
+## Step A.xiaozhi-client.3 Verification
+
+Confirm the clean-slate plan now includes implementation quality controls,
+module contracts, build graph gates, and board validation criteria:
+```bash
+cd /root/ameba-river
+rg -n "模块契约|xz_app|xz_state_machine|xz_audio_service|xz_protocol|xz_mcp_volume|并发与所有权|日志与诊断标准|构建图控制|质量门禁|板端验证矩阵" \
+  doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/changes.md
+```
+
+Expected result:
+- the plan has explicit contracts for the new XiaoZhi-only modules
+- the plan has live CMake/build graph controls
+- the plan has quality gates and board validation scenarios
+
+Run Codex harness validation because repo-level planning files changed:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits with `check_codex_harness: all checks passed`
+
 ## Step A.xiaozhi-client.2 Verification
 
 Confirm the clean-slate plan now protects only the current VAD and KWS

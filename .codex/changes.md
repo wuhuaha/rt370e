@@ -1,5 +1,35 @@
 # Change Log
 
+## Step A.xiaozhi-client.3
+- 按“后续实现质量可控”的要求，继续扩展
+  `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`。
+- 本轮没有改功能代码，只把计划升级为更完整的工程控制文档：
+  - 新增 `xz_app` 模块契约：
+    - 负责初始化、状态机持有和跨线程事件裁决
+    - 明确禁止依赖旧 `dialog_runtime / session_coordinator / cloud_adapter`
+  - 新增 `xz_state_machine` 契约：
+    - 定义 `starting / network_wait / idle / connecting / listening / speaking /
+      recovering / error`
+    - 明确核心转换和状态不变量
+  - 新增 `xz_audio_service` 契约：
+    - 定义 capture、KWS、VAD、Opus encode/decode、playback 的职责和队列策略
+    - 明确 KWS/VAD 受保护接口必须保留
+  - 新增 `xz_protocol` 契约：
+    - 对齐 `xiaozhi-esp32` 的 Protocol/WebsocketProtocol 语义
+    - 明确 hello、headers、binary v1/v2/v3 和禁止迁移旧 runtime truth
+  - 新增 `xz_mcp_volume` 契约：
+    - 只允许 `self.get_device_status` 和 `self.audio_speaker.set_volume`
+  - 新增并发、日志、诊断、构建图控制、质量门禁和板端验证矩阵。
+- 计划现在更明确地把后续实现顺序固定为：
+  - 解耦 VAD/KWS
+  - 建立最小新主干
+  - 重建 XiaoZhi protocol
+  - 重建 AudioService 风格音频链路
+  - 收缩 MCP
+  - 删除旧主干残留
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed。
+
 ## Step A.xiaozhi-client.2
 - 根据新的约束重新审视并强化 XiaoZhi 专用重构计划：
   - 用户明确要求保留当前项目的 VAD 和唤醒词识别实现
