@@ -1,5 +1,33 @@
 # Change Log
 
+## Step A.xiaozhi-client.1
+- 为当前 `xiaozhi-client` 分支建立新的主目标，不再把现有工作定义成
+  `/root/home_ai_server` M1 兼容收口，而是明确切到：
+  - 深度参考 `~/xiaozhi-esp32`
+  - 把当前仓库改造成 XiaoZhi 服务器专用设备端
+  - 保留现有本地 `VAD / AEC / 唤醒词 / BF`
+  - MCP 暂时只保留音量控制
+  - 删除所有无关代码与兼容路径
+- 本轮没有改功能代码，只沉淀正式执行蓝图并同步 Codex harness：
+  - 新增 `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+    - 明确当前架构判断：
+      - 现有 `river_xiaozhi_ws` 是兼容式接入
+      - `xiaozhi-esp32` 的主干是 `Application + AudioService + Protocol + DeviceStateMachine`
+      - 当前工程后续应收敛为 XiaoZhi-only 设备端，而不是继续维护多 provider 云层
+    - 明确保留项、删除项、重构主线、风险与执行切片
+  - 更新 `.codex/active_plans.md`
+    - 把新计划切为 primary active plan
+  - 更新 `.codex/active_context.md`
+    - 当前分支改为 `xiaozhi-client`
+    - 当前主目标改为 XiaoZhi-only 对齐重构
+    - 记录第一刀的分析结论和后续顺序
+- 这一步的价值不是“多一份文档”，而是把后续实现的边界写死：
+  - 不再以保留 Iflytek / provider 抽象为前提
+  - 不再以最小迁移成本为前提
+  - 先删多后端兼容层，再立新的设备主干
+- Verification for this step:
+  - `python3 tools/diag/check_codex_harness.py` passed。
+
 ## Step A.home-ai.20
 - 按当前收口目标，把本地唤醒词模型从
   `student_conv_resnet_ed_nano_v1_fp32_debug` 切换到

@@ -1,3 +1,32 @@
+## Step A.xiaozhi-client.1 Verification
+
+Confirm the repository now tracks a XiaoZhi-only aggressive rearchitecture plan
+as the main branch objective:
+```bash
+cd /root/ameba-river
+rg -n "XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN|xiaozhi-client|XiaoZhi-only|volume-only|Iflytek" \
+  doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_plans.md \
+  .codex/active_context.md \
+  .codex/changes.md
+```
+
+Expected result:
+- the new execution plan file exists
+- `.codex/active_plans.md` points primary active plan to
+  `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+- `.codex/active_context.md` shows branch `xiaozhi-client`
+- the active objective is the XiaoZhi-only rearchitecture
+
+Run Codex harness validation because repo-level planning files changed:
+```bash
+cd /root/ameba-river
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- the script exits with `check_codex_harness: all checks passed`
+
 ## Step A.home-ai.20 Verification
 
 Confirm the active KWS variant and threshold are now bound to the teacher-a

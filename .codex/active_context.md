@@ -6,7 +6,7 @@ or top-of-tree verification target changes.
 
 ## Active Working Set
 
-- Current working branch: `home-ai`
+- Current working branch: `xiaozhi-client`
 - Active SDK baseline: `/root/ameba-rtos`
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
@@ -15,15 +15,38 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step A.home-ai.20 切换 teacher-a 唤醒词模型并恢复校准阈值（本地 build 通过，待上板）`
+  - `Step A.xiaozhi-client.1 建立 XiaoZhi-only 激进重构执行计划（规划/harness 校验通过）`
 - Current active objective:
-  - Adapt the current branch to `/root/home_ai_server` M1 service-side contract.
+  - Re-architect this branch into a XiaoZhi-only device client aligned with `~/xiaozhi-esp32`, while reusing the current local VAD/AEC/KWS/BF stack.
 - Active plan:
-  - `doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md`
+  - `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
 - Latest workflow sync:
   - future `git commit` messages in this repository should use clear Chinese
     descriptions by default
 - Latest planning sync:
+    - newest active rearchitecture slice:
+    - Step A.xiaozhi-client.1 建立 XiaoZhi-only 激进重构执行计划：
+      - 这次分支目标已经改变，不再以 `/root/home_ai_server` M1 适配为主线
+      - 目标改为：
+        - 深度参考 `~/xiaozhi-esp32`
+        - 把当前工程改造成 XiaoZhi 服务器专用设备端
+        - 保留当前项目已有的本地 VAD / AEC / 唤醒词 / BF
+        - MCP 暂时只保留音量控制
+        - 删除所有与 XiaoZhi 专用目标无关的代码
+      - 当前分析结论：
+        - 现有 `river_xiaozhi_ws` 属于“兼容式接入”，不是主干同构
+        - 当前最大架构阻力不在协议，而在
+          `cloud adapter + provider + dialog runtime` 这套旧抽象
+        - 后续应优先：
+          - 删除 Iflytek / provider 兼容层
+          - 建立设备级状态机主干
+          - 以当前本地前端重组 AudioService 风格音频链路
+          - MCP 收缩为 volume-only
+      - 本轮已新增执行计划：
+        - `doc/XIAOZHI_ESP32_PARITY_REARCH_EXECUTION_PLAN_ZH.md`
+      - 本轮同步：
+        - `.codex/active_plans.md`
+        - `.codex/active_context.md`
     - newest active adaptation slice:
     - Step A.home-ai.20 切换 teacher-a 唤醒词模型并恢复校准阈值：
       - 当前工程原先还停留在
