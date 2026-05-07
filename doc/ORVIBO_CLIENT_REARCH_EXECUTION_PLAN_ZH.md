@@ -1064,12 +1064,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 自动状态机路径上的关键控制帧失败会记录 `last_error` / `protocol_control_fail` 并进入 recoverable recovery。
   - 诊断命令只记录失败，不主动触发恢复，避免手动测试命令改变主运行态。
   - app status 输出 `protocol_ctrl=ok/fail`，用于板端确认控制帧发送可靠性。
+- `Step H.xiaozhi-client.7`：
+  - transport mutex 改为 recursive mutex，支持 `ws_poll()` 回调内同步发送 MCP volume 回复而不自锁。
+  - hello 等待与常规 poll 都通过同一 transport lock 调用 `ws_poll()`，避免 uplink sender task 与 SDK `wsclient` 并发访问。
+  - WebSocket close callback 记录 `transport_closed` / `close_events` 并继续投递 `AUDIO_CHANNEL_CLOSED`。
+  - protocol status 输出 `poll` / `close_evt`，用于板端确认 poll 活性和远端断开次数。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt" \
   include components
 git diff --check
 python3 tools/diag/check_codex_harness.py
@@ -1080,9 +1085,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离和协议控制帧失败恢复，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理协议错误恢复、下行播放背压和板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复和 WebSocket poll/send 串行化，并通过 `/root/ameba-rtos` 构建验证。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/MCP volume-only 全链路日志，再继续处理重复断线 backoff、下行播放背压和板端诊断可观测性。

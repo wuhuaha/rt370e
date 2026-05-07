@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.6 收敛 Orvibo 协议控制帧失败恢复（SDK 构建通过）`
+  - `Step H.xiaozhi-client.7 序列化 Orvibo WebSocket poll/send 访问（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -50,6 +50,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.7` serializes Orvibo WebSocket poll/send access:
+  - protocol transport lock is a recursive mutex so `ws_poll()` callbacks can synchronously send MCP volume replies without self-deadlock.
+  - hello wait and steady-state poll call `ws_poll()` through the same transport lock used by uplink sender task.
+  - remote WebSocket close records `transport_closed`, increments `close_events`, and still posts `AUDIO_CHANNEL_CLOSED`.
+  - protocol status reports `poll` and `close_evt` counters.
 - `Step H.xiaozhi-client.6` hardens Orvibo protocol control-frame failures:
   - wake detected, listen start, listen stop, and abort speaking actions now record protocol send status.
   - automatic state-machine control failures update `last_error`, increment `protocol_control_fail`, and post recoverable error events.
@@ -89,6 +94,7 @@ or top-of-tree verification target changes.
   - Orvibo uplink queue/session-epoch grep
   - Orvibo app control/audio queue grep
   - Orvibo protocol control failure grep
+  - Orvibo WebSocket poll/send serialization grep
   - MCP volume-only grep
   - protected VAD/KWS API grep
   - `git diff --check`
@@ -98,8 +104,8 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
-  - protocol error recovery
   - downlink playback/backpressure board validation
+  - reconnect/backoff behavior during repeated transport failures
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - wake/listen/speak/barge-in state-machine verification

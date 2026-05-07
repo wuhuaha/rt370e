@@ -25794,3 +25794,53 @@ Expected result:
 - successful turns increment `protocol_ctrl` ok count
 - transient WebSocket/protocol send failure increments fail count and records `last_error`
 - automatic critical control-frame failure enters recoverable recovery instead of silently staying in the old state
+
+## Step H.xiaozhi-client.7 - serialize WebSocket poll/send access
+
+Confirm the Orvibo protocol transport uses a recursive mutex and routes both
+hello polling and steady-state polling through the same serialized helper:
+```bash
+cd /root/ameba-river
+rg -n "recursive_create|recursive_take|recursive_give|poll_once|poll_cycles|close_events|server_hello_poll_failed" \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- transport lock uses `rtos_mutex_recursive_*`
+- `river_orvibo_wait_server_hello()` and `river_orvibo_protocol_poll()` call `river_orvibo_poll_once(...)`
+- protocol status prints `poll=` and `close_evt=`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash the generated image and connect to the XiaoZhi-compatible server.
+2. Trigger one normal wake/listen/TTS/MCP-volume round.
+3. Trigger a server/network close or power-cycle the AP while a channel is open.
+4. Inspect `orvibo status`.
+```
+
+Expected result:
+- normal traffic still replies to MCP volume requests without deadlock
+- uplink remains real-time while status `poll` increases during the active channel
+- remote close increments `close_evt`, records `transport_closed`, and drives Orvibo state back through `AUDIO_CHANNEL_CLOSED`

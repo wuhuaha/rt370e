@@ -15625,3 +15625,16 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.7
+- 收敛 Orvibo 协议层 WebSocket poll/send 并发边界：
+  - transport mutex 改为 recursive mutex，允许 `ws_poll()` 回调内同步回复 MCP 时重入 JSON send 路径。
+  - hello 等待和常规 `river_orvibo_protocol_poll()` 都通过同一个 transport lock 调用 `ws_poll()`，阻断 uplink sender task 与 SDK `wsclient` 并发读写。
+  - WebSocket close callback 记录 `transport_closed`，累加 `close_events`，并继续投递 `AUDIO_CHANNEL_CLOSED` 给 Orvibo app 状态机。
+  - protocol status 新增 `poll` 和 `close_evt`，便于上板确认 poll 活性和远端断开次数。
+- 设计边界：
+  - 不改变 VAD/KWS/AEC/BF、Opus packet format、MCP volume-only 范围。
+  - 保留 callback 内同步 MCP volume 回复语义，但通过 recursive lock 避免自锁。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
