@@ -4,13 +4,22 @@ config AMEBA_RIVER_EN
     bool "Enable ameba-river application"
     default y
 
+config RIVER_ORVIBO_CLIENT_EN
+    bool "Enable Orvibo realtime voice client"
+    default y
+    help
+      Build the Orvibo voice-client mainline. The first external wire
+      contract is compatible with the XiaoZhi websocket protocol, but the
+      firmware architecture is Orvibo-owned.
+
 config RIVER_ONLINE_CONTROL_EN
     bool "Enable online home control path"
-    default y
+    default n
 
 choice RIVER_CLOUD_BACKEND
     prompt "Cloud voice backend"
     default RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
+    depends on !RIVER_ORVIBO_CLIENT_EN
 
 config RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME
     bool "Xiaozhi realtime session backend"

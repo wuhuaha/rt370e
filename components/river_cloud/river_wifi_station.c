@@ -11,7 +11,6 @@
 #include "wifi_api_ext.h"
 #include "wifi_fast_connect.h"
 
-#include "river/river_cloud.h"
 #include "river/river_log.h"
 #include "river/river_runtime_stats.h"
 #include "river/river_wifi_credentials.h"
@@ -549,7 +548,6 @@ static void river_wifi_station_mark_connected(void)
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
                (unsigned long)g_river_wifi_station.connect_successes);
     river_runtime_stats_snapshot("wifi_connected");
-    river_cloud_adapter_notify_network_ready();
 }
 
 static bool river_wifi_station_wait_driver_idle(uint32_t timeout_ms, bool allow_join_success)
@@ -1070,7 +1068,6 @@ static void river_wifi_station_disconnect_and_wait_idle(uint32_t timeout_ms)
     g_river_wifi_station.connection_latched = false;
     g_river_wifi_station.last_connected_ip = 0U;
     g_river_wifi_station.last_connected_ssid[0] = '\0';
-    river_cloud_adapter_notify_network_lost();
 
     wifi_disconnect();
     rtos_time_delay_ms(300);

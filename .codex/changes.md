@@ -1,5 +1,33 @@
 # Change Log
 
+## Step C.xiaozhi-client.1
+- 建立并切换到可构建的 Orvibo voice client live graph：
+  - `app/app_main.c` 改为启动 `river_orvibo_app_boot()`
+  - 新增 `river_orvibo_app / river_orvibo_state`，由 Orvibo app 持有业务状态并统一处理跨线程事件
+  - 新增 `river_orvibo_protocol`，直接实现 XiaoZhi-compatible websocket wire contract：
+    - headers: `Authorization` / `Protocol-Version` / `Device-Id` / `Client-Id`
+    - `hello / listen / abort / mcp / binary audio`
+    - 支持 protocol v1/v2/v3 音频 frame 发送和接收解析
+  - 新增 `river_orvibo_audio_service`，把当前 capture/preproc/VAD/KWS/Opus/playback 直接接入 Orvibo 主干
+  - 新增 `river_orvibo_mcp_volume`，MCP 初期只保留：
+    - `self.get_device_status`
+    - `self.audio_speaker.set_volume`
+  - `components/*/CMakeLists.txt` 已切到 Orvibo live graph，旧 provider/dialog/cloud adapter/session coordinator 不再进入 live CMake
+  - `components/river_diag/river_diag_cmd.c` 收缩为 Orvibo/KWS/VAD/audio/playback 诊断入口，保留 KWS tensor dump 和 alignment replay
+  - `river_wifi_station.c` 不再反向通知旧 `river_cloud_adapter_notify_network_*`，网络事件由 Orvibo app 轮询并裁决
+- 保持受保护能力：
+  - 当前 Silero VAD public API 和实现仍编译
+  - 当前 KWS、tensor dump、alignment replay、parity API 仍编译
+  - 未替换 VAD/KWS 模型、阈值、输入输出语义
+- Verification for this step:
+  - `git diff --check` passed。
+  - live CMake old-mainline grep passed:
+    `rg -n "river_dialog_runtime.c|river_session_coordinator.c|river_dialog_cloud_port.c|river_cloud_adapter.c|river_asr_iflytek|river_tts_iflytek|river_xiaozhi_ws.c|river_cloud_xiaozhi" components/*/CMakeLists.txt`
+    returned no matches.
+  - VAD/KWS protected API grep passed.
+  - `export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p`
+    completed with `Build done`。
+
 ## Step B.xiaozhi-client.2
 - 继续推进受保护语音链路和旧对话主干解耦：
   - `river_voice_runtime_policy` 不再 include `river_dialog_runtime.h` /

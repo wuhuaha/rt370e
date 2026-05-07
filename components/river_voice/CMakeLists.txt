@@ -21,22 +21,20 @@ ameba_list_append(private_sources
     river_voice_detector.c
     river_voice_detector_silero.cc
     river_voice_frontend.c
+    river_orvibo_audio_service.c
     river_playback_service.c
     river_playback_frame_pool.c
     river_reference_service.c
+    river_voice_vad_probe_stub.c
+    river_voice_experiment_stub.c
     river_voice_segment_buffer.c
-    river_voice_segment_sink.c
-    river_voice_vad_probe.c
-    river_voice_experiment.c
+    river_voice_segment_sink_stub.c
     river_voice_frame_pool.c
     river_voice_preproc.c
     river_voice_profile.c
     river_voice_runtime_policy.c
     river_voice_preproc_fixed_dsb.c
     river_voice_ref.c
-    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/complex_fft.c
-    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/real_fft.c
-    ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/signal_processing_library.cc
     generated/river_silero_vad_model_data.cc
 )
 
@@ -53,6 +51,9 @@ endif()
 if(CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN STREQUAL "y")
     ameba_list_append(private_sources
         river_voice_webrtc_aecm_adapter.c
+        ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/complex_fft.c
+        ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/real_fft.c
+        ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/signal_processing_library.cc
         ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/aecm_core.cc
         ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/aecm_core_c.cc
         ${RIVER_PROJECT_DIR}/third_party/webrtc_aecm/aecm/delay_estimator.cc

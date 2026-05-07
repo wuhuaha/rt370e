@@ -16,24 +16,9 @@ set(private_definitions)
 set(private_compile_options)
 
 ameba_list_append(private_sources
-    river_app.c
-    river_dialog_cloud_port.c
-    river_dialog_runtime.c
-    river_dialog_wake_admission.c
-    river_interaction_state.c
-    river_reset_trace.c
-    river_session_coordinator.c
+    river_orvibo_app.c
+    river_orvibo_state.c
 )
-
-if(CONFIG_RIVER_INTERACTION_DIAG_EN)
-    ameba_list_append(private_sources
-        river_interaction_diag.c
-    )
-else()
-    ameba_list_append(private_sources
-        river_interaction_diag_stub.c
-    )
-endif()
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include

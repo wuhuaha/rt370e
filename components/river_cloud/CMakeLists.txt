@@ -20,7 +20,7 @@ ameba_global_include(${public_includes})
 ameba_global_define(${public_definitions})
 ameba_global_library(${public_libraries})
 
-if(CONFIG_RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME AND
+if(CONFIG_RIVER_ORVIBO_CLIENT_EN AND
    EXISTS ${river_opus_component_dir}/CMakeLists.txt)
     ameba_add_subdirectory(${river_opus_component_dir} libopus_for_river)
 endif()
@@ -31,38 +31,21 @@ set(private_definitions)
 set(private_compile_options)
 
 ameba_list_append(private_sources
-    river_cloud_adapter.c
-    river_cloud_asr_bridge_runtime.c
-    river_online_control.c
     river_wifi_station.c
     river_ws_dispatch.c
+    river_opus_codec.c
+    river_orvibo_protocol.c
+    river_orvibo_mcp_volume.c
 )
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
+    ${c_CMPT_AUDIO_DIR}/interfaces
 )
 
-if(CONFIG_RIVER_CLOUD_BACKEND_IFLYTEK_SPLIT)
-    ameba_list_append(private_sources
-        river_asr_iflytek_rtasr.c
-        river_asr_provider_registry.c
-        river_tts_iflytek_ws.c
-    )
-endif()
-
-if(CONFIG_RIVER_CLOUD_BACKEND_XIAOZHI_REALTIME)
-    ameba_list_append(private_sources
-        river_opus_codec.c
-        river_cloud_xiaozhi_playback_runtime.c
-        river_cloud_xiaozhi_round_runtime.c
-        river_cloud_xiaozhi_session.c
-        river_xiaozhi_mcp_bridge.c
-        river_xiaozhi_ws.c
-    )
-    ameba_list_append(private_includes
-        ${river_opus_component_dir}/include
-    )
-endif()
+ameba_list_append(private_includes
+    ${river_opus_component_dir}/include
+)
 
 ameba_add_internal_library(river_cloud
     p_SOURCES

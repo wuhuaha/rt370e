@@ -6,6 +6,13 @@ Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
+Latest Verified Slice:
+
+- `Step C.xiaozhi-client.1` 已切换到可构建的 Orvibo voice client live graph。
+- live CMake 已移除旧 `dialog_runtime / session_coordinator / cloud_adapter / provider / xiaozhi_ws` 主干。
+- 当前 VAD、KWS、KWS tensor dump、alignment replay 仍保留并参与构建。
+- 最新 `/root/ameba-rtos` SDK build 已通过。
+
 ## 0. 文档用途
 
 这份计划是后续实现的工程控制文档，不是方向性备忘录。后续每个提交都应能回答：
@@ -985,4 +992,4 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 ## 14. 下一步
 
-下一步执行 Step B：先解耦 VAD/KWS 的旧对话运行时依赖。只有这两个模块作为受保护能力进入新主干，其余旧主干不再继续加补丁。
+下一步执行 Step G：删除未编译的旧主干源码和头文件残留。当前 live graph 已经切到 Orvibo 主干，但源码树中仍保留历史 `dialog / provider / cloud adapter / legacy xiaozhi / iflytek` 文件，后续必须继续清理，避免新实现再次误依赖旧抽象。

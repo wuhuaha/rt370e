@@ -1,3 +1,47 @@
+## Step C.xiaozhi-client.1 Verification
+
+Confirm the live build graph is now Orvibo-owned and does not compile the old
+provider/dialog/cloud-adapter mainline:
+```bash
+cd /root/ameba-river
+rg -n "river_dialog_runtime.c|river_session_coordinator.c|river_dialog_cloud_port.c|river_cloud_adapter.c|river_asr_iflytek|river_tts_iflytek|river_xiaozhi_ws.c|river_cloud_xiaozhi" \
+  components/*/CMakeLists.txt
+```
+
+Expected result:
+- no matches in live CMake source lists
+
+Confirm the protected VAD/KWS capabilities still exist:
+```bash
+cd /root/ameba-river
+rg -n "river_voice_kws_request_tensor_dump_next|river_voice_kws_dump_tensor_chunk|river_voice_kws_run_alignment_sample|river_voice_kws_dump_alignment_status" \
+  include/river/river_voice_kws.h \
+  components/river_voice/river_voice_kws.cc \
+  components/river_diag/river_diag_cmd.c
+rg -n "river_voice_detector_open|river_voice_detector_process|river_voice_detector_backend_name" \
+  include/river/river_voice_detector.h \
+  components/river_voice
+```
+
+Expected result:
+- KWS tensor dump / alignment APIs are present
+- VAD public API and Orvibo audio-service usage are present
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step B.xiaozhi-client.2 Verification
 
 Confirm voice runtime policy no longer exposes or consumes old dialog/runtime
