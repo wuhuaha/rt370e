@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.43` 已对齐 realtime / barge-in 场景的上行语义：
+  - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端在 TTS 期间是否继续音频处理，取决于当前 profile 是否具备 AEC/native reference 一类的 realtime 能力。
+  - 当前 Orvibo 分支此前只在 `LISTENING` 阶段编码上行，这会让 realtime-capable profile 在 TTS 播放期间缺少本该继续流动的上行音频。
+  - `river_orvibo_audio_service` 现仅在 barge-in 已启用且当前 profile 具备 `AEC` 或 `NATIVE_CAPTURE_REF` 时，才允许 `SPEAKING` 阶段继续 uplink 编码；auto-stop profile 仍保持不变。
+  - 本步不改 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、协议 framing、MCP 或 TTS drain/high-water 行为。
+  - 最新 `/root/ameba-rtos` build 已通过；下一步板端验证应在 realtime-capable profile 下打断一段 TTS，确认 TTS 播放中仍能持续上行，而 auto-stop profile 不受影响。
 - `Step H.xiaozhi-client.42` 已收敛根目录 `plan.md`：
   - 根 `plan.md` 不再直接承载 2026-04-01 `refactor` 分支的历史运行时性能优化计划，避免与当前 Orvibo / XiaoZhi-compatible 主线目标混淆。
   - 旧正文已归档到 `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`。

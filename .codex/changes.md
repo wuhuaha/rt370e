@@ -1,5 +1,20 @@
 # Change Log
 
+## Step H.xiaozhi-client.43
+- 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后，发现 Orvibo 目前的上行编码只在 `LISTENING` 阶段启用，这会让具备 AEC/native reference 的 realtime profile 在 TTS 播放期间丢失应继续保持的上行音频流。
+- 参考实现的 realtime 语义是：只有在 AEC/native reference 可用时，TTS 期间才继续保持音频处理与交互流；auto-stop 类 profile 则不应在 speaking 阶段放开 uplink。
+- 变更：
+  - 新增 `river_orvibo_audio_speaking_uplink_allowed()`，仅当当前 profile 具备 `AEC` 或 `NATIVE_CAPTURE_REF` 且 barge-in 已启用时，才允许 `SPEAKING` 阶段继续 uplink 编码。
+  - `river_orvibo_audio_task()` 现在在 `LISTENING` 和受限的 `SPEAKING` realtime 场景下都会执行 `river_orvibo_audio_try_encode(...)`。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、协议 framing、MCP、TTS drain/high-water 修复或文档归档。
+- Verification for this step:
+  - passed: reference audit against `~/xiaozhi-esp32` and `~/py-xiaozhi` for realtime/listening behavior.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation still needs a realtime-capable TTS interruption run to verify uplink continues while TTS is active and auto-stop profiles remain unchanged.
+
 ## Step H.xiaozhi-client.42
 - 收敛根目录 `plan.md`，避免旧 `refactor` 分支的运行时性能优化计划继续被误读为当前 `xiaozhi-client` / Orvibo 主线目标。
 - 变更：

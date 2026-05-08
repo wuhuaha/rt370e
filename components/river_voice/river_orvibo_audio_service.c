@@ -241,6 +241,16 @@ static void river_orvibo_audio_log_diag_if_needed(void)
                (unsigned long)g_river_orvibo_audio.downlink_buffer_size_bytes);
 }
 
+static bool river_orvibo_audio_speaking_uplink_allowed(void)
+{
+    river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
+
+    return g_river_orvibo_audio.barge_in_enabled &&
+           (river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
+            river_voice_profile_has_capability(profile,
+                                              RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF));
+}
+
 static void river_orvibo_audio_reset_vad_state(void)
 {
     g_river_orvibo_audio.vad_state_initialized = false;
@@ -486,7 +496,9 @@ static void river_orvibo_audio_task(void *param)
                 g_river_orvibo_audio.kws_submit_fail++;
             }
         }
-        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING) {
+        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING ||
+            (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_SPEAKING &&
+             river_orvibo_audio_speaking_uplink_allowed())) {
             river_orvibo_audio_try_encode(g_river_orvibo_audio.enhanced_buffer,
                                           enhanced_bytes);
         }

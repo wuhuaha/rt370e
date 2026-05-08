@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.42 收敛根计划文档入口`
+  - `Step H.xiaozhi-client.43 对齐 realtime barge-in 上行语义`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.43` aligns speaking-mode uplink with the XiaoZhi realtime/barge-in contract:
+  - static review against `~/xiaozhi-esp32` and `~/py-xiaozhi` shows the reference realtime path keeps audio processing alive during TTS only when the active profile is AEC/native-reference capable.
+  - Orvibo previously only encoded uplink in `LISTENING`, which meant realtime-capable profiles could stall uplink while TTS was still playing.
+  - `river_orvibo_audio_service` now allows uplink encoding during `SPEAKING` only when barge-in is enabled and the active local voice profile exposes `AEC` or `NATIVE_CAPTURE_REF`, keeping auto-stop profiles closed.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF implementation, Opus framing, and the TTS drain/high-water fixes remain unchanged.
+  - latest `/root/ameba-rtos` build passed after the change; board runtime confirmation still needs a realtime-capable TTS interruption test to verify barge-in audio continues to flow before TTS stop.
 - `Step H.xiaozhi-client.42` finishes root plan cleanup:
   - root `plan.md` no longer embeds the stale 2026-04-01 `refactor` runtime-optimization plan as if it were current branch context.
   - the old root plan body is archived under `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`.

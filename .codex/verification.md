@@ -1,3 +1,32 @@
+## Step H.xiaozhi-client.43 Verification
+
+Confirm speaking-mode uplink is now allowed only for realtime-capable profiles:
+```bash
+cd /root/ameba-river
+rg -n "river_orvibo_audio_speaking_uplink_allowed|mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING|RIVER_ORVIBO_AUDIO_MODE_SPEAKING &&|RIVER_VOICE_CAPABILITY_AEC|RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF" \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- `river_orvibo_audio_speaking_uplink_allowed()` exists and gates on barge-in plus AEC/native-capture-ref capability.
+- `river_orvibo_audio_task()` encodes uplink in `LISTENING` and in the constrained realtime `SPEAKING` case only.
+- auto-stop profiles do not gain a new speaking-mode uplink path.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.42 Verification
 
 Confirm the root plan is only a pointer and the old root body is archived:
