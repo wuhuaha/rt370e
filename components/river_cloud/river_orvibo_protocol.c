@@ -102,6 +102,7 @@ typedef struct {
     uint32_t audio_enqueued;
     uint32_t audio_queue_drop_oldest;
     uint32_t audio_queue_full;
+    uint32_t uplink_queue_flushes;
     uint32_t audio_drop_closed;
     uint32_t audio_drop_stale;
     uint32_t audio_send_retry;
@@ -131,6 +132,7 @@ static river_orvibo_protocol_context_t g_river_orvibo_protocol;
 
 static void river_orvibo_uplink_task(void *param);
 static bool river_orvibo_channel_open_locked(void);
+static void river_orvibo_clear_uplink_queue(const char *reason);
 
 static bool river_orvibo_protocol_version_supported(uint16_t version)
 {
@@ -341,6 +343,30 @@ exit:
     river_orvibo_transport_unlock(locked);
     cJSON_free(json);
     return status;
+}
+
+static void river_orvibo_clear_uplink_queue(const char *reason)
+{
+    river_orvibo_uplink_frame_t frame;
+    uint32_t drained = 0U;
+
+    if (g_river_orvibo_protocol.uplink_queue == NULL) {
+        return;
+    }
+
+    while (rtos_queue_receive(g_river_orvibo_protocol.uplink_queue, &frame, 0U) ==
+           RIVER_ORVIBO_RTOS_OK) {
+        drained++;
+    }
+
+    if (drained == 0U) {
+        return;
+    }
+
+    g_river_orvibo_protocol.uplink_queue_flushes++;
+    RIVER_LOGI("uplink queue cleared: reason=%s frames=%lu",
+               reason != NULL ? reason : "-",
+               (unsigned long)drained);
 }
 
 static river_status_t river_orvibo_send_hello(void)
@@ -844,6 +870,7 @@ static bool river_orvibo_close_context(void)
     g_river_orvibo_protocol.last_incoming_ms = 0U;
     g_river_orvibo_protocol.session_epoch++;
     river_orvibo_transport_unlock(locked);
+    river_orvibo_clear_uplink_queue("close_audio_channel");
     return was_open;
 }
 
@@ -1126,6 +1153,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     }
 
     river_orvibo_close_context();
+    river_orvibo_clear_uplink_queue("open_audio_channel");
     g_river_orvibo_protocol.session_id[0] = '\0';
     g_river_orvibo_protocol.last_error[0] = '\0';
     memset(g_river_orvibo_protocol.base_url, 0, sizeof(g_river_orvibo_protocol.base_url));
@@ -1576,7 +1604,7 @@ void river_orvibo_protocol_dump_status(void)
                                    now_ms - g_river_orvibo_protocol.last_incoming_ms :
                                    0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums last_text=%s",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu flush=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums last_text=%s",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1598,6 +1626,7 @@ void river_orvibo_protocol_dump_status(void)
                (unsigned long)g_river_orvibo_protocol.audio_enqueued,
                (unsigned long)g_river_orvibo_protocol.audio_queue_drop_oldest,
                (unsigned long)g_river_orvibo_protocol.audio_queue_full,
+               (unsigned long)g_river_orvibo_protocol.uplink_queue_flushes,
                (unsigned long)g_river_orvibo_protocol.audio_drop_closed,
                (unsigned long)g_river_orvibo_protocol.audio_drop_stale,
                (unsigned long)g_river_orvibo_protocol.audio_send_retry,

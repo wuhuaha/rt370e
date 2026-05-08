@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.43 对齐 realtime barge-in 上行语义`
+  - `Step H.xiaozhi-client.44 收敛会话切换时的残留队列`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -39,6 +39,11 @@ or top-of-tree verification target changes.
   - `river_orvibo_audio_service` now allows uplink encoding during `SPEAKING` only when barge-in is enabled and the active local voice profile exposes `AEC` or `NATIVE_CAPTURE_REF`, keeping auto-stop profiles closed.
   - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF implementation, Opus framing, and the TTS drain/high-water fixes remain unchanged.
   - latest `/root/ameba-rtos` build passed after the change; board runtime confirmation still needs a realtime-capable TTS interruption test to verify barge-in audio continues to flow before TTS stop.
+- `Step H.xiaozhi-client.44` 收敛会话切换时的残留队列：
+  - Orvibo protocol close/open now explicitly clears residual uplink queue frames and records `uplink_queue_flushes`, so old audio captured before a transport teardown cannot leak into a new websocket session.
+  - Orvibo app now clears queued audio work on channel loss / recoverable error / fatal error and records `audio_queue_flushes`, so stale TTS or downlink packets do not survive a session boundary and re-enter the next state machine epoch.
+  - This is a deterministic reconnect-hygiene improvement, not a protocol or codec change. The known risk is that audio already queued during teardown will be discarded, but that audio is no longer trustworthy once the transport is gone.
+  - latest `/root/ameba-rtos` build passed after the change; board runtime confirmation still needs a forced close/reopen stress run to verify stale frames do not reappear after reconnect.
 - `Step H.xiaozhi-client.42` finishes root plan cleanup:
   - root `plan.md` no longer embeds the stale 2026-04-01 `refactor` runtime-optimization plan as if it were current branch context.
   - the old root plan body is archived under `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`.

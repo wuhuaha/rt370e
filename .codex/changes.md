@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.44
+- 深入审视后确认，当前分支还存在一个更确定的会话级污染窗口：WebSocket 关闭或恢复后，已经入队但尚未处理的 uplink / audio 事件可能跨 session 残留，并在新连接建立后继续被消费。
+- 这类残留不是协议兼容问题，而是队列生命周期没有严格绑到 session boundary 上的问题。对比当前实现后，最稳妥的修正不是再调参数，而是把残留队列在会话边界主动清空。
+- 变更：
+  - `river_orvibo_protocol_close_context()` 和 `river_orvibo_protocol_open_audio_channel()` 现在会在收尾/重开时清空 uplink 队列，防止旧会话的待发语音帧跨会话复用。
+  - `river_orvibo_app_handle_state_event()` 在 `AUDIO_CHANNEL_CLOSED`、`NETWORK_LOST`、`ERROR_RECOVERABLE`、`ERROR_FATAL` 路径上清空 audio queue，避免旧 TTS / downlink 事件在新 session 中继续被处理。
+  - 协议与 app 状态输出新增 `uplink_queue_flushes` 和 `audio_queue_flushes`，便于板端确认队列确实在 session boundary 被清掉。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、协议 wire contract、MCP、TTS drain/high-water、realtime 上行语义或 KWS 保守参数。
+- 风险记录：
+  - 任何在 teardown 期间已经入队但尚未处理的音频都会被丢弃；这是有意的，因为这些帧已经失去所属 session 的有效性。代价是少量尾部语音可能不会尝试跨会话延续，但换来的是避免旧帧污染新会话。
+- Verification for this step:
+  - passed: static review confirmed queue flush is bound to session close/open and error recovery paths rather than to normal streaming writes.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation still needs a forced close/reopen stress run to verify `uplink queue cleared` and `audio queue cleared` appear before the next session begins and no stale frame leaks into the reopened session.
+
 ## Step H.xiaozhi-client.43
 - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后，发现 Orvibo 目前的上行编码只在 `LISTENING` 阶段启用，这会让具备 AEC/native reference 的 realtime profile 在 TTS 播放期间丢失应继续保持的上行音频流。
 - 参考实现的 realtime 语义是：只有在 AEC/native reference 可用时，TTS 期间才继续保持音频处理与交互流；auto-stop 类 profile 则不应在 speaking 阶段放开 uplink。

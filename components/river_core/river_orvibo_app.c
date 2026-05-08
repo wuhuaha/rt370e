@@ -95,6 +95,7 @@ typedef struct {
     uint32_t audio_posted;
     uint32_t audio_post_fail;
     uint32_t audio_drop_oldest;
+    uint32_t audio_queue_flushes;
     uint32_t handled;
     uint32_t uplink_sent;
     uint32_t uplink_busy;
@@ -215,6 +216,30 @@ static river_status_t river_orvibo_app_post_control(const river_orvibo_app_msg_t
     g_river_orvibo_app.control_posted++;
     g_river_orvibo_app.posted++;
     return RIVER_OK;
+}
+
+static void river_orvibo_app_clear_audio_queue(const char *reason)
+{
+    river_orvibo_app_msg_t dropped;
+    uint32_t drained = 0U;
+
+    if (g_river_orvibo_app.audio_queue == NULL) {
+        return;
+    }
+
+    while (rtos_queue_receive(g_river_orvibo_app.audio_queue, &dropped, 0U) ==
+           RIVER_ORVIBO_RTOS_OK) {
+        drained++;
+    }
+
+    if (drained == 0U) {
+        return;
+    }
+
+    g_river_orvibo_app.audio_queue_flushes++;
+    RIVER_LOGI("audio queue cleared: reason=%s frames=%lu",
+               reason != NULL ? reason : "-",
+               (unsigned long)drained);
 }
 
 static river_status_t river_orvibo_app_post(const river_orvibo_app_msg_t *msg)
@@ -702,6 +727,12 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, cons
         (void)river_orvibo_app_refresh_access(reason);
     }
     river_orvibo_app_apply_actions(transition.actions);
+    if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED ||
+        event == RIVER_ORVIBO_EVENT_NETWORK_LOST ||
+        event == RIVER_ORVIBO_EVENT_ERROR_RECOVERABLE ||
+        event == RIVER_ORVIBO_EVENT_ERROR_FATAL) {
+        river_orvibo_app_clear_audio_queue(river_orvibo_event_name(event));
+    }
     if (transition.changed && transition.new_state == RIVER_ORVIBO_STATE_RECOVERING) {
         river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_RECOVERY_DONE, "recoverable_error_closed");
     }
@@ -993,7 +1024,7 @@ void river_orvibo_app_print_status(void)
                                    g_river_orvibo_app.audio_queue) :
                                0U;
 
-    RIVER_LOGI("orvibo app: state=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu aud_flush=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
                river_wifi_station_status_name(),
                (unsigned int)RIVER_ORVIBO_APP_AUDIO_PACKET_MAX,
@@ -1008,6 +1039,7 @@ void river_orvibo_app_print_status(void)
                (unsigned long)g_river_orvibo_app.audio_posted,
                (unsigned long)g_river_orvibo_app.audio_post_fail,
                (unsigned long)g_river_orvibo_app.audio_drop_oldest,
+               (unsigned long)g_river_orvibo_app.audio_queue_flushes,
                (unsigned long)g_river_orvibo_app.handled,
                (unsigned long)g_river_orvibo_app.uplink_sent,
                (unsigned long)g_river_orvibo_app.uplink_busy,

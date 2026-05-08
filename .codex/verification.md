@@ -1,3 +1,43 @@
+## Step H.xiaozhi-client.44 Verification
+
+Confirm session-bound queue flushes are now wired into close/open and error-recovery paths:
+```bash
+cd /root/ameba-river
+rg -n "river_orvibo_clear_uplink_queue|river_orvibo_app_clear_audio_queue|uplink_queue_flushes|audio_queue_flushes" \
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- protocol close/open paths clear the uplink queue and increment `uplink_queue_flushes`.
+- app error and channel-loss paths clear the audio queue and increment `audio_queue_flushes`.
+- status logs expose both flush counters for board-side validation.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Board runtime check:
+```bash
+python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- after a forced audio-channel close or network loss, board logs show `uplink queue cleared` and/or `audio queue cleared` before the next session becomes active.
+- no stale uplink packet or stale TTS/downlink event from the prior session appears after reconnect.
+
 ## Step H.xiaozhi-client.43 Verification
 
 Confirm speaking-mode uplink is now allowed only for realtime-capable profiles:
