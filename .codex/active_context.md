@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.30 修正 Orvibo TTS 下行音频声道参数传递`
+  - `Step H.xiaozhi-client.31 收敛 Orvibo hello 发送失败清理路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.31` closes the websocket context immediately when hello send fails:
+  - protocol audit found that after `ws_connect_url()` succeeds, a `river_orvibo_send_hello()` failure returned immediately without closing the newly opened websocket context.
+  - this left cleanup to the higher-level recovery path and created a short half-open session window with already-incremented session counters.
+  - the `hello_send_failed` branch in `river_orvibo_protocol_open_audio_channel()` now calls `river_orvibo_close_context()` before returning, matching the existing server-hello timeout/failure cleanup path.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.30` fixes Orvibo TTS downlink channel propagation:
   - protocol already parsed `audio_params.channels` from server hello, but the app downlink message path forced `channels=1U` before calling the audio service.
   - this could open the Opus decoder with the wrong channel count if a XiaoZhi-compatible server is configured for non-mono TTS, even though the current default server config is `24000Hz/1ch/60ms`.

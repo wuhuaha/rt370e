@@ -1,3 +1,31 @@
+## Step H.xiaozhi-client.31 Verification
+
+Confirm hello-send failure now tears down the websocket context immediately:
+```bash
+cd /root/ameba-river
+rg -n "hello_send_failed|river_orvibo_close_context\\(\\);" \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- the `hello_send_failed` branch in `river_orvibo_protocol_open_audio_channel()` calls `river_orvibo_close_context()` before returning.
+- this matches the existing cleanup behavior for server-hello timeout/failure paths and avoids leaving a half-open websocket context behind after hello-send failure.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.30 Verification
 
 Confirm server downlink channel count is preserved from protocol to decoder:

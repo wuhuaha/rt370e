@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.31
+- 收敛 Orvibo `hello` 发送失败后的半开 WebSocket 清理路径：
+  - 审计 `river_orvibo_protocol_open_audio_channel()` 时发现，`ws_connect_url()` 成功后如果 `river_orvibo_send_hello()` 失败，当前代码会直接返回错误，但不会立即关闭已创建的 websocket context。
+  - 这会把清理时机推迟到上层 recover path，留下一个短暂的半开会话窗口，同时保留已经递增的 `session_epoch` / `sessions_opened`，增加后续排查连接失败路径时的歧义。
+- 变更：
+  - `hello_send_failed` 分支现在立即调用 `river_orvibo_close_context()`，确保与 `server_hello` 超时/失败路径一致，失败即同步回收 transport/session 状态。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 access 鉴权、listen/abort/TTS 语义、MCP volume-only 和音频链路格式。
+- Verification for this step:
+  - passed: static grep confirmed `hello_send_failed` now closes context immediately.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.30
 - 修正 Orvibo TTS 下行音频声道参数传递与解码边界：
   - 审计 `river_orvibo_protocol -> river_orvibo_app -> river_orvibo_audio_service` 时发现，协议层已从 server hello 保存 `audio_params.channels`，但向 app 投递 `AUDIO_PACKET` 后被固定写成 `1U`。

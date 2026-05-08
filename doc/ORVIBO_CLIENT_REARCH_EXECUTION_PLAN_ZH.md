@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.31` 已收敛 Orvibo `hello` 发送失败后的半开 WebSocket 清理路径：
+  - 审计 `river_orvibo_protocol_open_audio_channel()` 后发现，`ws_connect_url()` 成功后若 `river_orvibo_send_hello()` 失败，当前代码会直接返回，但不会立即关闭新建的 websocket context。
+  - 这会把 transport/session 的实际回收时机推迟到上层 recover path，留下一个短暂的半开会话窗口，也让 `session_epoch` / `sessions_opened` 的失败路径观测不够干净。
+  - 现已在 `hello_send_failed` 分支中立即调用 `river_orvibo_close_context()`，与 `server_hello` 超时/失败后的清理路径保持一致。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.30` 已修正 Orvibo TTS 下行声道参数传递：
   - 审计 Orvibo 协议层、app 层和音频服务层后发现，protocol 已从 server hello 保存 `audio_params.channels`，但向 app 投递下行音频消息时被固定成 `1U`。
   - 这会在 XiaoZhi-compatible server 将 TTS 配置为非单声道时，用错误的 channels 打开 Opus decoder；当前默认 server 配置虽然是 `24000Hz/1ch/60ms`，但端侧不能静默丢失该 wire contract 字段。

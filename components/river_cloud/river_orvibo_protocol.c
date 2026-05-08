@@ -1220,6 +1220,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     status = river_orvibo_send_hello();
     if (status != RIVER_OK) {
         river_orvibo_set_last_error("hello_send_failed");
+        river_orvibo_close_context();
         return status;
     }
     status = river_orvibo_wait_server_hello();
