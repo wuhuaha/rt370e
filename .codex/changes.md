@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.24
+- 修复 Orvibo 静态 fallback WebSocket 对“免鉴权 XiaoZhi-compatible server” 的错误阻断：
+  - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端在 `auth.enabled=false` 时不会要求 `Authorization`；空 token 的 websocket 连接是合法部署形态。
+  - 当前 Orvibo access 之前把“静态 fallback 可用”错误地收紧为“`ws_url` 与 `ws_token` 都非空”，这会让本地 `xiaozhi-esp32-server` 这类免鉴权部署即使已经显式配置 websocket URL，也仍被端侧判成 `needs_ota` / `waiting_ota_config`。
+  - 同时，当前默认 fallback URL 仍是一个历史硬编码地址，会弱化“本分支应优先通过 OTA/config 或显式本地配置接入目标 server”的控制面。
+- 变更：
+  - `RIVER_ORVIBO_WS_URL` / `CONFIG_RIVER_ORVIBO_WS_URL` 默认值改为空字符串，默认不再隐式直连历史硬编码 fallback 地址。
+  - `river_orvibo_access_static_config_usable()` 改为只要求显式配置了 `ws_url`，不再强制要求 `ws_token` 非空。
+  - Kconfig help 同步更新为：
+    - 未配置 fallback URL 时默认要求 OTA/config。
+    - 显式配置 fallback URL 时可直接使用。
+    - 只有目标 server 开启 auth 时才需要额外配置 token。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 hello/listen/abort/MCP、Opus framing、TTS 下行与状态机逻辑。
+- Verification for this step:
+  - passed: static review confirmed `xiaozhi-esp32-server` only enforces `Authorization` when `auth.enabled=true`.
+  - passed: static grep confirmed fallback readiness now depends on explicit `ws_url`, while token remains optional for unauthenticated deployments.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - blocked: board runtime confirmation remains gated by the current `/dev/ttyUSB0` historical pure-`0x00` UART state.
+
 ## Step H.xiaozhi-client.23
 - 对齐 Orvibo WebSocket 默认协议版本到 XiaoZhi 主线基线：
   - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，当前 XiaoZhi WebSocket 主链默认协议版本是 `1`。

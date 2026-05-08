@@ -22,19 +22,22 @@ config RIVER_ORVIBO_OTA_URL
 
 config RIVER_ORVIBO_WS_URL
     string "Orvibo fallback websocket URL"
-    default "ws://101.33.235.154:8081/xiaozhi/v1/"
+    default ""
     depends on RIVER_ORVIBO_CLIENT_EN
     help
-      Static fallback websocket endpoint. It is only considered directly usable
-      when RIVER_ORVIBO_WS_TOKEN is also set; otherwise OTA/config is required.
+      Optional static fallback websocket endpoint. Leave this empty to require
+      OTA/config before the realtime channel is opened. If you explicitly set a
+      websocket URL here, the client can use it directly; when the target
+      server has auth enabled, pair it with RIVER_ORVIBO_WS_TOKEN.
 
 config RIVER_ORVIBO_WS_TOKEN
     string "Orvibo fallback websocket token"
     default ""
     depends on RIVER_ORVIBO_CLIENT_EN
     help
-      Optional static websocket token. If empty, the device must obtain token
-      and endpoint from the OTA/config service.
+      Optional static websocket token for auth-enabled deployments. Leave empty
+      when the explicitly configured fallback websocket server accepts
+      unauthenticated connections.
 
 config RIVER_ORVIBO_WS_SUBPROTOCOL
     string "Orvibo websocket subprotocol"

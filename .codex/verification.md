@@ -1,3 +1,62 @@
+## Step H.xiaozhi-client.24 Verification
+
+Confirm static fallback websocket readiness now matches XiaoZhi-compatible
+unauthenticated server behavior:
+```bash
+cd /root/ameba-river
+rg -n "default \"\"|Optional static fallback websocket endpoint|auth-enabled|unauthenticated" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h
+rg -n "static_config_usable" components/river_cloud/river_orvibo_access.c
+sed -n '490,500p' components/river_cloud/river_orvibo_access.c
+```
+
+Expected result:
+- fallback websocket URL default is empty, so the branch does not silently
+  direct-connect to a historical hardcoded endpoint.
+- explicit fallback URL is sufficient to make static websocket config usable.
+- token remains optional for deployments where the target server disables auth.
+
+Reconfirm the target server auth gate:
+```bash
+sed -n '200,230p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/websocket_server.py
+```
+
+Expected result:
+- `Authorization` is only required when `auth_enable` is true.
+- an auth-disabled local XiaoZhi-compatible websocket server accepts empty token.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - `rg -n "default \"\"|Optional static fallback websocket endpoint|auth-enabled|unauthenticated" Kconfig include/river/river_orvibo_credentials.h`
+  - `rg -n "static_config_usable" components/river_cloud/river_orvibo_access.c`
+  - `sed -n '490,500p' components/river_cloud/river_orvibo_access.c`
+  - `sed -n '200,230p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/websocket_server.py`
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime verification that an auth-disabled local XiaoZhi-compatible server is reached directly on board
+  - board UART remains in the same historical pure-`0x00` session state, so no readable runtime log could be captured this step
+- current conclusion:
+  - H.24 is statically verified and builds on the active `/root/ameba-rtos` baseline.
+  - explicit fallback websocket URL can now be used without forcing a token, matching auth-disabled local server behavior.
+
 ## Step H.xiaozhi-client.23 Verification
 
 Confirm the default websocket protocol version now matches the XiaoZhi baseline:

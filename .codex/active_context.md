@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.23 对齐 Orvibo WebSocket 默认协议版本`
+  - `Step H.xiaozhi-client.24 修复 Orvibo 静态 fallback 空 token 兼容性`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.24` aligns static fallback websocket readiness with XiaoZhi-compatible unauthenticated server deployments:
+  - reference comparison against `~/xiaozhi-esp32-server` confirmed the server only enforces `Authorization` when `auth.enabled=true`; auth-disabled local deployments legally accept an empty websocket token.
+  - the current Orvibo branch previously treated static fallback as usable only when both `ws_url` and `ws_token` were non-empty, which incorrectly blocked explicit local websocket deployments that intentionally disable auth.
+  - the fallback websocket URL default is now empty, so the branch no longer silently directs to the old hardcoded endpoint when OTA/config is absent.
+  - explicit fallback `ws_url` is now enough to mark static websocket config usable; token remains optional and is only needed for auth-enabled targets.
+  - static checks, harness check, and latest-SDK build have all passed on `/root/ameba-rtos`; board runtime confirmation remains blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.23` aligns the default Orvibo websocket protocol version with the XiaoZhi baseline:
   - reference comparison across `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server` confirmed that the live XiaoZhi websocket baseline defaults to protocol version `1`.
   - both the ESP32 and Python reference clients send websocket binary audio as raw Opus packets under version `1`, while the local Python server websocket path forwards inbound bytes directly into Opus/VAD handling without a visible v2/v3 unwrap stage.

@@ -489,7 +489,7 @@ static river_status_t river_orvibo_access_apply_websocket_config(const cJSON *we
 
 static bool river_orvibo_access_static_config_usable(void)
 {
-    return RIVER_ORVIBO_WS_URL[0] != '\0' && RIVER_ORVIBO_WS_TOKEN[0] != '\0';
+    return RIVER_ORVIBO_WS_URL[0] != '\0';
 }
 
 static void river_orvibo_access_parse_activation(const cJSON *root)

@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.24` 已修复 Orvibo 静态 fallback WebSocket 对免鉴权 XiaoZhi-compatible server 的错误阻断：
+  - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端只会在 `auth.enabled=true` 时要求 `Authorization`；关闭 auth 的本地 websocket 部署允许空 token。
+  - 当前 Orvibo 分支此前把静态 fallback 可用性收紧为“`ws_url` 与 `ws_token` 都非空”，会错误拦住已显式配置 URL、但本就不需要 token 的本地免鉴权部署。
+  - 当前默认 fallback URL 也已从历史硬编码地址收敛为空字符串，避免在 OTA/config 缺失时静默连到非目标服务器。
+  - 现在只要显式配置了 `RIVER_ORVIBO_WS_URL` 就可把静态 websocket 视为可用；只有 auth-enabled 部署才需要额外配置 token。
+  - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查和完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.23` 已对齐 Orvibo WebSocket 默认协议版本到 XiaoZhi 主链基线：
   - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，当前 XiaoZhi WebSocket 主链默认协议版本是 `1`。
   - ESP32 与 Python 参考客户端在 version `1` 下都会直接发送原始 Opus 二进制帧；本地 Python 服务端 websocket 路径也会把入站 bytes 直接送入 Opus/VAD 处理，没有明显的 v2/v3 解包层。
