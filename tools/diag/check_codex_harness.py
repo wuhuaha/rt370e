@@ -11,7 +11,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CANONICAL_SDK = "/root/ameba-rtos"
+CANONICAL_SDK_WIN = r"\root\ameba-rtos"
 OLD_SDK = "/root/ameba-rtos-1.2"
+OLD_SDK_WIN = r"\root\ameba-rtos-1.2"
 
 
 def read_text(relative_path: str) -> str:
@@ -59,6 +61,11 @@ def main() -> int:
     active_context = read_text(".codex/active_context.md")
     active_plans = read_text(".codex/active_plans.md")
     execution_plan_template = read_text("doc/EXECUTION_PLAN_TEMPLATE_ZH.md")
+    env_sh = read_text("env.sh")
+    env_bat = read_text("env.bat")
+    river_cloud_cmake = read_text("components/river_cloud/CMakeLists.txt")
+    river_flash = read_text("tools/river_flash.py")
+    generate_rdev = read_text("tools/generate_rdev.py")
     primary_active_plan = extract_primary_active_plan(active_plans)
     primary_active_plan_exists = True
     if primary_active_plan is not None:
@@ -109,6 +116,28 @@ def main() -> int:
             "build.md avoids the old default SDK path",
             OLD_SDK not in build,
             "build.md should not advertise /root/ameba-rtos-1.2 as the default SDK.",
+        ),
+        (
+            "env scripts default to the canonical SDK",
+            CANONICAL_SDK in env_sh
+            and (CANONICAL_SDK in env_bat or CANONICAL_SDK_WIN in env_bat)
+            and OLD_SDK not in env_sh
+            and OLD_SDK not in env_bat
+            and OLD_SDK_WIN not in env_bat,
+            "env.sh and env.bat should default to /root/ameba-rtos.",
+        ),
+        (
+            "active project tools default to the canonical SDK",
+            CANONICAL_SDK in river_flash
+            and CANONICAL_SDK in generate_rdev
+            and OLD_SDK not in river_flash
+            and OLD_SDK not in generate_rdev,
+            "tools/river_flash.py and tools/generate_rdev.py should default to /root/ameba-rtos.",
+        ),
+        (
+            "river_cloud CMake defaults to the canonical SDK",
+            CANONICAL_SDK in river_cloud_cmake and OLD_SDK not in river_cloud_cmake,
+            "components/river_cloud/CMakeLists.txt should not fall back to /root/ameba-rtos-1.2.",
         ),
         (
             "active context tracks the current git branch",

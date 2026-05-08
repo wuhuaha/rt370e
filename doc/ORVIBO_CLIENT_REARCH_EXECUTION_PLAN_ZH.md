@@ -1,13 +1,25 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-07
+Last Updated: 2026-05-08
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.18` 已把 XiaoZhi-compatible 服务器文本语义接回 Orvibo 事件面：
+  - `tts sentence_start`、`stt`、`llm` 从只记日志升级为显式 Orvibo protocol/app 事件。
+  - protocol status 会显示最新 server text 与 `tts_sentence_rx` / `stt_rx` / `llm_rx` 计数。
+  - app status 会显示 `last_server_text_kind` / `last_server_text` / `last_server_text_detail`，便于板端确认服务端返回的文本和情绪。
+  - 未触碰 VAD、KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF、MCP volume-only、OTA/WS 连接和 TTS 复入边界。
+  - 最新 `/root/ameba-rtos` SDK build 已通过。
+- `Step H.xiaozhi-client.17` 已收敛 Orvibo 分支 SDK 默认入口：
+  - active executable defaults 在未显式设置 `AMEBA_SDK_ROOT` 时统一指向 `/root/ameba-rtos`。
+  - 覆盖 `components/river_cloud/CMakeLists.txt`、`tools/river_flash.py`、`tools/generate_rdev.py` 和 `env.bat`。
+  - harness 新增 active SDK default 检查，防止后续静默回退 `/root/ameba-rtos-1.2`。
+  - 协议、VAD、KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF 运行时逻辑不变。
+  - 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.16` 已硬化 Orvibo access 真实设备身份 ready 判定：
   - access `ready` 现在要求 `websocket_configured` 与有效 STA MAC 身份同时成立。
   - `river_orvibo_access_refresh()` 在 OTA/config 前刷新真实 STA MAC 生成的 `Device-Id` / `Client-Id`。
@@ -1146,13 +1158,19 @@ python3 /root/ameba-rtos/ameba.py build -p
   - access ready 增加真实 STA MAC 身份门控，避免启动早期全零 MAC 进入 OTA/WS 鉴权。
   - OTA/config 刷新前重新生成 `Device-Id` / `Client-Id`；无有效 STA MAC 时记录 `sta_mac_unavailable` 并返回 busy。
   - access status 输出 `identity=ready|waiting_mac`。
+- `Step H.xiaozhi-client.17`：
+  - active project CMake/tools/env 默认 SDK 收敛到 `/root/ameba-rtos`，保留 `AMEBA_SDK_ROOT` 覆盖。
+  - harness 增加 active SDK default 检查，避免 Orvibo 主线可复现性回退到旧 SDK。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout|identity_ready|sta_mac_unavailable|access identity refreshed" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout|identity_ready|sta_mac_unavailable|access identity refreshed|/root/ameba-rtos|AMEBA_SDK_ROOT" \
   include components
+rg -n 'ameba-rtos-1\.2|/root/ameba-rtos|AMEBA_SDK_ROOT|RIVER_SDK_ROOT' \
+  env.sh env.bat components/river_cloud/CMakeLists.txt \
+  tools/river_flash.py tools/generate_rdev.py tools/diag/check_codex_harness.py
 git diff --check
 python3 tools/diag/check_codex_harness.py
 export AMEBA_SDK_ROOT=/root/ameba-rtos
@@ -1162,9 +1180,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate 和 active SDK default 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复和 access 真实身份门控。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/多轮 listening/channel timeout/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控和 active SDK default 收敛。下一步进入板端实测和剩余运行时质量收敛：优先验证烧录后 Wi-Fi/OTA/绑定/WebSocket/hello/TTS/多轮 listening/channel timeout/MCP volume-only 全链路日志，再继续处理板端诊断可观测性。

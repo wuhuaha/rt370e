@@ -1,3 +1,75 @@
+## Step H.xiaozhi-client.18 Verification
+
+Confirm server text semantics are surfaced through Orvibo events and status:
+```bash
+cd /root/ameba-river
+rg -n "TTS_SENTENCE_START|STT_TEXT|LLM_EMOTION|tts_sentence_rx|stt_rx|llm_rx|last_server_text_kind|last_server_text|last_server_text_detail" \
+  include/river/river_orvibo_protocol.h \
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- `tts sentence_start`, `stt`, and `llm` are promoted to explicit Orvibo protocol/app events.
+- protocol status reports the latest server text payload and counters.
+- app status reports the last server text kind/text/detail for board-side diagnosis.
+
+Run static hygiene and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the SDK build exits successfully with `Build done`
+
+## Step H.xiaozhi-client.17 Verification
+
+Confirm active project defaults no longer fall back to the old SDK:
+```bash
+cd /root/ameba-river
+rg -n 'ameba-rtos-1\.2|/root/ameba-rtos|AMEBA_SDK_ROOT|RIVER_SDK_ROOT' \
+  env.sh \
+  env.bat \
+  components/river_cloud/CMakeLists.txt \
+  tools/river_flash.py \
+  tools/generate_rdev.py \
+  tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- active executable defaults point to `/root/ameba-rtos`.
+- `AMEBA_SDK_ROOT` remains the explicit override.
+- the old SDK path appears only as the harness negative sentinel, not as an active default.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```text
+烧录命令不显式传入旧 SDK；继续使用 `/root/ameba-rtos` 对当前 Orvibo 客户端镜像进行下载。
+```
+
+Expected result:
+- `tools/river_flash.py` 打印的 flash tool 路径来自 `/root/ameba-rtos`。
+- Orvibo/XiaoZhi-compatible 运行时行为与 H.16 保持一致。
+
 ## Step H.xiaozhi-client.16 Verification
 
 Confirm Orvibo access does not use a placeholder MAC identity for server auth:

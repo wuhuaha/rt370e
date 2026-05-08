@@ -1,5 +1,35 @@
 # Change Log
 
+## Step H.xiaozhi-client.18
+- 对齐 XiaoZhi-compatible 服务器文本语义到 Orvibo 事件面：
+  - `tts` 的 `sentence_start` 不再只打日志，而是通过 Orvibo protocol/app 事件流可见。
+  - `stt` 文本作为独立 Orvibo 事件进入 app 状态和诊断输出。
+  - `llm` 情绪消息保留 `emotion`，同时把关联文本一并挂到 Orvibo 侧状态。
+  - protocol status 增加 `last_text` 以及 `tts_sentence_rx` / `stt_rx` / `llm_rx` 计数。
+  - app status 增加 `last_server_text_kind` / `last_server_text` / `last_server_text_detail`，方便板端直接核对服务端回传内容。
+- 保持运行时边界不变：
+  - 未修改 VAD、KWS、KWS parity、AEC/BF、MCP volume-only、OTA/WS 连接、TTS 播放与 listening 复入逻辑。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `/root/ameba-rtos` SDK build passed with `Build done`.
+
+## Step H.xiaozhi-client.17
+- 收敛 Orvibo 分支可执行入口的 SDK 默认值：
+  - `components/river_cloud/CMakeLists.txt` 在未设置 `AMEBA_SDK_ROOT` 时回退到 `/root/ameba-rtos`。
+  - `tools/river_flash.py`、`tools/generate_rdev.py` 和 `env.bat` 默认使用 `/root/ameba-rtos`。
+  - 保留 `AMEBA_SDK_ROOT` 覆盖能力，历史文档中的旧 SDK 调研记录不机械改写。
+- 扩展 Codex harness：
+  - `tools/diag/check_codex_harness.py` 现在会检查 `env.sh` / `env.bat` / active project tools / `river_cloud` CMake 的 SDK 默认值。
+  - 防止当前 Orvibo/XiaoZhi-compatible 主线后续在未显式设置环境变量时静默回退到 `/root/ameba-rtos-1.2`。
+- 保持运行时行为不变：
+  - 未修改 Orvibo OTA/WS/hello/listen/TTS/MCP 逻辑。
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+- Verification for this step:
+  - SDK default grep passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `git diff --check` passed.
+  - `/root/ameba-rtos` SDK build passed with `Build done`.
+
 ## Step H.xiaozhi-client.16
 - 硬化 Orvibo access 身份生成与 ready 判定：
   - access 层新增 `identity_ready`，`ready` 现在要求 WebSocket 配置已存在且 STA MAC 已刷新为有效真实值。

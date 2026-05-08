@@ -5,7 +5,7 @@ set(public_libraries)
 if(DEFINED ENV{AMEBA_SDK_ROOT} AND NOT "$ENV{AMEBA_SDK_ROOT}" STREQUAL "")
     set(RIVER_SDK_ROOT $ENV{AMEBA_SDK_ROOT})
 else()
-    set(RIVER_SDK_ROOT ${RIVER_PROJECT_DIR}/../ameba-rtos-1.2)
+    set(RIVER_SDK_ROOT /root/ameba-rtos)
 endif()
 
 set(river_opus_component_dir

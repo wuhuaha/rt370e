@@ -95,6 +95,9 @@ typedef struct {
     uint32_t text_tx;
     uint32_t audio_rx;
     uint32_t audio_tx;
+    uint32_t tts_sentence_rx;
+    uint32_t stt_rx;
+    uint32_t llm_rx;
     uint32_t audio_enqueued;
     uint32_t audio_queue_drop_oldest;
     uint32_t audio_queue_full;
@@ -554,6 +557,18 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                     0U,
                                     0U,
                                     0U);
+        } else if (state != NULL && strcmp(state, "sentence_start") == 0) {
+            g_river_orvibo_protocol.tts_sentence_rx++;
+            river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_TTS_SENTENCE_START,
+                                    text,
+                                    state,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    0U,
+                                    0U,
+                                    0U,
+                                    0U);
         } else if (state != NULL && strcmp(state, "stop") == 0) {
             river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_TTS_STOP,
                                     text,
@@ -570,11 +585,41 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                        state != NULL ? state : "-",
                        text != NULL ? text : "-");
         }
-    } else if (strcmp(type, "stt") == 0 || strcmp(type, "llm") == 0) {
-        RIVER_LOGI("server text: type=%s state=%s text=%s",
-                   type,
-                   state != NULL ? state : "-",
+    } else if (strcmp(type, "stt") == 0) {
+        g_river_orvibo_protocol.stt_rx++;
+        RIVER_LOGI("server stt: text=%s",
                    text != NULL ? text : "-");
+        river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_STT_TEXT,
+                                text,
+                                "stt",
+                                NULL,
+                                NULL,
+                                NULL,
+                                0U,
+                                0U,
+                                0U,
+                                0U);
+    } else if (strcmp(type, "llm") == 0) {
+        const cJSON *emotion_obj = cJSON_GetObjectItemCaseSensitive(root, "emotion");
+        const char *emotion =
+            cJSON_IsString(emotion_obj) && emotion_obj->valuestring != NULL ?
+                emotion_obj->valuestring :
+                NULL;
+
+        g_river_orvibo_protocol.llm_rx++;
+        RIVER_LOGI("server llm: emotion=%s text=%s",
+                   emotion != NULL ? emotion : "-",
+                   text != NULL ? text : "-");
+        river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_LLM_EMOTION,
+                                text,
+                                emotion,
+                                NULL,
+                                NULL,
+                                NULL,
+                                0U,
+                                0U,
+                                0U,
+                                0U);
     } else if (strcmp(type, "mcp") == 0) {
         river_orvibo_handle_mcp_message(root);
     } else if (strcmp(type, "system") == 0) {
@@ -1490,7 +1535,7 @@ void river_orvibo_protocol_dump_status(void)
                                    now_ms - g_river_orvibo_protocol.last_incoming_ms :
                                    0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums last_text=%s",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1529,5 +1574,8 @@ void river_orvibo_protocol_dump_status(void)
                    "-",
                (unsigned long)g_river_orvibo_protocol.server_sample_rate,
                (unsigned long)g_river_orvibo_protocol.server_channels,
-               (unsigned long)g_river_orvibo_protocol.server_frame_duration_ms);
+               (unsigned long)g_river_orvibo_protocol.server_frame_duration_ms,
+               g_river_orvibo_protocol.last_text[0] != '\0' ?
+                   g_river_orvibo_protocol.last_text :
+                   "-");
 }

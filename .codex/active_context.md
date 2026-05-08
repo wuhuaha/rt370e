@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.16 硬化 Orvibo access 真实设备身份 ready 判定（SDK 构建通过）`
+  - `Step H.xiaozhi-client.18 对齐 Orvibo 服务器文本/情绪语义事件（SDK 构建通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -31,25 +31,19 @@ or top-of-tree verification target changes.
 - `components/river_voice/` contains current capture, preproc, Silero VAD, KWS, AEC/BF, playback, and reference services.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
-## Protected Implementation Boundaries
-
-- Preserve current Silero VAD implementation:
-  - `include/river/river_voice_detector.h`
-  - `components/river_voice/river_voice_detector.c`
-  - `components/river_voice/river_voice_detector_silero.cc`
-  - `components/river_voice/generated/river_silero_vad_model_data.*`
-- Preserve current wake-word implementation and board/local parity tooling:
-  - `include/river/river_voice_kws.h`
-  - `components/river_voice/river_voice_kws.cc`
-  - `components/river_voice/generated/*kws*`
-  - KWS tensor dump, chunk dump, alignment replay, feature/input/output comparison paths
-- Preserve current local preproc/AEC/BF implementation unless a future step provides an equal or stronger replacement:
-  - `components/river_voice/river_voice_preproc*.c`
-  - `components/river_voice/river_voice_webrtc_aecm_adapter.*`
-  - `third_party/webrtc_aecm/`
-
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.18` aligns the Orvibo runtime with XiaoZhi-compatible server text semantics:
+  - `tts sentence_start`、`stt`、`llm` 现在都会进入 Orvibo protocol/app 事件流，而不是只打日志。
+  - protocol status 记录最近一次 server text payload，以及 `tts_sentence_rx` / `stt_rx` / `llm_rx` 计数。
+  - app status 记录 `last_server_text_kind` / `last_server_text` / `last_server_text_detail`，便于板端直接核对文本与情绪。
+  - 未触碰 VAD、KWS、AEC/BF、MCP volume-only、OTA/WS 连接和 TTS 复入边界。
+  - 最新 `/root/ameba-rtos` SDK build 已通过。
+
+- `Step H.xiaozhi-client.17` aligns executable project SDK defaults with the branch baseline:
+  - `components/river_cloud/CMakeLists.txt`, `tools/river_flash.py`, `tools/generate_rdev.py`, and `env.bat` now default to `/root/ameba-rtos` when `AMEBA_SDK_ROOT` is not explicitly set.
+  - `tools/diag/check_codex_harness.py` now checks those active defaults so future Orvibo/XiaoZhi-compatible work cannot silently fall back to `/root/ameba-rtos-1.2`.
+  - No protocol, VAD, KWS, KWS parity, AEC, BF, or audio runtime behavior changed.
 - `Step H.xiaozhi-client.16` hardens Orvibo access identity before XiaoZhi-compatible auth:
   - access `ready` now requires both websocket config and a valid refreshed STA MAC identity.
   - `river_orvibo_access_refresh()` refreshes Device-Id/Client-Id from the runtime STA MAC before OTA/config.
@@ -163,6 +157,23 @@ or top-of-tree verification target changes.
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - board-side multi-turn wake/listen/speak/barge-in verification
+
+## Protected Implementation Boundaries
+
+- Preserve current Silero VAD implementation:
+  - `include/river/river_voice_detector.h`
+  - `components/river_voice/river_voice_detector.c`
+  - `components/river_voice/river_voice_detector_silero.cc`
+  - `components/river_voice/generated/river_silero_vad_model_data.*`
+- Preserve current wake-word implementation and board/local parity tooling:
+  - `include/river/river_voice_kws.h`
+  - `components/river_voice/river_voice_kws.cc`
+  - `components/river_voice/generated/*kws*`
+  - KWS tensor dump, chunk dump, alignment replay, feature/input/output comparison paths
+- Preserve current local preproc/AEC/BF implementation unless a future step provides an equal or stronger replacement:
+  - `components/river_voice/river_voice_preproc*.c`
+  - `components/river_voice/river_voice_webrtc_aecm_adapter.*`
+  - `third_party/webrtc_aecm/`
 
 ## Workflow Notes
 

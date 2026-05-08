@@ -39,6 +39,8 @@
 #define RIVER_ORVIBO_APP_ACCESS_RETRY_MS   10000U
 #define RIVER_ORVIBO_APP_TTS_DRAIN_MS      900U
 #define RIVER_ORVIBO_APP_AUDIO_PACKET_MAX  1536U
+#define RIVER_ORVIBO_APP_SERVER_TEXT_MAX   192U
+#define RIVER_ORVIBO_APP_SERVER_TEXT_DETAIL_MAX 48U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MIN_MS 1000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS 30000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_STREAK_CAP 6U
@@ -48,6 +50,7 @@ typedef enum {
     RIVER_ORVIBO_APP_MSG_STATE_EVENT = 0,
     RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK,
     RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO,
+    RIVER_ORVIBO_APP_MSG_SERVER_TEXT,
     RIVER_ORVIBO_APP_MSG_CONNECT,
     RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH,
     RIVER_ORVIBO_APP_MSG_LISTEN_START,
@@ -55,10 +58,19 @@ typedef enum {
     RIVER_ORVIBO_APP_MSG_ABORT
 } river_orvibo_app_msg_type_t;
 
+typedef enum {
+    RIVER_ORVIBO_APP_SERVER_TEXT_SENTENCE_START = 0,
+    RIVER_ORVIBO_APP_SERVER_TEXT_STT,
+    RIVER_ORVIBO_APP_SERVER_TEXT_LLM
+} river_orvibo_app_server_text_kind_t;
+
 typedef struct {
     river_orvibo_app_msg_type_t type;
     river_orvibo_event_t event;
+    river_orvibo_app_server_text_kind_t server_text_kind;
     char reason[48];
+    char text[RIVER_ORVIBO_APP_SERVER_TEXT_MAX];
+    char detail[RIVER_ORVIBO_APP_SERVER_TEXT_DETAIL_MAX];
     uint32_t timestamp_ms;
     uint32_t sample_rate;
     uint32_t channels;
@@ -104,6 +116,9 @@ typedef struct {
     uint32_t last_access_retry_ms;
     char wake_text[64];
     char last_event[48];
+    char last_server_text_kind[32];
+    char last_server_text[RIVER_ORVIBO_APP_SERVER_TEXT_MAX];
+    char last_server_detail[RIVER_ORVIBO_APP_SERVER_TEXT_DETAIL_MAX];
     char last_error[96];
 } river_orvibo_app_context_t;
 
@@ -127,6 +142,21 @@ static bool river_orvibo_app_msg_is_audio(const river_orvibo_app_msg_t *msg)
     return msg != NULL &&
            (msg->type == RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK ||
             msg->type == RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO);
+}
+
+static const char *river_orvibo_app_server_text_kind_name(
+    river_orvibo_app_server_text_kind_t kind)
+{
+    switch (kind) {
+    case RIVER_ORVIBO_APP_SERVER_TEXT_SENTENCE_START:
+        return "server_sentence_start";
+    case RIVER_ORVIBO_APP_SERVER_TEXT_STT:
+        return "server_stt";
+    case RIVER_ORVIBO_APP_SERVER_TEXT_LLM:
+        return "server_llm";
+    default:
+        return "server_text";
+    }
 }
 
 static river_status_t river_orvibo_app_post_audio(const river_orvibo_app_msg_t *msg)
@@ -345,6 +375,22 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
         msg.type = RIVER_ORVIBO_APP_MSG_STATE_EVENT;
         msg.event = RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED;
         river_orvibo_app_copy_text(msg.reason, sizeof(msg.reason), "tts_stop");
+        break;
+    case RIVER_ORVIBO_PROTOCOL_EVENT_TTS_SENTENCE_START:
+        msg.type = RIVER_ORVIBO_APP_MSG_SERVER_TEXT;
+        msg.server_text_kind = RIVER_ORVIBO_APP_SERVER_TEXT_SENTENCE_START;
+        river_orvibo_app_copy_text(msg.text, sizeof(msg.text), event->text);
+        break;
+    case RIVER_ORVIBO_PROTOCOL_EVENT_STT_TEXT:
+        msg.type = RIVER_ORVIBO_APP_MSG_SERVER_TEXT;
+        msg.server_text_kind = RIVER_ORVIBO_APP_SERVER_TEXT_STT;
+        river_orvibo_app_copy_text(msg.text, sizeof(msg.text), event->text);
+        break;
+    case RIVER_ORVIBO_PROTOCOL_EVENT_LLM_EMOTION:
+        msg.type = RIVER_ORVIBO_APP_MSG_SERVER_TEXT;
+        msg.server_text_kind = RIVER_ORVIBO_APP_SERVER_TEXT_LLM;
+        river_orvibo_app_copy_text(msg.text, sizeof(msg.text), event->text);
+        river_orvibo_app_copy_text(msg.detail, sizeof(msg.detail), event->state);
         break;
     case RIVER_ORVIBO_PROTOCOL_EVENT_AUDIO_PACKET:
         if (event->audio_data == NULL || event->audio_bytes == 0U) {
@@ -591,6 +637,39 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
             g_river_orvibo_app.downlink_fail++;
         }
         break;
+    case RIVER_ORVIBO_APP_MSG_SERVER_TEXT: {
+        const char *kind_name =
+            river_orvibo_app_server_text_kind_name(msg->server_text_kind);
+
+        river_orvibo_app_copy_text(g_river_orvibo_app.last_event,
+                                   sizeof(g_river_orvibo_app.last_event),
+                                   kind_name);
+        river_orvibo_app_copy_text(g_river_orvibo_app.last_server_text_kind,
+                                   sizeof(g_river_orvibo_app.last_server_text_kind),
+                                   kind_name);
+        river_orvibo_app_copy_text(g_river_orvibo_app.last_server_text,
+                                   sizeof(g_river_orvibo_app.last_server_text),
+                                   msg->text);
+        river_orvibo_app_copy_text(g_river_orvibo_app.last_server_detail,
+                                   sizeof(g_river_orvibo_app.last_server_detail),
+                                   msg->detail);
+        if (msg->server_text_kind == RIVER_ORVIBO_APP_SERVER_TEXT_LLM) {
+            RIVER_LOGI("server llm: emotion=%s text=%s",
+                       g_river_orvibo_app.last_server_detail[0] != '\0' ?
+                           g_river_orvibo_app.last_server_detail :
+                           "-",
+                       g_river_orvibo_app.last_server_text[0] != '\0' ?
+                           g_river_orvibo_app.last_server_text :
+                           "-");
+        } else {
+            RIVER_LOGI("server text: kind=%s text=%s",
+                       kind_name,
+                       g_river_orvibo_app.last_server_text[0] != '\0' ?
+                           g_river_orvibo_app.last_server_text :
+                           "-");
+        }
+        break;
+    }
     case RIVER_ORVIBO_APP_MSG_CONNECT:
         river_orvibo_app_handle_state_event(RIVER_ORVIBO_EVENT_WAKE_DETECTED, "diag_connect");
         break;
@@ -827,6 +906,16 @@ void river_orvibo_app_print_status(void)
                    "-",
                g_river_orvibo_app.last_error[0] != '\0' ?
                    g_river_orvibo_app.last_error :
+                   "-");
+    RIVER_LOGI("orvibo server text: kind=%s text=%s detail=%s",
+               g_river_orvibo_app.last_server_text_kind[0] != '\0' ?
+                   g_river_orvibo_app.last_server_text_kind :
+                   "-",
+               g_river_orvibo_app.last_server_text[0] != '\0' ?
+                   g_river_orvibo_app.last_server_text :
+                   "-",
+               g_river_orvibo_app.last_server_detail[0] != '\0' ?
+                   g_river_orvibo_app.last_server_detail :
                    "-");
     RIVER_LOGI("orvibo access refresh=%lu/%lu protocol_ctrl=%lu/%lu wake_text=%s",
                (unsigned long)g_river_orvibo_app.access_refresh_ok,
