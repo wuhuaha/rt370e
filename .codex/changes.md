@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.26
+- 修正 Orvibo client hello 中 `features.aec` 的语义：
+  - 再次对照 `~/xiaozhi-esp32` 后确认，WebSocket/MQTT hello 只在 `CONFIG_USE_SERVER_AEC` 下发送 `features.aec=true`。
+  - `xiaozhi-esp32` 同时明确禁止 `CONFIG_USE_DEVICE_AEC` 与 `CONFIG_USE_SERVER_AEC` 共存，说明该字段表达“请求服务端 AEC”，不是端侧本地 AEC/BF/native-ref 能力声明。
+  - `~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 未发现把本地 AEC 能力映射为 `features.aec` 的客户端/服务端逻辑。
+  - H.21 中按本地 voice profile 自动声明 `features.aec=true` 的实现会把当前受保护的本地 AEC/BF 路径误报为服务端 AEC 请求，存在服务端会话策略误判风险。
+- 变更：
+  - `river_orvibo_protocol` 不再 include `river_voice_profile.h`，client hello 不再从 `AEC` / `NATIVE_CAPTURE_REF` 能力位派生 `features.aec`。
+  - client hello 继续发送 `features.mcp`，MCP 范围仍保持 volume-only。
+  - hello 日志改为 `server_aec=no`，明确当前分支不请求服务端 AEC。
+  - H.21 保留的 `listen_start.mode` 选择逻辑不变，仍按当前 voice profile 在 `realtime` 与 `auto` 间选择。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 实现。
+  - 未修改 WebSocket 鉴权、OTA access、Opus framing、TTS 下行、MCP volume-only 和状态机。
+- Verification for this step:
+  - passed: reference grep confirmed `features.aec` in `xiaozhi-esp32` is gated by `CONFIG_USE_SERVER_AEC`.
+  - passed: static grep confirmed Orvibo hello no longer emits `features.aec`, while `listen_start.mode` remains voice-profile driven.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - blocked: board runtime confirmation remains gated by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.25
 - 收敛 Orvibo OTA/MCP 设备自描述元数据链路：
   - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 OTA 侧会优先从请求头读取 `device-model` / `application-version` / `firmware-version` 等字段，只有缺失时才回退到 body 的 `board.type` / `application.version`。
@@ -108,15 +130,15 @@
 ## Step H.xiaozhi-client.21
 - 对齐 Orvibo 端与 XiaoZhi 参考端的 listening mode / hello 特性声明：
   - H.20 之后继续对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server`，确认参考端不会把 `listen_start` 固定写死为 `auto`；默认模式会根据端侧是否具备 AEC/双工能力在 `auto` 与 `realtime` 间切换。
-  - 参考端 `hello.features` 也会在具备相应能力时声明 `aec=true`，影响服务端的会话与打断策略判断。
+  - 本步中将本地 AEC/native-ref 能力映射为 `hello.features.aec` 的判断已在 H.26 重新对照参考端后修正：该字段表达服务端 AEC 请求，不表达端侧本地 AEC/BF 能力。
 - 变更：
   - `river_orvibo_app` 新增基于当前语音 profile 能力位的 `listen_mode` 选择：具备 `AEC` 或 `NATIVE_CAPTURE_REF` 能力时发送 `mode=realtime`，否则发送 `mode=auto`。
-  - `river_orvibo_protocol` 发送 client hello 时按当前语音 profile 自动声明 `features.aec=true`；MCP 仍只保留 volume。
+  - `river_orvibo_protocol` 曾按当前语音 profile 自动声明 `features.aec=true`；该 hello 声明已由 H.26 移除，MCP 仍只保留 volume。
 - 保持受保护能力不变：
   - 未修改 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 算法实现本身，仅修正对外协议声明与 listening mode 选择。
   - 未修改 Opus 包格式、TTS 下行播放、access 鉴权、WebSocket 握手与 session_id 逻辑。
 - Verification for this step:
-  - passed: static grep confirmed app-side `listen_start` now derives mode from `AEC/NATIVE_CAPTURE_REF`, and hello emits `features.aec=true` on the same capability gate.
+  - superseded: H.26 已修正本步中的 hello `features.aec` 语义；保留的有效结论是 app-side `listen_start` now derives mode from `AEC/NATIVE_CAPTURE_REF`.
   - passed: `git diff --check`.
   - passed: `python3 tools/diag/check_codex_harness.py`.
   - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.

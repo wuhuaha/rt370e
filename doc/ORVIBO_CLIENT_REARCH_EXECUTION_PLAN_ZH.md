@@ -8,13 +8,21 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.26` 已修正 Orvibo client hello 的服务端 AEC 声明语义：
+  - 再次对照 `~/xiaozhi-esp32` 后确认，参考端 WebSocket/MQTT hello 只在 `CONFIG_USE_SERVER_AEC` 下发送 `features.aec=true`。
+  - `xiaozhi-esp32` 明确禁止 `CONFIG_USE_DEVICE_AEC` 与 `CONFIG_USE_SERVER_AEC` 同时启用，说明 `features.aec` 表达的是“请求服务端 AEC”，不是端侧本地 AEC/BF/native-ref 能力声明。
+  - `~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 未发现把本地 AEC 能力映射为 client hello `features.aec` 的逻辑。
+  - Orvibo hello 现在不再按本地 voice profile 自动声明 `features.aec`，日志显式输出 `server_aec=no`；MCP 仍只声明 volume-only 所需能力。
+  - H.21 的 `listen_start.mode` 选择逻辑保留：仍按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力位在 `realtime` 与 `auto` 间选择。
+  - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查和完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.25` 已收敛 Orvibo OTA/MCP 自描述元数据链路：
   - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 OTA handler 会优先读取请求头中的 `device-model` / `application-version` / `firmware-version` 等字段，只有缺失时才回退到 body 的 `board.type` / `application.version`。
   - 当前 Orvibo 分支此前仍残留 `application.version=0.1.0`、`board.type=wifi`、`User-Agent=orvibo-rtl8730e/0.1.0`、MCP `serverInfo.version=0.1.0` 等占位值，会导致服务端长期误判本实验分支的真实版本和型号。
   - 现已新增统一的 `river_orvibo_build_info` helper，集中导出 `app name/version`、`compile_time`、`board name/type`、`chip model` 和 `User-Agent`。
   - OTA 请求头已补齐 `Device-Model`、`Application-Version`、`Firmware-Version` 等服务端优先使用的字段；OTA body 也同步统一 `model`、`application.*`、`board.*`、`chip_model_name` 与 `application.compile_time`。
   - MCP initialize 的 `serverInfo` 也已切到同一元数据来源，不再返回历史占位版本。
-  - 当前 `/root/ameba-rtos` 路径下的静态检查已通过；harness/build 仍是本步待完成验证；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查和完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
   - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.24` 已修复 Orvibo 静态 fallback WebSocket 对免鉴权 XiaoZhi-compatible server 的错误阻断：
   - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端只会在 `auth.enabled=true` 时要求 `Authorization`；关闭 auth 的本地 websocket 部署允许空 token。
@@ -37,8 +45,9 @@ Latest Verified Slice:
   - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查和完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
 - `Step H.xiaozhi-client.21` 已对齐 client hello / listen mode 语义与当前 Orvibo 音频能力：
   - 对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，参考端不会把 `listen_start.mode` 固定写死为 `auto`；默认模式会根据双工/AEC 能力在 `auto` 与 `realtime` 之间切换。
-  - 当前 Orvibo 实现此前一直固定发送 `mode=auto`，且 hello 未按本分支现有语音 profile 能力声明 `features.aec`，会让服务端在支持实时双工的 profile 上按错误会话语义处理。
-  - Orvibo app 已改为按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力位选择 `listen_start.mode`；Orvibo hello 也会在对应 profile 下声明 `features.aec=true`。
+  - 当前 Orvibo 实现此前一直固定发送 `mode=auto`，会让支持实时双工的 profile 走错本地 listening 策略。
+  - Orvibo app 已改为按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力位选择 `listen_start.mode`。
+  - 本步曾把同一能力位映射为 Orvibo hello `features.aec=true`；H.26 重新对照参考端后已确认该字段表达服务端 AEC 请求，并已移除该声明。
   - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查、完整 build 和 reflash 已通过。
   - 但本轮板侧运行态再次落入历史上的纯 `0x00` UART 会话状态，导致 `client hello features: ...` 和 `listen start mode=...` 还未拿到实板日志闭环。
   - VAD、唤醒词/KWS、AEC/BF 算法实现、tensor dump、alignment replay、board/local parity、MCP volume-only 不变。
@@ -1221,7 +1230,11 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 实板验证已通过：TTS 后服务端 close 触发 `skip protocol control`，状态回到 `idle`，不再出现旧的 `listen_start:-4` recoverable error。
 - `Step H.xiaozhi-client.21`：
   - 对齐默认 listening mode 语义：按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力，在 `realtime` 与 `auto` 间选择 `listen_start.mode`，不再固定写死 `auto`。
-  - 对齐 client hello 特性声明：当当前 profile 具备对应能力时，hello `features` 声明 `aec=true`，让服务端按真实双工能力选择会话策略。
+  - 该步中按本地 profile 声明 hello `features.aec` 的做法已由 H.26 修正；当前分支不请求服务端 AEC。
+- `Step H.xiaozhi-client.26`：
+  - 对齐参考端服务端 AEC 语义：`features.aec` 只应表达 server-side AEC 请求，不应由本地 device-side AEC/BF/native-ref 能力自动触发。
+  - Orvibo hello 不再发送 `features.aec`，日志输出 `server_aec=no`。
+  - 保留本地 voice profile 驱动的 `listen_start.mode`，不回退 H.21 的 listening-mode 修正。
 - `Step H.xiaozhi-client.25`：
   - 新增统一 `river_orvibo_build_info` helper，集中导出 Orvibo app/version/compile_time/board/chip/user-agent，避免 OTA/MCP/诊断多处散落硬编码。
   - OTA 请求头补齐 `Device-Model`、`Model`、`Application-Version`、`App-Version`、`Firmware-Version`、`Device-Version`，对齐 `xiaozhi-esp32-server` OTA handler 的优先读取路径。
@@ -1250,9 +1263,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure/skip recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default、audio task stack，以及按当前 voice profile 选择 `listen_start.mode`/声明 hello `features.aec` 的关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure/skip recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default、audio task stack，以及按当前 voice profile 选择 `listen_start.mode`、hello 不误报 server AEC 的关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛，以及 OTA/MCP 自描述元数据统一收敛，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成 H.25 的 harness/build 闭环与板侧 OTA 身份复验，再继续收敛 H.21 之后可能残留的服务端能力声明偏差。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛、OTA/MCP 自描述元数据统一收敛，以及 hello 服务端 AEC 声明语义修正，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成板侧 OTA 身份与 `server_aec=no` hello 日志复验，并继续收敛 WebSocket subprotocol、下行采样率协商与 v2/v3 包络兼容的剩余静态风险。

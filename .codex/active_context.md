@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.25 收敛 Orvibo OTA/MCP 自描述元数据链路`
+  - `Step H.xiaozhi-client.26 修正 Orvibo hello 服务端 AEC 声明语义`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.26` corrects Orvibo client hello `features.aec` semantics:
+  - reference comparison against `~/xiaozhi-esp32` confirmed WebSocket/MQTT hello only sends `features.aec=true` under `CONFIG_USE_SERVER_AEC`.
+  - `xiaozhi-esp32` rejects simultaneous device-side AEC and server-side AEC at compile time, so this field represents a server-AEC request rather than local device AEC/BF/native-ref capability.
+  - Orvibo hello no longer derives `features.aec` from the active local voice profile; logs now state `server_aec=no`.
+  - `listen_start.mode` remains selected from the local voice-profile capability bits, preserving the H.21 listening-mode fix without misreporting local AEC as server AEC.
+  - static checks, harness check, and latest-SDK build have all passed on `/root/ameba-rtos`; board runtime confirmation remains blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.25` converges Orvibo OTA/MCP self-description metadata onto a single source:
   - reference comparison against `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server` confirmed the OTA handler prefers request headers such as `device-model` and `application-version`, then falls back to body `board.type` / `application.version`.
   - the current Orvibo branch previously still exported scattered placeholder values such as `application.version=0.1.0`, `board.type=wifi`, and MCP `serverInfo.version=0.1.0`, which could mislead OTA model/version matching and long-term server-side device profiling.
@@ -65,7 +72,7 @@ or top-of-tree verification target changes.
 - `Step H.xiaozhi-client.21` aligns client hello/listen-mode semantics with the active Orvibo voice profile:
   - reference comparison confirmed XiaoZhi clients do not hardcode post-wake listening mode; they switch between `auto` and `realtime` based on duplex/AEC capability.
   - Orvibo app now selects `listen_start.mode` from current voice-profile capability bits instead of always sending `auto`.
-  - Orvibo protocol hello now declares `features.aec=true` when the active profile exposes AEC or native capture-reference capability, keeping server-side policy selection aligned with the branch's actual duplex path.
+  - the H.21 attempt to map local AEC/native capture-reference capability into hello `features.aec=true` has been superseded by H.26 because the reference protocol uses that field for server-side AEC requests.
   - static checks, harness check, latest-SDK build, and reflash have all passed on `/root/ameba-rtos`.
   - board runtime confirmation is still blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state, so the expected `client hello features` / `listen start mode` logs are not yet captured on board.
   - VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF implementation, Opus framing, and MCP volume-only logic are unchanged.

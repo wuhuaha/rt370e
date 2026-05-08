@@ -17,7 +17,6 @@
 #include "river/river_orvibo_credentials.h"
 #include "river/river_orvibo_mcp_volume.h"
 #include "river/river_orvibo_protocol.h"
-#include "river/river_voice_profile.h"
 #include "river/river_wifi_station.h"
 #include "river_ws_dispatch.h"
 
@@ -341,10 +340,6 @@ static river_status_t river_orvibo_send_hello(void)
     cJSON *root;
     cJSON *features;
     cJSON *audio_params;
-    river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
-    bool aec_enabled =
-        river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
-        river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF);
 
     root = cJSON_CreateObject();
     features = cJSON_CreateObject();
@@ -364,9 +359,6 @@ static river_status_t river_orvibo_send_hello(void)
     cJSON_AddStringToObject(root, "type", "hello");
     cJSON_AddNumberToObject(root, "version", g_river_orvibo_protocol.config.protocol_version);
     cJSON_AddBoolToObject(features, "mcp", g_river_orvibo_protocol.config.enable_mcp);
-    if (aec_enabled) {
-        cJSON_AddBoolToObject(features, "aec", true);
-    }
     cJSON_AddItemToObject(root, "features", features);
     cJSON_AddStringToObject(root, "transport", "websocket");
     cJSON_AddStringToObject(audio_params, "format", RIVER_ORVIBO_AUDIO_FORMAT);
@@ -380,9 +372,8 @@ static river_status_t river_orvibo_send_hello(void)
                             "frame_duration",
                             g_river_orvibo_protocol.config.uplink_frame_duration_ms);
     cJSON_AddItemToObject(root, "audio_params", audio_params);
-    RIVER_LOGI("client hello features: mcp=%s aec=%s",
-               g_river_orvibo_protocol.config.enable_mcp ? "yes" : "no",
-               aec_enabled ? "yes" : "no");
+    RIVER_LOGI("client hello features: mcp=%s server_aec=no",
+               g_river_orvibo_protocol.config.enable_mcp ? "yes" : "no");
     return river_orvibo_send_json_root(root);
 }
 

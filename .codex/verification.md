@@ -1,3 +1,64 @@
+## Step H.xiaozhi-client.26 Verification
+
+Confirm Orvibo hello no longer reports local device AEC/BF as server-side AEC:
+```bash
+cd /root/ameba-river
+rg -n "client hello features|server_aec|features, \"mcp\"|features, \"aec\"|river_voice_profile" \
+  components/river_cloud/river_orvibo_protocol.c
+rg -n "river_orvibo_app_listen_mode|RIVER_VOICE_CAPABILITY_AEC|RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF|send_start_listening\\(" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- `river_orvibo_protocol.c` logs `server_aec=no`.
+- `river_orvibo_protocol.c` still emits `features.mcp`, but does not emit `features.aec`.
+- `river_orvibo_protocol.c` no longer includes or queries `river_voice_profile`.
+- `river_orvibo_app.c` still selects `listen_start.mode` from the local voice-profile capability bits.
+
+Reconfirm the reference semantics:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_USE_SERVER_AEC|features.*aec|\"aec\"" \
+  /root/xiaozhi-esp32/main/application.cc \
+  /root/xiaozhi-esp32/main/protocols/websocket_protocol.cc \
+  /root/xiaozhi-esp32/main/protocols/mqtt_protocol.cc
+rg -n "features.*aec|aec.*features|use_server_aec|\"aec\"" /root/py-xiaozhi /root/xiaozhi-esp32-server
+```
+
+Expected result:
+- `xiaozhi-esp32` only adds `features.aec=true` under `CONFIG_USE_SERVER_AEC`.
+- `xiaozhi-esp32` forbids enabling device-side and server-side AEC at the same time.
+- no Python reference/client or server path maps local AEC capability to client hello `features.aec`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - `rg -n "CONFIG_USE_SERVER_AEC|features.*aec|\"aec\"" /root/xiaozhi-esp32/main/application.cc /root/xiaozhi-esp32/main/protocols/websocket_protocol.cc /root/xiaozhi-esp32/main/protocols/mqtt_protocol.cc`
+  - `rg -n "features.*aec|aec.*features|use_server_aec|\"aec\"" /root/py-xiaozhi /root/xiaozhi-esp32-server` returned no matches.
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime confirmation that client hello logs `server_aec=no` and still receives server hello
+  - board UART remains in the same historical pure-`0x00` session state, so no readable runtime log could be captured this step
+- current conclusion:
+  - H.26 is statically verified and builds on the active `/root/ameba-rtos` baseline.
+  - Orvibo now preserves local AEC/BF implementation while avoiding a false server-AEC capability/request in XiaoZhi-compatible hello.
+
 ## Step H.xiaozhi-client.25 Verification
 
 Confirm the OTA self-description path now matches the fields actually consumed
@@ -229,18 +290,17 @@ Current execution status on 2026-05-08:
 
 ## Step H.xiaozhi-client.21 Verification
 
-Confirm Orvibo hello/listen mode selection now follows the active voice profile capability:
+Confirm Orvibo listen mode selection now follows the active voice profile capability:
 ```bash
 cd /root/ameba-river
-rg -n "river_orvibo_app_listen_mode|send_start_listening\\(|features, \\\"aec\\\"|RIVER_VOICE_CAPABILITY_AEC|RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF" \
-  components/river_core/river_orvibo_app.c \
-  components/river_cloud/river_orvibo_protocol.c
+rg -n "river_orvibo_app_listen_mode|send_start_listening\\(|RIVER_VOICE_CAPABILITY_AEC|RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF" \
+  components/river_core/river_orvibo_app.c
 ```
 
 Expected result:
 - app-side `listen_start` no longer hardcodes `"auto"`.
 - `mode=realtime` is selected when the active profile exposes `AEC` or `NATIVE_CAPTURE_REF`; otherwise `mode=auto`.
-- client hello adds `features.aec=true` when the active profile exposes the same capability.
+- H.26 supersedes the old hello `features.aec` expectation; local AEC/native-ref capability must not be reported as server-side AEC.
 
 Run static hygiene, harness, and latest-SDK build checks:
 ```bash
