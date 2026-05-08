@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.20` 已通过实板验证，收敛 TTS 后 WebSocket close 与本地控制帧发送竞态：
+  - H.19 实板验证已证明 server hello、listening uplink、TTS 下行播放可达，但一次 TTS 后服务端 close 会与本地 `tts_stop -> listen_start` 动作交错。
+  - 对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认：服务端 `close_after_chat` 场景可能在 TTS stop 后 close，客户端不应把关闭态 channel 上的 `listen_start` 当作 recoverable protocol error。
+  - Orvibo app 已为 wake/listen/abort 控制帧增加 channel-open guard；关闭态或发送竞态关闭时记录 `protocol_ctrl skip` 并投递 `AUDIO_CHANNEL_CLOSED` 收敛状态。
+  - `/dev/ttyUSB0` 实板复验确认：server hello、TTS 播放、服务端 close、`skip protocol control: action=listen_start state=listening reason=channel_closed` 和 `protocol_ctrl=3/0 skip=1` 均符合预期；旧的 `listen_start:-4` recoverable-error 路径未复现。
+  - VAD、唤醒词/KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF、MCP volume-only 不变。
 - `Step H.xiaozhi-client.19` 已修复实板首连后的 Orvibo audio task 栈溢出：
   - `/dev/ttyUSB0` 实板烧录已通过，Flash tool 使用 `/root/ameba-rtos` 与项目本地 `RTL8730E_NOR.rdev`。
   - 板端日志已确认真实 MAC 身份、WebSocket 连接和 XiaoZhi-compatible server hello：`24000Hz/1ch/60ms`。
@@ -1174,12 +1180,17 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 首次 listening 暴露 `orvibo_audio` 任务栈不足，已将 audio task stack 提高到 32 KB。
   - audio open/status 输出实际 `task_stack=`，便于后续板端复验。
   - 复验已通过：rebuild、reflash、monitor 后未复现 `orvibo_audio` 栈溢出，`enc=` 计数持续增长，并完成一次服务端 TTS 下行和播放。
+- `Step H.xiaozhi-client.20`：
+  - 对齐参考端/服务端通道语义：TTS 后服务端 close 是合法 channel 生命周期事件，不应把本地后续控制帧发送失败升级为协议恢复错误。
+  - wake/listen/abort 控制帧发送前检查 channel-open；关闭态或发送竞态关闭按 `protocol_ctrl skip` 统计，并投递 `AUDIO_CHANNEL_CLOSED` 收敛状态。
+  - app status 暴露 `protocol_ctrl=ok/fail skip=n`。
+  - 实板验证已通过：TTS 后服务端 close 触发 `skip protocol control`，状态回到 `idle`，不再出现旧的 `listen_start:-4` recoverable error。
 
 验证：
 
 ```bash
 cd /root/ameba-river
-rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout|identity_ready|sta_mac_unavailable|access identity refreshed|RIVER_ORVIBO_AUDIO_TASK_STACK|task_stack=|/root/ameba-rtos|AMEBA_SDK_ROOT" \
+rg -n "PREPARE_TTS_PLAYBACK|WAIT_PLAYBACK_IDLE|drop downlink audio outside speaking|river_playback_service_wait_idle|drain_count|buffered_bytes|RIVER_ORVIBO_UPLINK_QUEUE_DEPTH|orvibo_uplink|session_epoch|uplink_enq|RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH|control_queue|audio_queue|aud_drop_oldest|record_protocol_control|protocol_ctrl|protocol_control_skip|skip protocol control|send_channel_closed|recursive_take|poll_once|close_evt|CONNECT_BACKOFF|check_connect_retry|orvibo connect|DOWNLINK_BUFFER_HIGH_WATER|bp_drop|ACCESS_REFRESH|diag_refresh|orvibo <status|connect|refresh|PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max|RIVER_ORVIBO_WS_SUBPROTOCOL|ws_subprotocol|downlink_playback_pcm|resample_mono|downlink playback rate|ABORT_WAKE_WORD|abort_wake_word|send_abort_speaking\\(NULL\\)|BARGE_IN_LISTENING|orvibo_barge_in|CHANNEL_TIMEOUT|last_incoming_ms|incoming_age|channel_timeout|identity_ready|sta_mac_unavailable|access identity refreshed|RIVER_ORVIBO_AUDIO_TASK_STACK|task_stack=|/root/ameba-rtos|AMEBA_SDK_ROOT" \
   include components
 rg -n 'ameba-rtos-1\.2|/root/ameba-rtos|AMEBA_SDK_ROOT|RIVER_SDK_ROOT' \
   env.sh env.bat components/river_cloud/CMakeLists.txt \
@@ -1193,9 +1204,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default 和 audio task stack 关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure/skip recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default 和 audio task stack 关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放和 H.19 栈修复验证。下一步优先处理一次 TTS 后 WebSocket close 导致 app 停在 `idle` 的问题，让客户端能自动重建下一轮 listening channel，再继续验证 MCP volume-only 和 channel timeout。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步继续决定是否需要在“服务端合法 close 后”增加自动重建下一轮 listening channel 的产品策略。

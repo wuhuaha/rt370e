@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.20
+- 收敛 TTS 后 WebSocket close 与 Orvibo 控制帧发送的竞态：
+  - H.19 实板验证显示：服务端 TTS 下行和播放可以跑通，但 TTS 后 WebSocket close 与本地 `tts_stop -> listen_start` 动作交错，导致客户端在已关闭 channel 上发送 `listen_start` 并记录 `listen_start:-4` recoverable error。
+  - 对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，服务端在 `close_after_chat` 场景会在 TTS stop 后主动 close；客户端不应把关闭态 channel 上的控制帧发送当作协议错误。
+- 变更：
+  - `river_orvibo_app_apply_actions()` 里的 wake/listen/abort 控制帧发送前增加 channel-open guard。
+  - 若 channel 已关闭，记录 `protocol_ctrl skip`，更新 `last_error=<action>:channel_closed`，并投递 `AUDIO_CHANNEL_CLOSED` 让状态机收敛到 idle。
+  - 若 channel 在发送竞态窗口中关闭，`RIVER_ERR_BUSY + !channel_open` 也按 `skip` 处理，避免误触发 `ERROR_RECOVERABLE`。
+  - app status 输出 `protocol_ctrl=ok/fail skip=<n>`，便于板端确认 close 竞态被收敛而不是升级为恢复错误。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、唤醒词/KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF。
+  - 未修改 Opus 编解码、TTS 下行播放、MCP volume-only、OTA/WS 鉴权。
+- Verification for this step:
+  - passed: static grep confirmed control-frame guard/skip diagnostics.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK build with `Build done`.
+  - passed: `/dev/ttyUSB0` flash with `Finished PASS`.
+  - passed: board monitor confirmed server hello, TTS playback, server close, `skip protocol control: action=listen_start state=listening reason=channel_closed`, `protocol_ctrl=3/0 skip=1`, and no old `protocol control failed: action=listen_start status=-4 recover=yes` path for the close race.
+
 ## Step H.xiaozhi-client.19
 - 修复实板首连后的 Orvibo 音频任务栈溢出：
   - `/dev/ttyUSB0` 实板烧录已通过，Flash tool 使用 `/root/ameba-rtos` 与项目本地 `RTL8730E_NOR.rdev`。

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.19 修复 Orvibo 音频任务栈溢出（实板验证通过）`
+  - `Step H.xiaozhi-client.20 收敛 Orvibo 控制帧与 WebSocket close 竞态（实板验证通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -32,6 +32,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.20` is verified on board after H.19 board validation exposed a TTS/close race:
+  - reference behavior checked against `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server`.
+  - XiaoZhi-compatible servers may close the WebSocket after TTS in `close_after_chat` paths; the client must not treat a closed channel as a protocol-control failure while trying to send another `listen_start`.
+  - Orvibo app now guards wake/listen/abort control frames with `river_orvibo_protocol_audio_channel_open()`.
+  - if the channel closes before or during control-frame send, Orvibo records `protocol_ctrl skip`, posts `AUDIO_CHANNEL_CLOSED` for state convergence, and avoids recoverable-error escalation.
+  - `/dev/ttyUSB0` flash passed; monitor confirmed server hello, TTS playback, close-race skip log, `protocol_ctrl=3/0 skip=1`, and convergence to `idle` without the old `listen_start:-4` recoverable-error path.
+  - VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF, audio codec, and MCP volume-only logic are unchanged.
 
 - `Step H.xiaozhi-client.19` fixes the real-board Orvibo audio task stack overflow:
   - `/dev/ttyUSB0` flash passed with `/root/ameba-rtos`.

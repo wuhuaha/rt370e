@@ -1,3 +1,48 @@
+## Step H.xiaozhi-client.20 Verification
+
+Confirm protocol control sends are guarded and skip diagnostics are visible:
+```bash
+cd /root/ameba-river
+rg -n "protocol_control_skip|mark_protocol_control_skipped|protocol_control_channel_open|skip protocol control|send_channel_closed|protocol_ctrl=.*skip" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- wake/listen/abort protocol controls check `river_orvibo_protocol_audio_channel_open()`.
+- closed-channel control sends are counted as `skip`, not `protocol_control_fail`.
+- app status prints `protocol_ctrl=... skip=...`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash TTS-close race validation:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+printf 'reboot uartburn\r' > /dev/ttyUSB0
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- flash finishes with `Finished PASS`.
+- wake/connect/listen/TTS still works.
+- if the server closes the WebSocket after TTS, logs show `skip protocol control: action=listen_start ... reason=channel_closed` or `send_channel_closed`.
+- the previous `protocol control failed: action=listen_start status=-4 recover=yes` / `last_error=listen_start:-4` path should not appear for the close race.
+- `river orvibo status` reports `protocol_ctrl=<ok>/<fail> skip=<n>` and state converges to `idle` without a recoverable-error loop.
+
 ## Step H.xiaozhi-client.19 Verification
 
 Confirm the audio task stack budget and diagnostics were increased after the board-side overflow:
