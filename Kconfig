@@ -41,11 +41,12 @@ config RIVER_ORVIBO_WS_TOKEN
 
 config RIVER_ORVIBO_WS_SUBPROTOCOL
     string "Orvibo websocket subprotocol"
-    default "chat"
+    default ""
     depends on RIVER_ORVIBO_CLIENT_EN
     help
-      Explicit Sec-WebSocket-Protocol value for the realtime connection.
-      The Ameba SDK otherwise injects its legacy "chat, superchat" default.
+      Optional Sec-WebSocket-Protocol value for the realtime connection. Leave
+      empty to match the XiaoZhi reference clients, which do not request a
+      websocket subprotocol.
 
 config RIVER_ORVIBO_PROTOCOL_VERSION
     int "Orvibo websocket binary protocol version"

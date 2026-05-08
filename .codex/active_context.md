@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.26 修正 Orvibo hello 服务端 AEC 声明语义`
+  - `Step H.xiaozhi-client.27 对齐 Orvibo WebSocket 默认无子协议握手`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.27` aligns the default Orvibo WebSocket handshake with XiaoZhi reference clients:
+  - reference comparison against `~/xiaozhi-esp32` and `~/py-xiaozhi` confirmed they set auth/protocol/device headers but do not request `Sec-WebSocket-Protocol`.
+  - reference comparison against `~/xiaozhi-esp32-server` confirmed the current server does not configure required websocket subprotocols.
+  - the Ameba SDK would otherwise inject `Sec-WebSocket-Protocol: chat, superchat` whenever no protocol is explicitly configured.
+  - `RIVER_ORVIBO_WS_SUBPROTOCOL` now defaults to an empty string, and a project-side `--wrap=ws_client_handshake` shim omits `Sec-WebSocket-Protocol` when the configured subprotocol is empty.
+  - explicitly configured subprotocols remain supported through the existing Orvibo config path; connect/status logs show `ws_subprotocol=-` for the default no-subprotocol state.
+  - `build.ninja` and AP image symbol checks confirm `river_ws_handshake.o`, `-Wl,--wrap=ws_client_handshake`, and `__wrap_ws_client_handshake` are present; latest-SDK build passed on `/root/ameba-rtos`.
+  - board runtime confirmation remains blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.26` corrects Orvibo client hello `features.aec` semantics:
   - reference comparison against `~/xiaozhi-esp32` confirmed WebSocket/MQTT hello only sends `features.aec=true` under `CONFIG_USE_SERVER_AEC`.
   - `xiaozhi-esp32` rejects simultaneous device-side AEC and server-side AEC at compile time, so this field represents a server-AEC request rather than local device AEC/BF/native-ref capability.
@@ -128,11 +137,10 @@ or top-of-tree verification target changes.
   - 24 kHz server TTS is routed to 48 kHz playback because the current Ameba output policy does not list 24 kHz.
   - audio diag/status exposes `rs=converted/bypass/fail` and `rate=server->playback`.
   - VAD, KWS, KWS parity tooling, AEC, and BF paths are unchanged.
-- `Step H.xiaozhi-client.12` removes an SDK-default WebSocket handshake dependency:
-  - `RIVER_ORVIBO_WS_SUBPROTOCOL` defaults to `chat`, the subprotocol already accepted by the current XiaoZhi-compatible server.
-  - `river_orvibo_protocol_open_audio_channel()` explicitly calls `ws_handshake_header_set_protocol()` before `ws_connect_url()`.
-  - the call passes a NUL-inclusive length because the Ameba SDK setter copies bytes without appending a terminator.
-  - protocol connect/status logs now show `ws_subprotocol`.
+- `Step H.xiaozhi-client.12` first removed dependence on the SDK's implicit `chat, superchat` fallback by adding an explicit Orvibo subprotocol config and diagnostics; this has been superseded by H.27:
+  - the default is now no websocket subprotocol, matching XiaoZhi reference clients.
+  - the Orvibo config path still supports an explicitly configured `RIVER_ORVIBO_WS_SUBPROTOCOL`.
+  - protocol connect/status logs show `ws_subprotocol=-` for the default no-subprotocol state.
 - `Step H.xiaozhi-client.11` expands the Orvibo Opus payload envelope for the current XiaoZhi-compatible server contract:
   - host-side OTA/WebSocket probing reached `wss://api.tenclass.net/xiaozhi/v1/` and received server hello with `opus/24000Hz/1ch/60ms`.
   - protocol binary payload, app audio message payload, and audio-service Opus packet limits are now `1536U`.

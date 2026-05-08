@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.27` 已对齐 Orvibo WebSocket 默认握手子协议到 XiaoZhi 参考端行为：
+  - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端 WebSocket 连接设置 `Authorization`、`Protocol-Version`、`Device-Id`、`Client-Id`，但不请求 `Sec-WebSocket-Protocol`。
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前服务端 `websockets.serve(...)` 未配置 subprotocol，不要求客户端提供 subprotocol。
+  - Ameba SDK 原生握手在未显式设置 protocol 时会注入 `Sec-WebSocket-Protocol: chat, superchat`，与参考端默认行为不一致。
+  - 现已将 `RIVER_ORVIBO_WS_SUBPROTOCOL` 默认值改为空字符串，并新增 `river_ws_handshake.c`，通过 `--wrap=ws_client_handshake` 在项目侧覆盖 SDK 默认握手。
+  - 默认情况下 Orvibo 握手完全省略 `Sec-WebSocket-Protocol`；如果后续显式配置 `RIVER_ORVIBO_WS_SUBPROTOCOL`，仍保留发送对应 header 的能力。
+  - `build.ninja` 与最终 AP image symbol 已确认 `river_ws_handshake.o`、`-Wl,--wrap=ws_client_handshake`、`__wrap_ws_client_handshake` 生效；当前 `/root/ameba-rtos` 完整 build 已通过。
+  - 板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.26` 已修正 Orvibo client hello 的服务端 AEC 声明语义：
   - 再次对照 `~/xiaozhi-esp32` 后确认，参考端 WebSocket/MQTT hello 只在 `CONFIG_USE_SERVER_AEC` 下发送 `features.aec=true`。
   - `xiaozhi-esp32` 明确禁止 `CONFIG_USE_DEVICE_AEC` 与 `CONFIG_USE_SERVER_AEC` 同时启用，说明 `features.aec` 表达的是“请求服务端 AEC”，不是端侧本地 AEC/BF/native-ref 能力声明。
@@ -104,10 +113,9 @@ Latest Verified Slice:
   - audio diag/status 现在暴露 `rs=converted/bypass/fail` 和 `rate=server->playback`。
   - VAD、KWS、KWS tensor dump、alignment replay、board/local parity、AEC/BF 保护区不变。
 - 最新 `/root/ameba-rtos` SDK build 已通过。
-- `Step H.xiaozhi-client.12` 已显式设置 Orvibo WebSocket 握手子协议。
-- 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，默认 `chat`，避免继续依赖 Ameba SDK 内置 `chat, superchat`。
-- `river_orvibo_protocol_open_audio_channel()` 在连接前调用 `ws_handshake_header_set_protocol()`；调用长度包含 `NUL`，规避 SDK setter 不自动补终止符的问题。
-- connect 日志和 protocol status 输出 `ws_subprotocol`，便于板端确认实际握手配置。
+- `Step H.xiaozhi-client.12` 首次加入 Orvibo WebSocket subprotocol 配置并避免依赖 SDK 隐式 `chat, superchat` fallback；该默认策略已由 H.27 覆盖为“默认无子协议”。
+- 现阶段 `RIVER_ORVIBO_WS_SUBPROTOCOL` 默认空字符串，默认握手省略 `Sec-WebSocket-Protocol`；显式配置时仍可发送对应子协议。
+- connect 日志和 protocol status 输出 `ws_subprotocol=-`，便于板端确认当前默认无子协议握手。
 - 最新 `/root/ameba-rtos` SDK build 已通过。
 - `Step H.xiaozhi-client.5` 已隔离 Orvibo app 控制事件队列与音频事件队列。
 - state/connect/listen/abort 等控制消息不再与 uplink/downlink audio 共享队列容量。
@@ -1193,10 +1201,10 @@ python3 /root/ameba-rtos/ameba.py build -p
   - app 层 oversized uplink/downlink packet 不再静默丢弃，改为计数并打印日志。
   - protocol/app/audio 诊断输出 `payload_max`、`audio_max`、`packet_max` 和 `oversize=up/down`。
 - `Step H.xiaozhi-client.12`：
-  - 新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，默认 `chat`。
-  - `river_orvibo_protocol_open_audio_channel()` 在 `ws_connect_url()` 前显式设置 WebSocket subprotocol。
-  - 对 Ameba SDK setter 使用包含 `NUL` 的长度，避免握手头读取未终止字符串。
-  - connect/status 日志输出 `ws_subprotocol`。
+  - 首次新增 `RIVER_ORVIBO_WS_SUBPROTOCOL`，用于避免依赖 Ameba SDK 隐式 `chat, superchat` fallback。
+  - 该步的历史默认 `chat` 已由 H.27 覆盖为默认空字符串。
+  - 现阶段默认握手省略 `Sec-WebSocket-Protocol`；显式配置 subprotocol 时仍可通过同一 Orvibo config 路径发送。
+  - connect/status 日志输出 `ws_subprotocol=-` 表示默认无子协议。
 - `Step H.xiaozhi-client.13`：
   - 下行 Opus 按 server hello 解码后，本地 PCM 会适配到 Ameba 播放支持的采样率。
   - 当前服务端 `24000Hz/60ms` TTS 会转为 `48000Hz/60ms` 播放/reference 帧。
@@ -1235,6 +1243,11 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 对齐参考端服务端 AEC 语义：`features.aec` 只应表达 server-side AEC 请求，不应由本地 device-side AEC/BF/native-ref 能力自动触发。
   - Orvibo hello 不再发送 `features.aec`，日志输出 `server_aec=no`。
   - 保留本地 voice profile 驱动的 `listen_start.mode`，不回退 H.21 的 listening-mode 修正。
+- `Step H.xiaozhi-client.27`：
+  - 对齐参考端 WebSocket 握手：默认不发送 `Sec-WebSocket-Protocol`。
+  - 新增项目侧 `river_ws_handshake.c`，通过 `--wrap=ws_client_handshake` 覆盖 SDK 会注入 `chat, superchat` 的默认握手。
+  - `RIVER_ORVIBO_WS_SUBPROTOCOL` 默认空字符串；显式配置时仍保留发送具体 subprotocol 的能力。
+  - wrapper 保留 Host/Upgrade/Connection/Sec-WebSocket-Key/Sec-WebSocket-Version/custom headers，并按有效长度处理 SDK setter 写入的字段。
 - `Step H.xiaozhi-client.25`：
   - 新增统一 `river_orvibo_build_info` helper，集中导出 Orvibo app/version/compile_time/board/chip/user-agent，避免 OTA/MCP/诊断多处散落硬编码。
   - OTA 请求头补齐 `Device-Model`、`Model`、`Application-Version`、`App-Version`、`Firmware-Version`、`Device-Version`，对齐 `xiaozhi-esp32-server` OTA handler 的优先读取路径。
@@ -1263,9 +1276,9 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 期望结果：
 
-- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure/skip recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、WebSocket subprotocol、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default、audio task stack，以及按当前 voice profile 选择 `listen_start.mode`、hello 不误报 server AEC 的关键路径存在。
+- TTS/downlink/playback drain、uplink queue/session-epoch、app control/audio queue、protocol control failure/skip recovery、WebSocket poll/send serialization、connect retry/backoff、TTS playback backpressure、manual access refresh、Opus payload envelope/oversize diagnostics、默认无 WebSocket subprotocol 握手、downlink playback sample-rate adapter、listening 复入/abort reason/speaking KWS gate、channel timeout、access identity gate、active SDK default、audio task stack，以及按当前 voice profile 选择 `listen_start.mode`、hello 不误报 server AEC 的关键路径存在。
 - 静态检查、harness 检查和 SDK build 成功。
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛、OTA/MCP 自描述元数据统一收敛，以及 hello 服务端 AEC 声明语义修正，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成板侧 OTA 身份与 `server_aec=no` hello 日志复验，并继续收敛 WebSocket subprotocol、下行采样率协商与 v2/v3 包络兼容的剩余静态风险。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、默认无 WebSocket subprotocol 握手、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛、OTA/MCP 自描述元数据统一收敛，以及 hello 服务端 AEC 声明语义修正，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成板侧 OTA 身份、默认无 subprotocol 握手和 `server_aec=no` hello 日志复验，并继续收敛下行采样率协商与 v2/v3 包络兼容的剩余静态风险。

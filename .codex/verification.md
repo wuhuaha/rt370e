@@ -1,3 +1,69 @@
+## Step H.xiaozhi-client.27 Verification
+
+Confirm the default Orvibo WebSocket handshake omits SDK-injected subprotocols:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_WS_SUBPROTOCOL|Sec-WebSocket-Protocol|__wrap_ws_client_handshake|ws_client_handshake|ws_subprotocol" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h \
+  components/river_cloud/CMakeLists.txt \
+  components/river_cloud/river_ws_handshake.c \
+  components/river_cloud/river_orvibo_protocol.c
+rg -n -- "--wrap=ws_client_handshake|river_ws_handshake.o" build_RTL8730E/build/build.ninja
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -C \
+  build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "ws_client_handshake|__wrap_ws_client_handshake"
+```
+
+Expected result:
+- `RIVER_ORVIBO_WS_SUBPROTOCOL` defaults to an empty string.
+- `river_ws_handshake.c` omits `Sec-WebSocket-Protocol` when no explicit subprotocol is configured.
+- generated `build.ninja` includes `-Wl,--wrap=ws_client_handshake` and `river_ws_handshake.o`.
+- final AP image contains `__wrap_ws_client_handshake`, proving the project-side wrapper is linked.
+
+Reconfirm reference behavior:
+```bash
+cd /root/ameba-river
+sed -n '90,115p' /root/xiaozhi-esp32/main/protocols/websocket_protocol.cc
+sed -n '52,88p' /root/py-xiaozhi/src/protocols/websocket_protocol.py
+sed -n '70,82p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/websocket_server.py
+sed -n '122,225p' /root/ameba-rtos/component/network/websocket/libwsclient.c
+```
+
+Expected result:
+- ESP32/Python reference clients set request headers but do not request a websocket subprotocol.
+- current server `websockets.serve(...)` does not configure required subprotocols.
+- Ameba SDK default would otherwise inject `Sec-WebSocket-Protocol: chat, superchat`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - reference source review confirmed ESP32/Python clients do not request `Sec-WebSocket-Protocol`.
+  - server source review confirmed no required websocket subprotocols are configured.
+  - SDK source review confirmed default fallback `chat, superchat`.
+  - `rg -n -- "--wrap=ws_client_handshake|river_ws_handshake.o" build_RTL8730E/build/build.ninja`
+  - AP image symbol check showed `6039b24c T __wrap_ws_client_handshake`.
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime confirmation that connect/status logs show `ws_subprotocol=-`, server hello is still received, and handshake capture shows no `Sec-WebSocket-Protocol`
+  - board UART remains in the same historical pure-`0x00` session state, so no readable runtime log could be captured this step
+
 ## Step H.xiaozhi-client.26 Verification
 
 Confirm Orvibo hello no longer reports local device AEC/BF as server-side AEC:
@@ -720,21 +786,24 @@ Expected result:
 
 ## Step H.xiaozhi-client.12 Verification
 
-Confirm Orvibo WebSocket subprotocol is explicit and visible:
+Confirm Orvibo WebSocket subprotocol configuration is visible.
+This historical step has been superseded by H.27, so the current expected
+default is no websocket subprotocol:
 ```bash
 cd /root/ameba-river
-rg -n "RIVER_ORVIBO_WS_SUBPROTOCOL|websocket_subprotocol|ws_handshake_header_set_protocol|ws_subprotocol" \
+rg -n "RIVER_ORVIBO_WS_SUBPROTOCOL|websocket_subprotocol|ws_subprotocol|__wrap_ws_client_handshake" \
   Kconfig \
   include/river/river_orvibo_credentials.h \
   include/river/river_orvibo_protocol.h \
-  components/river_cloud/river_orvibo_protocol.c
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_cloud/river_ws_handshake.c
 ```
 
 Expected result:
-- Kconfig exposes `RIVER_ORVIBO_WS_SUBPROTOCOL` with default `chat`.
+- Kconfig exposes `RIVER_ORVIBO_WS_SUBPROTOCOL` with default empty string.
 - protocol config stores `websocket_subprotocol`.
-- `river_orvibo_protocol_open_audio_channel()` calls `ws_handshake_header_set_protocol()` before connecting.
-- connect/status logs include `ws_subprotocol`.
+- the H.27 handshake wrapper omits `Sec-WebSocket-Protocol` when the config is empty.
+- connect/status logs include `ws_subprotocol` and show `-` for the default no-subprotocol state.
 
 Run static hygiene, harness, and latest-SDK build checks:
 ```bash
@@ -757,8 +826,8 @@ Post-flash validation:
 ```
 
 Expected result:
-- connect 日志显示 `ws_subprotocol=chat`。
-- `river orvibo status` 的 protocol dump 显示 `ws_subprotocol=chat`。
+- connect 日志显示 `ws_subprotocol=-`。
+- `river orvibo status` 的 protocol dump 显示 `ws_subprotocol=-`。
 - WebSocket hello 仍能收到服务端 hello，并进入 listening。
 
 ## Step H.xiaozhi-client.5 Verification

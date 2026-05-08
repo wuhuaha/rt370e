@@ -1,5 +1,29 @@
 # Change Log
 
+## Step H.xiaozhi-client.27
+- 对齐 Orvibo WebSocket 默认握手子协议到 XiaoZhi 参考端行为：
+  - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端 WebSocket 连接只设置 `Authorization`、`Protocol-Version`、`Device-Id`、`Client-Id` 等请求头，不主动请求 `Sec-WebSocket-Protocol`。
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前服务端 `websockets.serve(...)` 未配置 subprotocol，也不要求客户端提供 subprotocol。
+  - Ameba SDK 原生 `ws_handshake_header()` 在未显式设置 protocol 时会强行发送 `Sec-WebSocket-Protocol: chat, superchat`，这与 XiaoZhi 参考端默认握手不一致。
+- 变更：
+  - `RIVER_ORVIBO_WS_SUBPROTOCOL` 默认值从 `chat` 改为空字符串；头文件 fallback 同步改为空字符串。
+  - 新增项目侧 `river_ws_handshake.c`，通过链接器 `--wrap=ws_client_handshake` 覆盖 SDK 默认握手。
+  - Orvibo 握手包装在未配置 subprotocol 时完全省略 `Sec-WebSocket-Protocol` header；如果后续显式配置 `RIVER_ORVIBO_WS_SUBPROTOCOL`，仍会发送对应 header。
+  - 包装实现保留 SDK 原有 Host/Upgrade/Connection/Sec-WebSocket-Key/Sec-WebSocket-Version/custom headers 语义，并按有效长度输出 SDK setter 写入但不保证 NUL 终止的字段。
+  - connect/status 日志继续使用 `ws_subprotocol=-` 表达当前默认无子协议。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 OTA access、鉴权 headers、hello/listen/abort、Opus framing、TTS 下行、MCP volume-only 和状态机。
+- Verification for this step:
+  - passed: reference grep confirmed ESP32/Python clients do not request `Sec-WebSocket-Protocol`, and server does not configure required subprotocols.
+  - passed: generated `build.ninja` contains `-Wl,--wrap=ws_client_handshake` and compiles `river_ws_handshake.o`.
+  - passed: final AP image symbol check shows `__wrap_ws_client_handshake`, confirming the project-side handshake wrapper is linked.
+  - passed: static grep confirmed `RIVER_ORVIBO_WS_SUBPROTOCOL` default/fallback is empty and explicit subprotocol path remains configurable.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.26
 - 修正 Orvibo client hello 中 `features.aec` 的语义：
   - 再次对照 `~/xiaozhi-esp32` 后确认，WebSocket/MQTT hello 只在 `CONFIG_USE_SERVER_AEC` 下发送 `features.aec=true`。
