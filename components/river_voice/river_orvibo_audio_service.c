@@ -145,6 +145,13 @@ static void river_orvibo_voice_event_handler(const river_voice_event_t *event)
     if (event == NULL || event->type != RIVER_VOICE_EVENT_WAKEWORD) {
         return;
     }
+    RIVER_LOGI("wake bridge: text=%s q15=%d mode=%s vad_speech=%s vad_prob=%u/%u",
+               event->text != NULL && event->text[0] != '\0' ? event->text : "-",
+               event->confidence,
+               river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
+               g_river_orvibo_audio.vad_is_speech ? "yes" : "no",
+               (unsigned int)g_river_orvibo_audio.vad_probability_raw_q15,
+               (unsigned int)g_river_orvibo_audio.vad_probability_q15);
     memset(&out_event, 0, sizeof(out_event));
     out_event.type = RIVER_ORVIBO_AUDIO_EVENT_WAKE_DETECTED;
     out_event.text = event->text;

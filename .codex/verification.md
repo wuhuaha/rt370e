@@ -27161,6 +27161,54 @@ Expected result:
 - `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
 - `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics
 
+## Step H.xiaozhi-client.36 - wakeword false-trigger diagnostics
+
+Confirm the wakeword path now emits enough qualitative logs to distinguish
+model/config aggressiveness from refactor-side duplicate wake handling:
+```bash
+cd /root/ameba-river
+rg -n "wakeword hit:|kws gate close:|wake bridge:" \
+  components/river_voice/river_voice_kws.cc \
+  components/river_voice/river_orvibo_audio_service.c
+rg -n "CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15|CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES|CONFIG_RIVER_KWS_COOLDOWN_MS|CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES" \
+  prj.conf
+```
+
+Expected result:
+- `wakeword hit:` includes `gate_best_pm`, `thresh_pm`, `weak_pm`, `gate_infer`, `hits`, and `mode`
+- `kws gate close:` includes `thresh_pm`, `weak_pm`, and `latched_trigger=yes|no`
+- `wake bridge:` logs the KWS event as it enters the Orvibo audio-service bridge with current `mode` and VAD snapshot
+- `prj.conf` still shows the current experimental KWS deployment parameters, including the aggressive `threshold_q15=9517` and `hold_frames=1`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash the image and monitor the board boot log.
+2. Capture one normal quiet-room idle period and one false-wake period.
+3. Preserve every nearby `wakeword hit:`, `kws gate close:`, `wake bridge:`,
+   `river kws status`, and `river orvibo status` line.
+```
+
+Diagnostic interpretation:
+- if each perceived false wake has a matching `wakeword hit:` and its `score_pm` is only slightly above `thresh_pm`, the main suspect is the current KWS model/threshold tuning rather than the Orvibo refactor
+- if `mode=gate_fallback` dominates, the fallback trigger path is too permissive for the current model/profile
+- if `wakeword hit:` appears only once but `wake bridge:` or later wake handling repeats, investigate state/event duplication above the KWS layer
+- if many `kws gate close:` lines show high `gate_best_pm` near or above `thresh_pm` even during obvious non-wake audio, the deployed model itself is likely over-firing on board
+
 ## Step H.xiaozhi-client.35 - MCP error semantics and volume range guard
 
 Confirm the volume-only MCP path now rejects invalid tool calls with JSON-RPC

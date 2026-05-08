@@ -8,6 +8,14 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.36` 已增补 Orvibo 唤醒词误触诊断日志：
+  - 静态复核 `capture -> preproc -> enhanced mono -> VAD -> river_voice_kws_submit_frame(...)` 链路后，当前没有直接证据表明 Orvibo 重构破坏了 KWS 推理输入路径或 detection gate 基本策略。
+  - 现阶段更强的嫌疑来自当前实验性 KWS 部署参数本身偏激进：`CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`、`CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`，比 `river_voice_kws.cc` 内部保守 fallback 默认值更容易因单次高分或短 gate 内峰值而触发。
+  - `wakeword hit:` 现已补充 `gate_best_pm`、`thresh_pm`、`weak_pm`、`gate_infer`、`hits` 与 `mode`，用于判断触发来自正常阈值还是 gate fallback。
+  - `kws gate close:` 现已补充 `thresh_pm`、`weak_pm` 与 `latched_trigger=yes|no`，用于判断每个 VAD gate 的最佳得分与是否已触发过。
+  - `wake bridge:` 现已在 KWS 事件真正进入 Orvibo audio-service 上抛桥接时记录 `mode` 与 VAD 快照，便于排除上层重复消费。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；下一步需要板端抓取新日志来判断是模型/阈值问题还是上层事件问题。
+  - 本地 VAD、唤醒词/KWS 推理实现、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.35` 已收敛 Orvibo volume-only MCP 的参数校验与错误语义：
   - 再次对照 `~/xiaozhi-esp32` 后确认，参考端对 `tools/call` 的无效请求形态会返回 JSON-RPC `error.message`，而不是把这些请求错误包装为 `result.isError=true`。
   - 再次对照 `~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 `device_mcp` 调用方优先按 JSON-RPC error 处理工具调用失败，成功路径才消费 `result.content[0].text`。

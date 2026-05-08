@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.36
+- 增补 Orvibo 唤醒词误触诊断日志，优先区分“模型/阈值过激”与“重构导致的重复上抛”：
+  - 静态复核当前 KWS 链路后，未发现 Orvibo 重构破坏 `capture -> preproc -> enhanced mono -> VAD -> river_voice_kws_submit_frame(...)` 输入路径的直接证据。
+  - 当前更可疑的是实验性 KWS 部署参数本身偏激进：`CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`、`CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`，相比 `river_voice_kws.cc` 内部 fallback 默认阈值/hold 更容易因单次高分触发。
+  - 在无法仅靠静态审计完全定责“模型/阈值”还是“重构交互”的情况下，本步先补充低噪声定性日志，而不直接改模型或门限。
+- 变更：
+  - `river_voice_kws_emit_trigger(...)` 的 `wakeword hit` 日志补充 `gate_best_pm`、`thresh_pm`、`weak_pm`、`gate_infer`、`hits` 与触发 `mode`，用于区分阈值触发和 gate fallback 触发。
+  - `river_voice_kws_submit_frame(...)` 的 `kws gate close` 日志补充 `thresh_pm`、`weak_pm` 和 `latched_trigger=yes|no`，用于判断一个 VAD gate 内最佳分数、是否已经触发过、以及是否只是“弱命中”。
+  - `river_orvibo_audio_service` 新增 `wake bridge` 日志，在唤醒事件真正上抛到 Orvibo 音频服务时记录 `text/q15/mode/vad_speech/vad_prob`，用于排除“模型只触发一次，但上层重复消费”的可能。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS 推理实现、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 Orvibo 状态机、云端协议、MCP volume-only、音频链路行为，只增加临时诊断可观测性。
+- Verification for this step:
+  - passed: static audit still indicates the refactor preserved the KWS input pipeline and runtime gate policy.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation still needs the user to flash and capture the new `wakeword hit` / `kws gate close` / `wake bridge` logs.
+
 ## Step H.xiaozhi-client.34
 - 补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环：
   - 再次对照 `~/xiaozhi-esp32-server` 后确认，WebSocket `Authorization` token 由 OTA 接口按 `client_id|device_id|timestamp` 重新签发，服务端验签同时检查 `expire_seconds` 过期窗口。
