@@ -27204,6 +27204,54 @@ Expected result:
 - `kws config` reports `fallback=off weak_q15=0 weak_pm=0`
 - this confirms the VAD gate fallback is disabled on the running image
 
+## Step H.xiaozhi-client.40 - document archive and active index cleanup
+
+Confirm current entry points no longer point at stale live document paths:
+```bash
+cd /root/ameba-river
+rg -n "doc/(FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH|VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH|VOICE_RUNTIME_ARCHITECTURE_REVIEW_ZH_2026-04-17|XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN_ZH|XIAOZHI_REALTIME_INTERACTION_ARCHITECTURE_ZH|XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH|XIAOZHI_UPLINK_BACKPRESSURE_ANALYSIS_LATEST_SDK_FP32_ZH|WAKE_WORD_XIAOZHI_SESSION_WINDOW_ARCHITECTURE_ZH|PROJECT_REFACTOR_EXECUTION_PLAN_ZH|PROJECT_STATUS_ZH|PROJECT_STATUS_SNAPSHOT_2026-04-09_ZH|HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH|IFLYTEK_TTS_WS_INTEGRATION_ZH|MILESTONE_IFLYTEK_ASR_USABLE_ZH|ARCHITECTURE_REFACTOR_BLUEPRINT_ZH|ARCHITECTURE_OPTIMIZATION_ZH|AUDIO_DATAFLOW_QUEUE_ARCHITECTURE_ZH|AUDIO_DATAFLOW_QUEUE_IMPLEMENTATION_PLAN_ZH|VOICE_INTERACTION_REFACTOR_PROPOSAL_ZH|VOICE_RUNTIME_REALTIME_OPTIMIZATION_DESIGN_ZH|VOICE_INTERACTION_HUMANIZATION_REVIEW_ZH|WAKE_ASR_AUDIO_PROFILE_DESIGN_ZH|REFACTOR_TODO_ZH)" \
+  README.md AGENTS.md build.md .codex/active_context.md .codex/active_plans.md doc/README.md doc/EXECUTION_PLAN_TEMPLATE_ZH.md
+```
+
+Expected result:
+- no matches
+- historical logs under `.codex/changes.md` and `.codex/verification.md` are intentionally excluded from this active-entry search
+
+Confirm archived document groups exist:
+```bash
+cd /root/ameba-river
+find doc/history -maxdepth 2 -type f -name '*.md' | sort
+```
+
+Expected result:
+- archived documents appear under:
+  - `doc/history/xiaozhi_legacy/`
+  - `doc/history/agent_server_v2/`
+  - `doc/history/refactor_legacy/`
+  - `doc/history/provider_iflytek/`
+  - `doc/history/project_snapshots/`
+  - `doc/history/codex/`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Runtime impact:
+- none expected; this step only moves or edits documentation/process records
+- no firmware source, Kconfig, protocol, audio path, VAD, KWS, model,
+  tensor dump, alignment replay, board/local parity, AEC/BF, or MCP behavior changed
+
 ## Step H.xiaozhi-client.38 - conservative KWS trigger profile
 
 Confirm the conservative KWS profile is compiled into the branch and the VAD

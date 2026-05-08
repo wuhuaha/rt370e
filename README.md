@@ -77,7 +77,7 @@ Process records:
 - [.codex/active_context.md](/root/ameba-river/.codex/active_context.md)
 - [.codex/active_plans.md](/root/ameba-river/.codex/active_plans.md)
 - [build.md](/root/ameba-river/build.md)
-- [doc/PROJECT_STATUS_ZH.md](/root/ameba-river/doc/PROJECT_STATUS_ZH.md)
+- [doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md](/root/ameba-river/doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md)
 - [doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md](/root/ameba-river/doc/RIVER_OPENWAKEWORD_LAB_MIGRATION_REPORT_ZH.md)
 - [doc/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md](/root/ameba-river/doc/DSCNN_KWS_TRAINING_PRO_MIGRATION_REPORT_ZH.md)
 - [doc/VOICE_FRONTEND_CHAIN_STATUS_ZH.md](/root/ameba-river/doc/VOICE_FRONTEND_CHAIN_STATUS_ZH.md)

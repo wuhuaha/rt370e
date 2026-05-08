@@ -9,7 +9,7 @@ of encoding long plan content directly in root entry files.
 - Primary active execution plan:
   - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
 - Secondary active execution plans:
-  - `doc/FULL_DUPLEX_VOICE_EXECUTION_PLAN_ZH.md`
+  - none pinned right now
 
 ## If A New Multi-Step Task Starts
 
@@ -25,13 +25,15 @@ of encoding long plan content directly in root entry files.
 
 - `plan.md`
   - historical root snapshot only
-- `doc/PROJECT_REFACTOR_EXECUTION_PLAN_ZH.md`
-  - historical reference
-- `doc/XIAOZHI_INTEGRATION_IMPLEMENTATION_PLAN_ZH.md`
-  - historical/reference implementation plan
-- `doc/XIAOZHI_SESSION_STABILITY_EXECUTION_PLAN_ZH.md`
-  - historical/reference plan for the deleted legacy transport
-- `doc/HOME_AI_SERVER_M1_ADAPTATION_PLAN_ZH.md`
-  - historical/reference plan for the deleted provider-era integration
-- `doc/VOICE_RUNTIME_REARCHITECTURE_EXECUTION_PLAN_ZH.md`
-  - historical/reference plan for the deleted dialog/runtime era
+- `doc/history/xiaozhi_legacy/`
+  - historical XiaoZhi direct-integration plans before the Orvibo-owned mainline
+- `doc/history/agent_server_v2/`
+  - historical `agent-server-v2` full-duplex and voice-runtime plans
+- `doc/history/refactor_legacy/`
+  - historical `refactor` branch architecture and dataflow plans
+- `doc/history/provider_iflytek/`
+  - historical Iflytek/provider-era integration notes
+- `doc/history/project_snapshots/`
+  - historical branch status snapshots
+- `doc/history/codex/`
+  - historical Codex process-context snapshots

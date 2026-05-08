@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.39 增强 KWS 状态参数可观测性`
+  - `Step H.xiaozhi-client.40 归档过期文档并收敛活动索引`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.40` archives stale branch-era documents and tightens the active document index:
+  - `doc/README.md` now prioritizes the Orvibo mainline plan plus protected KWS/VAD/AEC/BF diagnostic references, rather than old XiaoZhi/direct-provider/refactor plans.
+  - `.codex/active_plans.md` now lists only `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md` as active; old `agent-server-v2`, direct-XiaoZhi, refactor, Iflytek/provider, and branch snapshot documents are reference-only under `doc/history/`.
+  - stale `.codex` ASR-first / old-XiaoZhi / Iflytek process notes were moved into history so current Codex entry points no longer present them as live context.
+  - no firmware code, Kconfig, protocol, audio path, VAD, KWS, model, tensor dump, alignment replay, board/local parity, AEC/BF, or MCP behavior changed.
 - `Step H.xiaozhi-client.39` adds a runtime `kws config` line to `river kws status`:
   - this keeps the Step 38 conservative KWS trigger behavior unchanged.
   - board-side status now exposes `threshold_q15`, `threshold_pm`, `hold`, `cooldown_ms`, `fallback`, `weak_q15`, `weak_pm`, stride, pre-roll, queue, and log period without relying on the boot-time `kws backend` line.

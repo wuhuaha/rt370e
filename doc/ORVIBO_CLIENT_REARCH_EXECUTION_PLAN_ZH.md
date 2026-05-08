@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.40` 已整理当前分支文档入口并归档过期计划：
+  - `doc/README.md` 现在按 Orvibo 主线、受保护 KWS/VAD/AEC/BF 资料和历史归档分区组织。
+  - `.codex/active_plans.md` 只保留当前 Orvibo clean-slate 主计划为 active，旧 `agent-server-v2`、旧 direct-XiaoZhi、旧 refactor、旧 Iflytek/provider 和旧分支状态快照均移入 `doc/history/`。
+  - 旧 `.codex` ASR-first / old-XiaoZhi / Iflytek 过程记录也移入历史目录，避免继续作为当前 volatile context 被误读。
+  - 本步不改固件代码、协议、音频链路、VAD、KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP 行为。
 - `Step H.xiaozhi-client.39` 已增强 KWS 状态参数可观测性：
   - `river kws status` 现在会输出额外的 `kws config` 行，直接给出 `threshold_q15`、`threshold_pm`、`hold`、`cooldown_ms`、`fallback`、`weak_q15`、`weak_pm`、stride、pre-roll、queue 与 log period。
   - 这样烧录后无需依赖启动瞬间的 `kws backend` 日志，也能确认 Step 38 的保守参数是否真实生效。

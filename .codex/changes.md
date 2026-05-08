@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.40
+- 整理当前 Orvibo 分支的文档信息架构，降低过期计划对后续实现的误导：
+  - `doc/README.md` 改为按当前主线、受保护 KWS/VAD/AEC/BF 资料和历史归档分区组织。
+  - `README.md` 的推荐阅读从旧 `PROJECT_STATUS_ZH.md` 切到当前 `ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`。
+  - `.codex/active_plans.md` 只保留 `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md` 为 active plan；旧 `agent-server-v2` 全双工计划不再标为 secondary active。
+  - `doc/EXECUTION_PLAN_TEMPLATE_ZH.md` 的示例文件名改用 Orvibo 命名，避免新计划复制过期 XiaoZhi 直接接入命名。
+- 归档：
+  - 旧 direct-XiaoZhi 文档移入 `doc/history/xiaozhi_legacy/`。
+  - 旧 `agent-server-v2` 全双工和 voice-runtime 文档移入 `doc/history/agent_server_v2/`。
+  - 旧 `refactor` / 架构 / 数据流计划移入 `doc/history/refactor_legacy/`。
+  - 旧 Iflytek/provider 文档移入 `doc/history/provider_iflytek/`。
+  - 旧分支状态快照移入 `doc/history/project_snapshots/`。
+  - 旧 `.codex` ASR-first / old-XiaoZhi 过程快照移入 `doc/history/codex/`。
+- 保持受保护能力不变：
+  - 未修改固件源码、Kconfig、协议、音频链路、VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、MCP。
+  - 保留 KWS/VAD/AEC/BF 调试资料在 `doc/` 顶层，避免削弱后续模型/板端一致性排障能力。
+- Verification for this step:
+  - passed: stale active-doc path search.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild.
+
 ## Step H.xiaozhi-client.39
 - 增强 KWS 板端运行时参数可观测性，方便烧录后直接确认保守参数是否真实生效：
   - 上一步已在启动 `kws backend` 日志中输出 `threshold_q15/hold/cooldown_ms/fallback`，但现场排查时容易错过启动瞬间日志。
