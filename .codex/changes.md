@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.39
+- 增强 KWS 板端运行时参数可观测性，方便烧录后直接确认保守参数是否真实生效：
+  - 上一步已在启动 `kws backend` 日志中输出 `threshold_q15/hold/cooldown_ms/fallback`，但现场排查时容易错过启动瞬间日志。
+  - `river kws status` 现会额外输出 `kws config` 行，包含 q15 阈值、permille 阈值、hold、cooldown、fallback、weak 阈值、stride、pre-roll、queue 与 log period。
+- 变更：
+  - `river_voice_kws_dump_status()` 在强制输出常规 `kws status` 后，追加 `kws config: threshold_q15=... threshold_pm=... hold=... cooldown_ms=... fallback=... weak_q15=... weak_pm=...`。
+  - 当 fallback 关闭时，`weak_q15=0 weak_pm=0 fallback=off`，便于确认 VAD gate fallback 不会绕过 `hold=2`。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词模型、KWS 特征提取、TFLM 推理、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 KWS 触发判定，只增加状态查询日志。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild.
+  - passed: generated config confirmed `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9831`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`, `CONFIG_RIVER_KWS_COOLDOWN_MS=2500`, and `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`.
+  - board runtime confirmation after flashing should run `river kws status` and verify the `kws config` line reports `threshold_q15=9831 threshold_pm=300 hold=2 cooldown_ms=2500 fallback=off weak_q15=0 weak_pm=0`.
+
 ## Step H.xiaozhi-client.38
 - 收敛 Orvibo 分支的 KWS 保守唤醒参数，用于降低当前板端“非唤醒词也被触发”的误唤醒概率：
   - 根据用户提供的两段日志，真实唤醒样本约 `318pm/q15=10452`，误唤醒样本先出现 `283pm`、随后单次尖峰 `338pm/q15=11107` 并被当前 `hold=1` 直接触发。

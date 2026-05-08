@@ -4512,6 +4512,11 @@ extern "C" void river_voice_kws_dump_status(void)
     size_t input_chunks;
     size_t output_chunks;
     const char *handoff_block_reason;
+    bool fallback_enabled;
+    uint32_t threshold_q15;
+    uint32_t threshold_pm;
+    uint32_t fallback_q15;
+    uint32_t fallback_pm;
 
     if (g_river_voice_kws == NULL) {
         RIVER_LOGI("kws status: closed");
@@ -4520,6 +4525,26 @@ extern "C" void river_voice_kws_dump_status(void)
 
     g_river_voice_kws->last_status_log_ms = 0U;
     river_voice_kws_log_status(g_river_voice_kws);
+    fallback_enabled = river_voice_kws_gate_fallback_enabled();
+    threshold_q15 = river_voice_kws_score_threshold_q15();
+    threshold_pm = river_voice_kws_confidence_to_permille(threshold_q15);
+    fallback_q15 = fallback_enabled ? river_voice_kws_gate_fallback_threshold_q15() : 0U;
+    fallback_pm = fallback_enabled ?
+                      river_voice_kws_confidence_to_permille(fallback_q15) :
+                      0U;
+    RIVER_LOGI("kws config: threshold_q15=%lu threshold_pm=%lu hold=%u cooldown_ms=%u fallback=%s weak_q15=%lu weak_pm=%lu stride=%u pre_roll_ms=%u pre_roll_flush=%u queue=%u log_period_ms=%u",
+               (unsigned long)threshold_q15,
+               (unsigned long)threshold_pm,
+               (unsigned int)CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES,
+               (unsigned int)CONFIG_RIVER_KWS_COOLDOWN_MS,
+               fallback_enabled ? "on" : "off",
+               (unsigned long)fallback_q15,
+               (unsigned long)fallback_pm,
+               (unsigned int)CONFIG_RIVER_KWS_INFERENCE_STRIDE_FRAMES,
+               (unsigned int)CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS,
+               (unsigned int)RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES,
+               (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
+               (unsigned int)CONFIG_RIVER_KWS_LOG_PERIOD_MS);
 
     feat_chunks = g_river_voice_kws->tensor_dump_feature_bytes_captured == 0U ?
                       0U :

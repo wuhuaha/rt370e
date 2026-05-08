@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.38 收敛 Orvibo KWS 保守唤醒参数`
+  - `Step H.xiaozhi-client.39 增强 KWS 状态参数可观测性`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.39` adds a runtime `kws config` line to `river kws status`:
+  - this keeps the Step 38 conservative KWS trigger behavior unchanged.
+  - board-side status now exposes `threshold_q15`, `threshold_pm`, `hold`, `cooldown_ms`, `fallback`, `weak_q15`, `weak_pm`, stride, pre-roll, queue, and log period without relying on the boot-time `kws backend` line.
+  - with the current conservative profile, `river kws status` should report `threshold_q15=9831 threshold_pm=300 hold=2 cooldown_ms=2500 fallback=off weak_q15=0 weak_pm=0`.
+  - local VAD, wake-word model, KWS feature extraction/inference, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.38` applies a conservative KWS wake trigger profile based on the latest board logs:
   - the real wake example reached about `318pm/q15=10452`, while the false wake example was a single observed spike to about `338pm/q15=11107` after a prior below-threshold `283pm`.
   - the previous deployed profile used about `290pm` (`CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`) with `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`, so one high inference was sufficient to emit `wakeword hit`.

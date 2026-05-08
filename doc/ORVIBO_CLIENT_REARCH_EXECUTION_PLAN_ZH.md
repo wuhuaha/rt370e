@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.39` 已增强 KWS 状态参数可观测性：
+  - `river kws status` 现在会输出额外的 `kws config` 行，直接给出 `threshold_q15`、`threshold_pm`、`hold`、`cooldown_ms`、`fallback`、`weak_q15`、`weak_pm`、stride、pre-roll、queue 与 log period。
+  - 这样烧录后无需依赖启动瞬间的 `kws backend` 日志，也能确认 Step 38 的保守参数是否真实生效。
+  - 当前配置下期望看到 `threshold_q15=9831 threshold_pm=300 hold=2 cooldown_ms=2500 fallback=off weak_q15=0 weak_pm=0`。
+  - 本步只增加状态查询日志，不修改 KWS 触发判定、模型、特征、推理或受保护的 parity/dump 路径。
 - `Step H.xiaozhi-client.38` 已按最新误唤醒日志收敛 Orvibo KWS 保守触发参数：
   - 真实唤醒样本约 `318pm/q15=10452`，非唤醒误触样本先低于阈值到 `283pm`，随后单次峰值到 `338pm/q15=11107` 并触发。
   - 因此不能直接把阈值抬到 `330pm+`，否则有较高概率损失已观察到的真实唤醒；本步采用更稳妥的 `300pm` 主阈值、连续两次命中确认和更长 cooldown。

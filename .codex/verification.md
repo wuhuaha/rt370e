@@ -27161,6 +27161,49 @@ Expected result:
 - `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
 - `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics
 
+## Step H.xiaozhi-client.39 - KWS status config visibility
+
+Confirm the KWS runtime status command exposes the active conservative
+configuration without relying on boot-time logs:
+```bash
+cd /root/ameba-river
+rg -n "kws config: threshold_q15|river_voice_kws_dump_status|threshold_pm|weak_q15|CONFIG_RIVER_KWS_LOG_PERIOD_MS" \
+  components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- `river_voice_kws_dump_status()` logs a `kws config:` line
+- the line includes q15 and permille threshold values, hold, cooldown,
+  fallback state, weak threshold, stride, pre-roll, queue, and log period
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash the board.
+2. Run `river kws status` from the monitor shell.
+3. Preserve the `kws status`, `kws config`, `kws tensor dump status`, and
+   `kws debug status` lines.
+```
+
+Expected result:
+- `kws config` reports `threshold_q15=9831 threshold_pm=300 hold=2 cooldown_ms=2500`
+- `kws config` reports `fallback=off weak_q15=0 weak_pm=0`
+- this confirms the VAD gate fallback is disabled on the running image
+
 ## Step H.xiaozhi-client.38 - conservative KWS trigger profile
 
 Confirm the conservative KWS profile is compiled into the branch and the VAD
