@@ -1,3 +1,53 @@
+## Step H.xiaozhi-client.30 Verification
+
+Confirm server downlink channel count is preserved from protocol to decoder:
+```bash
+cd /root/ameba-river
+rg -n "event\\.channels|msg.channels =|server_channels|downlink unsupported channels|downmix_to_mono|last_downlink_channels|rate=%lu/%lu->%lu" \
+  components/river_cloud/river_orvibo_protocol.c \
+  components/river_core/river_orvibo_app.c \
+  components/river_voice/river_orvibo_audio_service.c \
+  include/river/river_orvibo_protocol.h
+```
+
+Expected result:
+- `river_orvibo_protocol_event_t` carries `channels`.
+- server hello / binary audio events pass `server_channels`.
+- app downlink audio uses `event->channels` and only falls back to `1` when missing.
+- audio service accepts `1ch` and `2ch` downlink Opus, explicitly downmixes `2ch` to mono, and rejects channels greater than `2`.
+- audio diag/status prints `rate=server_rate/server_channels->playback_rate`.
+
+Reconfirm reference/server field semantics:
+```bash
+cd /root/ameba-river
+rg -n "audio_params|sample_rate|channels|frame_duration|opus" \
+  /root/xiaozhi-esp32/main/protocols \
+  /root/py-xiaozhi/src/protocols \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/config.yaml \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/utils/opus_encoder_utils.py \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/handle/helloHandle.py
+```
+
+Expected result:
+- reference hello messages include `audio_params.channels`.
+- current server default is `24000Hz/1ch/60ms`.
+- server-side Opus encoder utilities treat channels as part of the actual encoder contract.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.29 Verification
 
 Confirm Orvibo activation defaults to the already verified v1/no-serial flow and only uses v2/HMAC when explicitly configured:

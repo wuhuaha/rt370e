@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.30` 已修正 Orvibo TTS 下行声道参数传递：
+  - 审计 Orvibo 协议层、app 层和音频服务层后发现，protocol 已从 server hello 保存 `audio_params.channels`，但向 app 投递下行音频消息时被固定成 `1U`。
+  - 这会在 XiaoZhi-compatible server 将 TTS 配置为非单声道时，用错误的 channels 打开 Opus decoder；当前默认 server 配置虽然是 `24000Hz/1ch/60ms`，但端侧不能静默丢失该 wire contract 字段。
+  - `river_orvibo_protocol_event_t` 现已携带 `channels`，server hello 与 binary audio event 均传递 `server_channels`。
+  - app 下行音频消息改为使用 protocol event 的 channels，只有字段缺省时才回退到 `1`。
+  - audio service 现支持 `1ch/2ch` 下行 Opus；`2ch` 解码后显式下混为 mono，再进入当前重采样、双声道播放和 AEC reference 输出路径。
+  - audio diag/status 输出已扩展为 `rate=server_rate/server_channels->playback_rate`，便于板端确认实际 decoder 参数。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.29` 已补齐 Orvibo 可选 XiaoZhi-compatible v2 激活 HMAC 路径：
   - 再次对照 `~/xiaozhi-esp32` 后确认，存在 serial number 的 ESP32 参考端会发送 `Activation-Version: 2`、`Serial-Number` header，并在 `/ota/activate` body 中提交根对象 `algorithm` / `serial_number` / `challenge` / `hmac`。
   - 对照 `~/py-xiaozhi` 后确认，HMAC 计算口径是对 challenge 使用配置中的原始字符串 key 做 HMAC-SHA256，并输出小写 hex。

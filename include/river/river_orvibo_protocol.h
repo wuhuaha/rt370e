@@ -47,6 +47,7 @@ typedef struct {
     const uint8_t *audio_data;
     size_t audio_bytes;
     uint32_t sample_rate;
+    uint32_t channels;
     uint32_t frame_duration_ms;
     uint32_t timestamp_ms;
 } river_orvibo_protocol_event_t;

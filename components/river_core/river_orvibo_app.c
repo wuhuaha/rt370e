@@ -407,7 +407,7 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
         }
         msg.type = RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO;
         msg.sample_rate = event->sample_rate;
-        msg.channels = 1U;
+        msg.channels = event->channels != 0U ? event->channels : 1U;
         msg.frame_duration_ms = event->frame_duration_ms;
         msg.timestamp_ms = event->timestamp_ms;
         msg.bytes = event->audio_bytes;

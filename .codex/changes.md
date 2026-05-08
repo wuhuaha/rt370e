@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.30
+- 修正 Orvibo TTS 下行音频声道参数传递与解码边界：
+  - 审计 `river_orvibo_protocol -> river_orvibo_app -> river_orvibo_audio_service` 时发现，协议层已从 server hello 保存 `audio_params.channels`，但向 app 投递 `AUDIO_PACKET` 后被固定写成 `1U`。
+  - 这会在目标 XiaoZhi-compatible server 的 `audio_params.channels` 不是 `1` 时，用错误声道数打开 Opus decoder；即使当前默认 server 配置是 `24000Hz/1ch/60ms`，该路径也不应静默丢失 wire contract 字段。
+  - 对照 `~/xiaozhi-esp32-server` 后确认，server hello 的 `audio_params` 明确包含 `channels` 字段，服务端 Opus 编码工具也按配置的 `channels` 创建 encoder。
+- 变更：
+  - `river_orvibo_protocol_event_t` 增加 `channels` 字段。
+  - protocol server hello / binary audio event 均携带 `server_channels`。
+  - app 下行音频消息不再固定 `1ch`，而是使用协议事件中的 channels，缺省时才回退 `1`。
+  - audio service 支持 `1ch/2ch` 下行 Opus；`2ch` 解码后显式下混为 mono，再复用当前重采样、双声道播放和 AEC reference 输出路径。
+  - audio diag/status 输出 `rate=server_rate/server_channels->playback_rate`，便于板端核对实际解码参数。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 uplink capture/preproc/Opus、WebSocket 鉴权/hello/listen/abort、MCP volume-only 和状态机。
+- Verification for this step:
+  - passed: static grep confirmed `event.channels` reaches app downlink handling and `msg.channels` is no longer hard-coded to `1U`.
+  - passed: static grep confirmed audio service accepts `1ch/2ch`, downmixes `2ch` to mono, and rejects channels greater than `2`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.29
 - 补齐 Orvibo 可选 XiaoZhi-compatible v2 激活 HMAC 路径：
   - 再次对照 `~/xiaozhi-esp32` 后确认，ESP32 参考端在存在序列号时会发送 `Activation-Version: 2`、`Serial-Number` header，并在 `/ota/activate` body 中提交根对象 `algorithm` / `serial_number` / `challenge` / `hmac`。

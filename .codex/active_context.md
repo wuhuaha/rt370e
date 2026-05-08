@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.29 补齐 Orvibo 可选 v2 激活 HMAC 路径`
+  - `Step H.xiaozhi-client.30 修正 Orvibo TTS 下行音频声道参数传递`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,14 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.30` fixes Orvibo TTS downlink channel propagation:
+  - protocol already parsed `audio_params.channels` from server hello, but the app downlink message path forced `channels=1U` before calling the audio service.
+  - this could open the Opus decoder with the wrong channel count if a XiaoZhi-compatible server is configured for non-mono TTS, even though the current default server config is `24000Hz/1ch/60ms`.
+  - `river_orvibo_protocol_event_t` now carries `channels`; server hello and binary audio events pass `server_channels` through to the app.
+  - the app forwards `event->channels` to `river_orvibo_audio_service_handle_downlink()` and only falls back to `1` when the field is missing.
+  - the audio service now accepts `1ch/2ch` downlink Opus; `2ch` is explicitly downmixed to mono before the existing resample, stereo playback expansion, and AEC reference export path.
+  - audio diag/status now reports `rate=server_rate/server_channels->playback_rate`.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.29` completes the optional XiaoZhi-compatible v2 activation HMAC path without changing the default activation baseline:
   - reference comparison against `~/xiaozhi-esp32` confirmed that serial-bearing clients send `Activation-Version: 2`, `Serial-Number`, and a root JSON activation payload containing `algorithm`, `serial_number`, `challenge`, and `hmac`.
   - reference comparison against `~/py-xiaozhi` confirmed HMAC-SHA256 uses the configured raw string key over the challenge and emits lowercase hex.

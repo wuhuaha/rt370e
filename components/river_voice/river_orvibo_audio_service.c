@@ -39,9 +39,13 @@
 #define RIVER_ORVIBO_PCM_ACCUM_MAX             (RIVER_ORVIBO_OPUS_FRAME_MS * 16U * sizeof(int16_t))
 #define RIVER_ORVIBO_PLAYBACK_FALLBACK_RATE_HZ 48000U
 #define RIVER_ORVIBO_DOWNLINK_MAX_RATE_HZ      48000U
+#define RIVER_ORVIBO_DOWNLINK_MAX_CHANNELS     2U
 #define RIVER_ORVIBO_DOWNLINK_PCM_MAX          \
+    (((RIVER_ORVIBO_DOWNLINK_MAX_RATE_HZ * RIVER_ORVIBO_OPUS_FRAME_MS) / 1000U) * \
+     RIVER_ORVIBO_DOWNLINK_MAX_CHANNELS * sizeof(int16_t))
+#define RIVER_ORVIBO_DOWNLINK_MONO_MAX         \
     (((RIVER_ORVIBO_DOWNLINK_MAX_RATE_HZ * RIVER_ORVIBO_OPUS_FRAME_MS) / 1000U) * sizeof(int16_t))
-#define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_PCM_MAX * 2U)
+#define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_MONO_MAX * 2U)
 #define RIVER_ORVIBO_DOWNLINK_BUFFER_HIGH_WATER_PCT 85U
 #define RIVER_ORVIBO_TTS_BUFFER_FRAMES         16U
 #define RIVER_ORVIBO_DIAG_LOG_INTERVAL_MS      5000U
@@ -74,9 +78,11 @@ typedef struct {
     size_t pcm_accum_bytes;
     uint8_t opus_packet[RIVER_ORVIBO_OPUS_PACKET_MAX];
     int16_t downlink_pcm[RIVER_ORVIBO_DOWNLINK_PCM_MAX / sizeof(int16_t)];
-    int16_t downlink_playback_pcm[RIVER_ORVIBO_DOWNLINK_PCM_MAX / sizeof(int16_t)];
+    int16_t downlink_mono[RIVER_ORVIBO_DOWNLINK_MONO_MAX / sizeof(int16_t)];
+    int16_t downlink_playback_pcm[RIVER_ORVIBO_DOWNLINK_MONO_MAX / sizeof(int16_t)];
     int16_t downlink_stereo[RIVER_ORVIBO_DOWNLINK_STEREO_MAX / sizeof(int16_t)];
     uint32_t last_downlink_sample_rate;
+    uint32_t last_downlink_channels;
     uint32_t last_playback_sample_rate;
     uint32_t playback_stream_sample_rate;
     uint32_t playback_stream_frame_ms;
@@ -198,7 +204,7 @@ static void river_orvibo_audio_log_diag_if_needed(void)
         return;
     }
     g_river_orvibo_audio.last_diag_log_ms = now_ms;
-    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu pre=%lu/%lu vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu->%lu play=%lu/%lu bp_drop=%lu buf=%lu/%lu",
+    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu pre=%lu/%lu vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu play=%lu/%lu bp_drop=%lu buf=%lu/%lu",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned long)g_river_orvibo_audio.capture_ok,
                (unsigned long)g_river_orvibo_audio.capture_fail,
@@ -219,6 +225,7 @@ static void river_orvibo_audio_log_diag_if_needed(void)
                (unsigned long)g_river_orvibo_audio.resample_bypass,
                (unsigned long)g_river_orvibo_audio.resample_fail,
                (unsigned long)g_river_orvibo_audio.last_downlink_sample_rate,
+               (unsigned long)g_river_orvibo_audio.last_downlink_channels,
                (unsigned long)g_river_orvibo_audio.last_playback_sample_rate,
                (unsigned long)g_river_orvibo_audio.playback_write_ok,
                (unsigned long)g_river_orvibo_audio.playback_write_fail,
@@ -599,6 +606,49 @@ static void river_orvibo_audio_expand_stereo(const int16_t *mono,
     }
 }
 
+static river_status_t river_orvibo_audio_downmix_to_mono(const int16_t *input,
+                                                         size_t input_bytes,
+                                                         uint32_t channels,
+                                                         int16_t *mono,
+                                                         size_t mono_capacity_bytes,
+                                                         size_t *mono_bytes)
+{
+    size_t frame_count;
+    size_t index;
+
+    if (mono_bytes != NULL) {
+        *mono_bytes = 0U;
+    }
+    if (input == NULL || mono == NULL || mono_bytes == NULL ||
+        input_bytes == 0U || channels == 0U) {
+        return RIVER_ERR_ARG;
+    }
+    if (channels == 1U) {
+        if (input_bytes > mono_capacity_bytes) {
+            return RIVER_ERR_NO_MEMORY;
+        }
+        memcpy(mono, input, input_bytes);
+        *mono_bytes = input_bytes;
+        return RIVER_OK;
+    }
+    if (channels != 2U ||
+        (input_bytes % (channels * sizeof(int16_t))) != 0U) {
+        return RIVER_ERR_UNSUPPORTED;
+    }
+
+    frame_count = input_bytes / (channels * sizeof(int16_t));
+    if ((frame_count * sizeof(int16_t)) > mono_capacity_bytes) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    for (index = 0U; index < frame_count; ++index) {
+        int32_t left = input[index * 2U];
+        int32_t right = input[index * 2U + 1U];
+        mono[index] = (int16_t)((left + right) / 2);
+    }
+    *mono_bytes = frame_count * sizeof(int16_t);
+    return RIVER_OK;
+}
+
 static bool river_orvibo_audio_playback_rate_supported(uint32_t sample_rate)
 {
     switch (sample_rate) {
@@ -788,9 +838,11 @@ river_status_t river_orvibo_audio_service_handle_downlink(
     uint32_t frame_duration_ms)
 {
     size_t pcm_bytes = 0U;
+    size_t mono_bytes = 0U;
     size_t playback_mono_bytes = 0U;
     uint32_t playback_sample_rate;
     river_status_t resample_status;
+    river_status_t downmix_status;
 
     if (packet == NULL || packet_bytes == 0U) {
         return RIVER_ERR_ARG;
@@ -798,7 +850,7 @@ river_status_t river_orvibo_audio_service_handle_downlink(
     if (channels == 0U) {
         channels = 1U;
     }
-    if (channels != 1U) {
+    if (channels > RIVER_ORVIBO_DOWNLINK_MAX_CHANNELS) {
         RIVER_LOGE("downlink unsupported channels=%lu", (unsigned long)channels);
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -831,18 +883,32 @@ river_status_t river_orvibo_audio_service_handle_downlink(
         return RIVER_ERR_IO;
     }
     g_river_orvibo_audio.decode_ok++;
+    downmix_status = river_orvibo_audio_downmix_to_mono(
+        g_river_orvibo_audio.downlink_pcm,
+        pcm_bytes,
+        channels,
+        g_river_orvibo_audio.downlink_mono,
+        sizeof(g_river_orvibo_audio.downlink_mono),
+        &mono_bytes);
+    if (downmix_status != RIVER_OK) {
+        g_river_orvibo_audio.decode_fail++;
+        return downmix_status;
+    }
     playback_sample_rate = river_orvibo_audio_select_playback_sample_rate(sample_rate);
     if (sample_rate != g_river_orvibo_audio.last_downlink_sample_rate ||
+        channels != g_river_orvibo_audio.last_downlink_channels ||
         playback_sample_rate != g_river_orvibo_audio.last_playback_sample_rate) {
-        RIVER_LOGI("downlink playback rate: server=%luHz playback=%luHz frame=%lums",
+        RIVER_LOGI("downlink playback rate: server=%luHz/%luch playback=%luHz/2ch frame=%lums",
                    (unsigned long)sample_rate,
+                   (unsigned long)channels,
                    (unsigned long)playback_sample_rate,
                    (unsigned long)frame_duration_ms);
         g_river_orvibo_audio.last_downlink_sample_rate = sample_rate;
+        g_river_orvibo_audio.last_downlink_channels = channels;
         g_river_orvibo_audio.last_playback_sample_rate = playback_sample_rate;
     }
-    resample_status = river_orvibo_audio_resample_mono(g_river_orvibo_audio.downlink_pcm,
-                                                       pcm_bytes,
+    resample_status = river_orvibo_audio_resample_mono(g_river_orvibo_audio.downlink_mono,
+                                                       mono_bytes,
                                                        sample_rate,
                                                        g_river_orvibo_audio.downlink_playback_pcm,
                                                        sizeof(g_river_orvibo_audio.downlink_playback_pcm),
@@ -931,7 +997,7 @@ void river_orvibo_audio_service_stop_playback(const char *reason)
 
 void river_orvibo_audio_service_dump_status(void)
 {
-    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu->%lu playback=%s write=%lu/%lu bp_drop=%lu bp_high=%lu buf=%lu/%lu",
+    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_drop=%lu bp_high=%lu buf=%lu/%lu",
                g_river_orvibo_audio.running ? "yes" : "no",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
@@ -956,6 +1022,7 @@ void river_orvibo_audio_service_dump_status(void)
                (unsigned long)g_river_orvibo_audio.resample_bypass,
                (unsigned long)g_river_orvibo_audio.resample_fail,
                (unsigned long)g_river_orvibo_audio.last_downlink_sample_rate,
+               (unsigned long)g_river_orvibo_audio.last_downlink_channels,
                (unsigned long)g_river_orvibo_audio.last_playback_sample_rate,
                g_river_orvibo_audio.playback_started ? "started" : "stopped",
                (unsigned long)g_river_orvibo_audio.playback_write_ok,

@@ -180,6 +180,7 @@ static void river_orvibo_emit_event(river_orvibo_protocol_event_type_t type,
                                     const uint8_t *audio_data,
                                     size_t audio_bytes,
                                     uint32_t sample_rate,
+                                    uint32_t channels,
                                     uint32_t frame_duration_ms,
                                     uint32_t timestamp_ms)
 {
@@ -201,6 +202,7 @@ static void river_orvibo_emit_event(river_orvibo_protocol_event_type_t type,
     event.audio_data = audio_data;
     event.audio_bytes = audio_bytes;
     event.sample_rate = sample_rate;
+    event.channels = channels;
     event.frame_duration_ms = frame_duration_ms;
     event.timestamp_ms = timestamp_ms;
     g_river_orvibo_protocol.event_handler(&event,
@@ -404,6 +406,7 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
                                 0U,
                                 0U,
                                 0U,
+                                0U,
                                 0U);
         return;
     }
@@ -447,6 +450,7 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
                             NULL,
                             0U,
                             g_river_orvibo_protocol.server_sample_rate,
+                            g_river_orvibo_protocol.server_channels,
                             g_river_orvibo_protocol.server_frame_duration_ms,
                             0U);
     river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_AUDIO_CHANNEL_OPENED,
@@ -457,6 +461,7 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
                             NULL,
                             0U,
                             g_river_orvibo_protocol.server_sample_rate,
+                            g_river_orvibo_protocol.server_channels,
                             g_river_orvibo_protocol.server_frame_duration_ms,
                             0U);
 }
@@ -493,6 +498,7 @@ static void river_orvibo_handle_mcp_message(const cJSON *root)
                             0U,
                             0U,
                             0U,
+                            0U,
                             0U);
     if (river_orvibo_mcp_volume_handle(payload, response_json, sizeof(response_json)) == RIVER_OK &&
         response_json[0] != '\0') {
@@ -519,6 +525,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                 "json_parse_failed",
                                 NULL,
                                 NULL,
+                                0U,
                                 0U,
                                 0U,
                                 0U,
@@ -563,6 +570,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                     0U,
                                     0U,
                                     0U,
+                                    0U,
                                     0U);
         } else if (state != NULL && strcmp(state, "sentence_start") == 0) {
             g_river_orvibo_protocol.tts_sentence_rx++;
@@ -575,6 +583,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                     0U,
                                     0U,
                                     0U,
+                                    0U,
                                     0U);
         } else if (state != NULL && strcmp(state, "stop") == 0) {
             river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_TTS_STOP,
@@ -583,6 +592,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                     NULL,
                                     NULL,
                                     NULL,
+                                    0U,
                                     0U,
                                     0U,
                                     0U,
@@ -602,6 +612,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                 NULL,
                                 NULL,
                                 NULL,
+                                0U,
                                 0U,
                                 0U,
                                 0U,
@@ -626,6 +637,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                 0U,
                                 0U,
                                 0U,
+                                0U,
                                 0U);
     } else if (strcmp(type, "mcp") == 0) {
         river_orvibo_handle_mcp_message(root);
@@ -643,6 +655,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                     0U,
                                     0U,
                                     0U,
+                                    0U,
                                     0U);
         }
     } else if (strcmp(type, "alert") == 0) {
@@ -656,6 +669,7 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                 "server_error",
                                 NULL,
                                 NULL,
+                                0U,
                                 0U,
                                 0U,
                                 0U,
@@ -707,6 +721,7 @@ static void river_orvibo_handle_binary_message(const uint8_t *data, size_t data_
                             payload,
                             payload_bytes,
                             g_river_orvibo_protocol.server_sample_rate,
+                            g_river_orvibo_protocol.server_channels,
                             g_river_orvibo_protocol.server_frame_duration_ms,
                             timestamp_ms);
 }
@@ -792,6 +807,7 @@ static void river_orvibo_ws_close_cb(wsclient_context *wsclient, void *user_data
                             "transport_closed",
                             NULL,
                             NULL,
+                            0U,
                             0U,
                             0U,
                             0U,
@@ -939,6 +955,7 @@ static river_status_t river_orvibo_close_channel_on_timeout(void)
                                 "channel_timeout",
                                 NULL,
                                 NULL,
+                                0U,
                                 0U,
                                 0U,
                                 0U,
@@ -1195,6 +1212,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
                             NULL,
                             NULL,
                             NULL,
+                            0U,
                             0U,
                             0U,
                             0U,
