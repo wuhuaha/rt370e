@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.37` 已修正 Orvibo TTS 尾包收口队列时序竞态：
+  - 板端日志与静态代码共同指向一个本地时序问题，而不是服务端少发尾包：协议层 `tts stop` 文本事件此前进入 `control_queue`，而同一条 WebSocket 上的 TTS 二进制音频进入 `audio_queue`。
+  - app 主循环固定“先清空 `control_queue`，再处理 `audio_queue`”，会打乱 `tts stop` 与尾部音频的原始到达顺序。
+  - 这使得 `tts stop` 有机会先把状态从 `speaking` 收回，再让后续已到达但尚未处理的尾包在 `RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO` 分支被按 `outside speaking` 丢弃，表现为尾音未播完整。
+  - 现在 `SERVER_TTS_STARTED` / `SERVER_TTS_FINISHED` 也归入 `audio_queue`，与下行音频按到达顺序串行处理，避免 `tts stop` 抢跑。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；下一步需要板端复现长尾 TTS，确认 `drop downlink audio outside speaking` 是否消失。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.36` 已增补 Orvibo 唤醒词误触诊断日志：
   - 静态复核 `capture -> preproc -> enhanced mono -> VAD -> river_voice_kws_submit_frame(...)` 链路后，当前没有直接证据表明 Orvibo 重构破坏了 KWS 推理输入路径或 detection gate 基本策略。
   - 现阶段更强的嫌疑来自当前实验性 KWS 部署参数本身偏激进：`CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`、`CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`，比 `river_voice_kws.cc` 内部保守 fallback 默认值更容易因单次高分或短 gate 内峰值而触发。

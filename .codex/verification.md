@@ -27161,6 +27161,49 @@ Expected result:
 - `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
 - `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics
 
+## Step H.xiaozhi-client.37 - TTS tail ordering fix
+
+Confirm server TTS state events now share the ordered audio queue with downlink audio,
+so `tts stop` can no longer overtake trailing audio packets from the same websocket stream:
+```bash
+cd /root/ameba-river
+rg -n "river_orvibo_app_msg_is_audio|SERVER_TTS_STARTED|SERVER_TTS_FINISHED|APP_MSG_DOWNLINK_AUDIO|control_queue|audio_queue" \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- `river_orvibo_app_msg_is_audio(...)` returns `true` for both `RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED` and `RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED`
+- downlink audio packets and `tts start/stop` now flow through the same `audio_queue`
+- the app still uses `control_queue` for unrelated control/state events
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Reflash the board and reproduce a response with a long TTS tail.
+2. Capture logs around `tts event: state=stop`, `server text: kind=server_sentence_start`,
+   `drop downlink audio outside speaking`, `playback drain complete|timeout`,
+   `river orvibo status`, and `river orvibo audio`.
+```
+
+Expected result:
+- the tail audio continues to be accepted after `tts stop` is received, until all already-arrived trailing audio packets are drained
+- `drop downlink audio outside speaking` should no longer appear for normal TTS tail packets
+- audible tail truncation should disappear or reduce materially if this ordering bug was the primary cause
+
 ## Step H.xiaozhi-client.36 - wakeword false-trigger diagnostics
 
 Confirm the wakeword path now emits enough qualitative logs to distinguish

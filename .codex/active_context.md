@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.36 增补 Orvibo 唤醒词误触诊断日志`
+  - `Step H.xiaozhi-client.37 修正 Orvibo TTS 尾包收口队列时序`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.37` fixes a local TTS tail truncation race in Orvibo app queue ordering:
+  - board log review showed a plausible symptom cluster around `tts sentence_end`, active playback/AEC reference, and an incomplete TTS tail.
+  - static audit confirmed that protocol `tts stop` events were previously posted to `control_queue`, while downlink TTS audio packets were posted to `audio_queue`.
+  - because the Orvibo app loop always drains `control_queue` before `audio_queue`, `tts stop` could overtake already-arrived trailing downlink audio from the same websocket stream, switch state away from `speaking`, and cause the remaining packets to be dropped as `outside speaking`.
+  - `river_orvibo_app_msg_is_audio(...)` now classifies `SERVER_TTS_STARTED` and `SERVER_TTS_FINISHED` as audio-ordered messages, so they stay serialized with downlink audio in `audio_queue` and preserve stream order.
+  - latest `/root/ameba-rtos` harness and full build are the current top-of-tree verification target; board runtime confirmation still requires reflashing and replaying a long TTS response.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.36` adds qualitative wakeword diagnostics to separate KWS model/config false triggers from Orvibo refactor-side duplicate wake handling:
   - static review still indicates the current refactor preserved the KWS input path from capture/preproc through VAD gating into `river_voice_kws_submit_frame(...)`, so there is no direct code-level evidence yet that the Orvibo rebuild broke inference input plumbing.
   - the currently deployed KWS config remains notably aggressive for an experimental branch: `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517` and `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`, making single-frame crossings materially easier to trigger than the more conservative internal defaults in `river_voice_kws.cc`.

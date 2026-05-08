@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.37
+- 修正 Orvibo TTS 尾包可能被本地状态切换提前截断的队列时序竞态：
+  - 根据板端日志与代码路径复核，`tts stop` 文本事件此前走 `control_queue`，而下行 TTS Opus 音频走 `audio_queue`。
+  - app 主循环又总是“先清空 control queue，再处理 audio queue”，这会打乱同一条 WebSocket 上原本正确的到达顺序。
+  - 结果是当服务端最后几包 TTS 音频与 `tts stop` 接近同时到达时，本地可能先处理 `tts stop -> speaking -> listening -> wait_playback_idle`，随后把还没处理到的尾部音频按 `outside speaking` 直接丢弃，表现为尾音没播完整。
+- 变更：
+  - `river_orvibo_app_msg_is_audio(...)` 现在把 `RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED` 与 `RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED` 也归入 `audio_queue`。
+  - 这样 `tts start/stop` 与对应的下行音频会按协议回调的实际到达顺序在同一队列内串行处理，不再被 control/audio 双队列优先级打乱。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 XiaoZhi-compatible wire contract，只修正本地 TTS 收口时序。
+- Verification for this step:
+  - passed: static audit confirmed the previous truncation path was caused by `tts_stop` in `control_queue` overtaking trailing downlink audio in `audio_queue`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation still needs reflashing and observing whether `drop downlink audio outside speaking` disappears around TTS tail.
+
 ## Step H.xiaozhi-client.36
 - 增补 Orvibo 唤醒词误触诊断日志，优先区分“模型/阈值过激”与“重构导致的重复上抛”：
   - 静态复核当前 KWS 链路后，未发现 Orvibo 重构破坏 `capture -> preproc -> enhanced mono -> VAD -> river_voice_kws_submit_frame(...)` 输入路径的直接证据。

@@ -141,9 +141,19 @@ static void river_orvibo_app_copy_text(char *dst, size_t dst_size, const char *s
 
 static bool river_orvibo_app_msg_is_audio(const river_orvibo_app_msg_t *msg)
 {
-    return msg != NULL &&
-           (msg->type == RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK ||
-            msg->type == RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO);
+    if (msg == NULL) {
+        return false;
+    }
+    if (msg->type == RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK ||
+        msg->type == RIVER_ORVIBO_APP_MSG_DOWNLINK_AUDIO) {
+        return true;
+    }
+    if (msg->type == RIVER_ORVIBO_APP_MSG_STATE_EVENT &&
+        (msg->event == RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED ||
+         msg->event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED)) {
+        return true;
+    }
+    return false;
 }
 
 static const char *river_orvibo_app_server_text_kind_name(
