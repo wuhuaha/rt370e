@@ -8,6 +8,14 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.35` 已收敛 Orvibo volume-only MCP 的参数校验与错误语义：
+  - 再次对照 `~/xiaozhi-esp32` 后确认，参考端对 `tools/call` 的无效请求形态会返回 JSON-RPC `error.message`，而不是把这些请求错误包装为 `result.isError=true`。
+  - 再次对照 `~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 `device_mcp` 调用方优先按 JSON-RPC error 处理工具调用失败，成功路径才消费 `result.content[0].text`。
+  - 当前 Orvibo 分支此前对 `self.audio_speaker.set_volume` 会先把 `valueint` 强转为 `uint8_t`，这使负值参数存在回绕成高音量的真实行为风险。
+  - 现已在 MCP 层先用有符号整数完成 `0..100` 校验，再写入本地音量；`missing name`、`missing volume`、越界音量和未知工具统一改为 JSON-RPC error 返回。
+  - 协议层也已显式静默容忍可选应用层 `pong` 文本消息，避免未来若启用该心跳时引入无效日志噪声。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.34` 已补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环：
   - 对照 `~/xiaozhi-esp32-server` 后确认，OTA 接口会按 `client_id|device_id|timestamp` 为 websocket 下发带时间戳的鉴权 token，WebSocket 服务端则按 `expire_seconds` 校验其有效期。
   - 当前 Orvibo 分支此前只在 `access_not_ready` 或 access-not-ready 周期刷新时重新拉取 OTA；如果设备已经 `ready=true`，但后续长时间运行后 token 过期，开声道路径会持续使用旧 token 重连，形成“ready 但鉴权永远失败”的隐性死路。

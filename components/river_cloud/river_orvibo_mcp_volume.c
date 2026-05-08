@@ -184,6 +184,26 @@ exit:
     return status;
 }
 
+static river_status_t river_orvibo_mcp_build_tool_argument_error(const cJSON *id_obj,
+                                                                 const char *argument_name,
+                                                                 char *response_json,
+                                                                 size_t response_json_size)
+{
+    char message[96];
+
+    if (argument_name == NULL || argument_name[0] == '\0') {
+        return river_orvibo_mcp_build_error(id_obj,
+                                            "Missing valid argument",
+                                            response_json,
+                                            response_json_size);
+    }
+    snprintf(message, sizeof(message), "Missing valid argument: %s", argument_name);
+    return river_orvibo_mcp_build_error(id_obj,
+                                        message,
+                                        response_json,
+                                        response_json_size);
+}
+
 static river_status_t river_orvibo_mcp_handle_initialize(const cJSON *id_obj,
                                                          char *response_json,
                                                          size_t response_json_size)
@@ -352,6 +372,7 @@ river_status_t river_orvibo_mcp_volume_handle(const cJSON *payload,
     const cJSON *id_obj;
     const cJSON *volume_obj;
     char text[96];
+    int volume_value;
 
     if (payload == NULL || response_json == NULL || response_json_size == 0U) {
         return RIVER_ERR_ARG;
@@ -395,11 +416,10 @@ river_status_t river_orvibo_mcp_volume_handle(const cJSON *payload,
     }
 
     if (!cJSON_IsString(name_obj) || name_obj->valuestring == NULL) {
-        return river_orvibo_mcp_build_result(id_obj,
-                                             true,
-                                             "missing tool name",
-                                             response_json,
-                                             response_json_size);
+        return river_orvibo_mcp_build_error(id_obj,
+                                            "Missing name",
+                                            response_json,
+                                            response_json_size);
     }
 
     if (strcmp(name_obj->valuestring, "self.get_device_status") == 0) {
@@ -421,13 +441,25 @@ river_status_t river_orvibo_mcp_volume_handle(const cJSON *payload,
                              NULL;
         }
         if (!cJSON_IsNumber(volume_obj)) {
-            return river_orvibo_mcp_build_result(id_obj,
-                                                 true,
-                                                 "missing volume",
-                                                 response_json,
-                                                 response_json_size);
+            return river_orvibo_mcp_build_tool_argument_error(id_obj,
+                                                              "volume",
+                                                              response_json,
+                                                              response_json_size);
         }
-        river_orvibo_mcp_volume_set((uint8_t)volume_obj->valueint);
+        volume_value = volume_obj->valueint;
+        if (volume_value < 0) {
+            return river_orvibo_mcp_build_error(id_obj,
+                                                "Value is below minimum allowed: 0",
+                                                response_json,
+                                                response_json_size);
+        }
+        if (volume_value > 100) {
+            return river_orvibo_mcp_build_error(id_obj,
+                                                "Value exceeds maximum allowed: 100",
+                                                response_json,
+                                                response_json_size);
+        }
+        river_orvibo_mcp_volume_set((uint8_t)volume_value);
         return river_orvibo_mcp_build_result(id_obj,
                                              false,
                                              "true",
@@ -436,11 +468,11 @@ river_status_t river_orvibo_mcp_volume_handle(const cJSON *payload,
     }
 
     RIVER_LOGW("unsupported mcp tool: %s", name_obj->valuestring);
-    return river_orvibo_mcp_build_result(id_obj,
-                                         true,
-                                         "unsupported tool",
-                                         response_json,
-                                         response_json_size);
+    snprintf(text, sizeof(text), "Unknown tool: %s", name_obj->valuestring);
+    return river_orvibo_mcp_build_error(id_obj,
+                                        text,
+                                        response_json,
+                                        response_json_size);
 }
 
 void river_orvibo_mcp_volume_dump_status(void)

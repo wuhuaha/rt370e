@@ -16175,3 +16175,15 @@
   - `rg -n "PACKET_MAX|PAYLOAD_MAX|AUDIO_PACKET_MAX|oversize|payload_max|audio_max" components/river_cloud/river_orvibo_protocol.c components/river_core/river_orvibo_app.c components/river_voice/river_orvibo_audio_service.c` passed.
   - `git diff --check` passed.
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`.
+
+## Step H.xiaozhi-client.35
+- 收敛 Orvibo volume-only MCP 的参数校验与错误语义，对齐 `~/xiaozhi-esp32` / `~/py-xiaozhi` / `~/xiaozhi-esp32-server` 当前交互预期：
+  - `self.audio_speaker.set_volume` 现在在强转前显式校验 `0..100`，避免负值经过 `uint8_t` 回绕后把音量错误写成高值。
+  - `tools/call` 的 `missing name`、`missing volume`、越界音量、未知工具等失败场景改为返回 JSON-RPC `error.message`，不再混用 `result.isError=true`。
+  - 这样服务端 `device_mcp` 调用栈会按参考端同一失败语义收敛，减少工具调用异常时的歧义分支和错误信息丢失。
+  - 协议层对可选应用层 `pong` 文本消息改为静默容忍，不影响状态机，也避免未来若启用该心跳时刷屏日志。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
+- Verification for this step:
+  - `git diff --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`

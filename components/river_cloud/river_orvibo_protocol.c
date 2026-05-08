@@ -643,6 +643,8 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
                                 0U);
     } else if (strcmp(type, "mcp") == 0) {
         river_orvibo_handle_mcp_message(root);
+    } else if (strcmp(type, "pong") == 0) {
+        /* Application-level pong is optional; accept it without affecting state. */
     } else if (strcmp(type, "system") == 0) {
         const cJSON *command_obj = cJSON_GetObjectItemCaseSensitive(root, "command");
         const char *command = cJSON_IsString(command_obj) ? command_obj->valuestring : NULL;

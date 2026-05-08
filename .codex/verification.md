@@ -27160,3 +27160,54 @@ Expected result:
 - no `drop oversize downlink opus packet` appears during normal TTS
 - `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
 - `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics
+
+## Step H.xiaozhi-client.35 - MCP error semantics and volume range guard
+
+Confirm the volume-only MCP path now rejects invalid tool calls with JSON-RPC
+errors and never wraps negative volume into a large `uint8_t`:
+```bash
+cd /root/ameba-river
+rg -n "Missing valid argument: volume|Value is below minimum allowed: 0|Value exceeds maximum allowed: 100|Unknown tool|strcmp\\(type, \"pong\"\\)" \
+  components/river_cloud/river_orvibo_mcp_volume.c \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- volume tool validates `0..100` before calling `river_orvibo_mcp_volume_set`
+- invalid tool-call failures use `river_orvibo_mcp_build_error(...)`
+- protocol text handler explicitly tolerates optional `pong`
+
+Run static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Boot the board and wait for `orvibo access: ready=yes`.
+2. Trigger wake or run `river orvibo connect`.
+3. From the XiaoZhi-compatible server side, call `self.audio_speaker.set_volume` with a valid value such as `30`.
+4. Then intentionally test invalid MCP arguments such as `-1`, `101`, or an unknown tool name.
+```
+
+Expected result:
+- valid volume calls still succeed and board-side logs show `volume set: percent=30`
+- invalid calls return clear JSON-RPC `error.message` on the server side
+- invalid negative volume never changes the local cached volume to a wrapped high value

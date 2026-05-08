@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.34 补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环`
+  - `Step H.xiaozhi-client.35 收敛 Orvibo volume-only MCP 参数校验与错误语义`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,14 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.35` aligns Orvibo volume-only MCP failure behavior with the XiaoZhi reference stack:
+  - reference comparison against `~/xiaozhi-esp32` confirmed invalid tool name / missing argument / out-of-range integer paths are returned as JSON-RPC `error.message`, not as a successful `result` envelope carrying `isError=true`.
+  - reference comparison against `~/py-xiaozhi` and `~/xiaozhi-esp32-server` confirmed the current server-side device-MCP caller prefers JSON-RPC error handling for these request-shape failures and otherwise only inspects `result.content[0].text` on success.
+  - the current Orvibo branch previously accepted negative volume, cast it through `uint8_t`, and could therefore wrap `-1` into a large local volume value before the later `>100` clamp.
+  - Orvibo MCP now validates `self.audio_speaker.set_volume` in signed integer space before casting, rejects `<0` / `>100`, returns JSON-RPC errors for invalid tool-call shape failures, and still keeps the successful volume-only MCP surface unchanged.
+  - protocol text handling now explicitly tolerates optional application-layer `pong` messages without affecting state or producing noisy logs.
+  - latest `/root/ameba-rtos` harness and full build are the current top-of-tree verification target; board runtime confirmation remains blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.34` refreshes OTA-issued websocket config before treating reconnect failure as terminal:
   - reference audit against `~/xiaozhi-esp32-server` confirmed OTA issues websocket tokens signed from `client_id|device_id|timestamp`, while the websocket server verifies both signature and `expire_seconds`.
   - the current Orvibo branch previously kept `access.ready=true` after a successful OTA pull and therefore kept retrying stale websocket credentials if a later reconnect happened after token expiry.
