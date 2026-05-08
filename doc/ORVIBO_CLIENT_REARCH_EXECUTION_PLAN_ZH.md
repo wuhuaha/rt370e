@@ -8,7 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
-- `Step H.xiaozhi-client.21` 正在对齐 client hello / listen mode 语义与当前 Orvibo 音频能力：
+- `Step H.xiaozhi-client.22` 已对齐 `listen detect.text` 与 XiaoZhi 服务端默认唤醒词语义：
+  - 对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，服务端会把 `listen detect.text` 当作“唤醒词或直接文本输入”处理；默认 `wakeup_words` 配置包含 `你好小智`，不包含当前本地 KWS 固定文本 `小欧管家`。
+  - Orvibo app 现已把云侧 `listen detect.text` 收敛为 Orvibo-owned、可配置、默认兼容 XiaoZhi 服务端的标准唤醒词 `RIVER_ORVIBO_SERVER_WAKE_TEXT`，默认值为 `你好小智`。
+  - 本地 KWS 文本、日志、tensor dump、alignment replay、board/local parity、VAD、AEC/BF 均保持不变。
+  - 当前 `/root/ameba-rtos` 路径下的静态检查、harness 检查和完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+- `Step H.xiaozhi-client.21` 已对齐 client hello / listen mode 语义与当前 Orvibo 音频能力：
   - 对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，参考端不会把 `listen_start.mode` 固定写死为 `auto`；默认模式会根据双工/AEC 能力在 `auto` 与 `realtime` 之间切换。
   - 当前 Orvibo 实现此前一直固定发送 `mode=auto`，且 hello 未按本分支现有语音 profile 能力声明 `features.aec`，会让服务端在支持实时双工的 profile 上按错误会话语义处理。
   - Orvibo app 已改为按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力位选择 `listen_start.mode`；Orvibo hello 也会在对应 profile 下声明 `features.aec=true`。

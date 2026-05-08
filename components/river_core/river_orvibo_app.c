@@ -12,6 +12,7 @@
 #include "river/river_orvibo_access.h"
 #include "river/river_orvibo_app.h"
 #include "river/river_orvibo_audio_service.h"
+#include "river/river_orvibo_credentials.h"
 #include "river/river_orvibo_mcp_volume.h"
 #include "river/river_orvibo_protocol.h"
 #include "river/river_orvibo_state.h"
@@ -441,6 +442,14 @@ static const char *river_orvibo_app_listen_mode(void)
     return "auto";
 }
 
+static const char *river_orvibo_app_server_wake_text(void)
+{
+    if (RIVER_ORVIBO_SERVER_WAKE_TEXT[0] != '\0') {
+        return RIVER_ORVIBO_SERVER_WAKE_TEXT;
+    }
+    return "你好小智";
+}
+
 static void river_orvibo_app_mark_protocol_control_skipped(const char *action,
                                                            const char *reason)
 {
@@ -580,9 +589,12 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
     if ((actions & RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED) != 0U) {
         if (river_orvibo_app_protocol_control_channel_open("send_wake_detected")) {
             river_status_t status = river_orvibo_protocol_send_wake_word_detected(
-                g_river_orvibo_app.wake_text[0] != '\0' ?
-                    g_river_orvibo_app.wake_text :
-                    "小欧管家");
+                river_orvibo_app_server_wake_text());
+            RIVER_LOGI("server wake detect text=%s local_wake=%s",
+                       river_orvibo_app_server_wake_text(),
+                       g_river_orvibo_app.wake_text[0] != '\0' ?
+                           g_river_orvibo_app.wake_text :
+                           "-");
             river_orvibo_app_record_protocol_control("send_wake_detected", status, true);
         }
     }

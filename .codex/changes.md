@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.22
+- 对齐 `listen detect.text` 与 XiaoZhi 服务端默认唤醒词语义：
+  - 继续对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，服务端会把 `listen detect.text` 当作“唤醒词或直接文本输入”处理；默认配置下 `wakeup_words` 包含 `你好小智`，并不包含当前本地 KWS 固定命中的 `小欧管家`。
+  - 这意味着如果把本地 KWS 文本原样上报，服务端可能把首次 `detect` 当作一条普通文本去对话，而不是标准唤醒语义。
+- 变更：
+  - 新增 `CONFIG_RIVER_ORVIBO_SERVER_WAKE_TEXT` / `RIVER_ORVIBO_SERVER_WAKE_TEXT`，默认值为 `你好小智`。
+  - `river_orvibo_app` 发送 `listen detect` 时改为上报服务端标准唤醒词，而不再直接复用本地 KWS 文本。
+  - 新增诊断日志 `server wake detect text=... local_wake=...`，保留本地命中词可观测性。
+- 保持受保护能力不变：
+  - 本地 VAD、唤醒词/KWS 模型与命中词、tensor dump、alignment replay、board/local parity、AEC/BF 完全不变。
+  - 仅修正发往 XiaoZhi-compatible 服务端的 `listen detect.text` 协议语义。
+- Verification for this step:
+  - passed: static grep confirmed cloud-facing wake text now comes from `RIVER_ORVIBO_SERVER_WAKE_TEXT`, while local KWS still preserves `小欧管家`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - blocked: board runtime confirmation is still trapped in the current historical pure-`0x00` UART session state, so the expected `server wake detect text=... local_wake=...` log is not yet captured on board.
+
 ## Step H.xiaozhi-client.21
 - 对齐 Orvibo 端与 XiaoZhi 参考端的 listening mode / hello 特性声明：
   - H.20 之后继续对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server`，确认参考端不会把 `listen_start` 固定写死为 `auto`；默认模式会根据端侧是否具备 AEC/双工能力在 `auto` 与 `realtime` 间切换。

@@ -1,3 +1,50 @@
+## Step H.xiaozhi-client.22 Verification
+
+Confirm the client now preserves local KWS text internally but normalizes
+`listen detect.text` to the XiaoZhi-compatible server wake text:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_SERVER_WAKE_TEXT|server_wake_text|server wake detect text|send_wake_word_detected" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h \
+  components/river_core/river_orvibo_app.c
+rg -n "g_river_voice_kws_text|小欧管家" components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- Orvibo cloud-facing wake text defaults to `你好小智`.
+- local KWS implementation still keeps its existing protected wake text path.
+- `listen detect.text` no longer depends on the local KWS text constant.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - `rg -n "RIVER_ORVIBO_SERVER_WAKE_TEXT|server_wake_text|server wake detect text|send_wake_word_detected" Kconfig include/river/river_orvibo_credentials.h components/river_core/river_orvibo_app.c`
+  - `rg -n "g_river_voice_kws_text|小欧管家" components/river_voice/river_voice_kws.cc`
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime verification for `server wake detect text=... local_wake=...`
+  - board UART remains in the same historical pure-`0x00` session state seen in H.21, so no readable runtime log could be captured this step
+- current conclusion:
+  - H.22 is statically verified and builds on the active `/root/ameba-rtos` baseline.
+  - board-side runtime proof remains pending due to the current board/UART session condition rather than a known compile or protocol defect.
+
 ## Step H.xiaozhi-client.21 Verification
 
 Confirm Orvibo hello/listen mode selection now follows the active voice profile capability:

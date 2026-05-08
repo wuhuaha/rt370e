@@ -50,6 +50,17 @@ config RIVER_ORVIBO_PROTOCOL_VERSION
     default 3
     depends on RIVER_ORVIBO_CLIENT_EN
 
+config RIVER_ORVIBO_SERVER_WAKE_TEXT
+    string "Orvibo server wake text"
+    default "你好小智"
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Text sent in the XiaoZhi-compatible `listen detect` control message after
+      the local wake-word path triggers. This is intentionally decoupled from
+      the protected local KWS implementation so the branch can preserve the
+      current on-device wake phrase while still matching the target server's
+      expected wakeup-word semantics.
+
 config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y

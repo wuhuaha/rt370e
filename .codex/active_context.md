@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.20 收敛 Orvibo 控制帧与 WebSocket close 竞态（实板验证通过）`
+  - `Step H.xiaozhi-client.21 对齐 Orvibo 会话模式与 AEC 能力声明`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,7 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
-- `Step H.xiaozhi-client.21` is in progress to align client hello/listen-mode semantics with the active Orvibo voice profile:
+- `Step H.xiaozhi-client.22` normalizes cloud-facing wake text for XiaoZhi-compatible servers:
+  - reference comparison confirmed the current branch preserves a local KWS hit text `小欧管家`, while the target server default wakeup-word handling expects `listen detect.text` values aligned with configured wake words such as `你好小智`.
+  - Orvibo app now decouples the protected local KWS text from the cloud-facing `listen detect.text`, using the new configurable `RIVER_ORVIBO_SERVER_WAKE_TEXT` and defaulting it to `你好小智`.
+  - static checks, harness check, and latest-SDK build have all passed on `/root/ameba-rtos`.
+  - board runtime confirmation is still blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state, so the expected `server wake detect text` log is not yet captured on board.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
+- `Step H.xiaozhi-client.21` aligns client hello/listen-mode semantics with the active Orvibo voice profile:
   - reference comparison confirmed XiaoZhi clients do not hardcode post-wake listening mode; they switch between `auto` and `realtime` based on duplex/AEC capability.
   - Orvibo app now selects `listen_start.mode` from current voice-profile capability bits instead of always sending `auto`.
   - Orvibo protocol hello now declares `features.aec=true` when the active profile exposes AEC or native capture-reference capability, keeping server-side policy selection aligned with the branch's actual duplex path.
