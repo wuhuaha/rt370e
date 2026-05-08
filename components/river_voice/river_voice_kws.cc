@@ -329,6 +329,10 @@ extern "C" {
 #define CONFIG_RIVER_KWS_COOLDOWN_MS 1800
 #endif
 
+#ifndef CONFIG_RIVER_KWS_GATE_FALLBACK_EN
+#define CONFIG_RIVER_KWS_GATE_FALLBACK_EN 0
+#endif
+
 #ifndef CONFIG_RIVER_KWS_LOG_PERIOD_MS
 #define CONFIG_RIVER_KWS_LOG_PERIOD_MS 1000
 #endif
@@ -1535,6 +1539,11 @@ static inline uint32_t river_voice_kws_score_threshold_q15(void)
     return (uint32_t)CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15;
 }
 
+static inline bool river_voice_kws_gate_fallback_enabled(void)
+{
+    return CONFIG_RIVER_KWS_GATE_FALLBACK_EN != 0;
+}
+
 static inline uint32_t river_voice_kws_gate_fallback_threshold_q15(void)
 {
     uint32_t primary = river_voice_kws_score_threshold_q15();
@@ -2723,6 +2732,7 @@ static void river_voice_kws_emit_trigger(river_voice_kws_context_t *context,
     uint32_t threshold_pm;
     uint32_t fallback_threshold_pm;
     uint32_t gate_best_pm;
+    const char *fallback_state;
 
     if (context == NULL) {
         return;
@@ -2742,18 +2752,22 @@ static void river_voice_kws_emit_trigger(river_voice_kws_context_t *context,
     context->gate_triggered = true;
     threshold_pm =
         river_voice_kws_confidence_to_permille(river_voice_kws_score_threshold_q15());
-    fallback_threshold_pm =
-        river_voice_kws_confidence_to_permille(river_voice_kws_gate_fallback_threshold_q15());
+    fallback_state = river_voice_kws_gate_fallback_enabled() ? "on" : "off";
+    fallback_threshold_pm = river_voice_kws_gate_fallback_enabled() ?
+        river_voice_kws_confidence_to_permille(
+            river_voice_kws_gate_fallback_threshold_q15()) :
+        0U;
     gate_best_pm =
         river_voice_kws_confidence_to_permille(context->gate_best_confidence_q15);
 
-    RIVER_LOGI("wakeword hit: text=%s score_pm=%lu q15=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu gate_infer=%lu hits=%lu triggers=%lu cooldown_ms=%u mode=%s",
+    RIVER_LOGI("wakeword hit: text=%s score_pm=%lu q15=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu fallback=%s gate_infer=%lu hits=%lu triggers=%lu cooldown_ms=%u mode=%s",
                g_river_voice_kws_text,
                (unsigned long)river_voice_kws_confidence_to_permille(confidence_q15),
                (unsigned long)confidence_q15,
                (unsigned long)gate_best_pm,
                (unsigned long)threshold_pm,
                (unsigned long)fallback_threshold_pm,
+               fallback_state,
                (unsigned long)context->gate_inference_count,
                (unsigned long)context->hit_count,
                (unsigned long)context->trigger_count,
@@ -3215,6 +3229,10 @@ static void river_voice_kws_maybe_emit_trigger(river_voice_kws_context_t *contex
         return;
     }
 
+    if (!river_voice_kws_gate_fallback_enabled()) {
+        return;
+    }
+
     fallback_threshold_q15 = river_voice_kws_gate_fallback_threshold_q15();
     if (context->gate_best_confidence_q15 < fallback_threshold_q15 ||
         context->gate_inference_count < RIVER_KWS_GATE_FALLBACK_MIN_INFER) {
@@ -3244,6 +3262,7 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
     uint32_t pre_roll_count;
     uint32_t pre_roll_peak;
     uint32_t gate_best_permille;
+    const char *fallback_state;
 
     river_voice_kws_update_peak_window(context);
     now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
@@ -3260,8 +3279,11 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
         river_voice_kws_confidence_to_permille(context->last_confidence_q15);
     threshold_permille =
         river_voice_kws_confidence_to_permille(river_voice_kws_score_threshold_q15());
-    fallback_threshold_permille =
-        river_voice_kws_confidence_to_permille(river_voice_kws_gate_fallback_threshold_q15());
+    fallback_state = river_voice_kws_gate_fallback_enabled() ? "on" : "off";
+    fallback_threshold_permille = river_voice_kws_gate_fallback_enabled() ?
+        river_voice_kws_confidence_to_permille(
+            river_voice_kws_gate_fallback_threshold_q15()) :
+        0U;
     gate_best_permille =
         river_voice_kws_confidence_to_permille(context->gate_best_confidence_q15);
     queue_count = river_audio_frame_ring_count(&context->input_ring);
@@ -3269,13 +3291,14 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
     pre_roll_count = river_audio_frame_ring_count(&context->pre_roll_ring);
     pre_roll_peak = river_audio_frame_ring_peak_count(&context->pre_roll_ring);
 
-    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu trim_ops=%lu trim_drop=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu last_raw=%ld same=[r:%lu f:%lu i:%lu] last_feat_hash=0x%08lx last_input_hash=0x%08lx",
+    RIVER_LOGI("kws status: gate=%s ready=%s score_pm=%lu gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu fallback=%s streak=%lu/%u hits=%lu triggers=%lu cooldown_left_ms=%lu window=%lu/%u infer=%lu gate_infer=%lu queue=%lu/%u peak=%lu dropped=%lu trim_ops=%lu trim_drop=%lu pre=%lu/%u pre_peak=%lu pre_dropped=%lu opens=%lu closes=%lu last_raw=%ld same=[r:%lu f:%lu i:%lu] last_feat_hash=0x%08lx last_input_hash=0x%08lx",
                context->gate_open ? "open" : "closed",
                context->window_ready ? "yes" : "no",
                (unsigned long)score_permille,
                (unsigned long)gate_best_permille,
                (unsigned long)threshold_permille,
                (unsigned long)fallback_threshold_permille,
+               fallback_state,
                (unsigned long)context->hit_streak,
                (unsigned int)CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES,
                (unsigned long)context->hit_count,
@@ -4319,6 +4342,7 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
     uint32_t threshold_permille;
     uint32_t fallback_threshold_permille;
     uint32_t queue_count;
+    const char *fallback_state;
 
     if (context == NULL || !context->initialized) {
         return RIVER_ERR_NOT_FOUND;
@@ -4346,13 +4370,19 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                         context->gate_best_confidence_q15);
                 threshold_permille = river_voice_kws_confidence_to_permille(
                     river_voice_kws_score_threshold_q15());
-                fallback_threshold_permille = river_voice_kws_confidence_to_permille(
-                    river_voice_kws_gate_fallback_threshold_q15());
+                fallback_state =
+                    river_voice_kws_gate_fallback_enabled() ? "on" : "off";
+                fallback_threshold_permille =
+                    river_voice_kws_gate_fallback_enabled() ?
+                        river_voice_kws_confidence_to_permille(
+                            river_voice_kws_gate_fallback_threshold_q15()) :
+                        0U;
                 queue_count = river_audio_frame_ring_count(&context->input_ring);
-                RIVER_LOGI("kws gate close: gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu gate_infer=%lu queue=%lu/%u dropped=%lu latched_trigger=yes",
+                RIVER_LOGI("kws gate close: gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu fallback=%s gate_infer=%lu queue=%lu/%u dropped=%lu latched_trigger=yes",
                            (unsigned long)gate_best_permille,
                            (unsigned long)threshold_permille,
                            (unsigned long)fallback_threshold_permille,
+                           fallback_state,
                            (unsigned long)context->gate_inference_count,
                            (unsigned long)queue_count,
                            (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
@@ -4402,13 +4432,17 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                 context->gate_best_confidence_q15);
         threshold_permille = river_voice_kws_confidence_to_permille(
             river_voice_kws_score_threshold_q15());
-        fallback_threshold_permille = river_voice_kws_confidence_to_permille(
-            river_voice_kws_gate_fallback_threshold_q15());
+        fallback_state = river_voice_kws_gate_fallback_enabled() ? "on" : "off";
+        fallback_threshold_permille = river_voice_kws_gate_fallback_enabled() ?
+            river_voice_kws_confidence_to_permille(
+                river_voice_kws_gate_fallback_threshold_q15()) :
+            0U;
         queue_count = river_audio_frame_ring_count(&context->input_ring);
-        RIVER_LOGI("kws gate close: gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu gate_infer=%lu queue=%lu/%u dropped=%lu latched_trigger=no",
+        RIVER_LOGI("kws gate close: gate_best_pm=%lu thresh_pm=%lu weak_pm=%lu fallback=%s gate_infer=%lu queue=%lu/%u dropped=%lu latched_trigger=no",
                    (unsigned long)gate_best_permille,
                    (unsigned long)threshold_permille,
                    (unsigned long)fallback_threshold_permille,
+                   fallback_state,
                    (unsigned long)context->gate_inference_count,
                    (unsigned long)queue_count,
                    (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
@@ -4434,7 +4468,7 @@ extern "C" void river_voice_kws_dump_profile(void)
             (unsigned long)g_river_voice_kws->input_shape[3] :
             1UL;
 
-    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=%u hop=%u center=%s arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u trim=%u->%u",
+    RIVER_LOGI("kws backend: runtime=tflite_micro input=%lux%lux%lu log_mel sr=16k fft=%u hop=%u center=%s arena=%uKB model=%luB variant=%s stride=%u threshold_q15=%u hold=%u cooldown_ms=%u fallback=%s gate=vad pre_roll_ms=%u pre_roll_flush=%u queue=%u trim=%u->%u",
                input_dim1,
                input_dim2,
                input_dim3,
@@ -4448,6 +4482,7 @@ extern "C" void river_voice_kws_dump_profile(void)
                (unsigned int)CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15,
                (unsigned int)CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES,
                (unsigned int)CONFIG_RIVER_KWS_COOLDOWN_MS,
+               river_voice_kws_gate_fallback_enabled() ? "on" : "off",
                (unsigned int)CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS,
                (unsigned int)RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES,
                (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,

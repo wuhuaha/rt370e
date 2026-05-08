@@ -27161,6 +27161,54 @@ Expected result:
 - `oversize=0/0` remains stable unless the server sends an invalidly large Opus packet
 - `payload_max=1536`, `audio_max=1536`, and `packet_max=1536` appear in diagnostics
 
+## Step H.xiaozhi-client.38 - conservative KWS trigger profile
+
+Confirm the conservative KWS profile is compiled into the branch and the VAD
+gate fallback can no longer bypass the two-hit main threshold hold:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_KWS_GATE_FALLBACK_EN|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9831|CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2|CONFIG_RIVER_KWS_COOLDOWN_MS=2500|CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n|fallback=on|fallback=off|gate_fallback" \
+  Kconfig prj.conf components/river_voice/river_voice_kws.cc
+```
+
+Expected result:
+- `prj.conf` sets `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9831`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`, and `CONFIG_RIVER_KWS_COOLDOWN_MS=2500`
+- `prj.conf` explicitly disables fallback with `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n`
+- `river_voice_kws_maybe_emit_trigger(...)` returns before the gate-fallback trigger path when fallback is disabled
+- `kws backend`, `wakeword hit`, `kws status`, and `kws gate close` logs include `fallback=on|off`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash the board and capture the boot-time `kws backend` line.
+2. Confirm it reports `threshold_q15=9831 hold=2 cooldown_ms=2500 fallback=off`.
+3. Say the real wake word several times at normal distance and volume.
+4. Say the previously false-triggering non-wake phrase several times.
+5. Preserve nearby `kws diag`, `kws status`, `kws gate close`, `wakeword hit`,
+   and `wake bridge` lines.
+```
+
+Expected result:
+- real wake attempts should still emit `wakeword hit` when at least two consecutive inferences exceed about `300pm`
+- non-wake utterances with only one `300pm+` spike should no longer emit `wakeword hit`
+- `mode=gate_fallback` should not appear while `fallback=off`
+- if real wake misses but logs show only one inference above `300pm`, keep `hold=2` and lower the threshold toward `9517..9670`
+- if false wakes persist with two consecutive scores above `300pm`, the next conservative step is to raise threshold toward `10486` (`~320pm`) and retest recall
+
 ## Step H.xiaozhi-client.37 - TTS tail ordering fix
 
 Confirm server TTS state events now share the ordered audio queue with downlink audio,

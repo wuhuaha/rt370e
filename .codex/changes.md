@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.38
+- 收敛 Orvibo 分支的 KWS 保守唤醒参数，用于降低当前板端“非唤醒词也被触发”的误唤醒概率：
+  - 根据用户提供的两段日志，真实唤醒样本约 `318pm/q15=10452`，误唤醒样本先出现 `283pm`、随后单次尖峰 `338pm/q15=11107` 并被当前 `hold=1` 直接触发。
+  - 当前 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517` 约等于 `290pm`，且 `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`，对单次高分尖峰过于敏感。
+  - 仅把阈值直接抬到 `320pm+` 会明显威胁已观察到的 `318pm` 真实唤醒，因此本步优先使用“轻微抬阈值 + 连续命中确认 + 关闭 gate fallback”的保守验证方案。
+- 变更：
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从 `9517` 调整为 `9831`，约 `300pm`。
+  - `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` 从 `1` 调整为 `2`，要求连续两次主阈值命中才触发。
+  - `CONFIG_RIVER_KWS_COOLDOWN_MS` 从 `1800` 调整为 `2500`，降低连续误触发/重复触发概率。
+  - 新增 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN`，Kconfig 默认保留原 fallback 能力；本分支 `prj.conf` 通过 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n` 显式关闭，避免 VAD gate 结束时用单个 gate 内峰值绕过 `hold=2`。
+  - `kws backend`、`wakeword hit`、`kws status`、`kws gate close` 日志补充 `fallback=on|off`，关闭 fallback 时 `weak_pm=0`，便于板端确认实际烧录策略。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词模型、KWS 特征提取、TFLM 推理、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 Orvibo 云端协议、音频上下行、MCP volume-only、状态机主流程。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - passed: generated config check confirmed `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9831`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`, `CONFIG_RIVER_KWS_COOLDOWN_MS=2500`, and `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`.
+  - board runtime confirmation after flashing should verify `kws backend` reports `threshold_q15=9831 hold=2 cooldown_ms=2500 fallback=off` and that non-wake single-spike utterances no longer emit `wakeword hit`.
+
 ## Step H.xiaozhi-client.37
 - 修正 Orvibo TTS 尾包可能被本地状态切换提前截断的队列时序竞态：
   - 根据板端日志与代码路径复核，`tts stop` 文本事件此前走 `control_queue`，而下行 TTS Opus 音频走 `audio_queue`。

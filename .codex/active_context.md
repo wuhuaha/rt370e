@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.37 修正 Orvibo TTS 尾包收口队列时序`
+  - `Step H.xiaozhi-client.38 收敛 Orvibo KWS 保守唤醒参数`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.38` applies a conservative KWS wake trigger profile based on the latest board logs:
+  - the real wake example reached about `318pm/q15=10452`, while the false wake example was a single observed spike to about `338pm/q15=11107` after a prior below-threshold `283pm`.
+  - the previous deployed profile used about `290pm` (`CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9517`) with `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`, so one high inference was sufficient to emit `wakeword hit`.
+  - the new profile raises the main threshold only modestly to `9831` (about `300pm`) to avoid immediately losing the observed `318pm` true wake, but requires `hold=2` consecutive main-threshold hits and extends cooldown to `2500ms`.
+  - `CONFIG_RIVER_KWS_GATE_FALLBACK_EN` is introduced so the VAD gate-close fallback can be disabled during false-trigger triage; this branch sets it to `n` so a single gate-local peak cannot bypass `hold=2`.
+  - KWS startup/status/trigger/gate-close logs now expose `fallback=on|off`; with fallback disabled, `weak_pm=0` confirms the conservative profile is active on-device.
+  - local VAD, wake-word model, KWS feature extraction/inference, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
+  - latest `/root/ameba-rtos` harness and full build passed; generated config confirms `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`.
+  - board runtime confirmation still requires reflashing and comparing true-wake vs non-wake utterances.
 - `Step H.xiaozhi-client.37` fixes a local TTS tail truncation race in Orvibo app queue ordering:
   - board log review showed a plausible symptom cluster around `tts sentence_end`, active playback/AEC reference, and an incomplete TTS tail.
   - static audit confirmed that protocol `tts stop` events were previously posted to `control_queue`, while downlink TTS audio packets were posted to `audio_queue`.

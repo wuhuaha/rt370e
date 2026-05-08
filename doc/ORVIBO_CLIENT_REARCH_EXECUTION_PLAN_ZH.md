@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.38` 已按最新误唤醒日志收敛 Orvibo KWS 保守触发参数：
+  - 真实唤醒样本约 `318pm/q15=10452`，非唤醒误触样本先低于阈值到 `283pm`，随后单次峰值到 `338pm/q15=11107` 并触发。
+  - 因此不能直接把阈值抬到 `330pm+`，否则有较高概率损失已观察到的真实唤醒；本步采用更稳妥的 `300pm` 主阈值、连续两次命中确认和更长 cooldown。
+  - `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=9831`、`CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`、`CONFIG_RIVER_KWS_COOLDOWN_MS=2500`。
+  - 新增 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN`，Kconfig 默认保留原 fallback 能力；本分支 `prj.conf` 通过 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n` 显式关闭，避免 VAD gate close 用单个 gate 内峰值绕过 `hold=2`。
+  - `kws backend`、`wakeword hit`、`kws status`、`kws gate close` 均能看到 `fallback=on|off`；本分支烧录后应看到 `fallback=off` 且 `weak_pm=0`。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过，生成配置已确认 `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`。
+  - 当前变更仍只在参数和触发判定策略层，不修改本地 VAD、唤醒词模型、特征、推理、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 下一步板端验证重点：真实喊“小欧管家”应仍能触发；非唤醒短语若只有单次 `300pm+` 峰值，不应再触发 `wakeword hit`。
 - `Step H.xiaozhi-client.37` 已修正 Orvibo TTS 尾包收口队列时序竞态：
   - 板端日志与静态代码共同指向一个本地时序问题，而不是服务端少发尾包：协议层 `tts stop` 文本事件此前进入 `control_queue`，而同一条 WebSocket 上的 TTS 二进制音频进入 `audio_queue`。
   - app 主循环固定“先清空 `control_queue`，再处理 `audio_queue`”，会打乱 `tts stop` 与尾部音频的原始到达顺序。

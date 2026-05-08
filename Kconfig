@@ -426,6 +426,17 @@ config RIVER_KWS_COOLDOWN_MS
     default 1800
     depends on RIVER_VOICE_CAPABILITY_KWS
 
+config RIVER_KWS_GATE_FALLBACK_EN
+    bool "Wake-word KWS VAD gate fallback trigger"
+    default y
+    depends on RIVER_VOICE_CAPABILITY_KWS
+    help
+      Allow the VAD gate close path to emit a wake-word trigger from the
+      best score observed inside the speech gate when no consecutive main
+      threshold trigger was latched. Disable this for conservative
+      false-trigger triage so wake emission requires consecutive
+      RIVER_KWS_SCORE_THRESHOLD_Q15 hits.
+
 config RIVER_KWS_LOG_PERIOD_MS
     int "Wake-word KWS status log period in milliseconds"
     range 100 10000
