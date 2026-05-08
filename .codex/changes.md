@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.33
+- 收敛 Orvibo 非法 `server hello` 的快速失败路径：
+  - 再次审计 `river_orvibo_wait_server_hello()` 与 `river_orvibo_parse_server_hello()` 时发现，当服务端返回的 `hello` 文本消息中 `transport` 字段缺失或不是 `websocket` 时，协议层虽然会立刻发出错误事件，但握手等待循环仍然只依赖 `server_hello_received` / `ws_closed` / timeout 退出。
+  - 这会让已经明确判定为协议不兼容的会话继续空等完整 `hello` 超时窗口，导致首连失败路径比 `xiaozhi-esp32` / `py-xiaozhi` 参考端更慢，也会把实际根因从 `hello_transport_invalid` 稀释成表面的超时失败。
+- 变更：
+  - 协议上下文新增 `server_hello_rejected` 标志位。
+  - 当收到非法 `transport` 的服务端 `hello` 时，解析阶段会先标记 `server_hello_rejected=true`，再保留现有协议错误事件与 `last_error`。
+  - `river_orvibo_wait_server_hello()` 现在会在轮询循环中优先检查该标志，并以 `server_hello_rejected` 立即返回 `RIVER_ERR_IO`，不再等待完整超时。
+  - 每次重新打开音频信道时都会把 `server_hello_received` 与 `server_hello_rejected` 一并复位，避免旧失败状态污染下一轮会话。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 access 鉴权、listen/abort/TTS/MCP volume-only 的正常 wire contract，仅收敛不兼容 `server hello` 的失败收敛速度。
+- Verification for this step:
+  - passed: static diff confirmed invalid `transport` now marks `server_hello_rejected`, wait loop fast-fails on that flag, and open path resets the flag before each new session.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.32
 - 收敛 Orvibo 远端关断后的本地 transport/context 回收路径：
   - 审计 `river_orvibo_ws_close_cb()`、`river_orvibo_protocol_poll()` 与 Orvibo app/state 后发现，远端主动关闭 WebSocket 时虽然会投递 `AUDIO_CHANNEL_CLOSED` 并把状态机收回 `idle`，但状态动作本身不会立即执行 `river_orvibo_protocol_close_audio_channel()`。

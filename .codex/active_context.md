@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.32 收敛 Orvibo 远端关断后的 transport 清理路径`
+  - `Step H.xiaozhi-client.33 收敛 Orvibo 非法 server hello 的快速失败路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.33` fast-fails invalid Orvibo server hello transport negotiation:
+  - protocol audit found that if the server hello message omitted `transport` or returned a non-`websocket` value, `river_orvibo_parse_server_hello()` emitted the expected protocol error but `river_orvibo_wait_server_hello()` still waited until the hello timeout unless the socket closed first.
+  - this made a clearly incompatible server hello look like a generic timeout from the open-audio-channel path and kept failure latency worse than the XiaoZhi reference clients.
+  - protocol context now tracks `server_hello_rejected`; invalid hello transport marks that flag before emitting the existing `hello_transport_invalid` error event.
+  - `river_orvibo_wait_server_hello()` now returns `RIVER_ERR_IO` immediately when the flag is observed, and each new audio-channel open resets both `server_hello_received` and `server_hello_rejected`.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.32` closes the local websocket context immediately after remote-close state convergence:
   - protocol audit found that `river_orvibo_ws_close_cb()` already marks the channel closed and emits `AUDIO_CHANNEL_CLOSED`, but the state machine only transitioned back to `idle` without also calling `river_orvibo_protocol_close_audio_channel()`.
   - this left a closed `wsclient` context resident until the next explicit reconnect attempt, adding avoidable transport residue and empty polling noise after server-side close paths.

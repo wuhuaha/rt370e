@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.33` 已收敛 Orvibo 非法 `server hello` 的快速失败路径：
+  - 再次审计 `river_orvibo_wait_server_hello()` 与 `river_orvibo_parse_server_hello()` 后发现，当服务端 `hello` 缺失 `transport` 或返回非 `websocket` 值时，协议层虽然会立刻发出错误事件，但握手等待循环仍会继续空等完整 `hello` 超时窗口。
+  - 这会让已经明确不兼容的服务端响应在 open 路径上表现成慢超时，既放大首连时延，也掩盖真实根因为 `hello_transport_invalid`。
+  - 现已新增 `server_hello_rejected` 标志，非法 `transport` 会在解析阶段先置位，再保留现有错误事件与 `last_error`。
+  - `river_orvibo_wait_server_hello()` 发现该标志后会立即返回 `RIVER_ERR_IO`，每次重新打开音频信道时也会同步复位 `server_hello_received` / `server_hello_rejected`。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.32` 已收敛 Orvibo 远端关断后的本地 transport/context 清理路径：
   - 审计 `river_orvibo_ws_close_cb()`、Orvibo app 事件桥接和 state machine 后发现，远端主动关闭 WebSocket 时虽然会投递 `AUDIO_CHANNEL_CLOSED` 并把状态收回 `idle`，但状态动作本身不会再显式执行 `river_orvibo_protocol_close_audio_channel()`。
   - 这会让已经 closed 的 `wsclient` context 残留到下一次重连前，继续被主循环持有并进入空 transport 轮询，增加后续连接失败/重连问题的观测噪声。

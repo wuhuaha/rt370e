@@ -1,3 +1,33 @@
+## Step H.xiaozhi-client.33 Verification
+
+Confirm invalid server hello transport is rejected immediately instead of waiting for the hello timeout:
+```bash
+cd /root/ameba-river
+rg -n "server_hello_rejected|hello_transport_invalid|transport_obj->valuestring|server_hello_received = false" \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- protocol context contains `server_hello_rejected`.
+- `river_orvibo_parse_server_hello()` sets that flag before emitting the existing `hello_transport_invalid` protocol error.
+- `river_orvibo_wait_server_hello()` returns early on `server_hello_rejected` instead of relying only on timeout.
+- `river_orvibo_protocol_open_audio_channel()` resets both `server_hello_received` and `server_hello_rejected` before each new websocket session.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.32 Verification
 
 Confirm remote-close state convergence now also frees the local websocket context:

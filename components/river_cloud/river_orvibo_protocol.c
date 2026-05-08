@@ -79,6 +79,7 @@ typedef struct {
     bool uplink_task_running;
     bool session_open;
     bool server_hello_received;
+    bool server_hello_rejected;
     bool ws_closed;
     river_orvibo_protocol_config_t config;
     wsclient_context *wsclient;
@@ -396,6 +397,7 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
     transport_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "transport");
     if (!cJSON_IsString(transport_obj) || transport_obj->valuestring == NULL ||
         strcmp(transport_obj->valuestring, "websocket") != 0) {
+        g_river_orvibo_protocol.server_hello_rejected = true;
         river_orvibo_set_last_error("hello_transport_invalid");
         river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_ERROR,
                                 NULL,
@@ -892,6 +894,10 @@ static river_status_t river_orvibo_wait_server_hello(void)
             river_orvibo_set_last_error("server_hello_channel_closed");
             return RIVER_ERR_IO;
         }
+        if (g_river_orvibo_protocol.server_hello_rejected) {
+            river_orvibo_set_last_error("server_hello_rejected");
+            return RIVER_ERR_IO;
+        }
 
         status = river_orvibo_poll_once(RIVER_ORVIBO_WS_HELLO_POLL_MS);
         if (status != RIVER_OK) {
@@ -1202,6 +1208,7 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     g_river_orvibo_protocol.session_open = true;
     g_river_orvibo_protocol.ws_closed = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.server_hello_rejected = false;
     g_river_orvibo_protocol.last_incoming_ms =
         (uint32_t)rtos_time_get_current_system_time_ms();
     g_river_orvibo_protocol.session_epoch++;
