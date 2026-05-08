@@ -158,7 +158,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE;
+                actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |
+                          RIVER_ORVIBO_ACTION_AUDIO_IDLE;
             }
             break;
         case RIVER_ORVIBO_STATE_LISTENING:
@@ -175,7 +176,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_ENABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE;
+                actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |
+                          RIVER_ORVIBO_ACTION_AUDIO_IDLE;
             }
             break;
         case RIVER_ORVIBO_STATE_SPEAKING:
@@ -201,7 +203,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE |
+                actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |
+                          RIVER_ORVIBO_ACTION_AUDIO_IDLE |
                           RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             }
@@ -210,7 +213,8 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
             if (event == RIVER_ORVIBO_EVENT_RECOVERY_DONE ||
                 event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
-                actions = RIVER_ORVIBO_ACTION_AUDIO_IDLE;
+                actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |
+                          RIVER_ORVIBO_ACTION_AUDIO_IDLE;
             }
             break;
         case RIVER_ORVIBO_STATE_ERROR:

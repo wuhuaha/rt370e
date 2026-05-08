@@ -1,3 +1,31 @@
+## Step H.xiaozhi-client.32 Verification
+
+Confirm remote-close state convergence now also frees the local websocket context:
+```bash
+cd /root/ameba-river
+rg -n "AUDIO_CHANNEL_CLOSED|RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL" \
+  components/river_core/river_orvibo_state.c
+```
+
+Expected result:
+- `CONNECTING` / `LISTENING` / `SPEAKING` / `RECOVERING` all map `AUDIO_CHANNEL_CLOSED` to an action set that includes `RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL`.
+- remote-close recovery now converges to `idle` and synchronously releases the local websocket context instead of leaving cleanup until the next reconnect attempt.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.31 Verification
 
 Confirm hello-send failure now tears down the websocket context immediately:

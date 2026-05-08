@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.31 收敛 Orvibo hello 发送失败清理路径`
+  - `Step H.xiaozhi-client.32 收敛 Orvibo 远端关断后的 transport 清理路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,11 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.32` closes the local websocket context immediately after remote-close state convergence:
+  - protocol audit found that `river_orvibo_ws_close_cb()` already marks the channel closed and emits `AUDIO_CHANNEL_CLOSED`, but the state machine only transitioned back to `idle` without also calling `river_orvibo_protocol_close_audio_channel()`.
+  - this left a closed `wsclient` context resident until the next explicit reconnect attempt, adding avoidable transport residue and empty polling noise after server-side close paths.
+  - `CONNECTING` / `LISTENING` / `SPEAKING` / `RECOVERING` now all include `RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL` when handling `AUDIO_CHANNEL_CLOSED`, so remote-close and timeout-close paths synchronously release the local websocket context.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.31` closes the websocket context immediately when hello send fails:
   - protocol audit found that after `ws_connect_url()` succeeds, a `river_orvibo_send_hello()` failure returned immediately without closing the newly opened websocket context.
   - this left cleanup to the higher-level recovery path and created a short half-open session window with already-incremented session counters.

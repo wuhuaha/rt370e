@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.32
+- 收敛 Orvibo 远端关断后的本地 transport/context 回收路径：
+  - 审计 `river_orvibo_ws_close_cb()`、`river_orvibo_protocol_poll()` 与 Orvibo app/state 后发现，远端主动关闭 WebSocket 时虽然会投递 `AUDIO_CHANNEL_CLOSED` 并把状态机收回 `idle`，但状态动作本身不会立即执行 `river_orvibo_protocol_close_audio_channel()`。
+  - 这会让已经 closed 的 `wsclient` context 残留到下一次显式重连前，由主循环继续持有并反复进入空 transport 轮询，增加后续连接失败/重连排查时的噪声。
+- 变更：
+  - `CONNECTING` / `LISTENING` / `SPEAKING` / `RECOVERING` 态收到 `AUDIO_CHANNEL_CLOSED` 后，除了收敛回 `idle` 和本地音频状态外，也同步执行 `RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL`。
+  - 这样远端关断、timeout 关断、recoverable close 之后都会立即回收 websocket context，与网络丢失/显式 recover 路径保持一致。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 access 鉴权、hello/listen/abort/TTS/MCP volume-only 的 wire contract。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.31
 - 收敛 Orvibo `hello` 发送失败后的半开 WebSocket 清理路径：
   - 审计 `river_orvibo_protocol_open_audio_channel()` 时发现，`ws_connect_url()` 成功后如果 `river_orvibo_send_hello()` 失败，当前代码会直接返回错误，但不会立即关闭已创建的 websocket context。
