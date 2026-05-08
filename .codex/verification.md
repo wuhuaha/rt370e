@@ -1,3 +1,51 @@
+## Step H.xiaozhi-client.29 Verification
+
+Confirm Orvibo activation defaults to the already verified v1/no-serial flow and only uses v2/HMAC when explicitly configured:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER|RIVER_ORVIBO_ACTIVATION_HMAC_KEY|Activation-Version|Serial-Number|activation_version|activation_hmac|activation_challenge|hmac-sha256|activation_payload" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h \
+  include/river/river_orvibo_access.h \
+  components/river_cloud/river_orvibo_access.c
+```
+
+Expected result:
+- default config strings are empty, so OTA/activate keeps `Activation-Version: 1`, `{}` body, and no `Serial-Number` header.
+- when serial and HMAC key are both configured, OTA/activate switches to `Activation-Version: 2`, sends `Serial-Number`, and builds a root JSON payload with `algorithm`, `serial_number`, `challenge`, and lowercase hex `hmac`.
+- status/log output exposes activation version and whether HMAC is configured, but never prints the HMAC key.
+
+Reconfirm reference and server behavior:
+```bash
+cd /root/ameba-river
+rg -n "Activation-Version|Serial-Number|GetActivationPayload|hmac|challenge|serial_number" \
+  /root/xiaozhi-esp32/main/ota.cc
+rg -n "hmac|serial_number|Payload|challenge|efuse" \
+  /root/py-xiaozhi/src/utils/device_activator.py \
+  /root/py-xiaozhi/src/utils/device_fingerprint.py
+rg -n "activate|Activation|Device-Id|challenge|buildActivation" \
+  /root/xiaozhi-esp32-server/main/manager-api/src/main/java/xiaozhi/modules/device/controller/OTAController.java \
+  /root/xiaozhi-esp32-server/main/manager-api/src/main/java/xiaozhi/modules/device/service/impl/DeviceServiceImpl.java
+```
+
+Expected result:
+- `xiaozhi-esp32` uses v2 activation only when a serial number exists, and otherwise sends `{}`.
+- `py-xiaozhi` computes HMAC-SHA256 over the challenge using the configured raw string key.
+- current manager-api activation success remains driven by whether `Device-Id` is already bound, so Orvibo's default v1/no-serial flow remains compatible.
+
+Run static hygiene and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.28 Verification
 
 Confirm Orvibo only accepts implemented websocket protocol versions:

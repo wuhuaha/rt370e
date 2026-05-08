@@ -29,8 +29,12 @@
 #define RIVER_ORVIBO_ACCESS_CLIENT_ID_MAX       48U
 #define RIVER_ORVIBO_ACCESS_CODE_MAX            32U
 #define RIVER_ORVIBO_ACCESS_MESSAGE_MAX         160U
+#define RIVER_ORVIBO_ACCESS_CHALLENGE_MAX       256U
 #define RIVER_ORVIBO_ACCESS_ERROR_MAX           96U
 #define RIVER_ORVIBO_ACCESS_HTTP_BODY_MAX       8192U
+#define RIVER_ORVIBO_ACCESS_ACTIVATION_BODY_MAX 768U
+#define RIVER_ORVIBO_ACCESS_SHA256_DIGEST_BYTES 32U
+#define RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES  64U
 #define RIVER_ORVIBO_ACCESS_HTTP_TIMEOUT_SEC    12U
 #define RIVER_ORVIBO_ACCESS_MAX_CHECK_ROUNDS    4U
 #define RIVER_ORVIBO_ACCESS_ACTIVATE_RETRIES    10U
@@ -67,8 +71,16 @@ typedef struct {
     char client_id[RIVER_ORVIBO_ACCESS_CLIENT_ID_MAX];
     char activation_code[RIVER_ORVIBO_ACCESS_CODE_MAX];
     char activation_message[RIVER_ORVIBO_ACCESS_MESSAGE_MAX];
+    char activation_challenge[RIVER_ORVIBO_ACCESS_CHALLENGE_MAX];
     char last_error[RIVER_ORVIBO_ACCESS_ERROR_MAX];
 } river_orvibo_access_context_t;
+
+typedef struct {
+    uint8_t data[RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES];
+    uint32_t data_len;
+    uint64_t bit_len;
+    uint32_t state[8];
+} river_orvibo_sha256_t;
 
 static river_orvibo_access_context_t g_river_orvibo_access;
 
@@ -90,6 +102,290 @@ static void river_orvibo_access_set_error(const char *error)
     river_orvibo_access_copy(g_river_orvibo_access.last_error,
                              sizeof(g_river_orvibo_access.last_error),
                              error != NULL ? error : "-");
+}
+
+static bool river_orvibo_access_activation_hmac_configured(void)
+{
+    return RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER[0] != '\0' &&
+           RIVER_ORVIBO_ACTIVATION_HMAC_KEY[0] != '\0';
+}
+
+static uint8_t river_orvibo_access_activation_version(void)
+{
+    return river_orvibo_access_activation_hmac_configured() ? 2U : 1U;
+}
+
+static const char *river_orvibo_access_activation_version_header(void)
+{
+    return river_orvibo_access_activation_hmac_configured() ? "2" : "1";
+}
+
+static const char *river_orvibo_access_activation_serial_number(void)
+{
+    return river_orvibo_access_activation_hmac_configured() ?
+               RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER :
+               "";
+}
+
+static uint32_t river_orvibo_access_rotr32(uint32_t value, uint8_t bits)
+{
+    return (value >> bits) | (value << (32U - bits));
+}
+
+static uint32_t river_orvibo_access_sha256_ch(uint32_t x, uint32_t y, uint32_t z)
+{
+    return (x & y) ^ (~x & z);
+}
+
+static uint32_t river_orvibo_access_sha256_maj(uint32_t x, uint32_t y, uint32_t z)
+{
+    return (x & y) ^ (x & z) ^ (y & z);
+}
+
+static uint32_t river_orvibo_access_sha256_ep0(uint32_t x)
+{
+    return river_orvibo_access_rotr32(x, 2U) ^
+           river_orvibo_access_rotr32(x, 13U) ^
+           river_orvibo_access_rotr32(x, 22U);
+}
+
+static uint32_t river_orvibo_access_sha256_ep1(uint32_t x)
+{
+    return river_orvibo_access_rotr32(x, 6U) ^
+           river_orvibo_access_rotr32(x, 11U) ^
+           river_orvibo_access_rotr32(x, 25U);
+}
+
+static uint32_t river_orvibo_access_sha256_sig0(uint32_t x)
+{
+    return river_orvibo_access_rotr32(x, 7U) ^
+           river_orvibo_access_rotr32(x, 18U) ^
+           (x >> 3U);
+}
+
+static uint32_t river_orvibo_access_sha256_sig1(uint32_t x)
+{
+    return river_orvibo_access_rotr32(x, 17U) ^
+           river_orvibo_access_rotr32(x, 19U) ^
+           (x >> 10U);
+}
+
+static void river_orvibo_access_sha256_transform(river_orvibo_sha256_t *ctx,
+                                                 const uint8_t data[64])
+{
+    static const uint32_t k[64] = {
+        0x428a2f98UL, 0x71374491UL, 0xb5c0fbcfUL, 0xe9b5dba5UL,
+        0x3956c25bUL, 0x59f111f1UL, 0x923f82a4UL, 0xab1c5ed5UL,
+        0xd807aa98UL, 0x12835b01UL, 0x243185beUL, 0x550c7dc3UL,
+        0x72be5d74UL, 0x80deb1feUL, 0x9bdc06a7UL, 0xc19bf174UL,
+        0xe49b69c1UL, 0xefbe4786UL, 0x0fc19dc6UL, 0x240ca1ccUL,
+        0x2de92c6fUL, 0x4a7484aaUL, 0x5cb0a9dcUL, 0x76f988daUL,
+        0x983e5152UL, 0xa831c66dUL, 0xb00327c8UL, 0xbf597fc7UL,
+        0xc6e00bf3UL, 0xd5a79147UL, 0x06ca6351UL, 0x14292967UL,
+        0x27b70a85UL, 0x2e1b2138UL, 0x4d2c6dfcUL, 0x53380d13UL,
+        0x650a7354UL, 0x766a0abbUL, 0x81c2c92eUL, 0x92722c85UL,
+        0xa2bfe8a1UL, 0xa81a664bUL, 0xc24b8b70UL, 0xc76c51a3UL,
+        0xd192e819UL, 0xd6990624UL, 0xf40e3585UL, 0x106aa070UL,
+        0x19a4c116UL, 0x1e376c08UL, 0x2748774cUL, 0x34b0bcb5UL,
+        0x391c0cb3UL, 0x4ed8aa4aUL, 0x5b9cca4fUL, 0x682e6ff3UL,
+        0x748f82eeUL, 0x78a5636fUL, 0x84c87814UL, 0x8cc70208UL,
+        0x90befffaUL, 0xa4506cebUL, 0xbef9a3f7UL, 0xc67178f2UL,
+    };
+    uint32_t m[64];
+    uint32_t a;
+    uint32_t b;
+    uint32_t c;
+    uint32_t d;
+    uint32_t e;
+    uint32_t f;
+    uint32_t g;
+    uint32_t h;
+    size_t index;
+
+    for (index = 0U; index < 16U; ++index) {
+        size_t offset = index * 4U;
+
+        m[index] = ((uint32_t)data[offset] << 24U) |
+                   ((uint32_t)data[offset + 1U] << 16U) |
+                   ((uint32_t)data[offset + 2U] << 8U) |
+                   (uint32_t)data[offset + 3U];
+    }
+    for (index = 16U; index < 64U; ++index) {
+        m[index] = river_orvibo_access_sha256_sig1(m[index - 2U]) +
+                   m[index - 7U] +
+                   river_orvibo_access_sha256_sig0(m[index - 15U]) +
+                   m[index - 16U];
+    }
+
+    a = ctx->state[0];
+    b = ctx->state[1];
+    c = ctx->state[2];
+    d = ctx->state[3];
+    e = ctx->state[4];
+    f = ctx->state[5];
+    g = ctx->state[6];
+    h = ctx->state[7];
+
+    for (index = 0U; index < 64U; ++index) {
+        uint32_t t1 = h + river_orvibo_access_sha256_ep1(e) +
+                      river_orvibo_access_sha256_ch(e, f, g) + k[index] + m[index];
+        uint32_t t2 = river_orvibo_access_sha256_ep0(a) +
+                      river_orvibo_access_sha256_maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1;
+        d = c;
+        c = b;
+        b = a;
+        a = t1 + t2;
+    }
+
+    ctx->state[0] += a;
+    ctx->state[1] += b;
+    ctx->state[2] += c;
+    ctx->state[3] += d;
+    ctx->state[4] += e;
+    ctx->state[5] += f;
+    ctx->state[6] += g;
+    ctx->state[7] += h;
+}
+
+static void river_orvibo_access_sha256_init(river_orvibo_sha256_t *ctx)
+{
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->state[0] = 0x6a09e667UL;
+    ctx->state[1] = 0xbb67ae85UL;
+    ctx->state[2] = 0x3c6ef372UL;
+    ctx->state[3] = 0xa54ff53aUL;
+    ctx->state[4] = 0x510e527fUL;
+    ctx->state[5] = 0x9b05688cUL;
+    ctx->state[6] = 0x1f83d9abUL;
+    ctx->state[7] = 0x5be0cd19UL;
+}
+
+static void river_orvibo_access_sha256_update(river_orvibo_sha256_t *ctx,
+                                              const uint8_t *data,
+                                              size_t len)
+{
+    size_t index;
+
+    if (ctx == NULL || data == NULL) {
+        return;
+    }
+    for (index = 0U; index < len; ++index) {
+        ctx->data[ctx->data_len++] = data[index];
+        if (ctx->data_len == RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES) {
+            river_orvibo_access_sha256_transform(ctx, ctx->data);
+            ctx->bit_len += 512ULL;
+            ctx->data_len = 0U;
+        }
+    }
+}
+
+static void river_orvibo_access_sha256_final(river_orvibo_sha256_t *ctx,
+                                             uint8_t hash[32])
+{
+    uint32_t index;
+    uint64_t bit_len;
+
+    index = ctx->data_len;
+    if (ctx->data_len < 56U) {
+        ctx->data[index++] = 0x80U;
+        while (index < 56U) {
+            ctx->data[index++] = 0U;
+        }
+    } else {
+        ctx->data[index++] = 0x80U;
+        while (index < 64U) {
+            ctx->data[index++] = 0U;
+        }
+        river_orvibo_access_sha256_transform(ctx, ctx->data);
+        memset(ctx->data, 0, 56U);
+    }
+
+    bit_len = ctx->bit_len + ((uint64_t)ctx->data_len * 8ULL);
+    ctx->data[63] = (uint8_t)(bit_len);
+    ctx->data[62] = (uint8_t)(bit_len >> 8U);
+    ctx->data[61] = (uint8_t)(bit_len >> 16U);
+    ctx->data[60] = (uint8_t)(bit_len >> 24U);
+    ctx->data[59] = (uint8_t)(bit_len >> 32U);
+    ctx->data[58] = (uint8_t)(bit_len >> 40U);
+    ctx->data[57] = (uint8_t)(bit_len >> 48U);
+    ctx->data[56] = (uint8_t)(bit_len >> 56U);
+    river_orvibo_access_sha256_transform(ctx, ctx->data);
+
+    for (index = 0U; index < 4U; ++index) {
+        hash[index] = (uint8_t)(ctx->state[0] >> (24U - index * 8U));
+        hash[index + 4U] = (uint8_t)(ctx->state[1] >> (24U - index * 8U));
+        hash[index + 8U] = (uint8_t)(ctx->state[2] >> (24U - index * 8U));
+        hash[index + 12U] = (uint8_t)(ctx->state[3] >> (24U - index * 8U));
+        hash[index + 16U] = (uint8_t)(ctx->state[4] >> (24U - index * 8U));
+        hash[index + 20U] = (uint8_t)(ctx->state[5] >> (24U - index * 8U));
+        hash[index + 24U] = (uint8_t)(ctx->state[6] >> (24U - index * 8U));
+        hash[index + 28U] = (uint8_t)(ctx->state[7] >> (24U - index * 8U));
+    }
+}
+
+static void river_orvibo_access_hmac_sha256(const uint8_t *key,
+                                            size_t key_len,
+                                            const uint8_t *data,
+                                            size_t data_len,
+                                            uint8_t out[32])
+{
+    uint8_t key_block[RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES];
+    uint8_t inner_pad[RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES];
+    uint8_t outer_pad[RIVER_ORVIBO_ACCESS_SHA256_BLOCK_BYTES];
+    uint8_t inner_hash[RIVER_ORVIBO_ACCESS_SHA256_DIGEST_BYTES];
+    river_orvibo_sha256_t ctx;
+    size_t index;
+
+    memset(key_block, 0, sizeof(key_block));
+    if (key_len > sizeof(key_block)) {
+        river_orvibo_access_sha256_init(&ctx);
+        river_orvibo_access_sha256_update(&ctx, key, key_len);
+        river_orvibo_access_sha256_final(&ctx, key_block);
+    } else if (key_len > 0U) {
+        memcpy(key_block, key, key_len);
+    }
+
+    for (index = 0U; index < sizeof(key_block); ++index) {
+        inner_pad[index] = key_block[index] ^ 0x36U;
+        outer_pad[index] = key_block[index] ^ 0x5cU;
+    }
+
+    river_orvibo_access_sha256_init(&ctx);
+    river_orvibo_access_sha256_update(&ctx, inner_pad, sizeof(inner_pad));
+    river_orvibo_access_sha256_update(&ctx, data, data_len);
+    river_orvibo_access_sha256_final(&ctx, inner_hash);
+
+    river_orvibo_access_sha256_init(&ctx);
+    river_orvibo_access_sha256_update(&ctx, outer_pad, sizeof(outer_pad));
+    river_orvibo_access_sha256_update(&ctx, inner_hash, sizeof(inner_hash));
+    river_orvibo_access_sha256_final(&ctx, out);
+}
+
+static void river_orvibo_access_hex_encode(const uint8_t *bytes,
+                                           size_t len,
+                                           char *out,
+                                           size_t out_size)
+{
+    static const char hex[] = "0123456789abcdef";
+    size_t index;
+
+    if (out == NULL || out_size == 0U) {
+        return;
+    }
+    if (bytes == NULL || out_size < (len * 2U + 1U)) {
+        out[0] = '\0';
+        return;
+    }
+    for (index = 0U; index < len; ++index) {
+        out[index * 2U] = hex[(bytes[index] >> 4U) & 0x0FU];
+        out[index * 2U + 1U] = hex[bytes[index] & 0x0FU];
+    }
+    out[len * 2U] = '\0';
 }
 
 static uint32_t river_orvibo_access_fnv1a32(const uint8_t *data, size_t bytes, uint32_t seed)
@@ -358,9 +654,16 @@ static river_status_t river_orvibo_access_http_request(const char *method,
         river_orvibo_access_set_error("http_header_start_failed");
         goto exit;
     }
-    (void)httpc_request_write_header(conn, (char *)"Activation-Version", (char *)"1");
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Activation-Version",
+                                     (char *)river_orvibo_access_activation_version_header());
     (void)httpc_request_write_header(conn, (char *)"Device-Id", g_river_orvibo_access.device_id);
     (void)httpc_request_write_header(conn, (char *)"Client-Id", g_river_orvibo_access.client_id);
+    if (river_orvibo_access_activation_hmac_configured()) {
+        (void)httpc_request_write_header(conn,
+                                         (char *)"Serial-Number",
+                                         (char *)RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER);
+    }
     (void)httpc_request_write_header(conn,
                                      (char *)"User-Agent",
                                      (char *)river_orvibo_build_info_user_agent());
@@ -536,6 +839,7 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
     g_river_orvibo_access.activation_challenge_available = false;
     g_river_orvibo_access.activation_code[0] = '\0';
     g_river_orvibo_access.activation_message[0] = '\0';
+    g_river_orvibo_access.activation_challenge[0] = '\0';
     activation = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "activation");
     if (!cJSON_IsObject(activation)) {
         return;
@@ -555,6 +859,9 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
         g_river_orvibo_access.activation_required = true;
     }
     if (cJSON_IsString(challenge) && challenge->valuestring != NULL) {
+        river_orvibo_access_copy(g_river_orvibo_access.activation_challenge,
+                                 sizeof(g_river_orvibo_access.activation_challenge),
+                                 challenge->valuestring);
         g_river_orvibo_access.activation_challenge_available = true;
         g_river_orvibo_access.activation_required = true;
     } else if (g_river_orvibo_access.activation_code[0] != '\0') {
@@ -620,9 +927,79 @@ static river_status_t river_orvibo_access_check_version_once(void)
     return RIVER_OK;
 }
 
+static river_status_t river_orvibo_access_build_activation_payload(char *payload,
+                                                                  size_t payload_size)
+{
+    cJSON *root = NULL;
+    char *printed = NULL;
+    uint8_t hmac[RIVER_ORVIBO_ACCESS_SHA256_DIGEST_BYTES];
+    char hmac_hex[(RIVER_ORVIBO_ACCESS_SHA256_DIGEST_BYTES * 2U) + 1U];
+    river_status_t status = RIVER_ERR_NO_MEMORY;
+
+    if (payload == NULL || payload_size == 0U) {
+        return RIVER_ERR_ARG;
+    }
+    payload[0] = '\0';
+
+    if (!river_orvibo_access_activation_hmac_configured()) {
+        if (snprintf(payload, payload_size, "%s", "{}") >= (int)payload_size) {
+            return RIVER_ERR_ARG;
+        }
+        return RIVER_OK;
+    }
+    if (g_river_orvibo_access.activation_challenge[0] == '\0') {
+        river_orvibo_access_set_error("activation_challenge_missing");
+        return RIVER_ERR_INVALID_STATE;
+    }
+
+    river_orvibo_access_hmac_sha256(
+        (const uint8_t *)RIVER_ORVIBO_ACTIVATION_HMAC_KEY,
+        strlen(RIVER_ORVIBO_ACTIVATION_HMAC_KEY),
+        (const uint8_t *)g_river_orvibo_access.activation_challenge,
+        strlen(g_river_orvibo_access.activation_challenge),
+        hmac);
+    river_orvibo_access_hex_encode(hmac, sizeof(hmac), hmac_hex, sizeof(hmac_hex));
+    if (hmac_hex[0] == '\0') {
+        river_orvibo_access_set_error("activation_hmac_encode_failed");
+        return RIVER_ERR_IO;
+    }
+
+    root = cJSON_CreateObject();
+    if (root == NULL) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    cJSON_AddStringToObject(root, "algorithm", "hmac-sha256");
+    cJSON_AddStringToObject(root,
+                            "serial_number",
+                            RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER);
+    cJSON_AddStringToObject(root,
+                            "challenge",
+                            g_river_orvibo_access.activation_challenge);
+    cJSON_AddStringToObject(root, "hmac", hmac_hex);
+    printed = cJSON_PrintUnformatted(root);
+    if (printed == NULL) {
+        goto exit;
+    }
+    if (strlen(printed) >= payload_size) {
+        river_orvibo_access_set_error("activation_payload_too_long");
+        status = RIVER_ERR_ARG;
+        goto exit;
+    }
+    river_orvibo_access_copy(payload, payload_size, printed);
+    status = RIVER_OK;
+
+exit:
+    if (printed != NULL) {
+        cJSON_free(printed);
+    }
+    cJSON_Delete(root);
+    return status;
+}
+
 static river_status_t river_orvibo_access_activate_once(void)
 {
     char activation_url[RIVER_ORVIBO_ACCESS_URL_MAX + 16U];
+    char payload[RIVER_ORVIBO_ACCESS_ACTIVATION_BODY_MAX];
     river_orvibo_http_response_t response;
     river_status_t status;
 
@@ -636,7 +1013,11 @@ static river_status_t river_orvibo_access_activate_once(void)
         river_orvibo_access_set_error("activation_url_too_long");
         return RIVER_ERR_ARG;
     }
-    status = river_orvibo_access_http_request("POST", activation_url, "{}", &response);
+    status = river_orvibo_access_build_activation_payload(payload, sizeof(payload));
+    if (status != RIVER_OK) {
+        return status;
+    }
+    status = river_orvibo_access_http_request("POST", activation_url, payload, &response);
     if (status != RIVER_OK) {
         return status;
     }
@@ -806,21 +1187,24 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
     status->activation_done = g_river_orvibo_access.activation_done;
     status->activation_challenge_available =
         g_river_orvibo_access.activation_challenge_available;
+    status->activation_hmac_configured = river_orvibo_access_activation_hmac_configured();
     status->device_id = g_river_orvibo_access.device_id;
     status->client_id = g_river_orvibo_access.client_id;
     status->ota_url = g_river_orvibo_access.ota_url;
+    status->activation_serial_number = river_orvibo_access_activation_serial_number();
     status->activation_code = g_river_orvibo_access.activation_code;
     status->activation_message = g_river_orvibo_access.activation_message;
     status->last_error = g_river_orvibo_access.last_error;
     status->attempts = g_river_orvibo_access.attempts;
     status->http_status = g_river_orvibo_access.http_status;
+    status->activation_version = river_orvibo_access_activation_version();
     return RIVER_OK;
 }
 
 void river_orvibo_access_dump_status(void)
 {
     (void)river_orvibo_access_init();
-    RIVER_LOGI("orvibo access: ready=%s identity=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu app=%s version=%s board=%s ua=%s device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
+    RIVER_LOGI("orvibo access: ready=%s identity=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s act_v=%u hmac=%s serial=%s attempts=%lu http=%lu app=%s version=%s board=%s ua=%s device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
                g_river_orvibo_access.ready ? "yes" : "no",
                g_river_orvibo_access.identity_ready ? "ready" : "waiting_mac",
                g_river_orvibo_access.websocket_configured ? "yes" : "no",
@@ -828,6 +1212,11 @@ void river_orvibo_access_dump_status(void)
                g_river_orvibo_access.activation_required ? "required" : "none",
                g_river_orvibo_access.activation_challenge_available ? "yes" : "no",
                g_river_orvibo_access.activation_done ? "yes" : "no",
+               (unsigned int)river_orvibo_access_activation_version(),
+               river_orvibo_access_activation_hmac_configured() ? "configured" : "none",
+               river_orvibo_access_activation_hmac_configured() ?
+                   RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER :
+                   "-",
                (unsigned long)g_river_orvibo_access.attempts,
                (unsigned long)g_river_orvibo_access.http_status,
                river_orvibo_build_info_app_name(),

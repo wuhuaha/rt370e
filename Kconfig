@@ -70,6 +70,26 @@ config RIVER_ORVIBO_SERVER_WAKE_TEXT
       current on-device wake phrase while still matching the target server's
       expected wakeup-word semantics.
 
+config RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER
+    string "Orvibo optional activation serial number"
+    default ""
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Optional XiaoZhi-compatible v2 activation serial number. Leave empty to
+      use the default v1/no-serial activation flow. When this and
+      RIVER_ORVIBO_ACTIVATION_HMAC_KEY are both set, OTA and activation
+      requests use Activation-Version 2 and send a Serial-Number header.
+
+config RIVER_ORVIBO_ACTIVATION_HMAC_KEY
+    string "Orvibo optional activation HMAC key"
+    default ""
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Optional XiaoZhi-compatible v2 activation HMAC key. It is used as raw
+      string bytes for HMAC-SHA256(challenge), matching py-xiaozhi's local
+      efuse.json behavior. Leave empty to keep the default v1/no-serial
+      activation payload.
+
 config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y

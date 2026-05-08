@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.28 收紧 Orvibo WebSocket 协议版本输入范围`
+  - `Step H.xiaozhi-client.29 补齐 Orvibo 可选 v2 激活 HMAC 路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.29` completes the optional XiaoZhi-compatible v2 activation HMAC path without changing the default activation baseline:
+  - reference comparison against `~/xiaozhi-esp32` confirmed that serial-bearing clients send `Activation-Version: 2`, `Serial-Number`, and a root JSON activation payload containing `algorithm`, `serial_number`, `challenge`, and `hmac`.
+  - reference comparison against `~/py-xiaozhi` confirmed HMAC-SHA256 uses the configured raw string key over the challenge and emits lowercase hex.
+  - reference comparison against `~/xiaozhi-esp32-server` confirmed the current manager-api `/ota/activate` path still succeeds/fails from `Device-Id` binding state rather than v2 payload verification, so Orvibo keeps the already verified v1/no-serial flow as the default.
+  - `CONFIG_RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` and `CONFIG_RIVER_ORVIBO_ACTIVATION_HMAC_KEY` are optional; both must be set before Orvibo switches activation requests to v2/HMAC.
+  - access status/logs now expose activation version, HMAC configured state, and serial number, but never expose the HMAC key.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.28` tightens Orvibo websocket protocol-version input:
   - reference comparison against `~/xiaozhi-esp32-server` confirmed direct websocket binary messages are treated as raw Opus unless the connection is explicitly from the MQTT gateway path.
   - the current server OTA response emits websocket `url/token` and does not emit `websocket.version`, so Orvibo should stay on the raw/v1 default unless a supported version is explicitly configured.

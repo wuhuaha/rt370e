@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.29
+- 补齐 Orvibo 可选 XiaoZhi-compatible v2 激活 HMAC 路径：
+  - 再次对照 `~/xiaozhi-esp32` 后确认，ESP32 参考端在存在序列号时会发送 `Activation-Version: 2`、`Serial-Number` header，并在 `/ota/activate` body 中提交根对象 `algorithm` / `serial_number` / `challenge` / `hmac`。
+  - 对照 `~/py-xiaozhi` 后确认，HMAC 计算口径为 `hmac-sha256(challenge)`，key 使用本地 efuse/配置中的原始字符串字节，hex 输出为小写。
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前 manager-api `/ota/activate` 仍按 `Device-Id` 绑定状态返回 200/202，未强制校验 v2 body；因此当前已验证的 v1/no-serial 激活流必须继续作为默认行为保留。
+- 变更：
+  - 新增 `CONFIG_RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` 与 `CONFIG_RIVER_ORVIBO_ACTIVATION_HMAC_KEY`。
+  - 默认两项为空时继续发送 `Activation-Version: 1` 与 `{}` body，不发送 `Serial-Number`。
+  - 当 serial 与 HMAC key 同时配置时，OTA/activate 请求自动切到 `Activation-Version: 2`，发送 `Serial-Number`，并按参考 ESP32 的根对象格式提交 HMAC payload。
+  - `river_orvibo_access` 保存 OTA 返回的 `activation.challenge`，并在状态/日志中输出 `act_v`、`hmac=configured|none`、`serial`，不输出 HMAC key。
+  - HMAC-SHA256 采用项目侧自包含实现，避免新增 SDK crypto link 依赖导致烧录前才暴露链接差异。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 WebSocket open/hello/listen/abort、raw/v1 默认 Opus framing、TTS 下行、MCP volume-only 和 Orvibo 状态机。
+- Verification for this step:
+  - passed: reference review confirmed ESP32 v2 activation headers/body and Python HMAC raw-string key behavior.
+  - passed: server review confirmed current manager-api activate path remains Device-Id binding driven, so default v1 remains the safer baseline.
+  - passed: static grep confirmed new config/status fields and v1/v2 payload selection paths.
+  - passed: `git diff --check`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.28
 - 收紧 Orvibo WebSocket 协议版本输入范围：
   - 对照 `~/xiaozhi-esp32-server` 后确认，当前 WebSocket 入站二进制消息在非 MQTT gateway 路径下直接作为 raw Opus 放入 ASR 队列，服务端 OTA 当前也只返回 websocket `url/token`，不返回 `version`。

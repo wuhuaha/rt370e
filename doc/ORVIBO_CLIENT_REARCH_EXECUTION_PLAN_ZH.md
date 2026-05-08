@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.29` 已补齐 Orvibo 可选 XiaoZhi-compatible v2 激活 HMAC 路径：
+  - 再次对照 `~/xiaozhi-esp32` 后确认，存在 serial number 的 ESP32 参考端会发送 `Activation-Version: 2`、`Serial-Number` header，并在 `/ota/activate` body 中提交根对象 `algorithm` / `serial_number` / `challenge` / `hmac`。
+  - 对照 `~/py-xiaozhi` 后确认，HMAC 计算口径是对 challenge 使用配置中的原始字符串 key 做 HMAC-SHA256，并输出小写 hex。
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前 manager-api `/ota/activate` 仍由 `Device-Id` 绑定状态决定 200/202，未强制校验 v2 payload，因此 Orvibo 默认仍保持已验证的 v1/no-serial 激活流。
+  - 新增 `CONFIG_RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` 与 `CONFIG_RIVER_ORVIBO_ACTIVATION_HMAC_KEY`；只有两者同时配置时才切到 v2/HMAC。
+  - 默认配置为空时继续发送 `Activation-Version: 1` 与 `{}` body，不发送 `Serial-Number`，以保持当前本地 manager-api 绑定流兼容性。
+  - `river_orvibo_access` 会保存 OTA 返回的 `activation.challenge`，状态/日志输出 `act_v`、`hmac=configured|none` 与 `serial`，但不输出 HMAC key。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.28` 已收紧 Orvibo WebSocket 协议版本输入范围：
   - 对照 `~/xiaozhi-esp32-server` 后确认，当前直接 WebSocket 入站二进制消息会作为 raw Opus 进入 ASR 队列；只有 `?from=mqtt_gateway` 路径才解析 MQTT gateway 的 16 字节头。
   - 当前服务端 OTA 返回 websocket `url/token`，不返回 `websocket.version`，因此直连 XiaoZhi-compatible websocket 的安全默认仍应保持 raw/v1。

@@ -15,14 +15,17 @@ typedef struct {
     bool activation_required;
     bool activation_done;
     bool activation_challenge_available;
+    bool activation_hmac_configured;
     const char *device_id;
     const char *client_id;
     const char *ota_url;
+    const char *activation_serial_number;
     const char *activation_code;
     const char *activation_message;
     const char *last_error;
     uint32_t attempts;
     uint32_t http_status;
+    uint8_t activation_version;
 } river_orvibo_access_status_t;
 
 river_status_t river_orvibo_access_init(void);
