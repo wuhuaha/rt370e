@@ -1,3 +1,47 @@
+## Step H.xiaozhi-client.34 Verification
+
+Confirm OTA-issued websocket config now refreshes once before treating open-audio-channel failure as a normal reconnect failure:
+```bash
+cd /root/ameba-river
+rg -n "access_refresh_retry_allowed|open_audio_channel_retry|retry open audio channel after OTA websocket refresh|used_ota" \
+  components/river_core/river_orvibo_app.c \
+  components/river_cloud/river_orvibo_access.c
+```
+
+Expected result:
+- app has an OTA-aware refresh gate based on `river_orvibo_access_get_status(...).used_ota`.
+- when the first `river_orvibo_protocol_open_audio_channel()` attempt fails, the app refreshes access with reason `open_audio_channel_retry` and retries the open once before falling back to the existing backoff/recover flow.
+- static fallback websocket deployments do not trigger this automatic refresh-retry path.
+
+Reconfirm the server-side expiry semantics that motivate this recovery path:
+```bash
+cd /root/ameba-river
+rg -n "generate_token|verify_token|expire_seconds|websocket.*token" \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/auth.py \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/api/ota_handler.py \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/websocket_server.py
+```
+
+Expected result:
+- OTA handler generates websocket token from `client_id` and `device_id`.
+- websocket server verifies that token and enforces `expire_seconds`.
+- the token string itself does not carry a separate expiry field the client can cache against, so retry-time refresh is a valid compatibility safeguard.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.33 Verification
 
 Confirm invalid server hello transport is rejected immediately instead of waiting for the hello timeout:

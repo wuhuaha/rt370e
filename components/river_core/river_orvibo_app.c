@@ -430,6 +430,16 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
 
 static river_status_t river_orvibo_app_refresh_access(const char *reason);
 
+static bool river_orvibo_app_access_refresh_retry_allowed(void)
+{
+    river_orvibo_access_status_t access_status;
+
+    if (river_orvibo_access_get_status(&access_status) != RIVER_OK) {
+        return false;
+    }
+    return access_status.used_ota;
+}
+
 static const char *river_orvibo_app_listen_mode(void)
 {
     river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
@@ -550,6 +560,7 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
                                     river_orvibo_app_refresh_access("open_audio_channel");
         uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
         bool backoff_suppressed = false;
+        bool refreshed_after_open_fail = false;
 
         if (g_river_orvibo_app.connect_retry_pending &&
             g_river_orvibo_app.next_connect_retry_ms != 0U &&
@@ -571,6 +582,17 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
         }
         if (status == RIVER_OK) {
             status = river_orvibo_protocol_open_audio_channel();
+            if (status != RIVER_OK &&
+                river_orvibo_app_access_refresh_retry_allowed()) {
+                river_status_t refresh_status =
+                    river_orvibo_app_refresh_access("open_audio_channel_retry");
+
+                if (refresh_status == RIVER_OK) {
+                    refreshed_after_open_fail = true;
+                    RIVER_LOGW("retry open audio channel after OTA websocket refresh");
+                    status = river_orvibo_protocol_open_audio_channel();
+                }
+            }
         }
         if (status != RIVER_OK) {
             if (!backoff_suppressed) {
@@ -581,6 +603,9 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
         } else {
             g_river_orvibo_app.connect_open_ok++;
             river_orvibo_app_clear_connect_retry("open_audio_channel_ok");
+            if (refreshed_after_open_fail) {
+                RIVER_LOGI("open audio channel recovered after access refresh");
+            }
         }
     }
     if ((actions & RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL) != 0U) {

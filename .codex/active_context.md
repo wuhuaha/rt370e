@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.33 收敛 Orvibo 非法 server hello 的快速失败路径`
+  - `Step H.xiaozhi-client.34 补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.34` refreshes OTA-issued websocket config before treating reconnect failure as terminal:
+  - reference audit against `~/xiaozhi-esp32-server` confirmed OTA issues websocket tokens signed from `client_id|device_id|timestamp`, while the websocket server verifies both signature and `expire_seconds`.
+  - the current Orvibo branch previously kept `access.ready=true` after a successful OTA pull and therefore kept retrying stale websocket credentials if a later reconnect happened after token expiry.
+  - app open-audio-channel handling now checks whether the active websocket config came from OTA; on the first open failure under that condition, it refreshes access once and immediately retries the websocket open.
+  - static fallback websocket deployments are intentionally excluded from this automatic refresh-retry path.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.33` fast-fails invalid Orvibo server hello transport negotiation:
   - protocol audit found that if the server hello message omitted `transport` or returned a non-`websocket` value, `river_orvibo_parse_server_hello()` emitted the expected protocol error but `river_orvibo_wait_server_hello()` still waited until the hello timeout unless the socket closed first.
   - this made a clearly incompatible server hello look like a generic timeout from the open-audio-channel path and kept failure latency worse than the XiaoZhi reference clients.

@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.34` 已补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环：
+  - 对照 `~/xiaozhi-esp32-server` 后确认，OTA 接口会按 `client_id|device_id|timestamp` 为 websocket 下发带时间戳的鉴权 token，WebSocket 服务端则按 `expire_seconds` 校验其有效期。
+  - 当前 Orvibo 分支此前只在 `access_not_ready` 或 access-not-ready 周期刷新时重新拉取 OTA；如果设备已经 `ready=true`，但后续长时间运行后 token 过期，开声道路径会持续使用旧 token 重连，形成“ready 但鉴权永远失败”的隐性死路。
+  - 现已在 app 开声道路径加入 OTA-aware 补偿：首次 `river_orvibo_protocol_open_audio_channel()` 失败后，如果当前 websocket 配置来自 OTA，则立即刷新一次 access 并同步再试一次开声道。
+  - 静态 fallback WebSocket 配置不会触发这条自动刷新补偿，避免干扰本地免 OTA 的固定部署。
+  - 当前 `/root/ameba-rtos` 完整 build 已通过；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.33` 已收敛 Orvibo 非法 `server hello` 的快速失败路径：
   - 再次审计 `river_orvibo_wait_server_hello()` 与 `river_orvibo_parse_server_hello()` 后发现，当服务端 `hello` 缺失 `transport` 或返回非 `websocket` 值时，协议层虽然会立刻发出错误事件，但握手等待循环仍会继续空等完整 `hello` 超时窗口。
   - 这会让已经明确不兼容的服务端响应在 open 路径上表现成慢超时，既放大首连时延，也掩盖真实根因为 `hello_transport_invalid`。

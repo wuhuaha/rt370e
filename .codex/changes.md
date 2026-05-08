@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.34
+- 补齐 Orvibo 基于 OTA 下发 WebSocket token 的重连刷新闭环：
+  - 再次对照 `~/xiaozhi-esp32-server` 后确认，WebSocket `Authorization` token 由 OTA 接口按 `client_id|device_id|timestamp` 重新签发，服务端验签同时检查 `expire_seconds` 过期窗口。
+  - 当前 Orvibo 分支只会在 `access_not_ready` 或周期性 access-not-ready 场景刷新 OTA 配置；一旦首次 OTA 已成功、`ready=true`，后续即使 token 因服务端过期策略失效，开声道路径也只会反复使用旧 token 重试，不会主动重新拉取新的 websocket 配置。
+  - 这会让设备在长时间运行或 server 侧缩短 token 有效期后进入“access 仍 ready，但 WebSocket 重连持续鉴权失败”的隐性死路。
+- 变更：
+  - app 开声道路径新增 `river_orvibo_app_access_refresh_retry_allowed()`，仅当当前 access 状态来自 OTA 下发配置时允许走“开声道失败后同步刷新 access 并立即重试一次”的补偿路径。
+  - `RIVER_ORVIBO_ACTION_OPEN_AUDIO_CHANNEL` 现在在首次 `river_orvibo_protocol_open_audio_channel()` 失败后，会尝试 `river_orvibo_app_refresh_access("open_audio_channel_retry")`，刷新成功则立刻再开一次声道。
+  - 静态 fallback WebSocket 配置不走这条自动刷新重试，避免把本地固定部署误判为必须 OTA 续签的场景。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改正常的 hello/listen/abort/TTS/MCP volume-only 协议语义，仅补齐 OTA token 过期后的重连恢复能力。
+- Verification for this step:
+  - passed: reference audit confirmed OTA handler reissues websocket token with timestamped HMAC and websocket server verifies token expiry.
+  - passed: static grep confirmed open-audio-channel failure now performs an OTA-only access refresh and immediate retry before entering the existing backoff/recover path.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.33
 - 收敛 Orvibo 非法 `server hello` 的快速失败路径：
   - 再次审计 `river_orvibo_wait_server_hello()` 与 `river_orvibo_parse_server_hello()` 时发现，当服务端返回的 `hello` 文本消息中 `transport` 字段缺失或不是 `websocket` 时，协议层虽然会立刻发出错误事件，但握手等待循环仍然只依赖 `server_hello_received` / `ws_closed` / timeout 退出。
