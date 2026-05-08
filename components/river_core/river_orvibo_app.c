@@ -429,6 +429,18 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
 
 static river_status_t river_orvibo_app_refresh_access(const char *reason);
 
+static const char *river_orvibo_app_listen_mode(void)
+{
+    river_voice_preproc_profile_t profile = river_voice_profile_active_preproc();
+
+    if (river_voice_profile_has_capability(profile, RIVER_VOICE_CAPABILITY_AEC) ||
+        river_voice_profile_has_capability(profile,
+                                           RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF)) {
+        return "realtime";
+    }
+    return "auto";
+}
+
 static void river_orvibo_app_mark_protocol_control_skipped(const char *action,
                                                            const char *reason)
 {
@@ -595,7 +607,10 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
     }
     if ((actions & RIVER_ORVIBO_ACTION_START_LISTENING) != 0U) {
         if (river_orvibo_app_protocol_control_channel_open("listen_start")) {
-            river_status_t status = river_orvibo_protocol_send_start_listening("auto");
+            const char *listen_mode = river_orvibo_app_listen_mode();
+            river_status_t status =
+                river_orvibo_protocol_send_start_listening(listen_mode);
+            RIVER_LOGI("listen start mode=%s", listen_mode);
             river_orvibo_app_record_protocol_control("listen_start", status, true);
         }
     }

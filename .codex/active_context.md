@@ -33,6 +33,14 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.21` is in progress to align client hello/listen-mode semantics with the active Orvibo voice profile:
+  - reference comparison confirmed XiaoZhi clients do not hardcode post-wake listening mode; they switch between `auto` and `realtime` based on duplex/AEC capability.
+  - Orvibo app now selects `listen_start.mode` from current voice-profile capability bits instead of always sending `auto`.
+  - Orvibo protocol hello now declares `features.aec=true` when the active profile exposes AEC or native capture-reference capability, keeping server-side policy selection aligned with the branch's actual duplex path.
+  - static checks, harness check, latest-SDK build, and reflash have all passed on `/root/ameba-rtos`.
+  - board runtime confirmation is still blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state, so the expected `client hello features` / `listen start mode` logs are not yet captured on board.
+  - VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF implementation, Opus framing, and MCP volume-only logic are unchanged.
+
 - `Step H.xiaozhi-client.20` is verified on board after H.19 board validation exposed a TTS/close race:
   - reference behavior checked against `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server`.
   - XiaoZhi-compatible servers may close the WebSocket after TTS in `close_after_chat` paths; the client must not treat a closed channel as a protocol-control failure while trying to send another `listen_start`.

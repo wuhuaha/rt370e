@@ -1,3 +1,83 @@
+## Step H.xiaozhi-client.21 Verification
+
+Confirm Orvibo hello/listen mode selection now follows the active voice profile capability:
+```bash
+cd /root/ameba-river
+rg -n "river_orvibo_app_listen_mode|send_start_listening\\(|features, \\\"aec\\\"|RIVER_VOICE_CAPABILITY_AEC|RIVER_VOICE_CAPABILITY_NATIVE_CAPTURE_REF" \
+  components/river_core/river_orvibo_app.c \
+  components/river_cloud/river_orvibo_protocol.c
+```
+
+Expected result:
+- app-side `listen_start` no longer hardcodes `"auto"`.
+- `mode=realtime` is selected when the active profile exposes `AEC` or `NATIVE_CAPTURE_REF`; otherwise `mode=auto`.
+- client hello adds `features.aec=true` when the active profile exposes the same capability.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash capability/hello retest:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+printf 'reboot uartburn\r' > /dev/ttyUSB0
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- flash finishes with `Finished PASS`.
+- board still completes access refresh and WebSocket hello.
+- the first `listen_start` after wake uses the mode that matches the active voice profile:
+  - `realtime` when current branch/profile enables AEC or native capture reference
+  - `auto` when current branch/profile has no such capability
+- if the active profile has AEC/reference capability, server-side conversation behavior matches a realtime-capable session and no regression appears in wake/TTS/barge-in flow.
+
+Current execution status on 2026-05-08:
+- passed:
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+  - low-baud fallback reflash after DTR/RTS reset pulse:
+    ```bash
+    python3 - <<'PY'
+    import serial, time
+    port='/dev/ttyUSB0'
+    ser=serial.Serial(port, 1500000, timeout=0.2)
+    ser.dtr=False; ser.rts=True; time.sleep(0.2)
+    ser.dtr=True; ser.rts=False; time.sleep(0.1)
+    ser.dtr=False; ser.rts=False; time.sleep(0.2)
+    ser.close()
+    PY
+
+    export AMEBA_SDK_ROOT=/root/ameba-rtos
+    python3 tools/river_flash.py -p /dev/ttyUSB0 -b 460800 -m nor
+    ```
+    result: `Finished PASS`
+- blocked:
+  - post-flash runtime verification for `client hello features: mcp=... aec=...` and `listen start mode=...`
+  - raw UART remains continuous `0x00` in the current board session even after:
+    - `ESC+CRLF`
+    - direct `reboot` / `river orvibo status`
+    - official `monitor.py`
+    - PL2303 driver unbind/bind in WSL
+    - Windows `usbipd detach --busid 4-1` / `attach --wsl --busid 4-1`
+- current conclusion:
+  - H.21 is statically verified, builds, and flashes on the active `/root/ameba-rtos` baseline.
+  - board-side runtime proof is still pending because the current board/UART session is stuck in the historical `0x00` failure state.
+
 ## Step H.xiaozhi-client.20 Verification
 
 Confirm protocol control sends are guarded and skip diagnostics are visible:

@@ -1,5 +1,31 @@
 # Change Log
 
+## Step H.xiaozhi-client.21
+- 对齐 Orvibo 端与 XiaoZhi 参考端的 listening mode / hello 特性声明：
+  - H.20 之后继续对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server`，确认参考端不会把 `listen_start` 固定写死为 `auto`；默认模式会根据端侧是否具备 AEC/双工能力在 `auto` 与 `realtime` 间切换。
+  - 参考端 `hello.features` 也会在具备相应能力时声明 `aec=true`，影响服务端的会话与打断策略判断。
+- 变更：
+  - `river_orvibo_app` 新增基于当前语音 profile 能力位的 `listen_mode` 选择：具备 `AEC` 或 `NATIVE_CAPTURE_REF` 能力时发送 `mode=realtime`，否则发送 `mode=auto`。
+  - `river_orvibo_protocol` 发送 client hello 时按当前语音 profile 自动声明 `features.aec=true`；MCP 仍只保留 volume。
+- 保持受保护能力不变：
+  - 未修改 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 算法实现本身，仅修正对外协议声明与 listening mode 选择。
+  - 未修改 Opus 包格式、TTS 下行播放、access 鉴权、WebSocket 握手与 session_id 逻辑。
+- Verification for this step:
+  - passed: static grep confirmed app-side `listen_start` now derives mode from `AEC/NATIVE_CAPTURE_REF`, and hello emits `features.aec=true` on the same capability gate.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - passed: `/dev/ttyUSB0` reflash with `Finished PASS` after DTR/RTS reset pulse and `460800` baud fallback.
+  - blocked: post-flash board runtime log confirmation is still trapped in the historical pure-`0x00` UART session state.
+  - attempted recovery paths this turn all failed to restore readable runtime text:
+    - raw serial probe at `1500000`
+    - `ESC+CRLF`
+    - direct `reboot` / `river orvibo status` serial writes
+    - official Ameba `monitor.py` attach
+    - PL2303 driver unbind/bind inside WSL
+    - Windows-side `usbipd detach/attach`
+  - current conclusion: H.21 code/build/flash is complete, but board-side hello / `listen start mode=` evidence remains blocked by the current board/UART session state rather than by a newly found protocol or build defect.
+
 ## Step H.xiaozhi-client.20
 - 收敛 TTS 后 WebSocket close 与 Orvibo 控制帧发送的竞态：
   - H.19 实板验证显示：服务端 TTS 下行和播放可以跑通，但 TTS 后 WebSocket close 与本地 `tts_stop -> listen_start` 动作交错，导致客户端在已关闭 channel 上发送 `listen_start` 并记录 `listen_start:-4` recoverable error。
