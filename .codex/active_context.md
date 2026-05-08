@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.21 对齐 Orvibo 会话模式与 AEC 能力声明`
+  - `Step H.xiaozhi-client.23 对齐 Orvibo WebSocket 默认协议版本`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,14 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.23` aligns the default Orvibo websocket protocol version with the XiaoZhi baseline:
+  - reference comparison across `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server` confirmed that the live XiaoZhi websocket baseline defaults to protocol version `1`.
+  - both the ESP32 and Python reference clients send websocket binary audio as raw Opus packets under version `1`, while the local Python server websocket path forwards inbound bytes directly into Opus/VAD handling without a visible v2/v3 unwrap stage.
+  - the current Orvibo branch previously defaulted to protocol version `3`, which risks wrapping uplink Opus in a v3 binary envelope when OTA/config does not explicitly override `websocket.version`.
+  - the Orvibo default is now version `1`, so direct websocket interop falls back to raw-Opus framing by default; OTA/config can still override the version if a deployment explicitly returns `2` or `3`.
+  - static checks, harness check, and latest-SDK build have all passed on `/root/ameba-rtos`.
+  - board runtime confirmation is still blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state, so raw-Opus first-turn runtime proof is not yet captured on board.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.22` normalizes cloud-facing wake text for XiaoZhi-compatible servers:
   - reference comparison confirmed the current branch preserves a local KWS hit text `小欧管家`, while the target server default wakeup-word handling expects `listen detect.text` values aligned with configured wake words such as `你好小智`.
   - Orvibo app now decouples the protected local KWS text from the cloud-facing `listen detect.text`, using the new configurable `RIVER_ORVIBO_SERVER_WAKE_TEXT` and defaulting it to `你好小智`.
@@ -185,6 +193,7 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
+  - board-side validation that version-1 default yields direct raw-Opus websocket interop against the target XiaoZhi-compatible server
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call
   - board-side multi-turn wake/listen/speak/barge-in verification

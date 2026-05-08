@@ -1,3 +1,60 @@
+## Step H.xiaozhi-client.23 Verification
+
+Confirm the default websocket protocol version now matches the XiaoZhi baseline:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_PROTOCOL_VERSION|CONFIG_RIVER_ORVIBO_PROTOCOL_VERSION|default 1" \
+  Kconfig \
+  include/river/river_orvibo_credentials.h
+```
+
+Expected result:
+- Orvibo default websocket protocol version is `1`.
+- this means direct websocket audio uplink/downlink defaults to raw Opus framing unless OTA/config overrides the version.
+
+Reconfirm the external references behind this default:
+```bash
+rg -n "version_ = 1|Protocol-Version\": \"1\"|send_audio\\(|await conn.websocket.send\\(opus_packet\\)|version: 1" \
+  /root/xiaozhi-esp32/main/protocols/websocket_protocol.h \
+  /root/py-xiaozhi/src/protocols/websocket_protocol.py \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/core/handle/sendAudioHandle.py \
+  /root/xiaozhi-esp32-server/main/xiaozhi-server/config.yaml
+```
+
+Expected result:
+- ESP32 reference websocket client defaults to version `1`.
+- Python reference websocket client sends `Protocol-Version: "1"` and raw audio bytes.
+- local XiaoZhi Python server default config is version `1` and websocket audio send path writes raw Opus bytes.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - `rg -n "RIVER_ORVIBO_PROTOCOL_VERSION|CONFIG_RIVER_ORVIBO_PROTOCOL_VERSION|default 1" Kconfig include/river/river_orvibo_credentials.h`
+  - `rg -n "version_ = 1|Protocol-Version\": \"1\"|send_audio\\(|await conn.websocket.send\\(opus_packet\\)|version: 1" /root/xiaozhi-esp32/main/protocols/websocket_protocol.h /root/py-xiaozhi/src/protocols/websocket_protocol.py /root/xiaozhi-esp32-server/main/xiaozhi-server/core/handle/sendAudioHandle.py /root/xiaozhi-esp32-server/main/xiaozhi-server/config.yaml`
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime verification that the target server accepts the new default raw-Opus framing on board
+  - board UART remains in the same historical pure-`0x00` session state, so no readable runtime log could be captured this step
+- current conclusion:
+  - H.23 is statically verified and builds on the active `/root/ameba-rtos` baseline.
+  - board-side runtime proof remains pending due to the current board/UART session condition rather than a known compile defect in this step.
+
 ## Step H.xiaozhi-client.22 Verification
 
 Confirm the client now preserves local KWS text internally but normalizes

@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.23
+- 对齐 Orvibo WebSocket 默认协议版本到 XiaoZhi 主线基线：
+  - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，当前 XiaoZhi WebSocket 主链默认协议版本是 `1`。
+  - 参考 ESP32 与 Python 客户端在 version `1` 下都直接发送原始 Opus 二进制帧；本地 Python 服务端的 websocket 接收主路径也会把入站 bytes 直接送入 Opus/VAD 处理，没有明显的 v2/v3 解包层。
+  - 当前 Orvibo 分支此前默认 `protocol_version=3`，在 OTA/config 未显式返回 `websocket.version` 的部署上，会把 uplink Opus 额外包成 v3 frame，存在首轮语音交互直接失配的风险。
+- 变更：
+  - `CONFIG_RIVER_ORVIBO_PROTOCOL_VERSION` 默认值从 `3` 改为 `1`。
+  - `RIVER_ORVIBO_PROTOCOL_VERSION` 头文件回退默认值同步改为 `1U`。
+  - Kconfig help 明确说明：默认直连 XiaoZhi-compatible websocket 时使用原始 Opus/v1 framing；如果目标部署通过 OTA/config 明确返回 `version=2/3`，仍允许覆盖。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改已验证的 hello、listen control、MCP volume-only、TTS 下行与状态机逻辑。
+- Verification for this step:
+  - passed: static reference review confirmed XiaoZhi ESP32/Python clients default to version `1`, and the local Python server websocket path consumes raw Opus bytes directly.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - blocked: board runtime confirmation is still trapped in the current historical pure-`0x00` UART session state, so direct raw-Opus first-turn runtime logs are not yet captured on board.
+
 ## Step H.xiaozhi-client.22
 - 对齐 `listen detect.text` 与 XiaoZhi 服务端默认唤醒词语义：
   - 继续对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 和 `~/xiaozhi-esp32-server` 后确认，服务端会把 `listen detect.text` 当作“唤醒词或直接文本输入”处理；默认配置下 `wakeup_words` 包含 `你好小智`，并不包含当前本地 KWS 固定命中的 `小欧管家`。
