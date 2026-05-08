@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.24 修复 Orvibo 静态 fallback 空 token 兼容性`
+  - `Step H.xiaozhi-client.25 收敛 Orvibo OTA/MCP 自描述元数据链路`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,14 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.25` converges Orvibo OTA/MCP self-description metadata onto a single source:
+  - reference comparison against `~/xiaozhi-esp32`, `~/py-xiaozhi`, and `~/xiaozhi-esp32-server` confirmed the OTA handler prefers request headers such as `device-model` and `application-version`, then falls back to body `board.type` / `application.version`.
+  - the current Orvibo branch previously still exported scattered placeholder values such as `application.version=0.1.0`, `board.type=wifi`, and MCP `serverInfo.version=0.1.0`, which could mislead OTA model/version matching and long-term server-side device profiling.
+  - a new Orvibo-owned build metadata helper now provides a single source for `app name/version`, `compile_time`, `board name/type`, `chip model`, and `User-Agent`.
+  - OTA requests now export the same metadata in both headers and JSON body, including the server-preferred header keys `Device-Model`, `Application-Version`, `Firmware-Version`, and related aliases.
+  - MCP initialize now reports the same Orvibo app name/version instead of a stale hard-coded version string.
+  - static checks have passed; harness/build verification is the active top-of-tree target on `/root/ameba-rtos`; board runtime confirmation remains blocked by the current historical `/dev/ttyUSB0` pure-`0x00` session state.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.24` aligns static fallback websocket readiness with XiaoZhi-compatible unauthenticated server deployments:
   - reference comparison against `~/xiaozhi-esp32-server` confirmed the server only enforces `Authorization` when `auth.enabled=true`; auth-disabled local deployments legally accept an empty websocket token.
   - the current Orvibo branch previously treated static fallback as usable only when both `ws_url` and `ws_token` were non-empty, which incorrectly blocked explicit local websocket deployments that intentionally disable auth.
@@ -200,6 +208,8 @@ or top-of-tree verification target changes.
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:
+  - run harness + latest-SDK build for H.25 metadata convergence
+  - board-side confirmation that OTA requests now expose the intended Orvibo model/version identity
   - board-side validation that version-1 default yields direct raw-Opus websocket interop against the target XiaoZhi-compatible server
   - OTA activation UX/log capture on real board
   - MCP volume-only end-to-end validation on server call

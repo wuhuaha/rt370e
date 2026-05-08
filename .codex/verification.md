@@ -1,3 +1,69 @@
+## Step H.xiaozhi-client.25 Verification
+
+Confirm the OTA self-description path now matches the fields actually consumed
+by the XiaoZhi-compatible OTA server:
+```bash
+cd /root/ameba-river
+rg -n "Device-Model|Model|Application-Version|App-Version|Firmware-Version|Device-Version|User-Agent" \
+  components/river_cloud/river_orvibo_access.c
+rg -n "model|chip_model_name|compile_time|application|board" \
+  components/river_cloud/river_orvibo_access.c
+rg -n "serverInfo|river_orvibo_build_info_app_version|river_orvibo_build_info_app_name" \
+  components/river_cloud/river_orvibo_mcp_volume.c
+rg -n "river_orvibo_build_info" \
+  components/river_cloud/CMakeLists.txt \
+  components/river_cloud/river_orvibo_build_info.c \
+  include/river/river_orvibo_build_info.h
+```
+
+Expected result:
+- Orvibo OTA requests send model/version metadata in headers, not only in body.
+- OTA JSON body exports unified `model`, `application.*`, `board.*`,
+  `chip_model_name`, and `application.compile_time`.
+- MCP initialize `serverInfo` name/version comes from the same helper instead of
+  hard-coded `0.1.0`.
+
+Reconfirm the target OTA server field priority:
+```bash
+sed -n '148,250p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/api/ota_handler.py
+```
+
+Expected result:
+- OTA handler prefers request headers for model/version.
+- body `board.type` / `application.version` remain the fallback path.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Current execution status on 2026-05-08:
+- passed:
+  - `rg -n "Device-Model|Model|Application-Version|App-Version|Firmware-Version|Device-Version|User-Agent" components/river_cloud/river_orvibo_access.c`
+  - `rg -n "model|chip_model_name|compile_time|application|board" components/river_cloud/river_orvibo_access.c`
+  - `rg -n "serverInfo|river_orvibo_build_info_app_version|river_orvibo_build_info_app_name" components/river_cloud/river_orvibo_mcp_volume.c`
+  - `rg -n "river_orvibo_build_info" components/river_cloud/CMakeLists.txt components/river_cloud/river_orvibo_build_info.c include/river/river_orvibo_build_info.h`
+  - `sed -n '148,250p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/api/ota_handler.py`
+  - `git diff --check`
+  - `python3 tools/diag/check_codex_harness.py`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source ./env.sh >/dev/null; python3 /root/ameba-rtos/ameba.py build -p'`
+- blocked:
+  - post-flash runtime verification that the board now reports the intended Orvibo model/version identity through OTA on a readable UART session
+  - board UART remains in the same historical pure-`0x00` session state, so no readable runtime log could be captured this step
+- current conclusion:
+  - H.25 is statically verified and builds on the active `/root/ameba-rtos` baseline.
+  - OTA/model/version self-description is now unified across headers, JSON body, MCP initialize, and diagnostics, reducing server-side version/model misclassification risk before the next board runtime round.
+
 ## Step H.xiaozhi-client.24 Verification
 
 Confirm static fallback websocket readiness now matches XiaoZhi-compatible

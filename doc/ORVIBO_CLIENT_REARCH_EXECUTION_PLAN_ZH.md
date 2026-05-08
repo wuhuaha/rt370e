@@ -8,6 +8,14 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.25` 已收敛 Orvibo OTA/MCP 自描述元数据链路：
+  - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 OTA handler 会优先读取请求头中的 `device-model` / `application-version` / `firmware-version` 等字段，只有缺失时才回退到 body 的 `board.type` / `application.version`。
+  - 当前 Orvibo 分支此前仍残留 `application.version=0.1.0`、`board.type=wifi`、`User-Agent=orvibo-rtl8730e/0.1.0`、MCP `serverInfo.version=0.1.0` 等占位值，会导致服务端长期误判本实验分支的真实版本和型号。
+  - 现已新增统一的 `river_orvibo_build_info` helper，集中导出 `app name/version`、`compile_time`、`board name/type`、`chip model` 和 `User-Agent`。
+  - OTA 请求头已补齐 `Device-Model`、`Application-Version`、`Firmware-Version` 等服务端优先使用的字段；OTA body 也同步统一 `model`、`application.*`、`board.*`、`chip_model_name` 与 `application.compile_time`。
+  - MCP initialize 的 `serverInfo` 也已切到同一元数据来源，不再返回历史占位版本。
+  - 当前 `/root/ameba-rtos` 路径下的静态检查已通过；harness/build 仍是本步待完成验证；板侧运行日志仍受当前历史纯 `0x00` UART 会话状态阻塞。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.24` 已修复 Orvibo 静态 fallback WebSocket 对免鉴权 XiaoZhi-compatible server 的错误阻断：
   - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端只会在 `auth.enabled=true` 时要求 `Authorization`；关闭 auth 的本地 websocket 部署允许空 token。
   - 当前 Orvibo 分支此前把静态 fallback 可用性收紧为“`ws_url` 与 `ws_token` 都非空”，会错误拦住已显式配置 URL、但本就不需要 token 的本地免鉴权部署。
@@ -1214,6 +1222,12 @@ python3 /root/ameba-rtos/ameba.py build -p
 - `Step H.xiaozhi-client.21`：
   - 对齐默认 listening mode 语义：按当前 voice profile 的 `AEC/NATIVE_CAPTURE_REF` 能力，在 `realtime` 与 `auto` 间选择 `listen_start.mode`，不再固定写死 `auto`。
   - 对齐 client hello 特性声明：当当前 profile 具备对应能力时，hello `features` 声明 `aec=true`，让服务端按真实双工能力选择会话策略。
+- `Step H.xiaozhi-client.25`：
+  - 新增统一 `river_orvibo_build_info` helper，集中导出 Orvibo app/version/compile_time/board/chip/user-agent，避免 OTA/MCP/诊断多处散落硬编码。
+  - OTA 请求头补齐 `Device-Model`、`Model`、`Application-Version`、`App-Version`、`Firmware-Version`、`Device-Version`，对齐 `xiaozhi-esp32-server` OTA handler 的优先读取路径。
+  - OTA body 统一输出顶层 `model`、`application.name/version/compile_time`、`board.name/type`、`chip_model_name`。
+  - MCP initialize 的 `serverInfo.name/version` 改为复用同一 build info 来源。
+  - access init/status 日志补充 app/version/board/user-agent，便于板侧核对 OTA 上报身份。
 
 验证：
 
@@ -1241,4 +1255,4 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 ## 14. 下一步
 
-Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先复验 H.21 的 hello/listening-mode 能力对齐，再继续收敛是否还有服务端策略依赖的能力声明偏差。
+Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、显式 WebSocket subprotocol、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛，以及 OTA/MCP 自描述元数据统一收敛，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成 H.25 的 harness/build 闭环与板侧 OTA 身份复验，再继续收敛 H.21 之后可能残留的服务端能力声明偏差。

@@ -1,5 +1,50 @@
 # Change Log
 
+## Step H.xiaozhi-client.25
+- 收敛 Orvibo OTA/MCP 设备自描述元数据链路：
+  - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后确认，当前服务端 OTA 侧会优先从请求头读取 `device-model` / `application-version` / `firmware-version` 等字段，只有缺失时才回退到 body 的 `board.type` / `application.version`。
+  - 当前 Orvibo 分支此前在 OTA body 和 MCP initialize 中仍残留多处静态占位值：
+    - `User-Agent: orvibo-rtl8730e/0.1.0`
+    - `application.name = ameba-river`
+    - `application.version = 0.1.0`
+    - `board.type = wifi`
+    - `chip_model_name = rtl8730e`
+    - `serverInfo.version = 0.1.0`
+  - 这会让 XiaoZhi-compatible server 的 OTA 固件匹配、版本比较和设备画像长期看到伪元数据，而不是当前实验分支真实的 Orvibo 端侧身份。
+- 变更：
+  - 新增统一 helper：
+    - `include/river/river_orvibo_build_info.h`
+    - `components/river_cloud/river_orvibo_build_info.c`
+  - 统一对外元数据来源：
+    - `application.name = orvibo-rtl8730e`
+    - `board.name = orvibo-rtl8730e`
+    - `board.type = orvibo-rtl8730e`
+    - `chip_model_name = rtl8730e`
+    - `application.version` / `MCP serverInfo.version` / `User-Agent` 统一从当前构建时间派生，格式为可被 `xiaozhi-esp32-server` 数字版本比较正确解析的 `YYYY.MM.DD.HHMMSS`
+    - `application.compile_time` 统一导出为 `YYYY-MM-DDTHH:MM:SSZ`
+  - OTA 请求头补齐服务端优先读取的版本/型号字段：
+    - `Device-Model`
+    - `Model`
+    - `Application-Version`
+    - `App-Version`
+    - `Firmware-Version`
+    - `Device-Version`
+  - OTA 请求 body 同步补齐：
+    - 顶层 `model`
+    - `application.compile_time`
+    - 统一后的 `application.*` / `board.*` / `chip_model_name`
+  - access status/init 日志补充当前 app/version/board/user-agent，可直接在板端确认 OTA 上报身份。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 hello/listen/abort、WebSocket framing、TTS 下行和 MCP volume-only 工具面，只收敛其对外元数据。
+- Verification for this step:
+  - passed: static review confirmed `xiaozhi-esp32-server` OTA handler prefers request headers such as `device-model` / `application-version` before falling back to body.
+  - passed: static grep confirmed Orvibo OTA requests now export unified metadata in both headers and JSON body, and MCP initialize no longer returns hard-coded `0.1.0`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - blocked: board runtime verification remains gated by the current `/dev/ttyUSB0` historical pure-`0x00` UART state.
+
 ## Step H.xiaozhi-client.24
 - 修复 Orvibo 静态 fallback WebSocket 对“免鉴权 XiaoZhi-compatible server” 的错误阻断：
   - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端在 `auth.enabled=false` 时不会要求 `Authorization`；空 token 的 websocket 连接是合法部署形态。

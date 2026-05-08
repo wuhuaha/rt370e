@@ -7,6 +7,7 @@
 #include "audio/audio_control.h"
 
 #include "river/river_log.h"
+#include "river/river_orvibo_build_info.h"
 #include "river/river_orvibo_mcp_volume.h"
 
 #undef RIVER_LOG_TAG
@@ -212,8 +213,8 @@ static river_status_t river_orvibo_mcp_handle_initialize(const cJSON *id_obj,
     tools = NULL;
     cJSON_AddItemToObject(result, "capabilities", capabilities);
     capabilities = NULL;
-    cJSON_AddStringToObject(server, "name", "orvibo-rtl8730e");
-    cJSON_AddStringToObject(server, "version", "0.1.0");
+    cJSON_AddStringToObject(server, "name", river_orvibo_build_info_app_name());
+    cJSON_AddStringToObject(server, "version", river_orvibo_build_info_app_version());
     cJSON_AddItemToObject(result, "serverInfo", server);
     server = NULL;
     return river_orvibo_mcp_build_raw_result(id_obj, result, response_json, response_json_size);

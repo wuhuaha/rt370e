@@ -34,6 +34,7 @@ ameba_list_append(private_sources
     river_wifi_station.c
     river_ws_dispatch.c
     river_opus_codec.c
+    river_orvibo_build_info.c
     river_orvibo_access.c
     river_orvibo_protocol.c
     river_orvibo_mcp_volume.c

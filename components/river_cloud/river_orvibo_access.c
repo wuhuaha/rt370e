@@ -13,6 +13,7 @@
 
 #include "river/river_log.h"
 #include "river/river_orvibo_access.h"
+#include "river/river_orvibo_build_info.h"
 #include "river/river_orvibo_credentials.h"
 #include "river/river_orvibo_protocol.h"
 #include "river/river_wifi_station.h"
@@ -358,7 +359,27 @@ static river_status_t river_orvibo_access_http_request(const char *method,
     (void)httpc_request_write_header(conn, (char *)"Activation-Version", (char *)"1");
     (void)httpc_request_write_header(conn, (char *)"Device-Id", g_river_orvibo_access.device_id);
     (void)httpc_request_write_header(conn, (char *)"Client-Id", g_river_orvibo_access.client_id);
-    (void)httpc_request_write_header(conn, (char *)"User-Agent", (char *)"orvibo-rtl8730e/0.1.0");
+    (void)httpc_request_write_header(conn,
+                                     (char *)"User-Agent",
+                                     (char *)river_orvibo_build_info_user_agent());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Device-Model",
+                                     (char *)river_orvibo_build_info_board_type());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Model",
+                                     (char *)river_orvibo_build_info_board_type());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Application-Version",
+                                     (char *)river_orvibo_build_info_app_version());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"App-Version",
+                                     (char *)river_orvibo_build_info_app_version());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Firmware-Version",
+                                     (char *)river_orvibo_build_info_app_version());
+    (void)httpc_request_write_header(conn,
+                                     (char *)"Device-Version",
+                                     (char *)river_orvibo_build_info_app_version());
     (void)httpc_request_write_header(conn, (char *)"Accept-Language", (char *)"zh-CN");
     (void)httpc_request_write_header(conn, (char *)"Connection", (char *)"close");
     if (httpc_request_write_header_finish(conn) <= 0) {
@@ -426,16 +447,22 @@ static char *river_orvibo_access_build_system_info_json(void)
         goto exit;
     }
     cJSON_AddNumberToObject(root, "version", 2);
+    cJSON_AddStringToObject(root, "model", river_orvibo_build_info_board_type());
     cJSON_AddStringToObject(root, "language", "zh-CN");
     cJSON_AddStringToObject(root, "mac_address", g_river_orvibo_access.device_id);
     cJSON_AddStringToObject(root, "uuid", g_river_orvibo_access.client_id);
-    cJSON_AddStringToObject(root, "chip_model_name", "rtl8730e");
-    cJSON_AddStringToObject(application, "name", "ameba-river");
-    cJSON_AddStringToObject(application, "version", "0.1.0");
+    cJSON_AddStringToObject(root,
+                            "chip_model_name",
+                            river_orvibo_build_info_chip_model_name());
+    cJSON_AddStringToObject(application, "name", river_orvibo_build_info_app_name());
+    cJSON_AddStringToObject(application, "version", river_orvibo_build_info_app_version());
+    cJSON_AddStringToObject(application,
+                            "compile_time",
+                            river_orvibo_build_info_compile_time());
     cJSON_AddItemToObject(root, "application", application);
     application = NULL;
-    cJSON_AddStringToObject(board, "type", "wifi");
-    cJSON_AddStringToObject(board, "name", "orvibo-rtl8730e");
+    cJSON_AddStringToObject(board, "type", river_orvibo_build_info_board_type());
+    cJSON_AddStringToObject(board, "name", river_orvibo_build_info_board_name());
     cJSON_AddStringToObject(board, "ssid", river_wifi_station_ssid());
     cJSON_AddStringToObject(board, "mac", g_river_orvibo_access.device_id);
     cJSON_AddItemToObject(root, "board", board);
@@ -682,11 +709,14 @@ river_status_t river_orvibo_access_init(void)
         river_orvibo_access_set_error("waiting_ota_config");
     }
     g_river_orvibo_access.initialized = true;
-    RIVER_LOGI("access identity: device_id=%s client_id=%s ota=%s static_ws=%s",
+    RIVER_LOGI("access identity: device_id=%s client_id=%s ota=%s static_ws=%s app=%s version=%s board=%s",
                g_river_orvibo_access.device_id,
                g_river_orvibo_access.client_id,
                g_river_orvibo_access.ota_url,
-               river_orvibo_access_static_config_usable() ? "usable" : "needs_ota");
+               river_orvibo_access_static_config_usable() ? "usable" : "needs_ota",
+               river_orvibo_build_info_app_name(),
+               river_orvibo_build_info_app_version(),
+               river_orvibo_build_info_board_type());
     return RIVER_OK;
 }
 
@@ -784,7 +814,7 @@ river_status_t river_orvibo_access_get_status(river_orvibo_access_status_t *stat
 void river_orvibo_access_dump_status(void)
 {
     (void)river_orvibo_access_init();
-    RIVER_LOGI("orvibo access: ready=%s identity=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
+    RIVER_LOGI("orvibo access: ready=%s identity=%s ws_config=%s used_ota=%s activation=%s challenge=%s done=%s attempts=%lu http=%lu app=%s version=%s board=%s ua=%s device_id=%s client_id=%s ota=%s code=%s message=%s last_error=%s",
                g_river_orvibo_access.ready ? "yes" : "no",
                g_river_orvibo_access.identity_ready ? "ready" : "waiting_mac",
                g_river_orvibo_access.websocket_configured ? "yes" : "no",
@@ -794,6 +824,10 @@ void river_orvibo_access_dump_status(void)
                g_river_orvibo_access.activation_done ? "yes" : "no",
                (unsigned long)g_river_orvibo_access.attempts,
                (unsigned long)g_river_orvibo_access.http_status,
+               river_orvibo_build_info_app_name(),
+               river_orvibo_build_info_app_version(),
+               river_orvibo_build_info_board_type(),
+               river_orvibo_build_info_user_agent(),
                g_river_orvibo_access.device_id,
                g_river_orvibo_access.client_id,
                g_river_orvibo_access.ota_url,
@@ -806,4 +840,5 @@ void river_orvibo_access_dump_status(void)
                g_river_orvibo_access.last_error[0] != '\0' ?
                    g_river_orvibo_access.last_error :
                    "-");
+    river_orvibo_build_info_dump_status();
 }
