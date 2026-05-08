@@ -1,3 +1,32 @@
+## Step H.xiaozhi-client.42 Verification
+
+Confirm the root plan is only a pointer and the old root body is archived:
+```bash
+cd /root/ameba-river
+sed -n '1,80p' plan.md
+sed -n '1,40p' doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md
+```
+
+Expected result:
+- `plan.md` points to `.codex/active_context.md`, `.codex/active_plans.md`, and `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`.
+- the archived file is marked as a historical 2026-04-01 `refactor` snapshot.
+- the old long root plan body is no longer embedded in root `plan.md`.
+
+Run documentation hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Firmware build note:
+- this is a documentation-only cleanup; no firmware code, Kconfig, protocol, audio, VAD, KWS, AEC/BF, MCP, or runtime behavior changed.
+- Step H.xiaozhi-client.41 remains the latest full `/root/ameba-rtos` firmware build baseline.
+
 ## Step H.xiaozhi-client.41 Verification
 
 Confirm TTS downlink playback no longer actively drops packets on local playback high-water:

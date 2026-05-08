@@ -1,5 +1,18 @@
 # Change Log
 
+## Step H.xiaozhi-client.42
+- 收敛根目录 `plan.md`，避免旧 `refactor` 分支的运行时性能优化计划继续被误读为当前 `xiaozhi-client` / Orvibo 主线目标。
+- 变更：
+  - `plan.md` 改为短入口文档，只指向当前权威上下文与计划：`.codex/active_context.md`、`.codex/active_plans.md`、`doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`。
+  - 旧根计划正文归档到 `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`，保留可追溯性。
+  - 归档文档明确标记为 historical snapshot，不代表当前分支目标。
+- 保持受保护能力不变：
+  - 未修改固件代码、Kconfig、协议、音频链路、VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP 行为。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - docs-only step: no firmware image rebuild is required; Step 41 remains the latest full firmware build baseline.
+
 ## Step H.xiaozhi-client.41
 - 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后，收紧 Orvibo TTS 下行播放完整性：
   - 参考服务端 `sendAudioHandle.py` 会先等待下行音频发送队列清空，再额外等待约 `(PRE_BUFFER_COUNT + 2) * frame_duration` 的客户端预缓冲播放时间，随后才发送 `tts stop` 或关闭连接。

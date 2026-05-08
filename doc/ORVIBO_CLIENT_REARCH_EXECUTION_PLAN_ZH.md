@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.42` 已收敛根目录 `plan.md`：
+  - 根 `plan.md` 不再直接承载 2026-04-01 `refactor` 分支的历史运行时性能优化计划，避免与当前 Orvibo / XiaoZhi-compatible 主线目标混淆。
+  - 旧正文已归档到 `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`。
+  - 当前权威入口保持为 `.codex/active_context.md`、`.codex/active_plans.md` 与本计划文档。
+  - 本步仅整理文档入口，不修改固件代码、Kconfig、协议、音频链路、VAD、KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、MCP 或运行时行为。
+  - `git diff --check` 与 `python3 tools/diag/check_codex_harness.py` 已通过；无需为本 docs-only slice 重新生成固件镜像。
 - `Step H.xiaozhi-client.41` 已增强 Orvibo TTS 下行播放完整性：
   - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端发送 TTS 时会通过 rate-controller 控制下行音频节奏；在发送 `tts stop` 前会等待音频发送队列清空，并额外等待约 `(PRE_BUFFER_COUNT + 2) * frame_duration` 的客户端预缓冲播放时间。
   - 因此端侧不应在本地播放 buffer 高水位时主动丢弃 TTS 包，否则会削弱服务端“完整音频后 stop”的协议假设，并可能表现为尾音丢失。

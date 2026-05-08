@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.41 增强 Orvibo TTS 播放完整性`
+  - `Step H.xiaozhi-client.42 收敛根计划文档入口`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.42` finishes root plan cleanup:
+  - root `plan.md` no longer embeds the stale 2026-04-01 `refactor` runtime-optimization plan as if it were current branch context.
+  - the old root plan body is archived under `doc/history/refactor_legacy/ARCHIVED_RUNTIME_PERFORMANCE_OPTIMIZATION_PLAN_2026-04-01_ZH.md`.
+  - current planning entry points remain `.codex/active_context.md`, `.codex/active_plans.md`, and `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`.
+  - no firmware code, Kconfig, protocol, audio path, VAD, KWS, model, tensor dump, alignment replay, board/local parity, AEC/BF, MCP, or runtime behavior changed.
+  - docs-only hygiene checks passed; no firmware rebuild is required for this documentation-only slice.
 - `Step H.xiaozhi-client.41` hardens Orvibo TTS downlink playback completion:
   - reference review against `~/xiaozhi-esp32-server` confirmed server-side TTS stop is emitted only after the audio rate-controller queue is drained plus an additional pre-buffer playback wait.
   - local playback high-water now records `bp_evt` diagnostics instead of dropping the downlink packet before `river_playback_service_write(...)`.
