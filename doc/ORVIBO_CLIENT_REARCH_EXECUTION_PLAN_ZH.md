@@ -1,13 +1,20 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-08
+Last Updated: 2026-05-09
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.41` 已增强 Orvibo TTS 下行播放完整性：
+  - 再次对照 `~/xiaozhi-esp32-server` 后确认，服务端发送 TTS 时会通过 rate-controller 控制下行音频节奏；在发送 `tts stop` 前会等待音频发送队列清空，并额外等待约 `(PRE_BUFFER_COUNT + 2) * frame_duration` 的客户端预缓冲播放时间。
+  - 因此端侧不应在本地播放 buffer 高水位时主动丢弃 TTS 包，否则会削弱服务端“完整音频后 stop”的协议假设，并可能表现为尾音丢失。
+  - `RIVER_ORVIBO_TTS_BUFFER_FRAMES` 从 `16` 提高到 `24`；下行播放高水位从主动 drop/busy 改为只记录 `bp_evt` 告警后继续写入播放服务。
+  - 高水位告警阈值从 `85%` 提高到 `95%`，降低正常速率控制抖动下的噪声；`RIVER_ORVIBO_APP_TTS_DRAIN_MS` 从 `900ms` 提高到 `3000ms`，给本地播放 buffer 更充分的 stop 后排空窗口。
+  - 当前 `/root/ameba-rtos` harness 与完整 build 已通过；下一步板端验证重点是长 TTS 响应尾音完整性、`bp_evt` 是否低且有界、以及旧 `drop downlink by playback backpressure` 不再出现。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF、WebSocket 鉴权/hello/listen/abort、MCP volume-only 与 Opus wire framing 保持不变。
 - `Step H.xiaozhi-client.40` 已整理当前分支文档入口并归档过期计划：
   - `doc/README.md` 现在按 Orvibo 主线、受保护 KWS/VAD/AEC/BF 资料和历史归档分区组织。
   - `.codex/active_plans.md` 只保留当前 Orvibo clean-slate 主计划为 active，旧 `agent-server-v2`、旧 direct-XiaoZhi、旧 refactor、旧 Iflytek/provider 和旧分支状态快照均移入 `doc/history/`。

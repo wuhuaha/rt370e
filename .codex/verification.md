@@ -1,3 +1,47 @@
+## Step H.xiaozhi-client.41 Verification
+
+Confirm TTS downlink playback no longer actively drops packets on local playback high-water:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_TTS_BUFFER_FRAMES|RIVER_ORVIBO_DOWNLINK_BUFFER_HIGH_WATER_PCT|downlink playback buffer high water|bp_evt|RIVER_ORVIBO_APP_TTS_DRAIN_MS|drop downlink by playback backpressure" \
+  components/river_voice/river_orvibo_audio_service.c \
+  components/river_core/river_orvibo_app.c
+```
+
+Expected result:
+- `RIVER_ORVIBO_TTS_BUFFER_FRAMES` is `24`.
+- high-water threshold is `95%`.
+- the high-water path logs `downlink playback buffer high water` and updates `bp_evt`, but does not return busy or drop before `river_playback_service_write(...)`.
+- `RIVER_ORVIBO_APP_TTS_DRAIN_MS` is `3000`.
+- the old `drop downlink by playback backpressure` log string is absent.
+
+Reconfirm the service-side TTS stop ordering that motivates this change:
+```bash
+cd /root/ameba-river
+sed -n '17,75p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/handle/sendAudioHandle.py
+sed -n '189,250p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/handle/sendAudioHandle.py
+```
+
+Expected result:
+- service-side `PRE_BUFFER_COUNT` is `5`.
+- the server waits for the audio rate-controller queue to empty.
+- the server then waits about `(PRE_BUFFER_COUNT + 2) * frame_duration` before sending `tts stop`, so the device should not independently discard trailing TTS packets because of local buffer high-water.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.34 Verification
 
 Confirm OTA-issued websocket config now refreshes once before treating open-audio-channel failure as a normal reconnect failure:

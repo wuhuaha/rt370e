@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.41
+- 再次对照 `~/xiaozhi-esp32`、`~/py-xiaozhi` 与 `~/xiaozhi-esp32-server` 后，收紧 Orvibo TTS 下行播放完整性：
+  - 参考服务端 `sendAudioHandle.py` 会先等待下行音频发送队列清空，再额外等待约 `(PRE_BUFFER_COUNT + 2) * frame_duration` 的客户端预缓冲播放时间，随后才发送 `tts stop` 或关闭连接。
+  - 参考端协议语义默认假设服务端已经发完整 Opus 流；端侧不应因为本地播放 buffer 高水位主动丢弃尾部 TTS 包。
+  - 当前 Orvibo 分支此前在播放 buffer 超过 85% 高水位时直接返回 `RIVER_ERR_BUSY`，导致 app 计数为 downlink failure，存在削弱服务端“完整发送后 stop”保证的风险。
+  - 当前 Orvibo 分支此前在 `tts stop` 后只等待 `900ms` playback drain，超时会强制 stop，长回复或播放侧轻微积压时仍可能截断尾音。
+- 变更：
+  - `RIVER_ORVIBO_TTS_BUFFER_FRAMES` 从 `16` 提高到 `24`，利用当前平台相对 ESP32 更宽裕的内存预算给 TTS 下行更多抖动空间。
+  - 下行播放高水位策略从“主动 drop / busy”改为“只记录 high-water event 并继续阻塞写入”，日志字段从 `bp_drop` 收敛为 `bp_evt`。
+  - 高水位告警阈值从 `85%` 提高到 `95%`，避免正常 server rate-control 抖动产生误导性告警。
+  - `RIVER_ORVIBO_APP_TTS_DRAIN_MS` 从 `900ms` 提高到 `3000ms`，给 stop 后本地 playback buffer 更充分的排空窗口。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 WebSocket 鉴权、hello、listen、abort、MCP volume-only 或 Opus wire framing；仅调整下行 TTS 本地缓存与 drain 策略。
+- Verification for this step:
+  - passed: static reference review confirmed server TTS stop is sent only after rate-controller queue drain plus pre-buffer playback wait.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation after flashing should replay a long TTS response and verify there is no `drop downlink by playback backpressure` log, `bp_evt` remains low or bounded, and TTS tail plays completely before state returns to listening/idle.
+
 ## Step H.xiaozhi-client.40
 - 整理当前 Orvibo 分支的文档信息架构，降低过期计划对后续实现的误导：
   - `doc/README.md` 改为按当前主线、受保护 KWS/VAD/AEC/BF 资料和历史归档分区组织。

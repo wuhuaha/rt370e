@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.40 归档过期文档并收敛活动索引`
+  - `Step H.xiaozhi-client.41 增强 Orvibo TTS 播放完整性`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,13 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.41` hardens Orvibo TTS downlink playback completion:
+  - reference review against `~/xiaozhi-esp32-server` confirmed server-side TTS stop is emitted only after the audio rate-controller queue is drained plus an additional pre-buffer playback wait.
+  - local playback high-water now records `bp_evt` diagnostics instead of dropping the downlink packet before `river_playback_service_write(...)`.
+  - TTS playback buffer frame budget is increased from `16` to `24`, and the high-water diagnostic threshold is raised from `85%` to `95%`.
+  - app-level TTS drain timeout is increased from `900ms` to `3000ms`, reducing the chance of forcing playback stop before the local buffer has drained.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, AEC/BF, WebSocket auth/hello/listen/abort, MCP volume-only, and Opus wire framing remain unchanged.
+  - latest `/root/ameba-rtos` harness and full build passed; board runtime confirmation still requires flashing and replaying a long TTS response to verify tail completion.
 - `Step H.xiaozhi-client.40` archives stale branch-era documents and tightens the active document index:
   - `doc/README.md` now prioritizes the Orvibo mainline plan plus protected KWS/VAD/AEC/BF diagnostic references, rather than old XiaoZhi/direct-provider/refactor plans.
   - `.codex/active_plans.md` now lists only `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md` as active; old `agent-server-v2`, direct-XiaoZhi, refactor, Iflytek/provider, and branch snapshot documents are reference-only under `doc/history/`.
