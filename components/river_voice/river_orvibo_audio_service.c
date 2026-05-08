@@ -30,7 +30,7 @@
 #define CONFIG_RIVER_VOICE_CAPABILITY_KWS 0
 #endif
 
-#define RIVER_ORVIBO_AUDIO_TASK_STACK          (1024U * 18U)
+#define RIVER_ORVIBO_AUDIO_TASK_STACK          (1024U * 32U)
 #define RIVER_ORVIBO_AUDIO_TASK_PRIORITY       4U
 #define RIVER_ORVIBO_CAPTURE_VOLUME            0x24U
 #define RIVER_ORVIBO_CAPTURE_HPF_FC            0U
@@ -381,7 +381,8 @@ static river_status_t river_orvibo_audio_open(void)
                                 16000) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;
     }
-    RIVER_LOGI("audio open: capture=%luHz/%luch/%lums preproc=%s detector=%s opus=%lums packet_max=%u",
+    RIVER_LOGI("audio open: task_stack=%u capture=%luHz/%luch/%lums preproc=%s detector=%s opus=%lums packet_max=%u",
+               (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
                (unsigned long)g_river_orvibo_audio.capture.sample_rate,
                (unsigned long)g_river_orvibo_audio.capture.channels,
                (unsigned long)g_river_orvibo_audio.capture.frame_ms,
@@ -930,9 +931,10 @@ void river_orvibo_audio_service_stop_playback(const char *reason)
 
 void river_orvibo_audio_service_dump_status(void)
 {
-    RIVER_LOGI("orvibo audio: running=%s mode=%s vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu->%lu playback=%s write=%lu/%lu bp_drop=%lu bp_high=%lu buf=%lu/%lu",
+    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu->%lu playback=%s write=%lu/%lu bp_drop=%lu bp_high=%lu buf=%lu/%lu",
                g_river_orvibo_audio.running ? "yes" : "no",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
+               (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
                g_river_orvibo_audio.vad_is_speech ? "speech" : "silence",
                (unsigned int)g_river_orvibo_audio.vad_probability_raw_q15,
                (unsigned int)g_river_orvibo_audio.vad_probability_q15,

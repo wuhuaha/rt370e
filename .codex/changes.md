@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.19
+- 修复实板首连后的 Orvibo 音频任务栈溢出：
+  - `/dev/ttyUSB0` 实板烧录已通过，Flash tool 使用 `/root/ameba-rtos` 与项目本地 `RTL8730E_NOR.rdev`。
+  - 实板日志已确认 OTA/WS 鉴权身份使用真实 MAC `8c:bd:37:49:a6:3c`，并成功连到 `wss://api.tenclass.net/xiaozhi/v1/`。
+  - WebSocket hello 已收到服务端返回：`server hello: sid=... audio=24000Hz/1ch/60ms`。
+  - 进入 listening 后暴露 `STACK OVERFLOW - TaskName(orvibo_audio)`，说明当前 18 KB audio task 栈不足以承载 capture/preproc/VAD/KWS submit/Opus encode 同线程组合。
+- 变更：
+  - `orvibo_audio` task stack 从 18 KB 提升到 32 KB，利用当前平台比 ESP32 更充裕的内存，优先保证实验分支运行稳定。
+  - audio open/status 日志输出 `task_stack=`，便于后续板端确认实际栈预算。
+- 保持受保护能力不变：
+  - 未修改 Silero VAD、KWS 模型/阈值/tensor dump/alignment replay/board-local parity、AEC/BF 算法。
+  - 本步只调整 Orvibo audio service 任务栈预算和诊断输出。
+- Verification for this step:
+  - Pre-fix board flash passed.
+  - Pre-fix board monitor confirmed WS server hello and exposed `orvibo_audio` stack overflow.
+  - Static/harness checks passed.
+  - `/root/ameba-rtos` SDK rebuild passed with `Build done`.
+  - Reflash passed with `Finished PASS` on `/dev/ttyUSB0` after entering `reboot uartburn`.
+  - Board monitor showed stable `mode=listening` with increasing `enc=` counters and no repeat `STACK OVERFLOW - TaskName(orvibo_audio)`.
+  - `river orvibo status` confirmed `task_stack=32768`, real identity `device_id=8c:bd:37:49:a6:3c`, WebSocket URL `wss://api.tenclass.net/xiaozhi/v1/`, server audio `24000Hz/1ch/60ms`, `rate=24000->48000`, and MCP volume-only tools.
+  - Follow-up runtime issue recorded for the next step: server-side WebSocket close after TTS currently leaves the app at `idle` instead of opening the next listening channel.
+
 ## Step H.xiaozhi-client.18
 - 对齐 XiaoZhi-compatible 服务器文本语义到 Orvibo 事件面：
   - `tts` 的 `sentence_start` 不再只打日志，而是通过 Orvibo protocol/app 事件流可见。

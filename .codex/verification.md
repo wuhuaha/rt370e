@@ -1,3 +1,59 @@
+## Step H.xiaozhi-client.19 Verification
+
+Confirm the audio task stack budget and diagnostics were increased after the board-side overflow:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_AUDIO_TASK_STACK|task_stack=" \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Expected result:
+- `RIVER_ORVIBO_AUDIO_TASK_STACK` is `1024U * 32U`.
+- audio open/status logs include `task_stack=`.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
+Post-flash validation:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+printf 'reboot uartburn\r' > /dev/ttyUSB0
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected result:
+- flash finishes with `Finished PASS`.
+- monitor shows real `device_id`, WebSocket `connecting`, and `server hello`.
+- after wake/listening, logs do not show `STACK OVERFLOW - TaskName(orvibo_audio)`.
+- `audio diag` should continue in `listening` with increasing `enc=` counters when speech/audio is present.
+
+Observed result on 2026-05-08:
+- rebuild passed with `Build done`.
+- direct first reflash attempt did not enter download mode; sending `reboot uartburn` restored the normal project flashing path.
+- one 1500000-baud download attempt failed mid-app image, but immediate retry at 1500000 completed with `Finished PASS`.
+- monitor showed stable `mode=listening` with `enc=` increasing from 72 to 1095 and no `STACK OVERFLOW - TaskName(orvibo_audio)`.
+- `river orvibo status` showed `task_stack=32768`, real device identity, OTA-derived `wss://api.tenclass.net/xiaozhi/v1/`, `server_audio=24000Hz/1ch/60ms`, `rate=24000->48000`, and MCP volume-only tools.
+- a follow-up issue remains outside this stack fix: after one server TTS, the server WebSocket close currently returns the app to `idle`.
+
+Pre-fix board evidence:
+- flash passed on `/dev/ttyUSB0`.
+- monitor confirmed `server hello: sid=... audio=24000Hz/1ch/60ms`.
+- monitor then reported `STACK OVERFLOW - TaskName(orvibo_audio)`, motivating this stack-budget fix.
+
 ## Step H.xiaozhi-client.18 Verification
 
 Confirm server text semantics are surfaced through Orvibo events and status:

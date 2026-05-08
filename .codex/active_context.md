@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.18 对齐 Orvibo 服务器文本/情绪语义事件（SDK 构建通过）`
+  - `Step H.xiaozhi-client.19 修复 Orvibo 音频任务栈溢出（实板验证通过）`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -32,6 +32,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.19` fixes the real-board Orvibo audio task stack overflow:
+  - `/dev/ttyUSB0` flash passed with `/root/ameba-rtos`.
+  - board monitor confirmed real MAC identity, WebSocket connection, and server hello from `wss://api.tenclass.net/xiaozhi/v1/`.
+  - the first wake/listening path then hit `STACK OVERFLOW - TaskName(orvibo_audio)`.
+  - `orvibo_audio` task stack is increased from 18 KB to 32 KB and logs now expose `task_stack=`.
+  - rebuilt with `/root/ameba-rtos`, reflashed successfully, and validated `mode=listening` with increasing `enc=` counters without another `STACK OVERFLOW`.
+  - `river orvibo status` confirmed `task_stack=32768`, real `device_id=8c:bd:37:49:a6:3c`, OTA-derived WebSocket URL, MCP volume-only tools, 24 kHz server audio, and 24 kHz to 48 kHz playback adaptation.
+  - follow-up runtime issue observed for a later step: after one server TTS, the WebSocket closed and the app recovered to `idle` instead of re-establishing the next listening channel.
 
 - `Step H.xiaozhi-client.18` aligns the Orvibo runtime with XiaoZhi-compatible server text semantics:
   - `tts sentence_start`、`stt`、`llm` 现在都会进入 Orvibo protocol/app 事件流，而不是只打日志。
