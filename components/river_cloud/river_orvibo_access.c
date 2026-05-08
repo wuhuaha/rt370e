@@ -35,6 +35,8 @@
 #define RIVER_ORVIBO_ACCESS_MAX_CHECK_ROUNDS    4U
 #define RIVER_ORVIBO_ACCESS_ACTIVATE_RETRIES    10U
 #define RIVER_ORVIBO_ACCESS_ACTIVATE_WAIT_MS    3000U
+#define RIVER_ORVIBO_ACCESS_PROTOCOL_MIN        1
+#define RIVER_ORVIBO_ACCESS_PROTOCOL_MAX        3
 
 typedef struct {
     bool secure;
@@ -504,8 +506,12 @@ static river_status_t river_orvibo_access_apply_websocket_config(const cJSON *we
     if (cJSON_IsString(token_obj) && token_obj->valuestring != NULL) {
         config.token = token_obj->valuestring;
     }
-    if (cJSON_IsNumber(version_obj) && version_obj->valueint > 0) {
+    if (cJSON_IsNumber(version_obj) &&
+        version_obj->valueint >= RIVER_ORVIBO_ACCESS_PROTOCOL_MIN &&
+        version_obj->valueint <= RIVER_ORVIBO_ACCESS_PROTOCOL_MAX) {
         config.protocol_version = (uint16_t)version_obj->valueint;
+    } else if (cJSON_IsNumber(version_obj)) {
+        RIVER_LOGW("ignore unsupported websocket version from OTA: %d", version_obj->valueint);
     }
     if (river_orvibo_protocol_set_config(&config) != RIVER_OK) {
         return RIVER_ERR_IO;

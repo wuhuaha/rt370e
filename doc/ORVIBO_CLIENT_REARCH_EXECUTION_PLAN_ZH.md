@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.28` 已收紧 Orvibo WebSocket 协议版本输入范围：
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前直接 WebSocket 入站二进制消息会作为 raw Opus 进入 ASR 队列；只有 `?from=mqtt_gateway` 路径才解析 MQTT gateway 的 16 字节头。
+  - 当前服务端 OTA 返回 websocket `url/token`，不返回 `websocket.version`，因此直连 XiaoZhi-compatible websocket 的安全默认仍应保持 raw/v1。
+  - OTA `websocket.version` 现在只接受 `1..3`；超出范围的数值会被忽略并打印 warning。
+  - `river_orvibo_protocol_set_config()` 也统一拒绝不支持的版本，并在写入全局配置前完成校验，避免 header/hello version 与实际音频 framing 分裂。
+  - 本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 保持不变。
 - `Step H.xiaozhi-client.27` 已对齐 Orvibo WebSocket 默认握手子协议到 XiaoZhi 参考端行为：
   - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端 WebSocket 连接设置 `Authorization`、`Protocol-Version`、`Device-Id`、`Client-Id`，但不请求 `Sec-WebSocket-Protocol`。
   - 对照 `~/xiaozhi-esp32-server` 后确认，当前服务端 `websockets.serve(...)` 未配置 subprotocol，不要求客户端提供 subprotocol。
@@ -1248,6 +1254,10 @@ python3 /root/ameba-rtos/ameba.py build -p
   - 新增项目侧 `river_ws_handshake.c`，通过 `--wrap=ws_client_handshake` 覆盖 SDK 会注入 `chat, superchat` 的默认握手。
   - `RIVER_ORVIBO_WS_SUBPROTOCOL` 默认空字符串；显式配置时仍保留发送具体 subprotocol 的能力。
   - wrapper 保留 Host/Upgrade/Connection/Sec-WebSocket-Key/Sec-WebSocket-Version/custom headers，并按有效长度处理 SDK setter 写入的字段。
+- `Step H.xiaozhi-client.28`：
+  - OTA `websocket.version` 只接受 `1..3`，异常数值不再写入 Orvibo protocol config。
+  - `river_orvibo_protocol_set_config()` 在更新全局配置前校验版本，避免不支持的 version 造成 hello/header 与 audio framing 不一致。
+  - 继续保持 direct websocket 默认 raw/v1，以匹配当前 `xiaozhi-esp32-server` 的直接入站 bytes 处理路径。
 - `Step H.xiaozhi-client.25`：
   - 新增统一 `river_orvibo_build_info` helper，集中导出 Orvibo app/version/compile_time/board/chip/user-agent，避免 OTA/MCP/诊断多处散落硬编码。
   - OTA 请求头补齐 `Device-Model`、`Model`、`Application-Version`、`App-Version`、`Firmware-Version`、`Device-Version`，对齐 `xiaozhi-esp32-server` OTA handler 的优先读取路径。

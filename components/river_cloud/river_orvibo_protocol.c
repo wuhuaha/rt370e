@@ -131,6 +131,11 @@ static river_orvibo_protocol_context_t g_river_orvibo_protocol;
 static void river_orvibo_uplink_task(void *param);
 static bool river_orvibo_channel_open_locked(void);
 
+static bool river_orvibo_protocol_version_supported(uint16_t version)
+{
+    return version >= 1U && version <= 3U;
+}
+
 static void river_orvibo_copy_text(char *dst, size_t dst_size, const char *src)
 {
     if (dst == NULL || dst_size == 0U) {
@@ -1013,11 +1018,19 @@ river_status_t river_orvibo_protocol_get_config(river_orvibo_protocol_config_t *
 
 river_status_t river_orvibo_protocol_set_config(const river_orvibo_protocol_config_t *config)
 {
+    uint16_t protocol_version;
+
     if (config == NULL) {
         return RIVER_ERR_ARG;
     }
     if (river_orvibo_protocol_init() != RIVER_OK) {
         return RIVER_ERR_NO_MEMORY;
+    }
+    protocol_version = config->protocol_version != 0U ?
+                           config->protocol_version :
+                           RIVER_ORVIBO_PROTOCOL_VERSION;
+    if (!river_orvibo_protocol_version_supported(protocol_version)) {
+        return RIVER_ERR_ARG;
     }
     if (config->url != NULL) {
         river_orvibo_copy_text(g_river_orvibo_protocol.url,
@@ -1039,9 +1052,7 @@ river_status_t river_orvibo_protocol_set_config(const river_orvibo_protocol_conf
     g_river_orvibo_protocol.config.token = g_river_orvibo_protocol.token;
     g_river_orvibo_protocol.config.websocket_subprotocol =
         g_river_orvibo_protocol.websocket_subprotocol;
-    if (g_river_orvibo_protocol.config.protocol_version == 0U) {
-        g_river_orvibo_protocol.config.protocol_version = RIVER_ORVIBO_PROTOCOL_VERSION;
-    }
+    g_river_orvibo_protocol.config.protocol_version = protocol_version;
     if (g_river_orvibo_protocol.config.uplink_sample_rate == 0U) {
         g_river_orvibo_protocol.config.uplink_sample_rate = RIVER_ORVIBO_AUDIO_SAMPLE_RATE;
     }

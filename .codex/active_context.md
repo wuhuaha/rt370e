@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.27 对齐 Orvibo WebSocket 默认无子协议握手`
+  - `Step H.xiaozhi-client.28 收紧 Orvibo WebSocket 协议版本输入范围`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.28` tightens Orvibo websocket protocol-version input:
+  - reference comparison against `~/xiaozhi-esp32-server` confirmed direct websocket binary messages are treated as raw Opus unless the connection is explicitly from the MQTT gateway path.
+  - the current server OTA response emits websocket `url/token` and does not emit `websocket.version`, so Orvibo should stay on the raw/v1 default unless a supported version is explicitly configured.
+  - OTA websocket version parsing now accepts only `1..3`; unsupported numeric versions are logged and ignored.
+  - `river_orvibo_protocol_set_config()` also rejects unsupported versions before mutating global config, preventing header/hello version from diverging from implemented audio framing.
+  - local VAD, wake-word/KWS, tensor dump, alignment replay, board/local parity, and AEC/BF implementation remain unchanged.
 - `Step H.xiaozhi-client.27` aligns the default Orvibo WebSocket handshake with XiaoZhi reference clients:
   - reference comparison against `~/xiaozhi-esp32` and `~/py-xiaozhi` confirmed they set auth/protocol/device headers but do not request `Sec-WebSocket-Protocol`.
   - reference comparison against `~/xiaozhi-esp32-server` confirmed the current server does not configure required websocket subprotocols.

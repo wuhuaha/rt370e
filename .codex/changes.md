@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.28
+- 收紧 Orvibo WebSocket 协议版本输入范围：
+  - 对照 `~/xiaozhi-esp32-server` 后确认，当前 WebSocket 入站二进制消息在非 MQTT gateway 路径下直接作为 raw Opus 放入 ASR 队列，服务端 OTA 当前也只返回 websocket `url/token`，不返回 `version`。
+  - Orvibo 端虽然已默认 `protocol_version=1`，但 OTA 解析此前会接受任意正数 `websocket.version`；若未来服务端或配置异常返回 `4+`，端侧会在 header/hello 声明未知版本，同时因本地只实现 1/2/3 而实际发送 raw Opus，形成 wire contract 自相矛盾。
+- 变更：
+  - `river_orvibo_access_apply_websocket_config()` 只接受 OTA `websocket.version` 的 `1..3`；超出范围时忽略并打印 `ignore unsupported websocket version from OTA`。
+  - `river_orvibo_protocol_set_config()` 统一校验 `protocol_version`，只允许 `1..3` 或 `0` 回退默认值。
+  - 校验在写入全局配置前完成，非法版本不会污染当前运行配置。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 raw/v1 默认、v2/v3 已有包络实现、OTA URL/token、hello/listen/abort、TTS 下行、MCP volume-only 和状态机。
+- Verification for this step:
+  - passed: static grep confirmed OTA version range and protocol `set_config` guard.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation remains blocked by the current historical pure-`0x00` UART session state.
+
 ## Step H.xiaozhi-client.27
 - 对齐 Orvibo WebSocket 默认握手子协议到 XiaoZhi 参考端行为：
   - 再次对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端 WebSocket 连接只设置 `Authorization`、`Protocol-Version`、`Device-Id`、`Client-Id` 等请求头，不主动请求 `Sec-WebSocket-Protocol`。

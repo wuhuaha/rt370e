@@ -1,3 +1,37 @@
+## Step H.xiaozhi-client.28 Verification
+
+Confirm Orvibo only accepts implemented websocket protocol versions:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_ACCESS_PROTOCOL|unsupported websocket version|protocol_version_supported|protocol_version = protocol_version|websocket.*version" \
+  components/river_cloud/river_orvibo_access.c \
+  components/river_cloud/river_orvibo_protocol.c
+sed -n '250,305p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/api/ota_handler.py
+sed -n '300,345p' /root/xiaozhi-esp32-server/main/xiaozhi-server/core/connection.py
+```
+
+Expected result:
+- OTA `websocket.version` is accepted only in the `1..3` range.
+- unsupported OTA numeric versions are ignored with a warning rather than applied.
+- protocol `set_config` rejects unsupported versions before mutating global config.
+- current XiaoZhi-compatible server OTA emits websocket `url/token` and no `version`.
+- current direct websocket binary path treats client bytes as raw Opus unless the request comes from the MQTT gateway path.
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+- the SDK build exits successfully with `Build done`
+
 ## Step H.xiaozhi-client.27 Verification
 
 Confirm the default Orvibo WebSocket handshake omits SDK-injected subprotocols:
