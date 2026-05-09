@@ -96,6 +96,7 @@ typedef struct {
     uint32_t vad_fail;
     uint32_t vad_speech_start;
     uint32_t vad_speech_end;
+    uint32_t vad_speaking_barge_suppressed;
     uint32_t kws_submit_ok;
     uint32_t kws_submit_fail;
     uint32_t encode_ok;
@@ -273,10 +274,18 @@ static void river_orvibo_audio_handle_vad(const river_voice_detector_result_t *r
     g_river_orvibo_audio.vad_probability_q15 = result->speech_probability_q15;
     if (result->is_speech && !previous) {
         g_river_orvibo_audio.vad_speech_start++;
-        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING ||
-            (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_SPEAKING &&
-             g_river_orvibo_audio.barge_in_enabled)) {
+        if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_LISTENING) {
             river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_SPEECH_STARTED);
+        } else if (g_river_orvibo_audio.mode == RIVER_ORVIBO_AUDIO_MODE_SPEAKING) {
+            g_river_orvibo_audio.vad_speaking_barge_suppressed++;
+            if (g_river_orvibo_audio.vad_speaking_barge_suppressed <= 3U ||
+                (g_river_orvibo_audio.vad_speaking_barge_suppressed % 20U) == 0U) {
+                RIVER_LOGI("vad speech ignored during speaking: barge_in=%s prob=%u/%u count=%lu",
+                           g_river_orvibo_audio.barge_in_enabled ? "on" : "off",
+                           (unsigned int)g_river_orvibo_audio.vad_probability_raw_q15,
+                           (unsigned int)g_river_orvibo_audio.vad_probability_q15,
+                           (unsigned long)g_river_orvibo_audio.vad_speaking_barge_suppressed);
+            }
         }
     } else if (!result->is_speech && previous) {
         g_river_orvibo_audio.vad_speech_end++;
@@ -1013,7 +1022,7 @@ void river_orvibo_audio_service_stop_playback(const char *reason)
 
 void river_orvibo_audio_service_dump_status(void)
 {
-    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
+    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu suppress=%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
                g_river_orvibo_audio.running ? "yes" : "no",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
@@ -1028,6 +1037,7 @@ void river_orvibo_audio_service_dump_status(void)
                (unsigned long)g_river_orvibo_audio.vad_fail,
                (unsigned long)g_river_orvibo_audio.vad_speech_start,
                (unsigned long)g_river_orvibo_audio.vad_speech_end,
+               (unsigned long)g_river_orvibo_audio.vad_speaking_barge_suppressed,
                (unsigned long)g_river_orvibo_audio.kws_submit_ok,
                (unsigned long)g_river_orvibo_audio.kws_submit_fail,
                (unsigned long)g_river_orvibo_audio.encode_ok,

@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.47 按播放呈现位置收敛 Orvibo TTS 尾部排空`
+  - `Step H.xiaozhi-client.48 屏蔽普通 VAD 误触发 Orvibo TTS 打断`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.48` 屏蔽普通 VAD 误触发 Orvibo TTS 打断：
+  - 2026-05-09 15:47 板端日志显示，TTS 中途被截断的直接原因是 `orvibo state: speaking -> listening reason=vad_start event=user_speech_started actions=0xaa4`，即普通 VAD speech-start 在 speaking 阶段触发了 `STOP_PLAYBACK`。
+  - 这次现象已经不是 H.47 的 playback drain 判据问题；截断发生在服务端后续 TTS 文本仍在到来期间，本地状态机先被 VAD barge-in 拉回 listening。
+  - `river_orvibo_audio_handle_vad()` 现在只在 `LISTENING` 模式下发出 `SPEECH_STARTED`；`SPEAKING` 模式继续运行 VAD 和统计概率，但只累加 `vad_speaking_barge_suppressed` 并限频打印 `vad speech ignored during speaking`。
+  - Orvibo 状态机同时移除 `SPEAKING + USER_SPEECH_STARTED -> STOP_PLAYBACK` 分支，防止未来其它路径绕过 audio service 再次用普通 VAD 中止 TTS。
+  - 唤醒词/KWS 打断保持不变，`SPEAKING + WAKE_DETECTED` 仍会停止当前播放并重新 listening；H.43 的 realtime-capable speaking 上行也保持不变。
+  - 本步未修改 VAD 模型/推理/阈值、唤醒词/KWS 模型/参数、tensor dump、alignment replay、board/local parity、AEC/BF、协议 wire contract、MCP、OTA/v2 激活或 Opus framing。
+  - 风险是普通非唤醒词语音不再能本地立即打断 TTS；后续若需要该能力，必须增加比单次本地 VAD start 更强的确认机制。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均已通过；仍需烧录后确认 TTS 期间不再出现 `speaking -> listening reason=vad_start`。
 - `Step H.xiaozhi-client.47` 按播放呈现位置收敛 Orvibo TTS 尾部排空：
   - 对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端不会在收到 `tts stop` 后立刻关闭/flush 输出设备，而是让播放队列或长期输出流自然排空。
   - 当前 Ameba 分支的上层仍会在 wait_idle 后执行 `Pause/Flush/Stop`，所以 wait_idle 必须代表硬件已经呈现完整尾部，而不是只看 SDK buffer 状态。

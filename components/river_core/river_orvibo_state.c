@@ -188,13 +188,6 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_START_LISTENING |
                           RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
-            } else if (event == RIVER_ORVIBO_EVENT_USER_SPEECH_STARTED) {
-                new_state = RIVER_ORVIBO_STATE_LISTENING;
-                actions = RIVER_ORVIBO_ACTION_ABORT_SPEAKING |
-                          RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
-                          RIVER_ORVIBO_ACTION_START_LISTENING |
-                          RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
-                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED) {
                 new_state = RIVER_ORVIBO_STATE_LISTENING;
                 actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |

@@ -1,3 +1,51 @@
+## Step H.xiaozhi-client.48 Verification
+
+Confirm ordinary VAD can no longer abort TTS while Orvibo is speaking, while
+wakeword/KWS barge-in remains available:
+```bash
+cd /root/ameba-river
+rg -n "vad speech ignored during speaking|vad_speaking_barge_suppressed|RIVER_ORVIBO_EVENT_USER_SPEECH_STARTED|RIVER_ORVIBO_EVENT_WAKE_DETECTED" \
+  components/river_voice/river_orvibo_audio_service.c \
+  components/river_core/river_orvibo_state.c
+```
+
+Expected result:
+- `river_orvibo_audio_handle_vad(...)` emits `SPEECH_STARTED` only in `RIVER_ORVIBO_AUDIO_MODE_LISTENING`
+- `RIVER_ORVIBO_AUDIO_MODE_SPEAKING` increments/logs `vad_speaking_barge_suppressed` instead of emitting a speech-start event
+- the Orvibo state machine no longer has a `SPEAKING + USER_SPEECH_STARTED` stop-playback transition
+- the Orvibo state machine still has `SPEAKING + WAKE_DETECTED` with `RIVER_ORVIBO_ACTION_STOP_PLAYBACK`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result:
+- `git diff --check` passed.
+- `check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
+Post-flash board validation:
+```text
+1. Flash the image and reproduce a multi-sentence TTS response.
+2. During TTS, confirm ordinary VAD activity no longer produces:
+   orvibo state: speaking -> listening reason=vad_start
+3. If VAD fires during TTS, confirm the board logs:
+   vad speech ignored during speaking: ...
+4. Confirm playback continues until server `tts stop`, then runs the normal playback drain path.
+5. Confirm wakeword/KWS barge-in still works during speaking by saying the wake word during a long TTS response.
+```
+
+Risk interpretation:
+- if TTS is still cut and the log shows `event=wake_detected`, the remaining issue is KWS false trigger / gate behavior rather than ordinary VAD routing
+- if TTS is still cut without `vad_start` or `wake_detected`, preserve nearby `server_tts_*`, `playback stop`, `audio diag`, `river playback status`, and `AudioHal` lines for the next playback-side investigation
+- ordinary non-wake speech is intentionally no longer a local TTS abort source in this step
+
 ## Step H.xiaozhi-client.47 Verification
 
 Confirm playback drain now waits on presentation position instead of only SDK buffer status:

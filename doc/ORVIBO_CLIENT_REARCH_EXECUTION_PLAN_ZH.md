@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.48` 屏蔽普通 VAD 误触发 Orvibo TTS 打断：
+  - 2026-05-09 15:47 板端日志显示，TTS 已经播放到 `好的`、`已经` 后，中途出现 `orvibo state: speaking -> listening reason=vad_start event=user_speech_started actions=0xaa4`。
+  - 该 action 包含 `STOP_PLAYBACK`，说明当前截断根因不是 `tts stop` 后 drain 不足，而是普通 VAD 在 speaking 期间被当成本地 barge-in，中止了还在播放/下发中的 TTS。
+  - `river_orvibo_audio_handle_vad()` 改为只在 `LISTENING` 模式下发出 `SPEECH_STARTED`；`SPEAKING` 模式下继续跑 VAD、更新概率和 speech 统计，但只记录 `vad_speaking_barge_suppressed` 与限频诊断日志。
+  - Orvibo 状态机移除 `SPEAKING + USER_SPEECH_STARTED` 的 stop-playback 转移，避免其它路径再次用普通 VAD 中止 TTS。
+  - speaking 期间唤醒词/KWS 打断保持不变，`WAKE_DETECTED` 仍可停止当前 TTS 并重新 listening；具备 AEC/native-ref 的 profile 仍按 H.43 在 speaking 期间保持上行编码。
+  - 本步不修改本地 VAD 实现、唤醒词模型、KWS 参数、tensor dump、alignment replay、board/local parity、AEC/BF、协议鉴权/hello/listen/abort、MCP volume-only 或 Opus wire framing。
+  - 风险是普通非唤醒词语音不再能本地立即打断 TTS；后续若要恢复这类体验，需要设计更强的打断确认，而不是让单次 VAD start 直接触发 stop playback。
+  - 已完成 `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build；下一步需要 flash 后确认 TTS 期间 VAD 触发只出现 `vad speech ignored during speaking`，不再出现 `speaking -> listening reason=vad_start`。
 - `Step H.xiaozhi-client.47` 按播放呈现位置收敛 Orvibo TTS 尾部排空：
   - 结合 2026-05-09 14:33 板端日志继续分析，当前现象已经从“完全听不到 TTS”收敛为“尾部仍有小段被截断”，问题重点转到 `tts stop -> wait_idle -> stop/flush` 的本地播放收口判据。
   - 对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端不会在 `tts stop` 后马上关闭/flush 输出设备，而是让 playback queue 或长期 output stream 自然排空。
