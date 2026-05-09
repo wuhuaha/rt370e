@@ -187,10 +187,7 @@ static void river_orvibo_audio_apply_runtime_policy(river_orvibo_audio_mode_t mo
         river_voice_runtime_set_playback_owner(RIVER_VOICE_RUNTIME_PLAYBACK_OWNER_NONE);
         break;
     case RIVER_ORVIBO_AUDIO_MODE_SPEAKING:
-        river_voice_kws_set_detection_gate(g_river_orvibo_audio.barge_in_enabled,
-                                           g_river_orvibo_audio.barge_in_enabled ?
-                                               "orvibo_barge_in" :
-                                               "orvibo_speaking");
+        river_voice_kws_set_detection_gate(false, "orvibo_speaking_playback");
         river_voice_runtime_set_interaction_state(
             g_river_orvibo_audio.barge_in_enabled ?
                 RIVER_VOICE_RUNTIME_INTERACTION_BARGE_IN_LISTENING :

@@ -1,3 +1,48 @@
+## Step H.xiaozhi-client.49 Verification
+
+Confirm local software KWS is blocked while Orvibo is playing TTS, matching the
+XiaoZhi reference behavior that only AFE wake word may run during speaking:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_AUDIO_MODE_SPEAKING|orvibo_speaking_playback|river_voice_kws_set_detection_gate\\(|river_orvibo_audio_speaking_uplink_allowed" \
+  components/river_voice/river_orvibo_audio_service.c
+nl -ba /root/xiaozhi-esp32/main/application.cc | sed -n '906,914p'
+```
+
+Expected result:
+- `RIVER_ORVIBO_AUDIO_MODE_SPEAKING` sets KWS detection gate to `false` with reason `orvibo_speaking_playback`
+- speaking-mode runtime interaction can still be `BARGE_IN_LISTENING` when barge-in is enabled
+- `river_orvibo_audio_speaking_uplink_allowed()` remains the gate for realtime-capable speaking uplink
+- the XiaoZhi reference code documents and implements "Only AFE wake word can be detected in speaking mode"
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result:
+- `git diff --check` passed.
+- `check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
+Post-flash board validation:
+```text
+1. Flash the image and reproduce a multi-sentence TTS response.
+2. During TTS playback, confirm there is no `kws gate open` followed by `wakeword hit`.
+3. If VAD fires during TTS, it may still log `vad speech ignored during speaking`, but KWS should remain gated.
+4. Run `river kws status` during speaking if possible; gate reason should be `orvibo_speaking_playback`.
+5. Confirm TTS continues through the phrase that previously stopped after `温度2`.
+```
+
+Risk interpretation:
+- local software wakeword no longer interrupts TTS during speaking; this is intentional for the current software KWS path
+- if TTS is still cut without `kws gate open` / `wakeword hit`, preserve nearby `playback stop`, `server_tts_*`, `audio diag`, and `river playback status` lines
+
 ## Step H.xiaozhi-client.48 Verification
 
 Confirm ordinary VAD can no longer abort TTS while Orvibo is speaking, while

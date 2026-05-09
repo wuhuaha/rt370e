@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.48 屏蔽普通 VAD 误触发 Orvibo TTS 打断`
+  - `Step H.xiaozhi-client.49 屏蔽播放期软件 KWS 误触发 Orvibo TTS 打断`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.49` 屏蔽播放期软件 KWS 误触发 Orvibo TTS 打断：
+  - 2026-05-09 16:22 板端日志显示 H.48 已生效，普通 VAD 在 speaking 期间只打印 `vad speech ignored during speaking`，没有直接触发状态切换。
+  - 新的截断风险来自 speaking 期间软件 KWS gate 被 TTS/回声打开，随后出现连续高于阈值的 KWS 分数；按当前 `hold=2` 会触发 `WAKE_DETECTED` 并停止 TTS。
+  - 对照 `~/xiaozhi-esp32/main/application.cc`，参考端 speaking 模式只允许 AFE wake word，普通/custom 软件 wake word 不在播放期运行。
+  - Orvibo `SPEAKING` 模式现在固定关闭本地软件 KWS detection gate，reason 为 `orvibo_speaking_playback`，避免 TTS 播放自身进入软件唤醒词判定。
+  - H.43 的 realtime-capable speaking 上行仍保留：barge-in enabled 且 profile 具备 AEC/native-ref 时继续编码上行；本步没有关闭采集、VAD、AEC 或服务端实时打断可能性。
+  - 本步未修改 KWS 模型/阈值/hold/cooldown/特征/推理、tensor dump、alignment replay、board/local parity、VAD、AEC/BF、协议 wire contract、MCP、OTA/v2 激活或 Opus framing。
+  - 风险是当前软件 KWS 不能在 speaking 期间本地打断 TTS；若后续要恢复，需要引入具备播放参考抑制能力的 AFE/hardware wake 或更强的软件确认机制。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均已通过；仍需烧录后确认 TTS 期间不再出现 `kws gate open` / `wakeword hit`。
 - `Step H.xiaozhi-client.48` 屏蔽普通 VAD 误触发 Orvibo TTS 打断：
   - 2026-05-09 15:47 板端日志显示，TTS 中途被截断的直接原因是 `orvibo state: speaking -> listening reason=vad_start event=user_speech_started actions=0xaa4`，即普通 VAD speech-start 在 speaking 阶段触发了 `STOP_PLAYBACK`。
   - 这次现象已经不是 H.47 的 playback drain 判据问题；截断发生在服务端后续 TTS 文本仍在到来期间，本地状态机先被 VAD barge-in 拉回 listening。

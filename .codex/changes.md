@@ -1,5 +1,29 @@
 # Change Log
 
+## Step H.xiaozhi-client.49
+- 针对 2026-05-09 16:22 上板日志中“播放到 `温度2` 后停止”的问题，继续定位截断源：
+  - H.48 的普通 VAD 屏蔽已生效，日志出现 `vad speech ignored during speaking` 后没有再直接触发 `speaking -> listening reason=vad_start`。
+  - 但随后 KWS gate 被 speaking 期间的 TTS/回声打开，并出现 `infer=6 score_pm=334 streak=1/2`、`infer=7 raw=343` 这类连续高于 `300pm` 的软件 KWS 分数；按当前 `hold=2` 会触发 wakeword hit，并通过 `WAKE_DETECTED` 打断 TTS。
+  - 对照 `~/xiaozhi-esp32`：参考端在 speaking 状态的注释和实现是“Only AFE wake word can be detected in speaking mode”，普通/custom 软件 wake word 不在播放期运行。
+- 变更：
+  - Orvibo `SPEAKING` 模式下不再开启本地软件 KWS detection gate，gate reason 固定为 `orvibo_speaking_playback`。
+  - speaking 期间仍保持 runtime interaction 的 `barge_in_listening` 状态和 H.43 的 realtime-capable 上行编码条件，因此服务端侧实时打断/上行链路不被关闭。
+  - `IDLE` 的唤醒词监听和 `LISTENING` 的 KWS disarm 行为保持不变；本次只收敛“播放 TTS 时让软件 KWS 识别播放自身”的风险窗口。
+- 保持受保护能力不变：
+  - 未修改 KWS 模型、阈值、hold、cooldown、特征、推理、tensor dump、alignment replay、board/local parity 或本地 VAD/AEC/BF 实现。
+  - 未修改 Orvibo/XiaoZhi-compatible 鉴权、hello/listen/abort、MCP、OTA/v2 激活、Opus wire framing 或 TTS playback drain。
+- 风险记录：
+  - speaking 期间本地软件唤醒词不再能打断 TTS；这与 `xiaozhi-esp32` 对非 AFE wake word 的处理一致，也是避免 TTS 自身误唤醒的确定性修复。
+  - 如果后续需要“播放期本地唤醒词打断”，应先接入具备播放参考抑制能力的 AFE/hardware wake path，或为软件 KWS 增加更强的 playback-reference 抑制/确认机制，而不是直接重开当前软件 gate。
+- Verification for this step:
+  - passed: source review confirmed `RIVER_ORVIBO_AUDIO_MODE_SPEAKING` calls `river_voice_kws_set_detection_gate(false, "orvibo_speaking_playback")`.
+  - passed: source review confirmed speaking-mode uplink condition still allows realtime-capable AEC/native-ref encoding via H.43.
+  - passed: reference review against `~/xiaozhi-esp32/main/application.cc` confirmed speaking mode only enables AFE wake word, not ordinary software wake word.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation after flashing should verify TTS期间不再出现 `kws gate open` / `wakeword hit` caused by playback; `river kws status` should report gate closed with reason `orvibo_speaking_playback` while speaking.
+
 ## Step H.xiaozhi-client.48
 - 针对 2026-05-09 15:47 上板日志中“播放了 `好的`、`已经`，后面的 TTS 被切断”的问题，重新定位截断源：
   - 日志里 `orvibo state: speaking -> listening reason=vad_start event=user_speech_started actions=0xaa4` 紧跟在 TTS 播放中间出现。
