@@ -20,9 +20,9 @@
   - buffer 从 24 收回 16 会降低本地吸收服务端 burst 的空间；若后续长 TTS 仍出现尾部积压，应优先观察 `bp_evt`、`playback write failed` 和 drain 日志，而不是直接恢复大 buffer。
   - 播放起播时显式解除 mute 可能影响未来“有意静音播放”的新功能；当前分支没有这类功能，且硬件音量仍由 MCP 负责。
 - Verification for this step:
-  - pending: `git diff --check`.
-  - pending: `python3 tools/diag/check_codex_harness.py`.
-  - pending: `/root/ameba-rtos` SDK rebuild.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
   - board runtime confirmation after flashing should verify `playback start ... stream=orvibo_tts ... reuse=no deferred=no`, no immediate `underrun`, `play` failures do not keep increasing, and TTS becomes audible again.
 
 ## Step H.xiaozhi-client.45
