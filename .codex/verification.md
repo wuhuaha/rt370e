@@ -1,3 +1,53 @@
+## Step H.xiaozhi-client.47 Verification
+
+Confirm playback drain now waits on presentation position instead of only SDK buffer status:
+```bash
+cd /root/ameba-river
+rg -n "AudioTrack_GetPosition|submitted_frames|rendered_frames|playback drain tail pad|playback drain tail grace|RENDER_FAIL_FALLBACK|RIVER_PLAYBACK_DRAINING" \
+  components/river_voice/river_playback_service.c \
+  include/river/river_playback_service.h
+```
+
+Expected result:
+- successful `AudioTrack_Write()` calls add to `submitted_frames`
+- `river_playback_service_wait_idle_ex()` writes one tail silence frame before drain
+- drain completion prefers `AudioTrack_GetPosition()` and waits for `rendered_frames >= submitted_frames`
+- fallback to buffer status is delayed until repeated render-position failures
+- status dump exposes `render=rendered/submitted` and `pos_fail`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result:
+- `git diff --check` passed.
+- `check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
+Post-flash board validation:
+```text
+1. Flash the image and trigger a multi-sentence TTS response.
+2. Confirm logs include:
+   playback drain tail pad: stream=orvibo_tts ...
+   playback drain tail grace: stream=orvibo_tts ... rendered=X/Y ...
+   playback drain complete: stream=orvibo_tts ... rendered=X/Y ...
+3. On successful drain, rendered should be >= submitted before `playback stop`.
+4. Confirm the TTS tail is audible and state returns to listening only after drain completion.
+5. If tail is still clipped, run `river playback status` and preserve `playback drain`,
+   `AudioHal`, `underrun`, `audio diag`, and `river playback status` lines.
+```
+
+Risk interpretation:
+- if `playback drain timeout ... rendered<X/Y` appears, `AudioTrack_GetPosition()` is not catching up before the 3000 ms app drain timeout or playback stalled
+- if `playback drain render position unavailable ... fallback=buffer` appears, the SDK position path failed repeatedly and the board log should be checked for AudioTrack/HAL state errors
+- if `rendered>=submitted` appears but audible tail is still clipped, the remaining issue is likely after HAL presentation accounting, such as codec/amplifier tail latency; increase tail grace or keep the output stream alive longer
+
 ## Step H.xiaozhi-client.46 Verification
 
 Confirmed on source and build:

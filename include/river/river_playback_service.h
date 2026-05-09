@@ -74,6 +74,9 @@ typedef struct {
     uint32_t ref_write_fail;
     uint32_t drain_count;
     uint32_t drain_timeout_count;
+    uint32_t render_position_fail;
+    uint64_t submitted_frames;
+    uint64_t rendered_frames;
     size_t buffered_bytes;
     size_t buffer_size_bytes;
     float duck_gain;

@@ -8,6 +8,15 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.47` 按播放呈现位置收敛 Orvibo TTS 尾部排空：
+  - 结合 2026-05-09 14:33 板端日志继续分析，当前现象已经从“完全听不到 TTS”收敛为“尾部仍有小段被截断”，问题重点转到 `tts stop -> wait_idle -> stop/flush` 的本地播放收口判据。
+  - 对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端不会在 `tts stop` 后马上关闭/flush 输出设备，而是让 playback queue 或长期 output stream 自然排空。
+  - `/root/ameba-rtos` SDK 复核确认 `AudioTrack_GetBufferStatus()` 更接近 DMA buffer remain/status，不应作为“已播完”的唯一依据；`AudioTrack_GetPosition()` 通过 AmebaSmart SPORT/DMA rendered counter 折算已呈现帧数，更适合作为本地 stop 前的硬判据。
+  - `river_playback_service` 现在统计每次成功写入 AudioTrack 的 `submitted_frames`，`wait_idle` 时进入 `DRAINING`，补一帧尾部静音 pad，并等待 `rendered_frames >= submitted_frames` 后再进入 `180ms` tail grace。
+  - `AudioTrack_GetPosition()` 连续 5 次失败后才 fallback 到 buffer 状态，且 buffer 状态必须有效并为 `0` 才允许完成，避免瞬时 position 失败或无效 buffer 读数导致再次提前停流。
+  - playback status / drain 日志新增 `render=rendered/submitted` 与 `pos_fail`；板端验证应重点确认 `playback drain complete ... rendered>=submitted` 出现在 `playback stop` 之前。
+  - 风险是 listening 回切会多出尾部 pad 与 grace 的少量延迟；如果 `rendered<X/Y` 到 3000ms 超时，仍会 forced stop，但日志会明确给出未追上的帧数。
+  - 已完成 `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build；下一步需要 flash 后验证多句 TTS 尾部是否完整。
 - `Step H.xiaozhi-client.46` 收敛 Orvibo TTS 起播回归并恢复已验证的 AudioTrack 安全约束：
   - 结合 `git` 历史与 2026-05-09 11:10 板端日志，当前“服务端 STT/TTS 正常但扬声器听不到 TTS”的现象更像 `ec5bc1e` 之后的播放策略回归，而不是协议、服务器或上行链路问题。
   - Orvibo TTS 重新固定为每轮新建 AudioTrack：`config.disable_track_reuse = true`，避免板端历史上已经证明不稳的复用路径再次出现。

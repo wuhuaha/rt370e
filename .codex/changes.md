@@ -1,5 +1,32 @@
 # Change Log
 
+## Step H.xiaozhi-client.47
+- 针对 2026-05-09 14:33 上板日志中“TTS 已可听但尾部仍有一小段听不到”的问题，继续对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 的播放收口方式：
+  - 参考端不会在收到 `tts stop` 后立刻关闭/flush 输出设备；`xiaozhi-esp32` 让 `audio_playback_queue_` 在 `AudioOutputTask()` 中自然排空，`py-xiaozhi` 使用长期存在的输出流并在队列空时输出静音。
+  - 当前 Ameba 分支虽然已经避免了 `tts stop` 抢跑下行音频队列的问题，但 `river_orvibo_audio_service_wait_playback_idle()` 之后仍会调用 `river_playback_service_stop_stream_ex()`，而 stop 内部会 `Pause/Flush/Stop`。因此 wait_idle 的完成条件必须代表“硬件已呈现到尾部”，不能只代表 SDK buffer 状态变化。
+  - 复核 `/root/ameba-rtos` 后确认 `AudioTrack_GetBufferStatus()` 注释和 HAL 实现更像 DMA buffer remain/status，不适合作为 TTS 尾部完整播放的唯一判据；`AudioTrack_GetPosition()` 最终走 AmebaSmart SPORT/DMA rendered counter，并由 HAL 折算成从 track start 起已播放帧数，更适合做排空判据。
+- 变更：
+  - playback service 对每次 `AudioTrack_Write()` 成功写入的字节按当前 stream frame size 累加为 `submitted_frames`，包括 start prime silence、正常 TTS PCM、drain tail pad。
+  - `river_playback_service_wait_idle_ex()` 进入等待后将播放状态从 `RUNNING` 显式切到 `DRAINING`，写入一帧尾部静音 pad，然后轮询 `AudioTrack_GetPosition()`，直到 `rendered_frames >= submitted_frames` 才进入尾部 grace。
+  - 呈现帧数达标后新增 `180ms` tail grace，再允许上层调用 stop/flush，降低 codec/DMA/amplifier 尾部被立即切断的风险。
+  - 若 `AudioTrack_GetPosition()` 连续 `5` 次不可用，才 fallback 到 buffer 状态；且只有 buffer 状态读取有效并显示 `0` 时才允许 fallback 排空完成，避免一次瞬时 position 失败或无效 buffer 状态把尾部误判为已播完。
+  - `river playback status` / `river_playback_service_dump_status()` 新增 `render=rendered/submitted` 和 `pos_fail`，`playback drain complete/timeout` 日志也输出 rendered/submitted，方便板端确认是否在真正播完前 stop。
+- 保持受保护能力不变：
+  - 未修改本地 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF。
+  - 未修改 Orvibo/XiaoZhi-compatible 鉴权、hello/listen/abort、OTA/v2 激活、MCP volume-only、Opus wire framing、下行包顺序或 KWS 保守参数。
+- 风险记录：
+  - 尾部静音 pad 与 180ms grace 会让 `tts_stop -> listening` 回切略晚，但这是为了避免上层 stop/flush 过早切断尾音；对用户体验的代价应小于尾音截断。
+  - 如果某个 AudioTrack/HAL 状态下 `GetPosition()` 长时间不递增，wait_idle 最多会等到现有 `RIVER_ORVIBO_APP_TTS_DRAIN_MS=3000ms` 超时并走 forced stop；板端日志会显示 `playback drain timeout ... rendered=X/Y`。
+  - `submitted_frames` 统计依赖 AudioTrack 返回的成功写入字节数；如果 SDK 返回 partial write，本实现按实际返回值累计，避免把未接受的数据计入排空目标。
+  - fallback 仍保留是为了避免极端 SDK 不支持 position 时完全卡死，但 fallback 只在连续失败后启用，并且不再把无效 buffer 状态当成 `0`。
+- Verification for this step:
+  - passed: static review against `~/xiaozhi-esp32` / `~/py-xiaozhi` playback drain behavior.
+  - passed: SDK audit confirmed `AudioTrack_GetPosition()` is the stronger presentation-position signal on AmebaSmart than `AudioTrack_GetBufferStatus()`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` SDK rebuild with `Build done`.
+  - board runtime confirmation after flashing should verify `playback drain tail pad`, `playback drain tail grace ... rendered=X/Y`, and `playback drain complete ... rendered>=submitted` appear before `playback stop`; if tail is still clipped, preserve all nearby `playback drain`, `AudioHal`, `underrun`, `audio diag`, and `river playback status` lines.
+
 ## Step H.xiaozhi-client.46
 - 针对 2026-05-09 11:10 上板日志中“服务端 STT/TTS 正常但扬声器听不到 TTS”的回归，按 git 历史回看近期播放链路变更：
   - 5/8 傍晚可用之后的 `ec5bc1e` 将 Orvibo TTS buffer 从 `16` 提到 `24`，并且 Orvibo TTS 仍配置为 `disable_track_reuse=false`。

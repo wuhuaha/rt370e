@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.46 收敛 Orvibo TTS 起播回归并恢复已验证的 AudioTrack 安全约束`
+  - `Step H.xiaozhi-client.47 按播放呈现位置收敛 Orvibo TTS 尾部排空`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,15 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.47` 按播放呈现位置收敛 Orvibo TTS 尾部排空：
+  - 对照 `~/xiaozhi-esp32` 与 `~/py-xiaozhi` 后确认，参考端不会在收到 `tts stop` 后立刻关闭/flush 输出设备，而是让播放队列或长期输出流自然排空。
+  - 当前 Ameba 分支的上层仍会在 wait_idle 后执行 `Pause/Flush/Stop`，所以 wait_idle 必须代表硬件已经呈现完整尾部，而不是只看 SDK buffer 状态。
+  - `/root/ameba-rtos` 复核确认 `AudioTrack_GetBufferStatus()` 更像 DMA buffer remain/status；`AudioTrack_GetPosition()` 通过 AmebaSmart presentation-position 路径反映从 track start 起已播放帧数，是更稳的 drain 判据。
+  - playback service 现在统计所有成功 `AudioTrack_Write()` 接收的 `submitted_frames`，drain 时进入 `DRAINING`，写入一帧 tail silence pad，然后等待 `rendered_frames >= submitted_frames`。
+  - 呈现帧数达标后增加 `180ms` tail grace，再允许 stop/flush；连续 5 次取不到 position 后才 fallback 到有效 buffer 状态，避免瞬时失败导致提前停流。
+  - status/drain 日志暴露 `rendered/submitted` 和 `pos_fail`，板端应看到 `playback drain tail pad`、`tail grace`、`drain complete ... rendered>=submitted`。
+  - 本步未修改 VAD、唤醒词/KWS、模型、tensor dump、alignment replay、board/local parity、AEC/BF、协议 wire contract、MCP、OTA/v2 激活或 Opus framing。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均已通过；仍需烧录后确认 TTS 尾部完整播放。
 - `Step H.xiaozhi-client.45` 主机侧验证 XiaoZhi-compatible v2 activation 可达性：
   - 本地配置检索未发现真实 `RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` / `RIVER_ORVIBO_ACTIVATION_HMAC_KEY`，因此本步只使用占位 serial/HMAC 验证请求形态和服务器可达性。
   - OTA v2 POST 到 `https://api.tenclass.net/xiaozhi/ota/` 返回 HTTP 200，包含 `activation.code`、`activation.message`、`activation.challenge` 和 websocket 配置。
