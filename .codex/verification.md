@@ -1,3 +1,119 @@
+## Step H.xiaozhi-client.45 Verification
+
+Host-side XiaoZhi-compatible v2 activation probe:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import base64, hashlib, hmac, http.client, json, os, socket, ssl, urllib.parse, uuid
+
+OTA_URL = 'https://api.tenclass.net/xiaozhi/ota/'
+SERIAL = 'codex-v2-probe-serial'
+HMAC_KEY = 'codex-v2-probe-key'
+DEVICE_ID = '02:%02x:%02x:%02x:%02x:%02x' % tuple(os.urandom(5))
+CLIENT_ID = str(uuid.uuid4())
+APP_VERSION = '0.0.0-codex-probe'
+BOARD_TYPE = 'rtl8730e'
+
+def request(method, url, body=None, headers=None):
+    parsed = urllib.parse.urlparse(url)
+    conn_cls = http.client.HTTPSConnection if parsed.scheme == 'https' else http.client.HTTPConnection
+    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+    path = parsed.path or '/'
+    if parsed.query:
+        path += '?' + parsed.query
+    conn = conn_cls(parsed.hostname, port, timeout=10)
+    data = None if body is None else body.encode('utf-8')
+    hdrs = dict(headers or {})
+    if data is not None:
+        hdrs['Content-Type'] = 'application/json'
+        hdrs['Content-Length'] = str(len(data))
+    conn.request(method, path, body=data, headers=hdrs)
+    resp = conn.getresponse()
+    text = resp.read(8192).decode('utf-8', errors='replace')
+    conn.close()
+    return resp.status, text
+
+headers = {
+    'Activation-Version': '2',
+    'Serial-Number': SERIAL,
+    'Device-Id': DEVICE_ID,
+    'Client-Id': CLIENT_ID,
+    'User-Agent': 'ameba-river/codex-probe',
+    'Device-Model': BOARD_TYPE,
+    'Model': BOARD_TYPE,
+    'Application-Version': APP_VERSION,
+    'App-Version': APP_VERSION,
+    'Firmware-Version': APP_VERSION,
+    'Device-Version': APP_VERSION,
+    'Accept-Language': 'zh-CN',
+    'Connection': 'close',
+}
+body = {
+    'version': 2,
+    'model': BOARD_TYPE,
+    'language': 'zh-CN',
+    'mac_address': DEVICE_ID,
+    'uuid': CLIENT_ID,
+    'chip_model_name': 'RTL8730E',
+    'application': {'name': 'ameba-river', 'version': APP_VERSION, 'compile_time': 'codex-probe'},
+    'board': {'type': BOARD_TYPE, 'name': 'ameba-river', 'ssid': 'codex-probe', 'mac': DEVICE_ID},
+}
+status, text = request('POST', OTA_URL, json.dumps(body, separators=(',', ':')), headers)
+print('ota status=', status)
+root = json.loads(text)
+activation = root.get('activation') or {}
+websocket = root.get('websocket') or {}
+print('activation challenge=', bool(activation.get('challenge')))
+print('websocket url=', websocket.get('url', '-'))
+
+challenge = activation.get('challenge')
+if challenge:
+    digest = hmac.new(HMAC_KEY.encode(), challenge.encode(), hashlib.sha256).hexdigest()
+    payload = {
+        'algorithm': 'hmac-sha256',
+        'serial_number': SERIAL,
+        'challenge': challenge,
+        'hmac': digest,
+    }
+    status, text = request('POST', OTA_URL.rstrip('/') + '/activate',
+                           json.dumps(payload, separators=(',', ':')), headers)
+    print('activate status=', status)
+    print('activate body=', text[:120].replace('\n', '\\n'))
+
+if websocket.get('url'):
+    parsed = urllib.parse.urlparse(websocket['url'])
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == 'wss' else 80)
+    path = parsed.path or '/'
+    token = websocket.get('token') or ''
+    key = base64.b64encode(os.urandom(16)).decode()
+    auth = f'Authorization: Bearer {token}\r\n' if token and ' ' not in token else ''
+    req = (
+        f'GET {path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\n'
+        f'Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n'
+        f'Sec-WebSocket-Version: 13\r\n{auth}Protocol-Version: 1\r\n'
+        f'Device-Id: {DEVICE_ID}\r\nClient-Id: {CLIENT_ID}\r\n\r\n'
+    )
+    sock = socket.create_connection((host, port), timeout=10)
+    if parsed.scheme == 'wss':
+        sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+    sock.sendall(req.encode())
+    response = sock.recv(4096).decode('utf-8', errors='replace')
+    sock.close()
+    print('ws status=', response.split('\r\n', 1)[0])
+PY
+```
+
+Observed result:
+- OTA v2 returned HTTP 200 with an activation challenge and websocket config.
+- `/activate` with placeholder serial/HMAC returned HTTP 404, as expected without a real license.
+- WebSocket upgrade with the OTA-returned token returned `HTTP/1.1 101 Switching Protocols`.
+
+Interpretation:
+- Current Orvibo v2 OTA/challenge/HMAC request shape and websocket handshake are protocol-reachable against the XiaoZhi-compatible server.
+- Full v2 activation success still requires a real server-registered serial/HMAC key pair.
+- No firmware source changed in this verification-only step; no SDK rebuild is required.
+
 ## Step H.xiaozhi-client.44 Verification
 
 Confirm session-bound queue flushes are now wired into close/open and error-recovery paths:

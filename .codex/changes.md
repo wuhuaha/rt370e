@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.45
+- 执行一次主机侧 XiaoZhi-compatible v2 activation 探测，用于判断当前 Orvibo v2 接入实现与线上服务器的基础兼容性。
+- 探测方式：
+  - 使用与固件一致的 OTA header/body 形态，发送 `Activation-Version: 2` 与 `Serial-Number`，并带 `Device-Id`、`Client-Id`、设备型号、应用版本等字段。
+  - 使用占位 serial/HMAC key 计算 `/activate` payload，payload 形态为 `algorithm=hmac-sha256`、`serial_number`、`challenge`、`hmac`。
+  - 若 OTA 返回 websocket 配置，则用返回的 websocket URL/token 进行一次主机侧 WebSocket upgrade 探测。
+- 结果：
+  - OTA v2 请求返回 HTTP 200，并返回 `activation.code`、`activation.message`、`activation.challenge` 以及 websocket 配置。
+  - 使用占位 serial/HMAC 调 `/activate` 返回 HTTP 404，错误为 license 不存在或已激活；这符合预期，说明没有真实授权 license 时不能证明 v2 激活成功。
+  - 使用 OTA 返回的 websocket URL/token 进行 WebSocket 握手，服务端返回 `HTTP/1.1 101 Switching Protocols`。
+- 结论：
+  - 当前 v2 OTA header、challenge 获取、HMAC payload 形态与 WebSocket 鉴权握手至少在主机侧协议层可达。
+  - 由于本地仓库/SDK 配置未发现真实 `RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` 与 `RIVER_ORVIBO_ACTIVATION_HMAC_KEY`，本次不能证明真实 v2 license 设备可以完成激活；要验证完整 v2 激活，必须使用服务端已登记且未激活的真实 serial/HMAC key。
+- 保持受保护能力不变：
+  - 本步不修改固件代码、Kconfig、协议实现、音频链路、本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP。
+- Verification for this step:
+  - passed: host-side OTA v2 probe to `https://api.tenclass.net/xiaozhi/ota/` returned HTTP 200 with activation challenge and websocket config.
+  - expected-fail: host-side `/activate` with placeholder serial/HMAC returned HTTP 404 because no real license was available.
+  - passed: host-side WebSocket upgrade to OTA-returned endpoint returned `HTTP/1.1 101 Switching Protocols`.
+  - firmware build not required because this is a verification-only step with no source changes.
+
 ## Step H.xiaozhi-client.44
 - 深入审视后确认，当前分支还存在一个更确定的会话级污染窗口：WebSocket 关闭或恢复后，已经入队但尚未处理的 uplink / audio 事件可能跨 session 残留，并在新连接建立后继续被消费。
 - 这类残留不是协议兼容问题，而是队列生命周期没有严格绑到 session boundary 上的问题。对比当前实现后，最稳妥的修正不是再调参数，而是把残留队列在会话边界主动清空。

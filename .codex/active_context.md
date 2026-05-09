@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.44 收敛会话切换时的残留队列`
+  - `Step H.xiaozhi-client.45 主机侧验证 XiaoZhi-compatible v2 activation 可达性`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -33,6 +33,12 @@ or top-of-tree verification target changes.
 
 ## Latest Verified Slice
 
+- `Step H.xiaozhi-client.45` 主机侧验证 XiaoZhi-compatible v2 activation 可达性：
+  - 本地配置检索未发现真实 `RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` / `RIVER_ORVIBO_ACTIVATION_HMAC_KEY`，因此本步只使用占位 serial/HMAC 验证请求形态和服务器可达性。
+  - OTA v2 POST 到 `https://api.tenclass.net/xiaozhi/ota/` 返回 HTTP 200，包含 `activation.code`、`activation.message`、`activation.challenge` 和 websocket 配置。
+  - 使用占位 serial/HMAC 调 `/activate` 返回 HTTP 404，错误为 license 不存在或已激活；这说明服务器路径可达，但没有真实登记 license/key pair 时不能证明完整 v2 激活成功。
+  - 使用 OTA 返回的 websocket URL/token 进行主机侧 WebSocket upgrade，服务端返回 `HTTP/1.1 101 Switching Protocols`。
+  - 本步只做验证记录，不修改固件代码、Kconfig、协议实现、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP；无需 SDK rebuild。
 - `Step H.xiaozhi-client.43` aligns speaking-mode uplink with the XiaoZhi realtime/barge-in contract:
   - static review against `~/xiaozhi-esp32` and `~/py-xiaozhi` shows the reference realtime path keeps audio processing alive during TTS only when the active profile is AEC/native-reference capable.
   - Orvibo previously only encoded uplink in `LISTENING`, which meant realtime-capable profiles could stall uplink while TTS was still playing.

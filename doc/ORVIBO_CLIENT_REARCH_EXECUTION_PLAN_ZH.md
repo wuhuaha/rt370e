@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.45` 已主机侧验证 XiaoZhi-compatible v2 activation 可达性：
+  - 本地仓库与 SDK 配置检索未发现真实 `RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` / `RIVER_ORVIBO_ACTIVATION_HMAC_KEY`，因此本次探测只能验证 v2 请求形态和服务器路径可达性，不能证明真实 license 设备已完成激活。
+  - 使用占位 serial/HMAC 发送 `Activation-Version: 2` OTA 请求，线上 OTA 返回 HTTP 200，并包含 `activation.code`、`activation.message`、`activation.challenge` 与 websocket 配置。
+  - 使用 OTA 返回的 challenge 构造 v2 `/activate` payload：`algorithm=hmac-sha256`、`serial_number`、`challenge`、`hmac`；占位 license 返回 HTTP 404，错误为 license 不存在或已激活，符合没有真实授权材料时的预期。
+  - 使用 OTA 返回的 websocket URL/token 进行 WebSocket upgrade，服务端返回 `HTTP/1.1 101 Switching Protocols`，说明 OTA 下发 token 的握手路径可达。
+  - 结论：当前 Orvibo v2 OTA header、challenge 获取、HMAC payload 形态和 websocket 鉴权握手在主机侧协议层可达；完整 v2 激活成功仍需要服务端已登记且未激活的真实 serial/HMAC key pair。
+  - 本步只记录验证，不改固件代码、Kconfig、协议实现、音频链路、本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP；无需重新 build。
 - `Step H.xiaozhi-client.44` 已收敛会话切换时的残留队列：
   - 再次审视后确认，当前分支还存在一个比“参数不够保守”更确定的会话级污染窗口：WebSocket 关闭或恢复后，已经入队但尚未处理的 uplink / audio 事件可能跨 session 残留，并在新连接建立后继续被消费。
   - 这不是协议兼容问题，而是队列生命周期没有严格绑到 session boundary 上的问题；因此本步采用确定性的队列清空，而不是继续叠加回退、节流或经验性延迟。
