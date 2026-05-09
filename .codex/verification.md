@@ -1,3 +1,45 @@
+## Step H.xiaozhi-client.46 Verification
+
+Confirmed on source and build:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_TTS_BUFFER_FRAMES|disable_track_reuse = true|defer_start_until_prefilled = false|playback write failed: stream=|AudioControl_SetPlaybackMute|AudioControl_SetAmplifierMute" \
+  components/river_voice/river_orvibo_audio_service.c \
+  components/river_voice/river_playback_service.c
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result:
+- `RIVER_ORVIBO_TTS_BUFFER_FRAMES` is `16`.
+- Orvibo TTS sets `config.disable_track_reuse = true`.
+- Orvibo TTS keeps `config.defer_start_until_prefilled = false`.
+- playback write failures now include state/start/deferred/prefetch diagnostics.
+- playback start paths unmute playback/amplifier, but the playback service no longer forces hardware volume.
+- `git diff --check` passed.
+- `check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
+Post-flash board validation still required:
+```text
+1. Flash the image and trigger one short TTS response such as volume control.
+2. Confirm playback starts with:
+   playback start ... stream=orvibo_tts ... reuse=no ... deferred=no
+3. Confirm TTS is audible.
+4. Confirm there is no immediate naked `underrun` after DMA start.
+5. Confirm `audio diag ... play=ok/fail` write failures do not continue increasing.
+6. If TTS is still silent, preserve all nearby `playback start`, `playback write failed`,
+   `AudioHal`, `underrun`, `audio diag`, and `river orvibo status` lines.
+```
+
+Risk interpretation:
+- if `reuse=yes` still appears, the flashed image is not this build or another playback path is starting the stream
+- if `reuse=no` appears but `playback write failed` logs show `state=running started=yes deferred=no`, the remaining issue is likely deeper in the AudioTrack write path
+- if write succeeds and reference remains active but no sound is audible, inspect board-level amplifier/output routing and MCP hardware volume state
+
 ## Step H.xiaozhi-client.45 Verification
 
 Host-side XiaoZhi-compatible v2 activation probe:

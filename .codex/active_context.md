@@ -15,7 +15,7 @@ or top-of-tree verification target changes.
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.45 主机侧验证 XiaoZhi-compatible v2 activation 可达性`
+  - `Step H.xiaozhi-client.46 收敛 Orvibo TTS 起播回归并恢复已验证的 AudioTrack 安全约束`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -39,6 +39,13 @@ or top-of-tree verification target changes.
   - 使用占位 serial/HMAC 调 `/activate` 返回 HTTP 404，错误为 license 不存在或已激活；这说明服务器路径可达，但没有真实登记 license/key pair 时不能证明完整 v2 激活成功。
   - 使用 OTA 返回的 websocket URL/token 进行主机侧 WebSocket upgrade，服务端返回 `HTTP/1.1 101 Switching Protocols`。
   - 本步只做验证记录，不修改固件代码、Kconfig、协议实现、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 MCP；无需 SDK rebuild。
+- `Step H.xiaozhi-client.46` 收敛 Orvibo TTS 起播回归并恢复已验证的 AudioTrack 安全约束：
+  - 对照 `git` 历史和 2026-05-09 11:10 板端日志确认，当前“能连上服务器但听不到 TTS”的回归最像 `ec5bc1e` 之后的播放策略倒退，而不是协议或服务端问题。
+  - Orvibo TTS 现在重新固定为 `disable_track_reuse = true`，并把 `RIVER_ORVIBO_TTS_BUFFER_FRAMES` 从 `24` 收回到 `16`，恢复历史上已验证可听的起播约束。
+  - 播放服务在 `AudioTrack_Start()` / restart / start_stream()` 前显式解除 playback 与 amplifier mute，但不再接管 MCP 的硬件音量所有权。
+  - 新增 `playback write failed` 诊断日志，会打印 stream、bytes、state、started、deferred、prefetched/threshold 和 track 状态，便于下一轮板端若仍无声时快速判断是否卡在 AudioTrack。
+  - 保留 `SERVER_TTS_STARTED/FINISHED` 与下行音频同队列串行、`bp_evt` 只作诊断、`RIVER_ORVIBO_APP_TTS_DRAIN_MS=3000` 等已验证修复，不回到 deferred-write 路径。
+  - 已完成静态检查、harness 检查和 `/root/ameba-rtos` 完整 build；当前待验证项仍是重新烧录后确认 `playback start ... reuse=no deferred=no`、无即时 `underrun`，并恢复可听 TTS。
 - `Step H.xiaozhi-client.43` aligns speaking-mode uplink with the XiaoZhi realtime/barge-in contract:
   - static review against `~/xiaozhi-esp32` and `~/py-xiaozhi` shows the reference realtime path keeps audio processing alive during TTS only when the active profile is AEC/native-reference capable.
   - Orvibo previously only encoded uplink in `LISTENING`, which meant realtime-capable profiles could stall uplink while TTS was still playing.

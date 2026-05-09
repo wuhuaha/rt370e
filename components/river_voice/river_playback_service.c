@@ -18,7 +18,6 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.playback"
 
-#define RIVER_PLAYBACK_SERVICE_HW_VOLUME 1.0f
 #define RIVER_PLAYBACK_SERVICE_STATS_WAIT_MS 0U
 #define RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS 0U
 #define RIVER_PLAYBACK_SERVICE_DEFAULT_DRAIN_POLL_MS 20U
@@ -271,10 +270,9 @@ static bool river_playback_service_update_buffer_stats_locked(size_t *buffered_b
 
 static void river_playback_service_prepare_output_locked(void)
 {
+    /* Keep the output path unmuted, but leave actual gain ownership to MCP. */
     AudioControl_SetPlaybackMute(false);
     AudioControl_SetAmplifierMute(false);
-    AudioControl_SetHardwareVolume(RIVER_PLAYBACK_SERVICE_HW_VOLUME,
-                                   RIVER_PLAYBACK_SERVICE_HW_VOLUME);
 }
 
 static void river_playback_service_prime_started_track_locked(void)
@@ -501,6 +499,7 @@ static river_status_t river_playback_service_restart_started_track_locked(void)
         return RIVER_OK;
     }
 
+    river_playback_service_prepare_output_locked();
     AudioTrack_Pause(g_river_playback_service.track);
     AudioTrack_Flush(g_river_playback_service.track);
     AudioTrack_Stop(g_river_playback_service.track);
@@ -521,6 +520,7 @@ static river_status_t river_playback_service_start_track_locked(void)
     if (g_river_playback_service.track_started) {
         return RIVER_OK;
     }
+    river_playback_service_prepare_output_locked();
     if (AudioTrack_Start(g_river_playback_service.track) != 0) {
         return RIVER_ERR_UNSUPPORTED;
     }
@@ -853,6 +853,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
         return status;
     }
 
+    river_playback_service_prepare_output_locked();
     river_playback_service_apply_volume_locked();
     active_track_buffer_bytes =
         (size_t)g_river_playback_service.prepared_track_config.buffer_bytes;
@@ -939,6 +940,17 @@ river_status_t river_playback_service_write(const uint8_t *playback,
                                     block);
     if (write_result < 0) {
         g_river_playback_service.stats.write_fail++;
+        RIVER_LOGW("playback write failed: stream=%s bytes=%lu state=%s started=%s deferred=%s prefetched=%lu/%lu track=%s",
+                   g_river_playback_service.stats.stream_name[0] != '\0' ?
+                       g_river_playback_service.stats.stream_name :
+                       "-",
+                   (unsigned long)playback_bytes,
+                   river_playback_service_state_name(g_river_playback_service.stats.state),
+                   g_river_playback_service.track_started ? "yes" : "no",
+                   g_river_playback_service.start_deferred ? "yes" : "no",
+                   (unsigned long)g_river_playback_service.prefetched_bytes,
+                   (unsigned long)g_river_playback_service.start_threshold_bytes,
+                   g_river_playback_service.track != NULL ? "yes" : "no");
         river_playback_service_record_control_locked("write_error", "playback_write_failed");
         river_playback_service_set_state_locked(RIVER_PLAYBACK_RECOVERING);
         rtos_mutex_give(g_river_playback_service.lock);

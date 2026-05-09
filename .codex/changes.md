@@ -1,5 +1,30 @@
 # Change Log
 
+## Step H.xiaozhi-client.46
+- 针对 2026-05-09 11:10 上板日志中“服务端 STT/TTS 正常但扬声器听不到 TTS”的回归，按 git 历史回看近期播放链路变更：
+  - 5/8 傍晚可用之后的 `ec5bc1e` 将 Orvibo TTS buffer 从 `16` 提到 `24`，并且 Orvibo TTS 仍配置为 `disable_track_reuse=false`。
+  - 用户日志里 TTS 事件、Opus 解码、重采样和 reference 活动都存在，但 `playback start ... reuse=yes`、`AudioTrack_SetStartThresholdBytes not supported`、DMA 延迟启动后立刻 `underrun`，与 Ameba AudioTrack 复用/大 buffer 启动不稳定高度吻合。
+  - 历史 Step A.home-ai.11 已证明同类 XiaoZhi TTS 短句/无声问题需要禁用 AudioTrack 复用；历史 Step A.home-ai.14 已证明 deferred-write 在当前 SDK 上会 `invalid state` 并导致无声，所以本次不重新启用预填后 start。
+- 变更：
+  - `orvibo_tts` 固定 `config.disable_track_reuse = true`，恢复每轮 TTS 使用新 AudioTrack 的已验证约束，目标板端日志应从 `reuse=yes` 变为 `reuse=no`。
+  - `RIVER_ORVIBO_TTS_BUFFER_FRAMES` 从 `24` 收回到 `16`，降低大 track buffer 在当前 SDK 路径上引入的起播延迟/underrun 风险。
+  - 播放服务在 `AudioTrack_Start()`、restart 和 `start_stream()` 准备阶段显式解除 playback/amplifier mute，但不再强制设置 hardware volume，避免覆盖 MCP volume ownership。
+  - playback write failure 现在打印 stream、bytes、state、started、deferred、prefetched/threshold 和 track 是否存在，便于下次板端判断是否仍卡在 AudioTrack 状态机。
+- 保留近期已验证/必要行为：
+  - 不回滚 `SERVER_TTS_STARTED/FINISHED` 与下行音频同队列排序修复。
+  - 不恢复高水位主动丢弃下行包；`bp_evt` 仍只作诊断，避免继续制造 TTS 尾包丢失。
+  - `RIVER_ORVIBO_APP_TTS_DRAIN_MS=3000` 保持不变，继续给本地 playback buffer 排空时间。
+  - 不修改 WebSocket 鉴权、hello/listen/abort、OTA/v2 激活、MCP volume-only、Opus wire framing、本地 VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity 或 AEC/BF。
+- 风险记录：
+  - 禁用 track 复用会增加每轮 TTS 的 AudioTrack create/destroy 成本和少量起播开销，但当前板端历史已经证明复用路径风险更高。
+  - buffer 从 24 收回 16 会降低本地吸收服务端 burst 的空间；若后续长 TTS 仍出现尾部积压，应优先观察 `bp_evt`、`playback write failed` 和 drain 日志，而不是直接恢复大 buffer。
+  - 播放起播时显式解除 mute 可能影响未来“有意静音播放”的新功能；当前分支没有这类功能，且硬件音量仍由 MCP 负责。
+- Verification for this step:
+  - pending: `git diff --check`.
+  - pending: `python3 tools/diag/check_codex_harness.py`.
+  - pending: `/root/ameba-rtos` SDK rebuild.
+  - board runtime confirmation after flashing should verify `playback start ... stream=orvibo_tts ... reuse=no deferred=no`, no immediate `underrun`, `play` failures do not keep increasing, and TTS becomes audible again.
+
 ## Step H.xiaozhi-client.45
 - 执行一次主机侧 XiaoZhi-compatible v2 activation 探测，用于判断当前 Orvibo v2 接入实现与线上服务器的基础兼容性。
 - 探测方式：

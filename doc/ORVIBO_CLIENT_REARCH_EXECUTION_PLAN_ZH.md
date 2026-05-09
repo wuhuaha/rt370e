@@ -8,6 +8,14 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.46` 收敛 Orvibo TTS 起播回归并恢复已验证的 AudioTrack 安全约束：
+  - 结合 `git` 历史与 2026-05-09 11:10 板端日志，当前“服务端 STT/TTS 正常但扬声器听不到 TTS”的现象更像 `ec5bc1e` 之后的播放策略回归，而不是协议、服务器或上行链路问题。
+  - Orvibo TTS 重新固定为每轮新建 AudioTrack：`config.disable_track_reuse = true`，避免板端历史上已经证明不稳的复用路径再次出现。
+  - `RIVER_ORVIBO_TTS_BUFFER_FRAMES` 从 `24` 收回到 `16`，减少起播延迟和大 buffer 带来的不稳定面。
+  - `river_playback_service` 在 `AudioTrack_Start()`、restart 和 `start_stream()` 入口显式解除 playback/amplifier mute，但不接管 MCP 的硬件音量所有权。
+  - 新增写失败诊断日志，板端如果仍无声可直接看 `state`、`started`、`deferred`、`prefetched/threshold` 与 `track` 状态。
+  - 本步保留 `SERVER_TTS_STARTED/FINISHED` 与下行音频同队列串行、`bp_evt` 只作诊断、`RIVER_ORVIBO_APP_TTS_DRAIN_MS=3000` 等已验证修复。
+  - 已完成静态检查、harness 检查和 `/root/ameba-rtos` 完整 build；当前待做的是重新 flash 并确认 `playback start ... reuse=no deferred=no`、无即时 `underrun`，且 TTS 恢复可听。
 - `Step H.xiaozhi-client.45` 已主机侧验证 XiaoZhi-compatible v2 activation 可达性：
   - 本地仓库与 SDK 配置检索未发现真实 `RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER` / `RIVER_ORVIBO_ACTIVATION_HMAC_KEY`，因此本次探测只能验证 v2 请求形态和服务器路径可达性，不能证明真实 license 设备已完成激活。
   - 使用占位 serial/HMAC 发送 `Activation-Version: 2` OTA 请求，线上 OTA 返回 HTTP 200，并包含 `activation.code`、`activation.message`、`activation.challenge` 与 websocket 配置。

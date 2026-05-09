@@ -47,7 +47,7 @@
     (((RIVER_ORVIBO_DOWNLINK_MAX_RATE_HZ * RIVER_ORVIBO_OPUS_FRAME_MS) / 1000U) * sizeof(int16_t))
 #define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_MONO_MAX * 2U)
 #define RIVER_ORVIBO_DOWNLINK_BUFFER_HIGH_WATER_PCT 95U
-#define RIVER_ORVIBO_TTS_BUFFER_FRAMES         24U
+#define RIVER_ORVIBO_TTS_BUFFER_FRAMES         16U
 #define RIVER_ORVIBO_DIAG_LOG_INTERVAL_MS      5000U
 #define RIVER_ORVIBO_PLAYBACK_DRAIN_POLL_MS    20U
 #define RIVER_ORVIBO_RTOS_OK                   0
@@ -798,7 +798,7 @@ static river_status_t river_orvibo_audio_start_playback_if_needed(uint32_t sampl
     config.reference_channels = 1U;
     config.reference_frame_bytes = mono_bytes;
     config.reference_history_ms = 600U;
-    config.disable_track_reuse = false;
+    config.disable_track_reuse = true;
     config.defer_start_until_prefilled = false;
     if (river_playback_service_start_stream(&config) != RIVER_OK) {
         g_river_orvibo_audio.playback_write_fail++;
