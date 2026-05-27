@@ -11,11 +11,13 @@ or top-of-tree verification target changes.
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
-  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand'`
+  - User-run only for current NAND hardware after manually entering flashing mode:
+    `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand'`
 - Active monitor command:
-  - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
+  - User-run only unless explicitly requested:
+    `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.50 为当前 NAND 硬件新增项目烧录 profile`
+  - `Step H.xiaozhi-client.51 增强 Wi-Fi 连接失败诊断日志`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -32,6 +34,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.51` 增强 Wi-Fi 连接失败诊断日志：
+  - 本步只修改 `components/river_cloud/river_wifi_station.c` 的诊断输出，不改变 Wi-Fi 连接策略、扫描策略、候选选择、重试节奏、credential 配置或网络协议行为。
+  - credential 加载时打印 `ssid`、`ssid_len`、`password_len`，不打印密码明文；当前主配置应显示 `credential[0] ssid=river ssid_len=5 password_len=10`。
+  - 扫描日志现在能看到前 8 个 AP 的 SSID/BSSID/channel/band/RSSI/security，并在目标 AP 命中时打印 candidate index、RSSI、信道、加密类型和 BSSID。
+  - 连接尝试日志增加策略、SSID/密码长度、是否使用扫描候选、候选 RSSI、信道、加密类型和 BSSID；join 等待过程中按状态变化/每秒输出 join 状态。
+  - 连接成功和 `river wifi/status` 相关 dump 会输出 PHY snapshot，包含 `rssi`、`data_rssi`、`beacon_rssi`、`snr`。
+  - 当前 NAND 硬件需要手动进入烧录模式；除非用户当前回合明确要求，Codex 后续只做到构建完成并通知用户，不主动运行烧录或串口 monitor。
+  - `/root/ameba-rtos` 完整 build 已通过，`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 已通过；板端运行验证等待用户手动烧录后观察日志。
 
 - `Step H.xiaozhi-client.50` 为当前 NAND 硬件新增项目烧录 profile：
   - 当前硬件切换到 NAND 烧录路径，活跃烧录命令改为 `tools/river_flash.py ... -m nand`。

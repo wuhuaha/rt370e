@@ -33,6 +33,7 @@
 #define RIVER_WIFI_STA_PASSWORD_BUFFER_SIZE (RTW_MAX_PSK_LEN + 1U)
 #define RIVER_WIFI_STA_MIN_RSSI_DBM (-80)
 #define RIVER_WIFI_STA_STICKY_RETRY_RSSI_DBM (-85)
+#define RIVER_WIFI_STA_SCAN_LOG_LIMIT 8U
 
 extern int (*p_wifi_do_fast_connect)(void);
 extern int (*p_store_fast_connect_info)(unsigned int data1, unsigned int data2);
@@ -212,6 +213,28 @@ static const char *river_wifi_station_connect_strategy_name(river_wifi_connect_s
     }
 }
 
+static void river_wifi_station_format_ssid(const struct rtw_ssid *ssid, char *buffer, size_t buffer_size)
+{
+    size_t len;
+
+    if ((buffer == NULL) || (buffer_size == 0U)) {
+        return;
+    }
+
+    buffer[0] = '\0';
+    if (ssid == NULL) {
+        return;
+    }
+
+    len = ssid->len;
+    if (len >= buffer_size) {
+        len = buffer_size - 1U;
+    }
+
+    memcpy(buffer, ssid->val, len);
+    buffer[len] = '\0';
+}
+
 static void river_wifi_station_copy_string(char *dst, size_t dst_size, const char *src)
 {
     if ((dst == NULL) || (dst_size == 0U)) {
@@ -256,6 +279,8 @@ static void river_wifi_station_add_credential(u8 *count, const char *ssid, const
 
 static void river_wifi_station_load_credentials(void)
 {
+    u8 index;
+
     g_river_wifi_station.credential_count = 0U;
     memset(g_river_wifi_station.credentials, 0, sizeof(g_river_wifi_station.credentials));
 
@@ -265,6 +290,15 @@ static void river_wifi_station_load_credentials(void)
     river_wifi_station_add_credential(&g_river_wifi_station.credential_count,
                                       RIVER_WIFI_STA_SECONDARY_SSID,
                                       RIVER_WIFI_STA_SECONDARY_PASSWORD);
+
+    for (index = 0U; index < g_river_wifi_station.credential_count; ++index) {
+        const river_wifi_credential_t *credential = &g_river_wifi_station.credentials[index];
+        RIVER_LOGI("credential[%u] ssid=%s ssid_len=%u password_len=%u",
+                   (unsigned int)index,
+                   credential->ssid,
+                   (unsigned int)credential->ssid_len,
+                   (unsigned int)credential->password_len);
+    }
 }
 
 static const river_wifi_credential_t *river_wifi_station_get_active_credential(void)
@@ -390,6 +424,42 @@ static bool river_wifi_station_join_in_progress(void)
     }
 
     return (join_status > RTW_JOINSTATUS_UNKNOWN) && (join_status < RTW_JOINSTATUS_SUCCESS);
+}
+
+static void river_wifi_station_log_join_snapshot(const char *source)
+{
+    u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+    int ret;
+
+    ret = wifi_get_join_status(&join_status);
+    if (ret == RTK_SUCCESS) {
+        RIVER_LOGI("join snapshot source=%s status=%s(%u) has_ipv4=%s",
+                   source,
+                   river_wifi_station_join_status_name(join_status),
+                   (unsigned int)join_status,
+                   river_wifi_station_has_ipv4() ? "yes" : "no");
+    } else {
+        RIVER_LOGW("join snapshot source=%s get_status_failed ret=%d", source, ret);
+    }
+}
+
+static void river_wifi_station_log_phy_snapshot(const char *source)
+{
+    union rtw_phy_stats phy_stats;
+    int ret;
+
+    memset(&phy_stats, 0, sizeof(phy_stats));
+    ret = wifi_get_phy_stats(STA_WLAN_INDEX, NULL, &phy_stats);
+    if (ret == RTK_SUCCESS) {
+        RIVER_LOGI("phy snapshot source=%s rssi=%d data_rssi=%d beacon_rssi=%d snr=%d",
+                   source,
+                   (int)phy_stats.sta.rssi,
+                   (int)phy_stats.sta.data_rssi,
+                   (int)phy_stats.sta.beacon_rssi,
+                   (int)phy_stats.sta.snr);
+    } else {
+        RIVER_LOGW("phy snapshot source=%s failed ret=%d", source, ret);
+    }
 }
 
 static void river_wifi_station_force_sdk_fast_connect_off(void)
@@ -547,6 +617,8 @@ static void river_wifi_station_mark_connected(void)
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[2],
                (unsigned int)LwIP_GetIP(NETIF_WLAN_STA_INDEX)[3],
                (unsigned long)g_river_wifi_station.connect_successes);
+    river_wifi_station_log_join_snapshot("connected");
+    river_wifi_station_log_phy_snapshot("connected");
     river_runtime_stats_snapshot("wifi_connected");
 }
 
@@ -666,7 +738,9 @@ static bool river_wifi_station_try_complete_join_without_reconnect(void)
 static bool river_wifi_station_wait_for_join_result(uint32_t timeout_ms)
 {
     uint32_t waited_ms = 0U;
+    uint32_t last_log_ms = 0U;
     u8 join_status = RTW_JOINSTATUS_UNKNOWN;
+    u8 last_join_status = RTW_JOINSTATUS_UNKNOWN;
 
     while (waited_ms < timeout_ms) {
         if (river_wifi_station_try_complete_join_without_reconnect()) {
@@ -680,13 +754,28 @@ static bool river_wifi_station_wait_for_join_result(uint32_t timeout_ms)
         if ((join_status == RTW_JOINSTATUS_FAIL) ||
             (join_status == RTW_JOINSTATUS_DISCONNECT) ||
             (join_status == RTW_JOINSTATUS_UNKNOWN)) {
+            RIVER_LOGW("join wait stopped status=%s(%u) waited_ms=%lu",
+                       river_wifi_station_join_status_name(join_status),
+                       (unsigned int)join_status,
+                       (unsigned long)waited_ms);
             return false;
+        }
+
+        if ((join_status != last_join_status) || (waited_ms - last_log_ms >= 1000U)) {
+            RIVER_LOGI("join wait status=%s(%u) waited_ms=%lu timeout_ms=%lu",
+                       river_wifi_station_join_status_name(join_status),
+                       (unsigned int)join_status,
+                       (unsigned long)waited_ms,
+                       (unsigned long)timeout_ms);
+            last_join_status = join_status;
+            last_log_ms = waited_ms;
         }
 
         rtos_time_delay_ms(200);
         waited_ms += 200U;
     }
 
+    river_wifi_station_log_join_snapshot("join_wait_timeout");
     return river_wifi_station_try_complete_join_without_reconnect();
 }
 
@@ -854,6 +943,7 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
     u32 ap_num;
     u32 i;
     size_t credential_index;
+    u32 log_count = 0U;
     bool any_candidate = false;
 
     memset(candidates, 0, candidate_count * sizeof(*candidates));
@@ -861,7 +951,11 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
     scan_param.ssid = NULL;
     scan_param.max_ap_record_num = 24;
 
+    RIVER_LOGI("scan start configured_ap=%u max_records=%lu",
+               (unsigned int)g_river_wifi_station.credential_count,
+               (unsigned long)scan_param.max_ap_record_num);
     if (!river_wifi_station_wait_driver_idle(RIVER_WIFI_STA_IDLE_WAIT_MS, false)) {
+        river_wifi_station_log_join_snapshot("scan_wait_idle_timeout");
         RIVER_LOGW("scan wait-idle timeout for configured ap list; skip active scan this round");
         return;
     }
@@ -879,6 +973,7 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
     }
 
     ap_num = (u32)scanned_ap_num;
+    RIVER_LOGI("scan done ret=%d ap_num=%lu", scanned_ap_num, (unsigned long)ap_num);
     records = (struct rtw_scan_result *)rtos_mem_zmalloc(ap_num * sizeof(struct rtw_scan_result));
     if (records == NULL) {
         RIVER_LOGW("scan result alloc failed ap_num=%lu", (unsigned long)ap_num);
@@ -893,6 +988,26 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
 
     for (i = 0; i < ap_num; ++i) {
         struct rtw_scan_result *record = &records[i];
+        char scanned_ssid[RTW_ESSID_MAX_SIZE + 1U];
+
+        if (log_count < RIVER_WIFI_STA_SCAN_LOG_LIMIT) {
+            river_wifi_station_format_ssid(&record->ssid, scanned_ssid, sizeof(scanned_ssid));
+            RIVER_LOGI("scan ap[%lu] ssid=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%lu band=%s rssi=%d sec=%s(0x%lx)",
+                       (unsigned long)i,
+                       scanned_ssid[0] != '\0' ? scanned_ssid : "<hidden>",
+                       record->bssid.octet[0],
+                       record->bssid.octet[1],
+                       record->bssid.octet[2],
+                       record->bssid.octet[3],
+                       record->bssid.octet[4],
+                       record->bssid.octet[5],
+                       (unsigned long)record->channel,
+                       record->band == RTW_BAND_ON_5G ? "5g" : "2.4g",
+                       (int)record->signal_strength,
+                       river_wifi_station_security_name(record->security),
+                       (unsigned long)record->security);
+            log_count++;
+        }
 
         for (credential_index = 0; credential_index < candidate_count; ++credential_index) {
             const river_wifi_credential_t *credential = &g_river_wifi_station.credentials[credential_index];
@@ -925,8 +1040,9 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
 
         if (candidate->valid) {
             any_candidate = true;
-            RIVER_LOGI("scan candidate ssid=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%lu band=%s rssi=%d sec=%s(0x%lx)",
+            RIVER_LOGI("scan candidate ssid=%s index=%lu bssid=%02x:%02x:%02x:%02x:%02x:%02x ch=%lu band=%s rssi=%d sec=%s(0x%lx)",
                        credential->ssid,
+                       (unsigned long)credential_index,
                        candidate->result.bssid.octet[0],
                        candidate->result.bssid.octet[1],
                        candidate->result.bssid.octet[2],
@@ -948,7 +1064,9 @@ static void river_wifi_station_scan_targets(river_wifi_scan_candidate_t *candida
     }
 
     if (!any_candidate) {
-        RIVER_LOGW("scan candidate not found for configured ap list");
+        RIVER_LOGW("scan candidate not found for configured ap list ap_num=%lu configured_ap=%u",
+                   (unsigned long)ap_num,
+                   (unsigned int)g_river_wifi_station.credential_count);
     }
 }
 
@@ -1275,9 +1393,11 @@ static void river_wifi_station_task(void *param)
                 }
 
                 river_wifi_station_fill_connect_param(&connect_param, credential, candidate, strategy);
-                RIVER_LOGI("connect strategy=%s ssid=%s channel=%u sec=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x",
+                RIVER_LOGI("connect strategy=%s ssid=%s ssid_len=%u password_len=%u channel=%u sec=%s bssid=%02x:%02x:%02x:%02x:%02x:%02x scan=%s rssi=%d",
                            river_wifi_station_connect_strategy_name(strategy),
                            credential->ssid,
+                           (unsigned int)credential->ssid_len,
+                           (unsigned int)credential->password_len,
                            (unsigned int)connect_param.channel,
                            river_wifi_station_strategy_security_name(credential, strategy),
                            connect_param.bssid.octet[0],
@@ -1285,11 +1405,14 @@ static void river_wifi_station_task(void *param)
                            connect_param.bssid.octet[2],
                            connect_param.bssid.octet[3],
                            connect_param.bssid.octet[4],
-                           connect_param.bssid.octet[5]);
+                           connect_param.bssid.octet[5],
+                           (candidate != NULL && candidate->valid) ? "yes" : "no",
+                           (candidate != NULL && candidate->valid) ? (int)candidate->result.signal_strength : 0);
 
                 result = wifi_connect(&connect_param, 1);
                 if (result == RTK_SUCCESS) {
                     g_river_wifi_station.next_credential_index = (u8)credential_index;
+                    river_wifi_station_log_join_snapshot("wifi_connect_return_success");
                     break;
                 }
 
@@ -1318,6 +1441,7 @@ static void river_wifi_station_task(void *param)
                            result,
                            river_wifi_station_error_name(result),
                            river_wifi_station_join_status_name(join_status));
+                river_wifi_station_log_join_snapshot("wifi_connect_failed");
                 river_wifi_station_disconnect_and_wait_idle(1500U);
             }
 
@@ -1444,4 +1568,8 @@ void river_wifi_station_dump_status(void)
                (unsigned long)g_river_wifi_station.connect_successes,
                (unsigned long)g_river_wifi_station.connect_failures,
                g_river_wifi_station.last_error);
+    river_wifi_station_log_join_snapshot("dump_status");
+    if (g_river_wifi_station.connected) {
+        river_wifi_station_log_phy_snapshot("dump_status");
+    }
 }

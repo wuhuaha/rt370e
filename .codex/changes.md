@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.51
+- 针对当前硬件 Wi-Fi 一直连接不上的问题，增强 `components/river_cloud/river_wifi_station.c` 的连接诊断日志，只加观测信息，不改变扫描、候选选择、重试或连接策略。
+- 新增/增强的诊断点：
+  - 启动加载 Wi-Fi credential 时打印 `ssid`、`ssid_len`、`password_len`，不打印密码明文；当前主配置应显示 `credential[0] ssid=river ssid_len=5 password_len=10`。
+  - 每轮主动扫描前打印已配置 AP 数和扫描记录上限，扫描完成后打印返回 AP 数。
+  - 每轮扫描最多打印前 8 个 AP 的 `ssid`、`bssid`、`channel`、`band`、`rssi` 和 `security`，用于确认目标 AP 是否被硬件看到、信号强度是否足够、加密类型是否匹配。
+  - 候选 AP 日志增加 credential index，并保留候选 `rssi` 弱信号告警；未找到候选时打印 `ap_num` 和 `configured_ap`。
+  - 每次 `wifi_connect()` 前打印策略、SSID 长度、密码长度、信道、加密类型、BSSID、是否来自扫描结果和候选 RSSI。
+  - join 等待过程中在状态变化或每秒打印 `join wait status=...`，在停止、失败、超时和 `wifi_connect()` 返回成功/失败时打印 join snapshot。
+  - 连接成功和 `river_wifi_station_dump_status()` 时增加 PHY snapshot，包含 `rssi`、`data_rssi`、`beacon_rssi`、`snr`。
+- 新增 `river_wifi_station_format_ssid()` 用于安全打印扫描结果中的非 NUL SSID buffer。
+- 持久化当前硬件烧录约束：
+  - `AGENTS.md` 新增 Hardware Flashing Policy：当前 NAND 硬件需要手动进入烧录模式，除非用户在当前回合明确要求，Codex 不再主动运行烧录工具或串口 monitor。
+  - `.codex/active_context.md` 将活跃 flash/monitor 命令标记为 user-run validation，用于给用户参考，不作为 Codex 默认动作。
+- Verification for this step:
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - board runtime validation is pending user manual flash because the current hardware must be placed into flashing mode manually.
+
 ## Step H.xiaozhi-client.50
 - 针对当前硬件切换到 NAND 烧录路径，新增项目自有 `RTL8730E_NAND` flash profile：
   - 从 `/root/ameba-rtos/tools/ameba/Flash/Devices/Profiles/RTL8730E_NAND.rdev` 解出 stock JSON 副本，保存为 `board/rtl8730e/profiles/RTL8730E_NAND.sdk.json`，用于对比和追溯。

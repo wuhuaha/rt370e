@@ -16,6 +16,15 @@
 - Unless the user explicitly asks otherwise, use clear Chinese commit messages
   for future `git commit` operations in this repository.
 
+## Hardware Flashing Policy
+- The current NAND hardware requires manually entering flashing/download mode.
+- Unless the user explicitly asks in the current turn, do not run flash tools or
+  serial runtime monitors against the board; after a successful build, report
+  that the image is ready and let the user perform flashing and board runtime
+  validation.
+- It is still acceptable to update project-owned flash profiles/wrappers and to
+  document the exact command and expected logs for user-run validation.
+
 ## Codex Harness Hygiene
 - Treat `.codex/active_context.md` as the canonical volatile context for the current branch, active objective, SDK baseline, and latest verified step.
 - Treat `.codex/active_plans.md` as the canonical index of currently active multi-step execution plans.

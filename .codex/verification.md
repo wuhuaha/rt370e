@@ -1,3 +1,54 @@
+## Step H.xiaozhi-client.51 Verification
+
+Confirm Wi-Fi diagnostic log coverage in source:
+```bash
+cd /root/ameba-river
+rg -n "credential\\[|scan start|scan done|scan ap\\[|scan candidate|join snapshot|join wait status|phy snapshot|password_len|scan=yes" \
+  components/river_cloud/river_wifi_station.c
+```
+
+Expected source result:
+- credentials are logged as SSID plus lengths only; password plaintext is not logged
+- scan logs include AP RSSI, BSSID, channel, band, and security
+- connect attempts log strategy, SSID/password lengths, scan usage, candidate RSSI, channel, security, and BSSID
+- join wait logs expose intermediate join states and final snapshots
+- connected/status dump paths expose PHY RSSI/SNR snapshots
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result on 2026-05-27:
+- `/root/ameba-rtos` build completed with `Build done`
+- `git diff --check` passed
+- `python3 tools/diag/check_codex_harness.py` passed
+
+Post-flash board validation is user-run because current hardware requires
+manual entry into flashing/download mode. After flashing, preserve the boot and
+Wi-Fi connection log around these lines:
+```text
+credential[0] ssid=river ssid_len=5 password_len=10
+scan start configured_ap=...
+scan done ret=... ap_num=...
+scan ap[...] ssid=... bssid=... ch=... band=... rssi=... sec=...
+scan candidate ssid=river index=... rssi=...
+connect strategy=... ssid=river ssid_len=5 password_len=10 ... scan=... rssi=...
+join wait status=...
+join snapshot source=...
+phy snapshot source=connected rssi=... data_rssi=... beacon_rssi=... snr=...
+```
+
+Interpretation:
+- if no `scan candidate ssid=river` appears, the board is not seeing the configured AP or the SSID differs
+- if candidate RSSI is below about `-80 dBm`, treat it as weak signal/antenna/location risk before changing protocol code
+- if join stalls at `authenticating`, `associating`, or `4way_handshaking`, preserve the exact state and any `wifi_connect failed ... err=...` line
+
 ## Step H.xiaozhi-client.50 Verification
 
 Generate and inspect the project NAND profile:
