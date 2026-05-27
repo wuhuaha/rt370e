@@ -1,3 +1,55 @@
+## Step H.xiaozhi-client.52 Verification
+
+Confirm Wi-Fi initialization boundary diagnostics and efuse fallback in source:
+```bash
+cd /root/ameba-river
+rg -n "user cfg source|country=00|tx_pwr_sel=1|wifi_on start|wifi_on returned|whc_api=0x9|wifi_on=|RTW_SUPPORT_BAND_2_4G_5G_BOTH" \
+  components/river_cloud/river_wifi_station.c
+```
+
+Expected source result:
+- user config logs show patch-before, patch-after, and wifi_on-start snapshots
+- project fallback sets `country_code` to `00`, band support to `2.4g+5g`, and `tx_pwr_table_selection` to `1`
+- `wifi_on start ... whc_api=0x9` appears before SDK `wifi_on(RTW_MODE_STA)`
+- `wifi_on returned ret=... elapsed_ms=...` appears only if SDK `wifi_on()` returns
+- status dump includes `wifi_on=not_done|pending|ok`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result on 2026-05-27:
+- source grep confirmed the new user-config and `wifi_on` boundary logs
+- `git diff --check` passed
+- `python3 tools/diag/check_codex_harness.py` passed
+- `/root/ameba-rtos` build completed with `Build done`
+
+Post-flash board validation is user-run because current hardware requires
+manual entry into flashing/download mode. After flashing, preserve the boot and
+Wi-Fi initialization log around these lines:
+```text
+user cfg source=patch_before country=0000(..) ... tx_pwr_sel=2 ...
+sdk user config patched before wifi_on: country=00 band=2.4g+5g tx_pwr_sel=1 ...
+user cfg source=patch_after country=3030(00) band=2.4g+5g(0x03) tx_pwr_sel=1 ...
+user cfg source=wifi_on_start country=3030(00) band=2.4g+5g(0x03) tx_pwr_sel=1 ...
+wifi_on start attempt=1 mode=sta whc_api=0x9 ...
+wifi_on returned ret=0 elapsed_ms=...
+post-wifi_on sta state reset complete; app owns first connection
+connect attempt=...
+scan start configured_ap=...
+```
+
+Interpretation:
+- if `wifi_on start` appears but `wifi_on returned` never appears, the board is still stuck inside SDK `wifi_on()` / WHC API `0x9`; preserve nearby `[WLAN-*]`, `[INIC-*]`, and efuse lines
+- if `wifi_on returned ret=0` appears, the next expected logs are `post-wifi_on sta state reset complete`, then `connect attempt` and `scan start`
+- if scan logs appear, use the H.51 RSSI/security/candidate logs to judge SSID visibility, signal strength, and auth/security mismatch
+
 ## Step H.xiaozhi-client.51 Verification
 
 Confirm Wi-Fi diagnostic log coverage in source:

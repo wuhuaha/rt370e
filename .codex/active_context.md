@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.51 增强 Wi-Fi 连接失败诊断日志`
+  - `Step H.xiaozhi-client.52 增强 Wi-Fi 初始化阶段诊断`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,17 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.52` 增强 Wi-Fi 初始化阶段诊断：
+  - 用户 2026-05-27 19:30 板端日志已经证明 H.51 的 credential/dump 日志生效，但没有出现 `connect attempt`、`scan start`、`scan ap[...]` 或 `connect strategy=...`，说明还没有进入项目侧扫描/连接阶段。
+  - 同一段日志反复出现 `[INIC-A] Host api ipc timeout: cur id 0x9`；复核 `/root/ameba-rtos/component/wifi/whc/whc_def.h` 后确认 `WHC_API_WIFI_ON = BASIC_API_BASE + 9`，当前卡点更像 SDK `wifi_on(RTW_MODE_STA)` / WHC IPC 初始化。
+  - 日志里的 `[WLAN-E] Efuse empty! Wifi performance may be affected...` 与 SDK 默认 `country_code=0x0000`、`tx_pwr_table_selection=2` 依赖 efuse 的配置相冲突，因此本步在项目侧显式设置空 efuse fallback。
+  - Wi-Fi user config patch 前后和 `wifi_on` 前都会打印 country、band、tx power table selection、802.11d、EDCCA、fast/auto reconnect、IPS/LPS。
+  - 项目侧 Wi-Fi fallback 现在设置为 `country_code='0''0'`、`freq_band_support=RTW_SUPPORT_BAND_2_4G_5G_BOTH`、`tx_pwr_table_selection=1`、`rtw_802_11d_en=0`，避免 SDK 继续 follow/depend on 空 efuse。
+  - 新增 `wifi_on start ... whc_api=0x9` 和 `wifi_on returned ret=... elapsed_ms=...` 边界日志；如果用户烧录后仍只看到 start 看不到 returned，就可以确认仍卡在 SDK `wifi_on()` 内部。
+  - `river_wifi_station_dump_status()` 增加 `wifi_on=not_done|pending|ok`、attempts、ret、elapsed_ms，方便从状态行判断初始化是否卡住。
+  - 本步未修改 Wi-Fi credential、密码内容、扫描/连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.51` 增强 Wi-Fi 连接失败诊断日志：
   - 本步只修改 `components/river_cloud/river_wifi_station.c` 的诊断输出，不改变 Wi-Fi 连接策略、扫描策略、候选选择、重试节奏、credential 配置或网络协议行为。

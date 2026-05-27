@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.52
+- 根据用户提供的 2026-05-27 19:30 板端日志继续定位 Wi-Fi 未连接问题：
+  - 新固件已包含 H.51 的 credential/dump 日志，例如 `credential[0] ssid=river ...` 和 `join snapshot source=dump_status ...`。
+  - 但日志中没有出现 `connect attempt`、`scan start`、`scan ap[...]` 或 `connect strategy=...`，说明问题还没有进入项目侧扫描/连接阶段。
+  - 日志反复出现 `[INIC-A] Host api ipc timeout: cur id 0x9`；复核 `/root/ameba-rtos/component/wifi/whc/whc_def.h` 后确认 `WHC_API_WIFI_ON = BASIC_API_BASE + 9`，因此当前卡点更像 SDK `wifi_on(RTW_MODE_STA)` / WHC IPC 初始化阶段。
+  - 同一段日志中有 `[WLAN-E] Efuse empty! Wifi performance may be affected...`，SDK 默认 `country_code=0x0000` 和 `tx_pwr_table_selection=2` 都会依赖 efuse，因此空 efuse 是本轮重点规避对象。
+- 变更 `components/river_cloud/river_wifi_station.c`：
+  - 在项目侧 Wi-Fi user config patch 前后打印完整关键配置：country、band、tx power table selection、802.11d、EDCCA、fast reconnect、auto reconnect、IPS/LPS。
+  - 将 Wi-Fi regulatory/power fallback 显式化为 `country_code='0''0'`、`freq_band_support=RTW_SUPPORT_BAND_2_4G_5G_BOTH`、`tx_pwr_table_selection=1`、`rtw_802_11d_en=0`，避免 SDK 默认继续 follow/depend on 空 efuse。
+  - 新增 `wifi_on start` / `wifi_on returned` 边界日志，`wifi_on start` 明确标出 `whc_api=0x9`；若后续仍只看到 start 看不到 returned，就能确认卡在 SDK `wifi_on()` 内部。
+  - `wifi_on()` 返回失败时记录失败次数并按既有重试周期重试，不再继续走后续 scan/connect。
+  - `river_wifi_station_dump_status()` 增加 `wifi_on=not_done|pending|ok`、attempts、ret、elapsed_ms，便于用户烧录后从状态行判断 Wi-Fi 初始化是否卡住。
+- 保持受保护能力不变：
+  - 未修改 Wi-Fi credential、密码内容、扫描/候选选择、连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation is user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.51
 - 针对当前硬件 Wi-Fi 一直连接不上的问题，增强 `components/river_cloud/river_wifi_station.c` 的连接诊断日志，只加观测信息，不改变扫描、候选选择、重试或连接策略。
 - 新增/增强的诊断点：

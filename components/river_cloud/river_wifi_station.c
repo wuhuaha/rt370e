@@ -60,10 +60,16 @@ typedef struct {
     bool sdk_fast_connect_profile_cleared;
     bool startup_sta_state_cleared;
     bool sdk_user_config_patched;
+    bool wifi_on_pending;
+    bool wifi_on_seen_success;
     rtos_task_t task;
     uint32_t connect_attempts;
     uint32_t connect_successes;
     uint32_t connect_failures;
+    uint32_t wifi_on_attempts;
+    uint32_t wifi_on_start_ms;
+    uint32_t wifi_on_last_elapsed_ms;
+    int wifi_on_last_result;
     int last_error;
     river_wifi_credential_t credentials[RIVER_WIFI_STA_MAX_CREDENTIALS];
     u8 credential_count;
@@ -211,6 +217,53 @@ static const char *river_wifi_station_connect_strategy_name(river_wifi_connect_s
     default:
         return "unknown";
     }
+}
+
+static char river_wifi_station_printable_char(u8 value)
+{
+    if ((value >= 0x20U) && (value <= 0x7eU)) {
+        return (char)value;
+    }
+
+    return '.';
+}
+
+static const char *river_wifi_station_band_support_name(u8 band)
+{
+    switch (band) {
+    case RTW_SUPPORT_BAND_2_4G:
+        return "2.4g";
+    case RTW_SUPPORT_BAND_5G:
+        return "5g";
+    case RTW_SUPPORT_BAND_2_4G_5G_BOTH:
+        return "2.4g+5g";
+    case RTW_SUPPORT_BAND_MAX:
+        return "hw_default";
+    default:
+        return "unknown";
+    }
+}
+
+static void river_wifi_station_log_user_config(const char *source)
+{
+    RIVER_LOGI("user cfg source=%s country=%02x%02x(%c%c) band=%s(0x%02x) tx_pwr_sel=%u 11d=%u edcca=%u fast=%u auto=%u/%u/%u ips=%u ctrl=%u lps=%u",
+               source,
+               (unsigned int)wifi_user_config.country_code[0],
+               (unsigned int)wifi_user_config.country_code[1],
+               river_wifi_station_printable_char(wifi_user_config.country_code[0]),
+               river_wifi_station_printable_char(wifi_user_config.country_code[1]),
+               river_wifi_station_band_support_name(wifi_user_config.freq_band_support),
+               (unsigned int)wifi_user_config.freq_band_support,
+               (unsigned int)wifi_user_config.tx_pwr_table_selection,
+               (unsigned int)wifi_user_config.rtw_802_11d_en,
+               (unsigned int)wifi_user_config.rtw_edcca_mode,
+               (unsigned int)wifi_user_config.fast_reconnect_en,
+               (unsigned int)wifi_user_config.auto_reconnect_en,
+               (unsigned int)wifi_user_config.auto_reconnect_count,
+               (unsigned int)wifi_user_config.auto_reconnect_interval,
+               (unsigned int)wifi_user_config.ips_enable,
+               (unsigned int)wifi_user_config.ips_ctrl_by_usr,
+               (unsigned int)wifi_user_config.lps_enable);
 }
 
 static void river_wifi_station_format_ssid(const struct rtw_ssid *ssid, char *buffer, size_t buffer_size)
@@ -475,6 +528,13 @@ static void river_wifi_station_patch_user_config_once(void)
         return;
     }
 
+    river_wifi_station_log_user_config("patch_before");
+
+    wifi_user_config.country_code[0] = '0';
+    wifi_user_config.country_code[1] = '0';
+    wifi_user_config.freq_band_support = RTW_SUPPORT_BAND_2_4G_5G_BOTH;
+    wifi_user_config.tx_pwr_table_selection = 1;
+    wifi_user_config.rtw_802_11d_en = 0;
     wifi_user_config.fast_reconnect_en = 0;
     wifi_user_config.auto_reconnect_en = 0;
     wifi_user_config.auto_reconnect_count = 0;
@@ -484,7 +544,41 @@ static void river_wifi_station_patch_user_config_once(void)
     wifi_user_config.lps_enable = 0;
 
     g_river_wifi_station.sdk_user_config_patched = true;
-    RIVER_LOGI("sdk user config patched before wifi_on: fast_reconnect=0 auto_reconnect=0 ips=0 lps=0");
+    RIVER_LOGI("sdk user config patched before wifi_on: country=00 band=2.4g+5g tx_pwr_sel=1 fast_reconnect=0 auto_reconnect=0 ips=0 lps=0");
+    river_wifi_station_log_user_config("patch_after");
+}
+
+static int river_wifi_station_wifi_on_sta(void)
+{
+    uint32_t start_ms;
+    uint32_t end_ms;
+    uint32_t elapsed_ms;
+    int ret;
+
+    start_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    g_river_wifi_station.wifi_on_pending = true;
+    g_river_wifi_station.wifi_on_start_ms = start_ms;
+    g_river_wifi_station.wifi_on_attempts++;
+
+    river_wifi_station_log_user_config("wifi_on_start");
+    RIVER_LOGI("wifi_on start attempt=%lu mode=sta whc_api=0x9 note=no-return-log-means-sdk-wifi_on-stalled",
+               (unsigned long)g_river_wifi_station.wifi_on_attempts);
+
+    ret = wifi_on(RTW_MODE_STA);
+
+    end_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    elapsed_ms = end_ms - start_ms;
+    g_river_wifi_station.wifi_on_pending = false;
+    g_river_wifi_station.wifi_on_last_result = ret;
+    g_river_wifi_station.wifi_on_last_elapsed_ms = elapsed_ms;
+    if (ret == RTK_SUCCESS) {
+        g_river_wifi_station.wifi_on_seen_success = true;
+        RIVER_LOGI("wifi_on returned ret=%d elapsed_ms=%lu", ret, (unsigned long)elapsed_ms);
+    } else {
+        RIVER_LOGW("wifi_on returned ret=%d elapsed_ms=%lu", ret, (unsigned long)elapsed_ms);
+    }
+
+    return ret;
 }
 
 static void river_wifi_station_disable_sdk_autoreconnect_once(void)
@@ -1250,7 +1344,17 @@ static void river_wifi_station_task(void *param)
         if (!wifi_is_running(STA_WLAN_INDEX)) {
             river_wifi_station_force_sdk_fast_connect_off();
             river_wifi_station_patch_user_config_once();
-            wifi_on(RTW_MODE_STA);
+            result = river_wifi_station_wifi_on_sta();
+            if (result != RTK_SUCCESS) {
+                g_river_wifi_station.last_error = result;
+                g_river_wifi_station.connect_failures++;
+                RIVER_LOGW("wifi_on failed ret=%d failures=%lu retry_ms=%u",
+                           result,
+                           (unsigned long)g_river_wifi_station.connect_failures,
+                           (unsigned int)RIVER_WIFI_STA_RETRY_MS);
+                rtos_time_delay_ms(RIVER_WIFI_STA_RETRY_MS);
+                continue;
+            }
             g_river_wifi_station.sdk_autoreconnect_disabled = false;
             g_river_wifi_station.sdk_fast_connect_disabled = false;
             g_river_wifi_station.sdk_lps_disabled = false;
@@ -1561,13 +1665,25 @@ const char *river_wifi_station_status_name(void)
 
 void river_wifi_station_dump_status(void)
 {
-    RIVER_LOGI("status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d",
+    uint32_t wifi_on_elapsed_ms = g_river_wifi_station.wifi_on_last_elapsed_ms;
+
+    if (g_river_wifi_station.wifi_on_pending) {
+        wifi_on_elapsed_ms = (uint32_t)rtos_time_get_current_system_time_ms() -
+                             g_river_wifi_station.wifi_on_start_ms;
+    }
+
+    RIVER_LOGI("status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d wifi_on=%s attempts=%lu ret=%d elapsed_ms=%lu",
                river_wifi_station_status_name(),
                river_wifi_station_ssid(),
                (unsigned long)g_river_wifi_station.connect_attempts,
                (unsigned long)g_river_wifi_station.connect_successes,
                (unsigned long)g_river_wifi_station.connect_failures,
-               g_river_wifi_station.last_error);
+               g_river_wifi_station.last_error,
+               g_river_wifi_station.wifi_on_pending ? "pending" :
+                   (g_river_wifi_station.wifi_on_seen_success ? "ok" : "not_done"),
+               (unsigned long)g_river_wifi_station.wifi_on_attempts,
+               g_river_wifi_station.wifi_on_last_result,
+               (unsigned long)wifi_on_elapsed_ms);
     river_wifi_station_log_join_snapshot("dump_status");
     if (g_river_wifi_station.connected) {
         river_wifi_station_log_phy_snapshot("dump_status");
