@@ -57,6 +57,18 @@ export AMEBA_SDK_ROOT=/root/ameba-rtos
 python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
 ```
 
+当前 NAND 硬件使用：
+
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand
+```
+
+`-m nand` 会使用项目内 `RTL8730E_NAND.rdev`，并在临时 SDK Flash
+工具副本中提高 NAND 写入重试/等待参数。该设置只影响本次烧录进程，
+不会修改 `/root/ameba-rtos` 的 stock `Settings.json`。
+
 串口监视：
 
 ```bash
@@ -66,7 +78,8 @@ python3 "$AMEBA_SDK_ROOT/tools/ameba/Monitor/monitor.py" -p /dev/ttyUSB0 -b 1500
 补充说明：
 
 - 当前应用镜像继续要求使用项目自定义 profile：
-  - `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`
+  - NAND 硬件：`/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NAND.rdev`
+  - NOR 硬件：`/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`
 - 如果使用官方 GUI 下载工具，也必须加载上面的项目 profile，而不是工具自带的默认 `RTL8730E` profile。
 
 ## 5. 常用构建流程

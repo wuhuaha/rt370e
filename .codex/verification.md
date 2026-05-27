@@ -1,3 +1,66 @@
+## Step H.xiaozhi-client.50 Verification
+
+Generate and inspect the project NAND profile:
+```bash
+cd /root/ameba-river
+python3 tools/generate_rdev.py \
+  --input board/rtl8730e/profiles/RTL8730E_NAND.json \
+  --output board/rtl8730e/profiles/RTL8730E_NAND.rdev
+python3 - <<'PY'
+import json, sys
+sys.path.insert(0, '/root/ameba-rtos/tools/ameba/Flash')
+from base.json_utils import JsonUtils
+obj = JsonUtils.load_from_file('board/rtl8730e/profiles/RTL8730E_NAND.rdev', need_decrypt=True)
+print(json.dumps(obj['Images'], indent=2))
+PY
+```
+
+Expected result:
+- bootloader remains `0x00000000-0x00040000`
+- `km0_km4_ca32_app.bin` uses `0x00040000-0x00C40000`
+- `MemoryType` remains `2` for NAND
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Flash current NAND hardware:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand --log-level debug
+```
+
+Expected flash wrapper output:
+- `[river_flash] profile=/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NAND.rdev`
+- `[river_flash] image_dir=/root/ameba-river/build_RTL8730E/build/project_hp/image`
+- `[river_flash] nand_settings={'RequestRetryCount': 20, ...}`
+- SDK flash tool completes with `Finished PASS`
+
+Observed result on 2026-05-27:
+- build with `/root/ameba-rtos` completed with `Build done`
+- flash command completed with `Finished PASS`
+- flash tool used project profile `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NAND.rdev`
+- flash tool used temporary settings path `/tmp/ameba_river_flash_.../Flash/Settings.json`
+- detected NAND: GIGADEVICE `GD5F1GM7U`, `1Gb/128MB`, `2048B` page, `128KB` block
+- app checksum covered `0x00040000-0x00C40000`
+- full app download line: `km0_km4_ca32_app.bin download done: 3688KB / 42869.0ms / 704.0Kbps`
+- `0xe2` still appeared as an intermittent NAND write negative response, but the project retry settings absorbed it and the full flash passed
+- after the final rebuild, a second flash with `--log-level info` also completed with `Finished PASS`
+
+If flashing fails:
+- preserve the complete flash log, especially handshake, erase, image range, and error code lines
+- first verify the project NAND profile is actually selected
+- first retry the project wrapper default NAND path
+- use `--use-sdk-flash-tool` only when intentionally comparing against unmodified SDK flash settings
+- do not edit SDK stock profiles or SDK stock `Settings.json`
+
 ## Step H.xiaozhi-client.49 Verification
 
 Confirm local software KWS is blocked while Orvibo is playing TTS, matching the

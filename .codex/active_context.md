@@ -11,11 +11,11 @@ or top-of-tree verification target changes.
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
-  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor'`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand'`
 - Active monitor command:
   - `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.49 屏蔽播放期软件 KWS 误触发 Orvibo TTS 打断`
+  - `Step H.xiaozhi-client.50 为当前 NAND 硬件新增项目烧录 profile`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -32,6 +32,18 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.50` 为当前 NAND 硬件新增项目烧录 profile：
+  - 当前硬件切换到 NAND 烧录路径，活跃烧录命令改为 `tools/river_flash.py ... -m nand`。
+  - 从 `/root/ameba-rtos` 的 SDK stock `RTL8730E_NAND.rdev` 建立项目内可审阅 JSON 副本，并新增项目版 `RTL8730E_NAND.json` / `RTL8730E_NAND.rdev`。
+  - NAND bootloader slot 保持 stock `0x00000000-0x00040000` 不变。
+  - NAND 主应用下载区间从 stock `0x00040000-0x00300000` 扩到当前硬件要求的 `0x00040000-0x00C40000`。
+  - 当前 `km0_km4_ca32_app.bin` 约 `0x399a80` bytes；从 `0x00040000` 下载后结束于约 `0x003d9a80`，会越过 SDK stock NAND 的 `0x00300000` 上限，但仍落在项目 NAND profile 的 `0x00C40000` 内。
+  - `tools/river_flash.py -m nand` 默认复制 SDK Flash 工具到临时目录运行，并只提高临时 `Settings.json` 的 NAND 请求重试/写入等待参数，避免修改 SDK 本体。
+  - 2026-05-27 已在当前 NAND 板上完成实际烧录：GD5F1GM7U NAND 全量 app 下载校验覆盖 `0x00040000-0x00C40000`，最终 `Finished PASS`。
+  - 烧录日志中仍出现多次 `Negative response: b'\xe2'`，对应 NAND 写入路径的间歇性超时；项目 wrapper 的更高 retry budget 已能消化该现象。
+  - 本步只改变项目烧录 profile/文档/活跃命令，不修改固件源码、Kconfig、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+  - `RTL8730E_NAND.rdev` 已由项目 JSON 生成并反解确认 `EndAddress=12845056`，即 `0x00C40000`；`/root/ameba-rtos` 完整 build 和 NAND flash 实测均已通过。
 
 - `Step H.xiaozhi-client.49` 屏蔽播放期软件 KWS 误触发 Orvibo TTS 打断：
   - 2026-05-09 16:22 板端日志显示 H.48 已生效，普通 VAD 在 speaking 期间只打印 `vad speech ignored during speaking`，没有直接触发状态切换。

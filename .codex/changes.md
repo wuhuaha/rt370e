@@ -1,5 +1,37 @@
 # Change Log
 
+## Step H.xiaozhi-client.50
+- 针对当前硬件切换到 NAND 烧录路径，新增项目自有 `RTL8730E_NAND` flash profile：
+  - 从 `/root/ameba-rtos/tools/ameba/Flash/Devices/Profiles/RTL8730E_NAND.rdev` 解出 stock JSON 副本，保存为 `board/rtl8730e/profiles/RTL8730E_NAND.sdk.json`，用于对比和追溯。
+  - 新增 `board/rtl8730e/profiles/RTL8730E_NAND.json`，作为项目 NAND profile 源文件。
+  - 新增生成目标 `board/rtl8730e/profiles/RTL8730E_NAND.rdev`，`tools/river_flash.py -m nand` 会优先使用该项目 profile。
+- profile 策略：
+  - NAND bootloader slot 保持 SDK stock `0x00000000-0x00040000`。
+  - NAND 主应用下载区间从 SDK stock `0x00040000-0x00300000` 扩到当前硬件要求的 `0x00040000-0x00C40000`。
+  - 当前 `km0_km4_ca32_app.bin` 大小约 `0x399a80`，若从 `0x00040000` 下载会结束在约 `0x003d9a80`，已超过 stock NAND profile 但仍在项目 NAND profile 内。
+  - 该策略与既有 NOR 开发 profile 一样仍是开发期单槽扩容，不代表 OTA2/双槽产品布局已重新设计。
+- 文档/上下文：
+  - `board/rtl8730e/profiles/README.md` 增加 NAND profile 说明和 regeneration 命令。
+  - `.codex/active_context.md` 的活跃烧录命令切到 `tools/river_flash.py ... -m nand`。
+  - `build.md` 增加当前 NAND 硬件烧录命令，同时保留 NOR 命令作为旧硬件路径。
+- 烧录稳定性：
+  - `tools/river_flash.py -m nand` 现在默认复制 `/root/ameba-rtos/tools/ameba/Flash` 到临时目录运行，并只修改临时 `Settings.json`，不污染 SDK。
+  - NAND 临时设置提高请求重试和写入等待：`RequestRetryCount=20`、`RequestRetryIntervalInMillisecond=50`、`AsyncResponseTimeoutInMilliseccond=2000`、`SyncResponseTimeoutInMillisecond=2000`、`WriteResponseTimeoutInMillisecond=5000`。
+  - 保留 `--use-sdk-flash-tool` 作为直连 SDK Flash 工具的诊断开关。
+- 保持受保护能力不变：
+  - 未修改固件源码、Kconfig、协议、音频链路、VAD、唤醒词/KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+- Verification for this step:
+  - passed: `python3 tools/generate_rdev.py --input board/rtl8730e/profiles/RTL8730E_NAND.json --output board/rtl8730e/profiles/RTL8730E_NAND.rdev`.
+  - passed: decrypted `RTL8730E_NAND.rdev` confirms app range `0x00040000-0x00C40000` and `MemoryType=2`.
+  - passed: `/root/ameba-rtos` build completed with `Build done`.
+  - passed: current NAND hardware flash completed with `Finished PASS` using `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand --log-level debug`.
+  - passed: flash log confirmed `Settings path: /tmp/ameba_river_flash_.../Flash/Settings.json`, checksum over `0x00040000-0x00C40000`, and `All images download done`.
+  - observed: the GD5F1GM7U NAND path still returned intermittent `Negative response: b'\xe2'` 43 times during the successful full download; the project wrapper's higher retry budget absorbed them.
+  - passed: after the final `/root/ameba-rtos` rebuild, reflashed the current image again with `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand --log-level info`; result was `Finished PASS`.
+  - passed: `python3 -m py_compile tools/river_flash.py`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.49
 - 针对 2026-05-09 16:22 上板日志中“播放到 `温度2` 后停止”的问题，继续定位截断源：
   - H.48 的普通 VAD 屏蔽已生效，日志出现 `vad speech ignored during speaking` 后没有再直接触发 `speaking -> listening reason=vad_start`。

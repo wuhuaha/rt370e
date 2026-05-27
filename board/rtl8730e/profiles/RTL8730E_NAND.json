@@ -1,0 +1,41 @@
+{
+  "Images": [
+    {
+      "ImageName": "km4_boot_all.bin",
+      "StartAddress": 0,
+      "EndAddress": 262144,
+      "FullErase": true,
+      "MemoryType": 2,
+      "Mandatory": true,
+      "Description": "KM4 bootloader"
+    },
+    {
+      "ImageName": "km0_km4_ca32_app.bin",
+      "StartAddress": 262144,
+      "EndAddress": 12845056,
+      "FullErase": true,
+      "MemoryType": 2,
+      "Mandatory": true,
+      "Description": "Project NAND package for current RTL8730E hardware"
+    }
+  ],
+  "DefaultEfuseMap": [
+    {
+      "Value": "MIcAAAAAAAAAAAAAAAAAAA==",
+      "Offset": 0
+    }
+  ],
+  "Version": "1.1.1",
+  "DeviceName": "RTL8730E",
+  "DeviceID": 26232,
+  "MemoryType": 2,
+  "SupportUsbDownload": true,
+  "FlashStartAddress": 0,
+  "RamStartAddress": 536870912,
+  "Floader": "floader_amebasmart.bin",
+  "FloaderAddress": 805318656,
+  "HandshakeBaudrate": 115200,
+  "LogBaudrate": 1500000,
+  "LogicalEfuseLen": 1024,
+  "PhysicalEfuseLen": 2048
+}
