@@ -1,3 +1,56 @@
+## Step H.xiaozhi-client.53 Verification
+
+Confirm the project flash wrapper defaults to NAND for the current hardware:
+```bash
+cd /root/ameba-river
+python3 -m py_compile tools/river_flash.py
+python3 tools/river_flash.py --help | rg -- "--memory-type"
+rg -n "default=.*nand|defaults to nand|Current NAND|旧 NOR|Old NOR|-m nor" \
+  tools/river_flash.py build.md board/rtl8730e/profiles/README.md
+```
+
+Expected source/help result:
+- `tools/river_flash.py --help` shows `--memory-type {nor,nand,ram}`
+- the help text says memory type defaults to NAND for the current hardware
+- `tools/river_flash.py` uses `default="nand"`
+- docs show the current NAND command without `-m`, and say old NOR hardware must explicitly use `-m nor`
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed result on 2026-05-27:
+- `python3 -m py_compile tools/river_flash.py` passed
+- `python3 tools/river_flash.py --help` shows `Memory type; defaults to nand for the current hardware`
+- source/doc grep confirmed `default="nand"` and explicit `-m nor` guidance for old NOR hardware
+- `git diff --check` passed
+- `python3 tools/diag/check_codex_harness.py` passed
+
+Post-fix user-run flash command for current NAND hardware:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected flash wrapper output:
+```text
+[river_flash] profile=/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NAND.rdev
+[river_flash] nand_settings={'RequestRetryCount': 20, ...}
+Device info:
+* MemoryType: NAND
+...
+Finished PASS
+```
+
+Interpretation:
+- if the wrapper prints `RTL8730E_NOR.rdev` for current hardware, the command or checkout is stale
+- if the tool reports `Flash type mismatch: Device: 2 / Device Profile: 1`, it is still using a NOR profile against NAND hardware
+- old NOR hardware remains supported with explicit `-m nor`
+
 ## Step H.xiaozhi-client.52 Verification
 
 Confirm Wi-Fi initialization boundary diagnostics and efuse fallback in source:

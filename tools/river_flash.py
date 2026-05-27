@@ -55,7 +55,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Project-owned flash wrapper for ameba-river.")
     parser.add_argument("-p", "--port", nargs="+", required=True, help="Serial port")
     parser.add_argument("-b", "--baudrate", type=int, default=1500000, help="Serial baud rate")
-    parser.add_argument("-m", "--memory-type", choices=["nor", "nand", "ram"], default="nor", help="Memory type")
+    parser.add_argument(
+        "-m",
+        "--memory-type",
+        choices=["nor", "nand", "ram"],
+        default="nand",
+        help="Memory type; defaults to nand for the current hardware",
+    )
     parser.add_argument("--device", default="RTL8730E", help="Device name")
     parser.add_argument("--image-dir", help="Image directory")
     parser.add_argument("--chip-erase", action="store_true", help="Chip erase before download")

@@ -12,12 +12,12 @@ or top-of-tree verification target changes.
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
   - User-run only for current NAND hardware after manually entering flashing mode:
-    `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand'`
+    `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000'`
 - Active monitor command:
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.52 增强 Wi-Fi 初始化阶段诊断`
+  - `Step H.xiaozhi-client.53 将默认烧录模式切到当前 NAND 硬件`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.53` 将默认烧录模式切到当前 NAND 硬件：
+  - 用户 2026-05-27 20:10 烧录失败日志显示 wrapper 选了 `RTL8730E_NOR.rdev`，而 Flash 工具实际探测到 `MemoryType: NAND`、GD5F1GM7U、`1Gb/128MB`。
+  - 失败根因是 `Flash type mismatch: Device: 2 / Device Profile: 1`，即实际 NAND 硬件被 NOR profile 烧录，不是固件镜像或 Wi-Fi 初始化改动导致。
+  - `tools/river_flash.py` 的 `--memory-type/-m` 默认值从 `nor` 改为 `nand`，匹配当前硬件；当前 NAND 烧录命令可直接使用 `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000`。
+  - `-m nand` 仍是等价显式写法；旧 NOR 硬件必须显式使用 `-m nor`。
+  - 本步只修改主机侧烧录 wrapper 默认值和文档，不修改固件源码、烧录 profile 内容、SDK、Wi-Fi credential、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity 或 AEC/BF。
 
 - `Step H.xiaozhi-client.52` 增强 Wi-Fi 初始化阶段诊断：
   - 用户 2026-05-27 19:30 板端日志已经证明 H.51 的 credential/dump 日志生效，但没有出现 `connect attempt`、`scan start`、`scan ap[...]` 或 `connect strategy=...`，说明还没有进入项目侧扫描/连接阶段。

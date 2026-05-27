@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.53
+- 根据用户提供的 2026-05-27 20:10 烧录失败日志修正项目默认烧录模式：
+  - 烧录 wrapper 输出显示使用了 `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`。
+  - Flash 工具实际探测到 `MemoryType: NAND`、GIGADEVICE `GD5F1GM7U`、`1Gb/128MB`。
+  - 失败根因是 `Flash type mismatch: Device: 2 / Device Profile: 1`，也就是实际 NAND 硬件被 NOR profile 烧录，不是固件镜像或 Wi-Fi 改动导致。
+- 变更：
+  - `tools/river_flash.py` 的 `--memory-type/-m` 默认值从 `nor` 改为 `nand`，匹配当前硬件，避免不带 `-m` 时再次误选 NOR profile。
+  - `build.md` 的推荐烧录命令改为当前 NAND 默认命令 `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000`，保留显式 `-m nand` 等价命令。
+  - `build.md` 和 `board/rtl8730e/profiles/README.md` 明确旧 NOR 硬件必须显式使用 `-m nor`。
+- 保持受保护能力不变：
+  - 未修改固件源码、Kconfig、烧录 profile 内容、Wi-Fi credential、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+- Verification for this step:
+  - passed: `python3 -m py_compile tools/river_flash.py`.
+  - passed: `python3 tools/river_flash.py --help`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - firmware rebuild not required because this step changes only the host-side flash wrapper default and documentation.
+
 ## Step H.xiaozhi-client.52
 - 根据用户提供的 2026-05-27 19:30 板端日志继续定位 Wi-Fi 未连接问题：
   - 新固件已包含 H.51 的 credential/dump 日志，例如 `credential[0] ssid=river ...` 和 `join snapshot source=dump_status ...`。

@@ -11,7 +11,7 @@ This directory is the project-owned source of truth for `RTL8730E` flash profile
   - this is the JSON file to edit
 - `RTL8730E_NOR.rdev`
   - encrypted profile generated from `RTL8730E_NOR.json`
-  - this is the file used by the project flash wrapper
+  - this is the file used by the project flash wrapper when `-m nor` is selected
 - `RTL8730E_NAND.sdk.json`
   - decrypted copy of the SDK stock NAND profile
   - kept only for comparison and traceability
@@ -20,7 +20,7 @@ This directory is the project-owned source of truth for `RTL8730E` flash profile
   - this is the JSON file to edit for NAND hardware
 - `RTL8730E_NAND.rdev`
   - encrypted profile generated from `RTL8730E_NAND.json`
-  - this is the file used by the project flash wrapper when `-m nand` is selected
+  - this is the default file used by the project flash wrapper for the current hardware
 
 ## Current policy
 - board flash type: `NAND`
@@ -41,9 +41,13 @@ range, so flashing fails before download when a stock profile is used.
 
 The project profiles reclaim the OTA2 region for a larger single-slot app package.
 
-For the current NAND hardware, `tools/river_flash.py -m nand` also runs the SDK
+For the current NAND hardware, `tools/river_flash.py` defaults to NAND. The
+explicit form `tools/river_flash.py -m nand` is equivalent. NAND mode also runs the SDK
 Flash tool from a temporary copy with a larger retry budget. This absorbs
 intermittent GD5F1GM7U NAND program timeouts without modifying the SDK checkout.
+
+Old NOR hardware must be flashed with `tools/river_flash.py -m nor`; otherwise
+the wrapper intentionally uses the current NAND profile.
 
 ## Warning
 These are development-only flash profiles.

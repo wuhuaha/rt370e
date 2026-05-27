@@ -51,23 +51,29 @@ python3 "$AMEBA_SDK_ROOT/ameba.py" build -p
 项目当前使用自定义烧录脚本，不建议直接手敲 SDK 默认 `flash`
 命令。
 
+当前 NAND 硬件使用默认烧录模式即可：
+
 ```bash
 cd /root/ameba-river
 export AMEBA_SDK_ROOT=/root/ameba-rtos
-python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
 ```
 
-当前 NAND 硬件使用：
+等价的显式 NAND 命令：
 
 ```bash
-cd /root/ameba-river
-export AMEBA_SDK_ROOT=/root/ameba-rtos
 python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nand
 ```
 
-`-m nand` 会使用项目内 `RTL8730E_NAND.rdev`，并在临时 SDK Flash
+默认 NAND / `-m nand` 会使用项目内 `RTL8730E_NAND.rdev`，并在临时 SDK Flash
 工具副本中提高 NAND 写入重试/等待参数。该设置只影响本次烧录进程，
 不会修改 `/root/ameba-rtos` 的 stock `Settings.json`。
+
+旧 NOR 硬件必须显式指定：
+
+```bash
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000 -m nor
+```
 
 串口监视：
 
