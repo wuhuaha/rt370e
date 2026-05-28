@@ -1,3 +1,54 @@
+## Step H.xiaozhi-client.57 Verification
+
+Confirm activation binding-code diagnostics and refresh-failure status dump:
+```bash
+cd /root/ameba-river
+rg -n "activation bind code|OTA activation:|cJSON_IsNumber\\(code\\)|activation HTTP result|activation request result|river_orvibo_access_dump_status\\(\\)" \
+  components/river_cloud/river_orvibo_access.c components/river_core/river_orvibo_app.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+preserve the access logs after Wi-Fi gets an IP:
+```text
+wifi got ip:"..."
+connected ssid=river ip=...
+access identity refreshed: device_id=...
+OTA activation: required=... challenge=... act_v=... hmac=... code=... message=...
+activation bind code=...
+OTA websocket config applied
+access refresh failed: ...
+orvibo access: ready=... ws_config=... activation=... challenge=... code=... message=... http=... last_error=...
+```
+
+Interpretation:
+- `activation bind code=<digits>` is the server-side binding code to add on
+  the server/admin side.
+- after binding, run `river orvibo refresh` or reboot; expected next result is
+  `access refresh ok` and `orvibo access: ready=yes ... activation=none`.
+- if `challenge=yes` appears, `/activate` HTTP result lines will show whether
+  the activation endpoint is returning `200`, `202`, or an error.
+
+Observed result on 2026-05-28:
+- source grep confirmed `activation bind code`、`OTA activation:`、数字型
+  `activation.code` 解析、`/activate` HTTP 结果日志和 access refresh failure
+  dump 均存在。
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+- final AP image strings contain `OTA activation:`、`activation bind code`、
+  `activation HTTP result` and `activation request result`.
+
 ## Step H.xiaozhi-client.56 Verification
 
 Confirm the HP-side empty-efuse bypass shim is wired only into HP image2:

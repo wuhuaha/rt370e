@@ -127,6 +127,11 @@ static const char *river_orvibo_access_activation_serial_number(void)
                "";
 }
 
+static const char *river_orvibo_access_text_or_dash(const char *text)
+{
+    return text != NULL && text[0] != '\0' ? text : "-";
+}
+
 static uint32_t river_orvibo_access_rotr32(uint32_t value, uint8_t bits)
 {
     return (value >> bits) | (value << (32U - bits));
@@ -624,6 +629,7 @@ static river_status_t river_orvibo_access_http_request(const char *method,
         return RIVER_ERR_ARG;
     }
     memset(response, 0, sizeof(*response));
+    g_river_orvibo_access.http_status = 0U;
     response->body = (char *)rtos_mem_zmalloc(RIVER_ORVIBO_ACCESS_HTTP_BODY_MAX);
     if (response->body == NULL) {
         return RIVER_ERR_NO_MEMORY;
@@ -842,6 +848,10 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
     g_river_orvibo_access.activation_challenge[0] = '\0';
     activation = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "activation");
     if (!cJSON_IsObject(activation)) {
+        RIVER_LOGI("OTA activation: required=no challenge=no done=%s act_v=%u hmac=%s code=- message=-",
+                   g_river_orvibo_access.activation_done ? "yes" : "no",
+                   (unsigned int)river_orvibo_access_activation_version(),
+                   river_orvibo_access_activation_hmac_configured() ? "configured" : "none");
         return;
     }
     message = cJSON_GetObjectItemCaseSensitive((cJSON *)activation, "message");
@@ -857,6 +867,12 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
                                  sizeof(g_river_orvibo_access.activation_code),
                                  code->valuestring);
         g_river_orvibo_access.activation_required = true;
+    } else if (cJSON_IsNumber(code)) {
+        (void)snprintf(g_river_orvibo_access.activation_code,
+                       sizeof(g_river_orvibo_access.activation_code),
+                       "%d",
+                       code->valueint);
+        g_river_orvibo_access.activation_required = true;
     }
     if (cJSON_IsString(challenge) && challenge->valuestring != NULL) {
         river_orvibo_access_copy(g_river_orvibo_access.activation_challenge,
@@ -866,6 +882,19 @@ static void river_orvibo_access_parse_activation(const cJSON *root)
         g_river_orvibo_access.activation_required = true;
     } else if (g_river_orvibo_access.activation_code[0] != '\0') {
         river_orvibo_access_set_error("activation_waiting_user");
+    }
+    RIVER_LOGI("OTA activation: required=%s challenge=%s done=%s act_v=%u hmac=%s code=%s message=%s",
+               g_river_orvibo_access.activation_required ? "yes" : "no",
+               g_river_orvibo_access.activation_challenge_available ? "yes" : "no",
+               g_river_orvibo_access.activation_done ? "yes" : "no",
+               (unsigned int)river_orvibo_access_activation_version(),
+               river_orvibo_access_activation_hmac_configured() ? "configured" : "none",
+               river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_code),
+               river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_message));
+    if (g_river_orvibo_access.activation_code[0] != '\0') {
+        RIVER_LOGW("activation bind code=%s message=%s",
+                   g_river_orvibo_access.activation_code,
+                   river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_message));
     }
 }
 
@@ -1019,6 +1048,12 @@ static river_status_t river_orvibo_access_activate_once(void)
     }
     status = river_orvibo_access_http_request("POST", activation_url, payload, &response);
     if (status != RIVER_OK) {
+        RIVER_LOGW("activation HTTP request failed: status=%d http=%lu challenge=%s hmac=%s error=%s",
+                   (int)status,
+                   (unsigned long)g_river_orvibo_access.http_status,
+                   g_river_orvibo_access.activation_challenge_available ? "yes" : "no",
+                   river_orvibo_access_activation_hmac_configured() ? "configured" : "none",
+                   river_orvibo_access_text_or_dash(g_river_orvibo_access.last_error));
         return status;
     }
     g_river_orvibo_access.http_status = response.status_code;
@@ -1034,6 +1069,13 @@ static river_status_t river_orvibo_access_activate_once(void)
         river_orvibo_access_set_error("activation_failed");
         status = RIVER_ERR_IO;
     }
+    RIVER_LOGI("activation HTTP result: status=%d http=%u challenge=%s hmac=%s done=%s error=%s",
+               (int)status,
+               (unsigned int)response.status_code,
+               g_river_orvibo_access.activation_challenge_available ? "yes" : "no",
+               river_orvibo_access_activation_hmac_configured() ? "configured" : "none",
+               g_river_orvibo_access.activation_done ? "yes" : "no",
+               river_orvibo_access_text_or_dash(g_river_orvibo_access.last_error));
     river_orvibo_access_free_response(&response);
     return status;
 }
@@ -1046,35 +1088,34 @@ static river_status_t river_orvibo_access_run_activation(void)
         return RIVER_OK;
     }
     if (!g_river_orvibo_access.activation_challenge_available) {
-        RIVER_LOGW("device activation waiting for user binding: code=%s message=%s",
-                   g_river_orvibo_access.activation_code[0] != '\0' ?
-                       g_river_orvibo_access.activation_code :
-                       "-",
-                   g_river_orvibo_access.activation_message[0] != '\0' ?
-                       g_river_orvibo_access.activation_message :
-                       "-");
+        RIVER_LOGW("device activation waiting for user binding: code=%s message=%s act_v=%u hmac=%s",
+                   river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_code),
+                   river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_message),
+                   (unsigned int)river_orvibo_access_activation_version(),
+                   river_orvibo_access_activation_hmac_configured() ? "configured" : "none");
         river_orvibo_access_set_error("activation_waiting_user");
         return RIVER_ERR_BUSY;
     }
-    RIVER_LOGW("device activation required: code=%s message=%s",
-               g_river_orvibo_access.activation_code[0] != '\0' ?
-                   g_river_orvibo_access.activation_code :
-                   "-",
-               g_river_orvibo_access.activation_message[0] != '\0' ?
-                   g_river_orvibo_access.activation_message :
-                   "-");
+    RIVER_LOGW("device activation required: code=%s message=%s act_v=%u hmac=%s retries=%u",
+               river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_code),
+               river_orvibo_access_text_or_dash(g_river_orvibo_access.activation_message),
+               (unsigned int)river_orvibo_access_activation_version(),
+               river_orvibo_access_activation_hmac_configured() ? "configured" : "none",
+               (unsigned int)RIVER_ORVIBO_ACCESS_ACTIVATE_RETRIES);
     for (retry = 0U; retry < RIVER_ORVIBO_ACCESS_ACTIVATE_RETRIES; ++retry) {
         river_status_t status = river_orvibo_access_activate_once();
         if (status == RIVER_OK) {
-            RIVER_LOGI("device activation accepted");
+            RIVER_LOGI("device activation accepted: attempt=%u http=%lu",
+                       (unsigned int)(retry + 1U),
+                       (unsigned long)g_river_orvibo_access.http_status);
             return RIVER_OK;
         }
-        if (status != RIVER_ERR_BUSY) {
-            RIVER_LOGW("activation request failed: status=%d http=%lu error=%s",
-                       (int)status,
-                       (unsigned long)g_river_orvibo_access.http_status,
-                       g_river_orvibo_access.last_error);
-        }
+        RIVER_LOGW("activation request result: attempt=%u/%u status=%d http=%lu error=%s",
+                   (unsigned int)(retry + 1U),
+                   (unsigned int)RIVER_ORVIBO_ACCESS_ACTIVATE_RETRIES,
+                   (int)status,
+                   (unsigned long)g_river_orvibo_access.http_status,
+                   river_orvibo_access_text_or_dash(g_river_orvibo_access.last_error));
         rtos_time_delay_ms(RIVER_ORVIBO_ACCESS_ACTIVATE_WAIT_MS);
     }
     return RIVER_ERR_BUSY;

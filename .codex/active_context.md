@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.56 绕过 HP 空 efuse 按键等待`
+  - `Step H.xiaozhi-client.57 增强 Orvibo 激活绑定码诊断`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.57` 增强 Orvibo 激活绑定码诊断：
+  - 用户 2026-05-28 11:53 板端日志显示，H.56 已解决 Wi-Fi bring-up 卡点：HP 空 efuse prompt 被 bypass，`wifi_on()` 返回，设备扫描并连接 `river`，DHCP 获取 `192.168.3.24`。
+  - Orvibo access 已刷新真实 MAC identity `00:e0:4c:b7:23:68`，OTA 能应用 websocket config；当前剩余问题是服务端提示 `device activation required`。
+  - `river_orvibo_access` 现在同时解析字符串型和数字型 `activation.code`，并单独打印 `activation bind code=...`，便于用户在服务器侧添加/绑定。
+  - OTA activation 摘要现在打印 required/challenge/done/activation version/HMAC configured/code/message；`/activate` 轮询打印每次 HTTP result 与 error。
+  - access refresh 失败后会立即 dump `orvibo access` 状态，方便从同一段串口日志判断 `ready/ws_config/activation/challenge/code/message/http/last_error`。
+  - 本步不改变 activation payload 语义、不输出 HMAC key 或 websocket token，也不修改 Wi-Fi、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.56` 绕过 HP 空 efuse 按键等待：
   - 用户 2026-05-28 11:02 板端日志显示，H.55 的 AP 侧 `wifi_init` wrapper 已生效，`sdk auto wifi_on skipped` 已出现，首次项目所有的 `wifi_on()` 进入后卡在 `whc_api=0x9`。

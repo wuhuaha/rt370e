@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.57
+- 根据用户提供的 2026-05-28 11:53 板端日志继续推进：
+  - H.56 后 Wi-Fi 已越过空 efuse prompt 和 `wifi_on()` 卡点，扫描到目标 `river`，完成 WPA2 关联并拿到 `192.168.3.24`。
+  - Orvibo access 已刷新真实 MAC identity：`device_id=00:e0:4c:b7:23:68`，OTA 能返回 websocket config。
+  - 当前剩余问题转为服务端激活/绑定：日志出现 `device activation required`，需要端侧稳定打印服务端下发的绑定码，用户再到服务器侧添加/绑定。
+- 变更：
+  - `river_orvibo_access_parse_activation()` 现在同时接受字符串型和数字型 `activation.code`，数字型会转为端侧可打印字符串。
+  - OTA activation 解析后新增摘要日志：`OTA activation: required=... challenge=... done=... act_v=... hmac=... code=... message=...`。
+  - 若服务端下发绑定码，额外打印独立高亮行：`activation bind code=... message=...`，便于从串口日志中直接复制到服务器侧。
+  - `/activate` 请求路径新增每次 HTTP 结果日志，包含 `status`、`http`、challenge 是否存在、HMAC 是否配置、done 和 error；请求开始前清零 `http_status`，避免失败时沿用上一轮 OTA HTTP 200。
+  - `river_orvibo_app_refresh_access()` 在 access refresh 失败后立即调用 `river_orvibo_access_dump_status()`，让用户日志里同步看到 `ready/ws_config/activation/challenge/code/message/http/last_error`。
+- 保持受保护能力不变：
+  - 未修改 Wi-Fi credential、扫描/连接策略、DHCP、Orvibo websocket token、activation payload 语义、HMAC key 输出策略、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF、烧录 profile 或 SDK 源码。
+- Verification for this step:
+  - passed: source grep confirmed `activation bind code`、数字型 `activation.code` 解析、`/activate` HTTP 结果日志和 access refresh failure dump 均存在。
+  - passed: final AP image strings contain `OTA activation:`、`activation bind code`、`activation HTTP result` and `activation request result`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.56
 - 根据用户提供的 2026-05-28 11:02 板端日志继续定位 Wi-Fi 初始化卡住：
   - H.55 后 AP 侧 `wifi_init` wrapper 已生效，日志出现 `sdk auto wifi_on skipped`，说明 SDK 自动 `wifi_on()` 已被移除。

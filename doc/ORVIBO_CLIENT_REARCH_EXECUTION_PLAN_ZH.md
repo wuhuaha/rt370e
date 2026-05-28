@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.57` 增强 Orvibo 激活绑定码诊断：
+  - 2026-05-28 11:53 板端日志显示，H.56 后 Wi-Fi 已完成 `wifi_on`、扫描、WPA2 关联和 DHCP，设备拿到 `192.168.3.24`。
+  - Access identity 已从启动时全零 MAC 刷新为真实 `device_id=00:e0:4c:b7:23:68`，OTA websocket config 已应用；剩余阻塞点是服务端返回 `device activation required`。
+  - 端侧现在同时接受字符串/数字 `activation.code`，并单独打印 `activation bind code=...`，便于用户把服务端下发的数字码添加到服务器。
+  - OTA activation 摘要与 `/activate` HTTP 结果现在会带上 required/challenge/act_v/hmac/http/error，access refresh 失败会立即 dump access 状态。
+  - 下一步板端验证应在 Wi-Fi ready 后记录 `activation bind code=...`；用户完成服务器侧绑定后运行 `river orvibo refresh` 或重启，期望看到 `access refresh ok` 与 `orvibo access: ready=yes`。
 - `Step H.xiaozhi-client.56` 绕过 HP 空 efuse 按键等待：
   - 2026-05-28 11:02 板端日志显示，H.55 后 AP 侧已经跳过 SDK 自动 `wifi_on()`，但项目首次 `wifi_on()` 仍卡在 `whc_api=0x9`。
   - 同段日志 HP/KM4 侧出现 `[WLAN-E] Efuse empty! Wifi performance may be affected. Press any key to ignore and continue`，并持续出现 `[INIC-A] cur id 0x9; latest id 0x9`，当前问题收敛到 HP/WHC device 侧 `wifi_on()` 内部。

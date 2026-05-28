@@ -706,6 +706,7 @@ static river_status_t river_orvibo_app_refresh_access(const char *reason)
         RIVER_LOGW("access refresh failed: reason=%s status=%d",
                    reason != NULL ? reason : "-",
                    (int)status);
+        river_orvibo_access_dump_status();
     }
     return status;
 }
