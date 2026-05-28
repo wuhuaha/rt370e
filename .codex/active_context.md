@@ -19,7 +19,7 @@ or top-of-tree verification target changes.
   - Codex should attempt after successful download:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.64 将 AudioRecord 参数下发移到 Start 后`
+  - `Step H.xiaozhi-client.65 扫描 PA DATA1 DMIC3/DMIC4 采集路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -469,6 +469,19 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.65` scans the PA DATA1 DMIC source path:
+  - H.64 build/download succeeded and runtime capture still produced persistent
+    `0/0/0` peaks despite corrected SDK AudioRecord sequencing.
+  - Board profile now uses `pdm-2mic-pa-data1` with `DMIC3/DMIC4`, while keeping
+    `DEVICE_IN_DMIC_REF_AMIC`, PA alternate pinmux, and the H.64
+    Start-before-SetParameters order.
+  - Verification passed: static checks, harness check, latest-SDK build, image
+    string check, and `/dev/ttyUSB0` NAND download all succeeded.
+  - Runtime monitor showed DATA1 is not hard-zero (`peak` around `20-40` and
+    preproc peak around `20`), but it is still only low-level noise and remains
+    `speech=no`.
+  - Next hardware-audio step should scan PA DATA2 (`DMIC5/DMIC6`) or inspect
+    DMIC clock/data routing against the schematic.
 - `Step H.xiaozhi-client.64` follows the 2026-05-28 18:33 board log:
   - H.63 image is running and applies DMIC1/DMIC2 plus PA alternate pinmux, but
     `AudioRecord_SetParameters` still fails with `record not created` and

@@ -1,3 +1,61 @@
+## Step H.xiaozhi-client.65 Verification
+
+Confirm the PA DATA1 DMIC source scan profile while preserving the H.64
+AudioRecord sequencing:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-pa-data1|AUDIO_DMIC3|AUDIO_DMIC4|capture params applied|AudioRecord_Start|AudioRecord_SetParameters" \
+  components/river_voice/river_voice_board.c \
+  components/river_voice/river_voice_capture.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "pdm-2mic-pa-data1|capture params applied|capture dmic pinmux applied|capture board mics applied"
+```
+
+After a successful build, attempt download and monitor automatically:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected post-flash logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa-data1 usage=DMIC primary=DMIC3 secondary=DMIC4 ...
+capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4
+capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14
+capture params applied: ret=0 params=cap_mode=no_afe_pure_data
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> ...
+```
+
+Interpretation:
+- if speech raises ch0/ch1 and preproc peak, the current board routes useful
+  PDM data through SDK DATA1 (`DMIC3/DMIC4`).
+- if peaks remain `0/0/0`, continue the source scan to DATA2 (`DMIC5/DMIC6`)
+  or DATA3 (`DMIC7/DMIC8`) with the same H.64 call order.
+
+Observed result on 2026-05-28:
+- `git diff --check`, `python3 tools/diag/check_codex_harness.py`, source grep,
+  `/root/ameba-rtos` build, and final AP image string checks passed.
+- `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000` completed with
+  `Finished PASS`.
+- Serial monitor showed normal Wi-Fi/OTA recovery and H.65 capture no longer
+  hard-zero: examples included `peak=21/35/0 pre ... peak=21` and status
+  preproc peak around `23`.
+- The signal is still only low-level noise; `speech=no` remains, so DATA1 is
+  not yet a confirmed live microphone path. Continue with DATA2/DMIC5+6 scan or
+  lower-level clock/data routing checks.
+
 ## Step H.xiaozhi-client.64 Verification
 
 Confirm the SDK-compatible AudioRecord sequencing and new params diagnostic:

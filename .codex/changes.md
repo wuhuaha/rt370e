@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.65
+- 根据 H.64 下载后串口 monitor 结果继续定位 DMIC source routing：
+  - H.64 已成功构建并下载，运行期 capture frame count 持续增长，但 `audio diag` / `river audio status` 仍显示 capture/preproc peak 为 `0/0/0` / `0`。
+  - 这说明 `AudioRecord_Start()` 后下发参数的顺序修正不是唯一阻塞点；在调用顺序已匹配 SDK 示例后，下一步应继续做受控 DMIC 数据线/source 扫描。
+- 变更：
+  - 当前板级 profile 从 `pdm-2mic-pa-data0` 切到 `pdm-2mic-pa-data1`。
+  - 当前采集 mic pair 从 `AUDIO_DMIC1/2` 切到 `AUDIO_DMIC3/4`，触发 SDK AmebaSmart `AUDIO_HW_DMIC_DATA1_PIN` 路径。
+  - 保留 H.64 的 `AudioRecord_Init()` -> `AudioRecord_Start()` -> `AudioRecord_SetParameters()` 顺序、Start 后 board mic/pinmux 重放，以及 `capture params applied` 诊断。
+- 保持受保护能力不变：
+  - 未修改 `DEVICE_IN_DMIC_REF_AMIC`、PA 组 pinmux、VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source grep confirms `pdm-2mic-pa-data1`, `AUDIO_DMIC3/4`, and `capture params applied`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `pdm-2mic-pa-data1`, `capture params applied`, `capture dmic pinmux applied`, and `capture board mics applied`.
+  - passed: project NAND flash/download completed on `/dev/ttyUSB0` with `Finished PASS`.
+  - observed: H.65 runtime connected Wi-Fi and OTA normally; `audio diag` showed non-zero low-level capture/preproc peaks such as `peak=21/35/0 pre ... peak=21` and `river audio status` showed preproc peak about `23`, but still `speech=no` and no useful voice energy.
+  - next: DATA1 is no longer hard-zero like H.64 DATA0, but still not the live mic path; continue source scan to PA DATA2 (`DMIC5/DMIC6`) or inspect DMIC clock/data pin mapping against the schematic.
+
 ## Step H.xiaozhi-client.64
 - 根据用户提供的 2026-05-28 18:33 上板日志继续定位 DMIC 采集全零：
   - H.63 镜像已确认生效：日志显示 `capture board mics applied: usage=DMIC ch0=DMIC1 ch1=DMIC2`、`capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`、`AudioHal ... rx start`。

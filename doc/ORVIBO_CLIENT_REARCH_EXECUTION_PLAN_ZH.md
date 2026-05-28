@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.65` 扫描 PA DATA1 DMIC3/DMIC4 采集路径：
+  - H.64 已完成构建、下载和串口观察；采集线程运行、帧数增长，但 capture/preproc peak 仍为 `0/0/0` / `0`。
+  - 本步在保留 H.64 的 `AudioRecord_Start()` 后下发参数顺序、`DEVICE_IN_DMIC_REF_AMIC` 和 PA 组 pinmux 的前提下，把板级 profile 切到 `pdm-2mic-pa-data1` + `DMIC3/DMIC4`。
+  - 构建和 `/dev/ttyUSB0` NAND 下载通过；串口 monitor 显示 DATA1 不再全零，capture/preproc peak 约 `20-40`，但仍是低电平噪声、`speech=no`。
+  - 下一轮应继续扫描 PA DATA2 (`DMIC5/DMIC6`) 或对照原理图复核 DMIC clock/data pin mapping。
 - `Step H.xiaozhi-client.64` 将 AudioRecord 参数下发移到 Start 后：
   - 18:33 用户日志确认 H.63 已运行到 `AudioHal ... rx start`，但 `[AudioRecord_SetParameters] error: record not created.` 仍存在，且初始瞬态后长期 `peak=0/0/0`。
   - 复核 SDK 示例后确认 `speechmind`、`arecord`、`pcrecord` 都按 `AudioRecord_Init()` -> `AudioRecord_Start()` -> `AudioRecord_SetParameters()` 顺序调用。
