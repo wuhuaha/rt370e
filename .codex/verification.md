@@ -1,3 +1,61 @@
+## Step H.xiaozhi-client.66 Verification
+
+Confirm the PA DATA2 DMIC source scan profile while preserving the H.64
+AudioRecord sequencing:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-pa-data2|AUDIO_DMIC5|AUDIO_DMIC6|capture params applied|AudioRecord_Start|AudioRecord_SetParameters" \
+  components/river_voice/river_voice_board.c \
+  components/river_voice/river_voice_capture.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "pdm-2mic-pa-data2|capture params applied|capture dmic pinmux applied|capture board mics applied"
+```
+
+After a successful build, attempt download and monitor automatically:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed on 2026-05-28:
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: latest-SDK full build using `/root/ameba-rtos`, with `Build done`.
+- passed: AP image strings contain `pdm-2mic-pa-data2`, `capture params applied`,
+  `capture dmic pinmux applied`, and `capture board mics applied`.
+- blocked: automatic NAND download reached `/dev/ttyUSB0` and completed
+  `km4_boot_all.bin`, but failed during `km0_km4_ca32_app.bin` at
+  `addr=002d7800`, `size=2048`, with result `b'\xe2'`.
+- not run: monitor/runtime validation; please manually download this image and
+  then capture the post-boot audio diagnostics.
+
+Expected post-flash logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa-data2 usage=DMIC primary=DMIC5 secondary=DMIC6 ...
+capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6
+capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14
+capture params applied: ret=0 params=cap_mode=no_afe_pure_data
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> ...
+```
+
+Interpretation:
+- if speech raises ch0/ch1 and preproc peak, the current board routes useful
+  PDM data through SDK DATA2 (`DMIC5/DMIC6`).
+- if DATA2 is also silent/low-noise, continue to DATA3 (`DMIC7/DMIC8`) or move
+  to lower-level clock/data pin validation.
+
 ## Step H.xiaozhi-client.65 Verification
 
 Confirm the PA DATA1 DMIC source scan profile while preserving the H.64

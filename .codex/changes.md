@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.66
+- 根据 H.65 DATA1 上板结果继续扫描 DMIC source routing：
+  - H.65 已证明 `DMIC3/DMIC4` 不再全零，但只有 `20-40` 量级低底噪，仍无有效语音能量、`speech=no`。
+  - 在 H.64 的正确 `AudioRecord` 调用顺序和 PA 组 pinmux 已保留的前提下，本步继续扫描 SDK AmebaSmart DATA2 路径。
+- 变更：
+  - 当前板级 profile 从 `pdm-2mic-pa-data1` 切到 `pdm-2mic-pa-data2`。
+  - 当前采集 mic pair 从 `AUDIO_DMIC3/4` 切到 `AUDIO_DMIC5/6`，触发 SDK `AUDIO_HW_DMIC_DATA2_PIN` 路径。
+  - 保留 `DEVICE_IN_DMIC_REF_AMIC`、H.64 Start 后参数下发、Start 后 board mic/pinmux 重放，以及 `capture params applied` 诊断。
+- 保持受保护能力不变：
+  - 未修改 PA 组 pinmux、VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source/image grep confirms `pdm-2mic-pa-data2`, `AUDIO_DMIC5/6`, `capture params applied`, `capture dmic pinmux applied`, and `capture board mics applied`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - blocked: automatic project NAND flash/download reached the board and wrote `km4_boot_all.bin`, but failed while writing `km0_km4_ca32_app.bin` at `addr=002d7800`, `size=2048`, result `b'\xe2'`.
+  - not run: serial monitor/runtime validation because download did not complete.
+  - next: 用户需手动重新进入下载模式并下载该 H.66 镜像；下载成功后观察 `DMIC5/DMIC6`、`capture params applied: ret=0`，以及说话时 capture/preproc peak 是否恢复。
+
 ## Step H.xiaozhi-client.65
 - 根据 H.64 下载后串口 monitor 结果继续定位 DMIC source routing：
   - H.64 已成功构建并下载，运行期 capture frame count 持续增长，但 `audio diag` / `river audio status` 仍显示 capture/preproc peak 为 `0/0/0` / `0`。

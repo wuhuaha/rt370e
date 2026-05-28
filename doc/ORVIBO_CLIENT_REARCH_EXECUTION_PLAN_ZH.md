@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.66` 扫描 PA DATA2 DMIC5/DMIC6 采集路径：
+  - H.65 DATA1 (`DMIC3/DMIC4`) 有低底噪但仍无有效语音能量；本步继续按同一方法扫描 SDK DATA2。
+  - 板级 profile 切到 `pdm-2mic-pa-data2` + `DMIC5/DMIC6`，保留 `DEVICE_IN_DMIC_REF_AMIC`、PA 组 pinmux、H.64 Start 后参数下发顺序和 `capture params applied` 诊断。
+  - 静态检查、harness 检查、`/root/ameba-rtos` 完整构建和 AP 镜像字符串确认已通过；自动 NAND 下载在写 `km0_km4_ca32_app.bin` 的 `addr=002d7800` 时返回 `b'\xe2'`，因此串口 runtime 未运行。
+  - 需要用户手动重新下载该镜像；上板重点确认 `capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6`，以及说话时 capture/preproc peak 是否恢复。
 - `Step H.xiaozhi-client.65` 扫描 PA DATA1 DMIC3/DMIC4 采集路径：
   - H.64 已完成构建、下载和串口观察；采集线程运行、帧数增长，但 capture/preproc peak 仍为 `0/0/0` / `0`。
   - 本步在保留 H.64 的 `AudioRecord_Start()` 后下发参数顺序、`DEVICE_IN_DMIC_REF_AMIC` 和 PA 组 pinmux 的前提下，把板级 profile 切到 `pdm-2mic-pa-data1` + `DMIC3/DMIC4`。
