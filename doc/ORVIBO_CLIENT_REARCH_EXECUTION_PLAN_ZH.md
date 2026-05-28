@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.59` 收敛空响应的音频前端诊断：
+  - 2026-05-28 16:17 板端日志显示，Wi-Fi、OTA 和激活已经通过，`access refresh ok` 已出现；用户说话时仍无反应，周期音频日志显示 VAD 一直 `speech=no` 且概率约 `48/47`。
+  - 新增 `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY` 并在当前项目配置启用，fixed DSB 输出改为主麦直通，避免 bring-up 阶段双麦直接相加抵消语音。
+  - Orvibo audio 诊断新增原始采集三路峰值和预处理 mono 峰值，下一步板端验证可直接判断麦克风输入、预处理输出和 VAD/KWS 行为的分界。
+  - 本步不修改 VAD/KWS 模型、阈值、tensor dump、alignment replay、board/local parity、网络/激活/协议、AECM 实验代码或 SDK 源码。
+  - 下一步板端验证应确认启动日志出现 `mode=primary_only`，说话时 `audio diag` 的 capture/preproc peak 是否明显上升；若 peak 上升但仍不触发，再继续收敛 VAD/KWS 判定。
 - `Step H.xiaozhi-client.58` 固定空 efuse 板 Orvibo Device-Id：
   - 2026-05-28 13:40 板端日志显示，绑定码 `514285` 对应 `device_id=00:e0:4c:b7:23:e2`；用户在服务端添加后，13:45 重启日志显示 Device-Id 漂移为 `00:e0:4c:b7:23:1a`，服务端重新下发 `379507` 并继续 HTTP 202。
   - 这证明当前空 efuse 板 runtime STA MAC 不稳定，不能直接作为服务端长期绑定身份。

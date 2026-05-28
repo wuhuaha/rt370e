@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.58 固定空 efuse 板 Orvibo Device-Id`
+  - `Step H.xiaozhi-client.59 收敛空响应的音频前端诊断`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.59` 收敛空响应的音频前端诊断：
+  - 用户 2026-05-28 16:17 日志显示网络和激活已正常：固定 `device_id=00:e0:4c:b7:23:e2` 生效，Wi-Fi 获取 `192.168.3.32`，OTA 返回 `activation required=no`，并出现 `access refresh ok`。
+  - 同段日志在用户说话时仍反复显示 `audio diag: mode=idle ... speech=no prob=48/47 ... kws=...`，说明当前问题已经转为本地 VAD/KWS 前端未检测到有效语音。
+  - 新增 `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY`，当前 `prj.conf` 启用主麦直通作为 fixed DSB mono 输出，规避双麦极性/声道映射不确定导致的相加抵消。
+  - `river_orvibo_audio_service` 周期诊断新增原始采集三路峰值和预处理 mono 峰值，便于上板区分“麦克风没声”“预处理抵消”和“VAD/KWS 阈值/模型问题”。
+  - 本步保留 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/参数、AECM 实验代码、网络/激活/协议和 SDK 源码不变。
+  - `/root/ameba-rtos` 完整 build 已通过；当前 NAND 硬件需要手动进入烧录模式，板端 runtime validation 由用户执行。
 
 - `Step H.xiaozhi-client.58` 固定空 efuse 板 Orvibo Device-Id：
   - 用户 2026-05-28 13:40 日志显示服务端下发 code `514285` 时，access identity 为 `00:e0:4c:b7:23:e2`；用户添加该 code 后，2026-05-28 13:45 重启日志显示 Device-Id 又漂移为 `00:e0:4c:b7:23:1a`，服务端重新下发 code `379507` 并保持 HTTP 202 pending。

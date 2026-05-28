@@ -112,6 +112,10 @@ typedef struct {
     uint32_t downlink_backpressure_high_water;
     size_t downlink_buffered_bytes;
     size_t downlink_buffer_size_bytes;
+    uint16_t capture_peak_ch0;
+    uint16_t capture_peak_ch1;
+    uint16_t capture_peak_ch2;
+    uint16_t preproc_peak;
     uint16_t vad_probability_q15;
     uint16_t vad_probability_raw_q15;
     uint64_t last_diag_log_ms;
@@ -199,6 +203,74 @@ static void river_orvibo_audio_apply_runtime_policy(river_orvibo_audio_mode_t mo
     }
 }
 
+static uint16_t river_orvibo_audio_abs_peak_i16(const int16_t *samples,
+                                                size_t sample_count,
+                                                size_t stride)
+{
+    uint32_t peak = 0U;
+
+    if (samples == NULL || sample_count == 0U || stride == 0U) {
+        return 0U;
+    }
+    for (size_t i = 0; i < sample_count; ++i) {
+        int32_t value = samples[i * stride];
+        uint32_t magnitude;
+
+        if (value < 0) {
+            magnitude = (value == -32768) ? 32768U : (uint32_t)(-value);
+        } else {
+            magnitude = (uint32_t)value;
+        }
+        if (magnitude > peak) {
+            peak = magnitude;
+        }
+    }
+    if (peak > 32767U) {
+        return 32767U;
+    }
+    return (uint16_t)peak;
+}
+
+static void river_orvibo_audio_update_capture_peaks(const uint8_t *buffer,
+                                                    size_t bytes,
+                                                    uint32_t channels)
+{
+    const int16_t *samples = (const int16_t *)buffer;
+    size_t frames;
+
+    g_river_orvibo_audio.capture_peak_ch0 = 0U;
+    g_river_orvibo_audio.capture_peak_ch1 = 0U;
+    g_river_orvibo_audio.capture_peak_ch2 = 0U;
+    if (samples == NULL || bytes == 0U || channels == 0U ||
+        (bytes % (channels * sizeof(int16_t))) != 0U) {
+        return;
+    }
+    frames = bytes / (channels * sizeof(int16_t));
+    g_river_orvibo_audio.capture_peak_ch0 =
+        river_orvibo_audio_abs_peak_i16(samples, frames, channels);
+    if (channels > 1U) {
+        g_river_orvibo_audio.capture_peak_ch1 =
+            river_orvibo_audio_abs_peak_i16(samples + 1, frames, channels);
+    }
+    if (channels > 2U) {
+        g_river_orvibo_audio.capture_peak_ch2 =
+            river_orvibo_audio_abs_peak_i16(samples + 2, frames, channels);
+    }
+}
+
+static void river_orvibo_audio_update_preproc_peak(const uint8_t *buffer,
+                                                   size_t bytes)
+{
+    const int16_t *samples = (const int16_t *)buffer;
+
+    g_river_orvibo_audio.preproc_peak = 0U;
+    if (samples == NULL || bytes == 0U || (bytes % sizeof(int16_t)) != 0U) {
+        return;
+    }
+    g_river_orvibo_audio.preproc_peak =
+        river_orvibo_audio_abs_peak_i16(samples, bytes / sizeof(int16_t), 1U);
+}
+
 static void river_orvibo_audio_log_diag_if_needed(void)
 {
     uint64_t now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
@@ -209,12 +281,16 @@ static void river_orvibo_audio_log_diag_if_needed(void)
         return;
     }
     g_river_orvibo_audio.last_diag_log_ms = now_ms;
-    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu pre=%lu/%lu vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu play=%lu/%lu bp_evt=%lu buf=%lu/%lu",
+    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu peak=%u/%u/%u pre=%lu/%lu peak=%u vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu play=%lu/%lu bp_evt=%lu buf=%lu/%lu",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned long)g_river_orvibo_audio.capture_ok,
                (unsigned long)g_river_orvibo_audio.capture_fail,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch0,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch1,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch2,
                (unsigned long)g_river_orvibo_audio.preproc_ok,
                (unsigned long)g_river_orvibo_audio.preproc_fail,
+               (unsigned int)g_river_orvibo_audio.preproc_peak,
                (unsigned long)g_river_orvibo_audio.vad_ok,
                (unsigned long)g_river_orvibo_audio.vad_fail,
                g_river_orvibo_audio.vad_is_speech ? "yes" : "no",
@@ -459,6 +535,9 @@ static void river_orvibo_audio_task(void *param)
             continue;
         }
         g_river_orvibo_audio.capture_ok++;
+        river_orvibo_audio_update_capture_peaks(g_river_orvibo_audio.capture_buffer,
+                                                g_river_orvibo_audio.capture_chunk_bytes,
+                                                g_river_orvibo_audio.capture.channels);
         if (river_voice_preproc_process(&g_river_orvibo_audio.preproc,
                                         g_river_orvibo_audio.capture_buffer,
                                         g_river_orvibo_audio.capture_chunk_bytes,
@@ -478,6 +557,8 @@ static void river_orvibo_audio_task(void *param)
                    g_river_orvibo_audio.enhanced_chunk_bytes - enhanced_bytes);
             enhanced_bytes = g_river_orvibo_audio.enhanced_chunk_bytes;
         }
+        river_orvibo_audio_update_preproc_peak(g_river_orvibo_audio.enhanced_buffer,
+                                               enhanced_bytes);
         memset(&detector_result, 0, sizeof(detector_result));
         if (river_voice_detector_process(&g_river_orvibo_audio.detector,
                                          g_river_orvibo_audio.enhanced_buffer,
@@ -1019,7 +1100,7 @@ void river_orvibo_audio_service_stop_playback(const char *reason)
 
 void river_orvibo_audio_service_dump_status(void)
 {
-    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu preproc=%lu/%lu vad_cnt=%lu/%lu speech=%lu/%lu suppress=%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
+    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu peak=%u/%u/%u preproc=%lu/%lu peak=%u vad_cnt=%lu/%lu speech=%lu/%lu suppress=%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
                g_river_orvibo_audio.running ? "yes" : "no",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
@@ -1028,8 +1109,12 @@ void river_orvibo_audio_service_dump_status(void)
                (unsigned int)g_river_orvibo_audio.vad_probability_q15,
                (unsigned long)g_river_orvibo_audio.capture_ok,
                (unsigned long)g_river_orvibo_audio.capture_fail,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch0,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch1,
+               (unsigned int)g_river_orvibo_audio.capture_peak_ch2,
                (unsigned long)g_river_orvibo_audio.preproc_ok,
                (unsigned long)g_river_orvibo_audio.preproc_fail,
+               (unsigned int)g_river_orvibo_audio.preproc_peak,
                (unsigned long)g_river_orvibo_audio.vad_ok,
                (unsigned long)g_river_orvibo_audio.vad_fail,
                (unsigned long)g_river_orvibo_audio.vad_speech_start,

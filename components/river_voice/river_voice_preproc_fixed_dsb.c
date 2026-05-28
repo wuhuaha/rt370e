@@ -19,11 +19,16 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.voice.preproc"
 
+#ifndef CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY
+#define CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY 0
+#endif
+
 typedef struct {
     uint32_t frame_samples;
     uint32_t frame_ms;
     uint32_t input_channels;
     uint32_t secondary_delay_samples;
+    bool primary_only;
     int16_t secondary_history[8];
     uint32_t history_count;
 #ifdef CONFIG_RIVER_WEBRTC_AECM_EXPERIMENT_EN
@@ -255,6 +260,7 @@ river_status_t river_voice_preproc_fixed_dsb_open(river_voice_preproc_t *preproc
     context->frame_samples = (uint32_t)((profile->sample_rate * profile->frame_ms) / 1000U);
     context->frame_ms = profile->frame_ms;
     context->input_channels = preproc->input_channels;
+    context->primary_only = CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY ? true : false;
     context->secondary_delay_samples = (uint32_t)CONFIG_RIVER_VOICE_DSB_SECONDARY_DELAY_SAMPLES;
     if (context->secondary_delay_samples > (sizeof(context->secondary_history) / sizeof(context->secondary_history[0]))) {
         context->secondary_delay_samples = (sizeof(context->secondary_history) / sizeof(context->secondary_history[0]));
@@ -356,6 +362,11 @@ river_status_t river_voice_preproc_fixed_dsb_process(river_voice_preproc_t *prep
         int16_t secondary = src[(i * context->input_channels) + 1U];
         int16_t aligned_secondary;
         int32_t mixed;
+
+        if (context->primary_only || context->input_channels < 2U) {
+            dst[i] = primary;
+            continue;
+        }
 
         if (delay > 0U) {
             aligned_secondary = context->secondary_history[delay_index];
@@ -598,8 +609,9 @@ void river_voice_preproc_fixed_dsb_dump_profile(void)
 #endif
     } else {
         RIVER_LOGI("preproc backend: fixed_dsb [software beamformer]");
-        RIVER_LOGI("preproc dsb: profile=%s mode=fixed_delay_and_sum primary=%s secondary=%s spacing=%lumm delay_samples=%u output=mono focus=broadside/asr",
+        RIVER_LOGI("preproc dsb: profile=%s mode=%s primary=%s secondary=%s spacing=%lumm delay_samples=%u output=mono focus=broadside/asr",
                    profile_name,
+                   CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY ? "primary_only" : "fixed_delay_and_sum",
                    river_voice_board_mic_name(profile->primary_mic),
                    river_voice_board_mic_name(profile->secondary_mic),
                    (unsigned long)profile->mic_spacing_mm,

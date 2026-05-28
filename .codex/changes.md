@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.59
+- 根据用户提供的 2026-05-28 16:17 板端日志继续定位“说话没有任何反应”：
+  - 网络与激活链路已经正常：固定 `device_id=00:e0:4c:b7:23:e2` 生效，Wi-Fi 获取 `192.168.3.32`，OTA 返回 `activation: required=no`，并出现 `access refresh ok`。
+  - 当前卡点转为本地音频前端：用户说话期间周期 `audio diag` 仍显示 `mode=idle`、`speech=no`、VAD 概率约 `48/47`，KWS 提交计数增长但未触发 wake bridge。
+  - 现有日志只能看到帧计数，无法判断原始麦克风是否有能量、预处理是否把能量抵消或压没。
+- 变更：
+  - 新增 `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY`，当前 `prj.conf` 打开该项，让 fixed DSB 输出优先使用主麦直通，规避双麦极性/声道映射不确定导致的直接相加抵消。
+  - `river_orvibo_audio_service` 在每帧更新原始采集三路峰值和预处理后 mono 峰值，周期 `audio diag` 与 `river orvibo audio` 状态新增 `peak=ch0/ch1/ch2` 与 `pre ... peak=...`。
+  - fixed DSB profile 日志会打印 `mode=primary_only` 或 `mode=fixed_delay_and_sum`，便于确认当前唤醒输入路径。
+- 保持受保护能力不变：
+  - 未删除或绕过 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值/hold/cooldown、activation、Wi-Fi、WebSocket、Opus、AECM 实验代码或 SDK 源码。
+  - AECM 实验 profile 仍保留；本步仅让当前 fixed DSB mono 输出在 bring-up 阶段使用主麦，后续可依据峰值日志再决定是否恢复双麦混合。
+- Verification for this step:
+  - passed: source grep confirmed `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY`, `primary_only`, and audio `peak=` diagnostics are present.
+  - passed: generated `.config` and `.config_ca32` contain `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY=y`.
+  - passed: final AP image strings contain `audio diag ... peak=`, `preproc dsb ... mode=...`, and `primary_only`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.58
 - 根据用户提供的 2026-05-28 13:40 与 13:45 板端日志继续定位激活失败：
   - 13:40 首次下发绑定码 `514285` 时，access identity 为 `device_id=00:e0:4c:b7:23:e2`。
@@ -20,7 +41,7 @@
   - passed: `git diff --check`.
   - passed: `python3 tools/diag/check_codex_harness.py`.
   - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
-  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+  - passed: 2026-05-28 15:54 user-run board validation confirmed `access identity configured: device_id=00:e0:4c:b7:23:e2 client_id=999300e2-eca3-402d-aa25-7ebfc3299bc3`, Wi-Fi connected with IP `192.168.3.31`, OTA returned `activation: required=no`, websocket config was applied, and `access refresh ok` was logged.
 
 ## Step H.xiaozhi-client.57
 - 根据用户提供的 2026-05-28 11:53 板端日志继续推进：

@@ -155,6 +155,14 @@ config RIVER_VOICE_DSB_SECONDARY_DELAY_SAMPLES
     range 0 8
     default 0
 
+config RIVER_VOICE_DSB_PRIMARY_ONLY
+    bool "Use primary mic only for fixed DSB output"
+    default n
+    help
+      Use the primary mic as the fixed-DSB mono output. This is useful on
+      bring-up boards where the secondary mic polarity, placement, or channel
+      map may cancel speech when the two channels are averaged directly.
+
 choice RIVER_VOICE_PREPROC_PROFILE
     prompt "Local voice pre-processing profile"
     default RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE

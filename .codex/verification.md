@@ -1,3 +1,59 @@
+## Step H.xiaozhi-client.59 Verification
+
+Confirm primary-only fixed DSB and audio peak diagnostics:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY|primary_only|audio diag: mode=.*peak|preproc dsb: profile=.*mode" \
+  Kconfig prj.conf components/river_voice/river_voice_preproc_fixed_dsb.c \
+  components/river_voice/river_orvibo_audio_service.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm generated config and final image strings:
+```bash
+cd /root/ameba-river
+rg -n 'CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY=y' \
+  build_RTL8730E/build/.config build_RTL8730E/build/project_ap/.config_ca32
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "audio diag: mode=.*peak|preproc dsb: profile=.*mode|primary_only"
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+say the wake phrase near the board and preserve the `audio diag` lines:
+```text
+preproc dsb: profile=... mode=primary_only ...
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if capture peak and preproc peak rise clearly while speaking, the mic path is
+  alive and the next issue is VAD/KWS threshold/model behavior.
+- if capture peak stays near zero, the board is not receiving useful mic input
+  or the active mic/channel map is wrong.
+- if capture peak rises but preproc peak stays near zero, the preproc path is
+  still suppressing/canceling speech and should be narrowed further.
+
+Observed result on 2026-05-28:
+- source grep confirmed `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY`,
+  `primary_only`, and audio `peak=` diagnostics are present.
+- generated `.config` and `.config_ca32` contain
+  `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY=y`.
+- final AP image strings contain `audio diag ... peak=`,
+  `preproc dsb ... mode=...`, and `primary_only`.
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
 ## Step H.xiaozhi-client.58 Verification
 
 Confirm fixed Orvibo Device-Id config and access identity override:
