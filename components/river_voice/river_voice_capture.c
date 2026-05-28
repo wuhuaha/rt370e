@@ -362,6 +362,7 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     }
 
     river_voice_capture_apply_board_mics(profile);
+    river_voice_board_apply_capture_pinmux();
 
     AudioRecord_SetParameters((struct AudioRecord *)capture->record,
                               voice_profile->capture_audio_record_params);

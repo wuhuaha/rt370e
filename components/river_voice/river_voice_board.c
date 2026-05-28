@@ -1,6 +1,7 @@
 /* 板级语音拓扑实现：集中固化当前硬件的双麦阵列参数。 */
 #include <stdbool.h>
 
+#include "ameba_soc.h"
 #include "audio/audio_control.h"
 
 #include "river/river_log.h"
@@ -11,7 +12,7 @@
 
 static const river_voice_board_array_profile_t g_river_voice_board_array_profile = {
     .board_name = "Orvibo-RTL8730E-PDM",
-    .geometry_name = "pdm-2mic-data1",
+    .geometry_name = "pdm-2mic-pa-data1",
     .mic_spacing_mm = 50U,
     .sample_rate = 16000U,
     .frame_ms = 16U,
@@ -103,6 +104,27 @@ const char *river_voice_board_capture_usage_name(uint32_t capture_usage)
     default:
         return "MIC_USAGE?";
     }
+}
+
+void river_voice_board_apply_capture_pinmux(void)
+{
+    const river_voice_board_array_profile_t *profile;
+
+    profile = river_voice_board_array_profile();
+    if (profile->capture_usage != AUDIO_CAPTURE_USAGE_DMIC) {
+        return;
+    }
+
+#if defined(CONFIG_AMEBASMART) && defined(PINMUX_FUNCTION_DMIC)
+    Pinmux_Config(_PA_2, PINMUX_FUNCTION_DMIC);
+    Pinmux_Config(_PA_3, PINMUX_FUNCTION_DMIC);
+    Pinmux_Config(_PA_4, PINMUX_FUNCTION_DMIC);
+    Pinmux_Config(_PA_5, PINMUX_FUNCTION_DMIC);
+    Pinmux_Config(_PA_14, PINMUX_FUNCTION_DMIC);
+    RIVER_LOGI("capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14");
+#else
+    RIVER_LOGW("capture dmic pinmux skipped: unsupported target");
+#endif
 }
 
 void river_voice_board_dump_array_profile(void)

@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.61 验证 PDM DAT1 到 DMIC3/DMIC4 映射`
+  - `Step H.xiaozhi-client.62 验证 PA 组 PDM pinmux`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -467,6 +467,11 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.62` follows the 2026-05-28 17:29 board log:
+  - H.61 image was running with `DMIC3/DMIC4` and `capture=16000Hz/2ch/16ms`, but long-term peak stayed near `0/1`.
+  - This points at a hardware pinmux route mismatch rather than VAD/KWS behavior.
+  - Board profile now uses `pdm-2mic-pa-data1` and applies AmebaSmart PA alternate DMIC pinmux on `PA2/PA3/PA4/PA5/PA14` before capture starts.
+  - Next user-run board validation should confirm `capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14` and whether speech raises capture/preproc peaks.
 - `Step H.xiaozhi-client.61` follows the 2026-05-28 17:17 board log:
   - H.60 image was running, but long-term `audio diag peak=` stayed at `0/1`, so the issue is PDM data/channel mapping rather than VAD/KWS scoring.
   - Board profile now uses `pdm-2mic-data1`, `AUDIO_DMIC3/DMIC4`, and current active profile is 2ch ASR mainline.

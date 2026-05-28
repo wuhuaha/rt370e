@@ -1,3 +1,45 @@
+## Step H.xiaozhi-client.62 Verification
+
+Confirm the PA alternate DMIC pinmux and current DATA1/2ch capture profile:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-pa-data1|river_voice_board_apply_capture_pinmux|capture dmic pinmux applied|_PA_2|_PA_14|AUDIO_DMIC3|AUDIO_DMIC4" \
+  include/river/river_voice_board.h \
+  components/river_voice/river_voice_board.c \
+  components/river_voice/river_voice_capture.c
+```
+
+Run static hygiene and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+rg -n "CONFIG_AMEBASMART=y" build_RTL8730E/build/.config build_RTL8730E/build/project_ap/.config_ca32
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "pdm-2mic-pa-data1|capture dmic pinmux applied|capture board mics applied"
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+capture boot and speech logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa-data1 usage=DMIC primary=DMIC3 secondary=DMIC4 ...
+capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4
+capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14
+audio open: ... capture=16000Hz/2ch/16ms ...
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if speech raises ch0/ch1 and preproc peak, the current board needs the PA
+  alternate DMIC pinmux and the hardware input path is fixed.
+- if peaks remain near `0/1`, continue with direct SDK DMIC source/pinmux tests
+  or validate whether `PDM_DAT1` maps to another internal DMIC source on this
+  package.
+
 ## Step H.xiaozhi-client.61 Verification
 
 Confirm the DATA1 DMIC mapping and 2ch ASR mainline profile:

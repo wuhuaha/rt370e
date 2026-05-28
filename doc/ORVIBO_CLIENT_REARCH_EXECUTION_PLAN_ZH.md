@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.62` 根据 17:29 上板结果验证 PA 组 PDM pinmux：
+  - 用户日志确认 H.61 已实际使用 `DMIC3/DMIC4`、`asr_mainline` 和 `capture=16000Hz/2ch/16ms`，但说话时长期 peak 仍接近 `0/1`，问题继续收敛在 PDM 硬件输入路由。
+  - SDK AmebaSmart 默认 DMIC pinmux 使用 PB 组；SDK `mbed_audio_dmic_snr` 示例另有 PA 组 `PA2/PA3/PA4/PA5/PA14`，与当前原理图 `PDM_CLK` / `PDM_DAT1` 在 PA 区域的证据一致。
+  - 本步把 geometry 标为 `pdm-2mic-pa-data1`，并在 capture 启动前显式应用 `Pinmux_Config(..., PINMUX_FUNCTION_DMIC)` 到 `PA2/PA3/PA4/PA5/PA14`。
+  - 下一轮上板应确认 `capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`，再观察说话时 capture/preproc peak 是否明显上升。
 - `Step H.xiaozhi-client.61` 根据上板 peak 结果切到 DMIC DATA1 验证：
   - 2026-05-28 17:17 用户日志确认 H.60 新镜像已运行，但持续 `peak=0/1`，说明没有采到有效 PDM 语音能量；当前问题已从 VAD/KWS 收敛到 PDM data pin/channel mapping。
   - SDK AmebaSmart 的 `DMIC1/2` 使用 `AUDIO_HW_DMIC_DATA0_PIN`，原理图网名为 `PDM_DAT1`，因此本步把板级 profile 改为 `pdm-2mic-data1`，通道改为 `DMIC3/DMIC4`，触发 SDK DATA1。

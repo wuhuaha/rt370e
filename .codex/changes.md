@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.62
+- 根据用户提供的 2026-05-28 17:29 上板日志继续定位当前 PDM 无有效语音能量：
+  - H.61 镜像已确认生效：日志显示 `profile=asr_mainline`、`board=Orvibo-RTL8730E-PDM`、`capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4`、`capture=16000Hz/2ch/16ms`。
+  - 长期 `audio diag` 仍显示 capture/preproc peak 只有 `0/1` 量级，`speech=no`；这进一步证明问题不在 VAD/KWS 阈值，而在 PDM 硬件输入路由。
+  - `/root/ameba-rtos` 的 AmebaSmart audio HAL 默认 DMIC pinmux 使用 PB 组，例如 `AUDIO_HW_DMIC_CLK_PIN=_PB_22`、`AUDIO_HW_DMIC_DATA1_PIN=_PB_18`；而 SDK DMIC SNR 示例提供 PA 组 `PA2/PA3/PA4/PA5/PA14`，与当前原理图中 `PDM_CLK` / `PDM_DAT1` 落在 PA 区域的证据一致。
+- 变更：
+  - 板级 geometry 从 `pdm-2mic-data1` 改为 `pdm-2mic-pa-data1`，明确当前验证的是 PA 组上的 DATA1 PDM 线路。
+  - 新增 `river_voice_board_apply_capture_pinmux()`，在 AmebaSmart DMIC profile 下显式对 `_PA_2/_PA_3/_PA_4/_PA_5/_PA_14` 调用 `Pinmux_Config(..., PINMUX_FUNCTION_DMIC)`。
+  - `river_voice_capture_open()` 在应用 board mic mapping 后、启动 `AudioRecord` 前调用该 pinmux helper。
+  - 新增上板确认日志 `capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+  - 仍保留 H.61 的 2ch ASR mainline、DMIC3/DMIC4 映射和 H.59 的 peak 诊断，便于用户烧录后直接判断硬件输入是否恢复。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: generated build configs contain `CONFIG_AMEBASMART=y`, so the AmebaSmart pinmux branch is compiled.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `pdm-2mic-pa-data1`, `capture dmic pinmux applied`, and `capture board mics applied`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.61
 - 根据用户提供的 2026-05-28 17:17 上板日志继续定位 DMIC 无有效语音能量：
   - 新镜像已确认生效：日志显示 `board=Orvibo-RTL8730E-PDM`，版本为 `2026.05.28.171135`。

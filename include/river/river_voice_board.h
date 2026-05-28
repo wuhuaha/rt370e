@@ -26,6 +26,7 @@ const river_voice_board_array_profile_t *river_voice_board_array_profile(void);
 const char *river_voice_board_mic_name(uint32_t mic_category);
 const char *river_voice_board_mic_gain_name(uint32_t mic_gain);
 const char *river_voice_board_capture_usage_name(uint32_t capture_usage);
+void river_voice_board_apply_capture_pinmux(void);
 void river_voice_board_dump_array_profile(void);
 
 #endif
