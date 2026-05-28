@@ -1,5 +1,30 @@
 # Change Log
 
+## Step H.xiaozhi-client.56
+- 根据用户提供的 2026-05-28 11:02 板端日志继续定位 Wi-Fi 初始化卡住：
+  - H.55 后 AP 侧 `wifi_init` wrapper 已生效，日志出现 `sdk auto wifi_on skipped`，说明 SDK 自动 `wifi_on()` 已被移除。
+  - 项目 STA 任务随后调用首个项目所有的 `wifi_on()`，日志出现 `wifi_on start ... whc_api=0x9`，但 AP 侧一直显示 `wifi_on=pending`。
+  - HP/KM4 侧同时打印 `[WLAN-E] Efuse empty! Wifi performance may be affected. Press any key to ignore and continue`，并持续出现 `[INIC-A] Host api ipc timeout: cur id 0x9; latest id 0x9`，当前卡点收敛到 HP/WHC device 侧 `wifi_on()` 内部的空 efuse 按键等待或其后续初始化。
+- 变更：
+  - 在根 `CMakeLists.txt` 中为 HP 工程注册 `CMAKE_PROJECT_hp_INCLUDE`，不修改 `/root/ameba-rtos` SDK 源码。
+  - 新增 `cmake/river_hp_project_hook.cmake`，在 HP 工程配置时把 `c_CMPT_EXAMPLE_DIR` 指向项目自有 `cmake/river_hp_example`。
+  - 新增 `cmake/river_hp_example/CMakeLists.txt`，仅在 HP `image2` 中加入项目 HP Wi-Fi shim。
+  - 新增 `components/river_wifi_hp_shim`，通过 HP 镜像链接参数 `--wrap=wifi_on`、`--wrap=LOGUART_INTConfig`、`--wrap=LOGUART_Readable` 包装 SDK `wifi_on()` 内部的 LOGUART 按键等待。
+  - HP shim 只在 `wifi_on()` 调用期间生效；当 SDK 禁用 LOGUART RX interrupt 后，下一次 `LOGUART_Readable()` 返回一次 `TRUE`，让空 efuse 开发板自动越过 `Press any key` 等待。
+  - 新增 HP 侧边界日志：`[river.wifi.hp] wifi_on start ... efuse_key_wait_bypass=armed`、`[river.wifi.hp] efuse key wait bypassed`、`[river.wifi.hp] wifi_on returned ... efuse_key_wait_bypass=...`。
+- 保持受保护能力不变：
+  - 未修改 SDK 源码、Wi-Fi credential、密码内容、扫描/候选选择、连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或烧录 profile。
+  - AP/CA32 侧仍只保留既有 `wifi_init` wrapper；HP efuse bypass shim 只进入 HP/KM4 image2。
+- Verification for this step:
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final `build.ninja` confirms HP image link flags include `-Wl,--wrap=wifi_on`、`-Wl,--wrap=LOGUART_INTConfig`、`-Wl,--wrap=LOGUART_Readable` and links `lib_river_wifi_hp_shim.a`.
+  - passed: final HP image symbols include `__wrap_wifi_on`、`__wrap_LOGUART_INTConfig`、`__wrap_LOGUART_Readable` and keep SDK `wifi_on` / `LOGUART_*` targets available.
+  - passed: final HP image strings include the three `[river.wifi.hp]` diagnostics.
+  - passed: final AP image contains existing `__wrap_wifi_init` but no HP efuse bypass strings.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.55
 - 根据用户提供的 2026-05-28 10:09 板端日志继续定位 Wi-Fi 初始化卡住：
   - H.54 后 SDK 默认 `wifi_user_config` 已正确加载，`sdk_defaults` 显示 `concurrent=1`、`skb=22/8`、`ampdu=16/20`，项目补丁后的 country/band/tx power 也已生效。

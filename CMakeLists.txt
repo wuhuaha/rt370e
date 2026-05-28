@@ -4,6 +4,13 @@ river_prepare_build_info_placeholders()
 
 set(RIVER_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(DEFINED c_MCU_PROJECT_NAME AND c_MCU_PROJECT_NAME STREQUAL "ap")
+    set(CMAKE_PROJECT_hp_INCLUDE
+        ${RIVER_PROJECT_DIR}/cmake/river_hp_project_hook.cmake
+        CACHE FILEPATH "ameba-river HP project hook" FORCE
+    )
+endif()
+
 # Keep extra shell headroom on the AP monitor in this debug branch without
 # editing the SDK's non-prompt Kconfig symbol.
 if(DEFINED c_CURRENT_IMAGE AND DEFINED c_MCU_PROJECT_NAME AND c_MCU_PROJECT_NAME STREQUAL "ap")

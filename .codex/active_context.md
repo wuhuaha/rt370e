@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.55 禁止 SDK 自动启动 Wi-Fi`
+  - `Step H.xiaozhi-client.56 绕过 HP 空 efuse 按键等待`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,16 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.56` 绕过 HP 空 efuse 按键等待：
+  - 用户 2026-05-28 11:02 板端日志显示，H.55 的 AP 侧 `wifi_init` wrapper 已生效，`sdk auto wifi_on skipped` 已出现，首次项目所有的 `wifi_on()` 进入后卡在 `whc_api=0x9`。
+  - 同段日志 HP/KM4 侧打印 `[WLAN-E] Efuse empty! Wifi performance may be affected. Press any key to ignore and continue`，且 AP 侧 `wifi_on=pending`、`[INIC-A] cur id 0x9; latest id 0x9` 持续出现。
+  - 新增项目侧 HP project hook，不修改 `/root/ameba-rtos` SDK 源码；HP `image2` 现在会引入 `components/river_wifi_hp_shim`。
+  - HP shim 通过链接器 `--wrap=wifi_on`、`--wrap=LOGUART_INTConfig`、`--wrap=LOGUART_Readable`，仅在 HP `wifi_on()` 调用期间对空 efuse 按键等待返回一次可读状态。
+  - 新增 HP 侧日志 `[river.wifi.hp] wifi_on start ... efuse_key_wait_bypass=armed`、`[river.wifi.hp] efuse key wait bypassed`、`[river.wifi.hp] wifi_on returned ... efuse_key_wait_bypass=...`。
+  - 完整 `/root/ameba-rtos` build 已通过；HP image2 链接参数和符号均确认包含三个 wrap，AP image 仅保留既有 `__wrap_wifi_init` 且不包含 HP efuse bypass 字符串。
+  - 本步未修改 SDK 源码、Wi-Fi credential、扫描/连接策略、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或烧录 profile。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.55` 禁止 SDK 自动启动 Wi-Fi：
   - 用户 2026-05-28 10:09 板端日志显示，H.54 后 SDK 默认 Wi-Fi 配置已正确加载，但项目 STA 任务卡在 `wifi_is_running start attempt=1 wlan=0 whc_api=0x4`。

@@ -1,3 +1,77 @@
+## Step H.xiaozhi-client.56 Verification
+
+Confirm the HP-side empty-efuse bypass shim is wired only into HP image2:
+```bash
+cd /root/ameba-river
+rg -n "river_hp_project_hook|river_hp_example|river_wifi_hp_shim|--wrap=wifi_on|--wrap=LOGUART_INTConfig|--wrap=LOGUART_Readable|efuse key wait bypassed" \
+  CMakeLists.txt cmake components/river_wifi_hp_shim
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm final link/symbol/string placement:
+```bash
+cd /root/ameba-river
+rg -n -- "--wrap=wifi_on|--wrap=LOGUART_INTConfig|--wrap=LOGUART_Readable|river_wifi_hp_shim" \
+  build_RTL8730E/build/build.ninja
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -a \
+  build_RTL8730E/build/project_hp/make/image2/target_img2_hp.axf | \
+  rg "__wrap_wifi_on|__wrap_LOGUART_INTConfig|__wrap_LOGUART_Readable| wifi_on$| LOGUART_INTConfig$| LOGUART_Readable$"
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -a \
+  build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "river_wifi_hp|__wrap_wifi_on|__wrap_LOGUART_Readable|__wrap_LOGUART_INTConfig|__wrap_wifi_init"
+strings build_RTL8730E/build/project_hp/make/image2/target_img2_hp.axf | \
+  rg "river\\.wifi\\.hp|efuse_key_wait_bypass|efuse key wait bypassed"
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "river\\.wifi\\.hp|efuse_key_wait_bypass|efuse key wait bypassed|sdk wifi_init override"
+```
+
+Observed result on 2026-05-28:
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+- `build.ninja` HP link flags include all three wraps and link `lib_river_wifi_hp_shim.a`.
+- HP image contains `__wrap_wifi_on`, `__wrap_LOGUART_INTConfig`,
+  `__wrap_LOGUART_Readable`, plus SDK `wifi_on` / `LOGUART_*` targets.
+- HP image strings contain the three `[river.wifi.hp]` diagnostics.
+- AP image still contains existing `__wrap_wifi_init` and no HP efuse bypass
+  strings.
+
+Post-flash board validation is user-run because current hardware requires
+manual entry into flashing/download mode. After flashing, preserve the boot and
+Wi-Fi initialization log around these lines:
+```text
+sdk wifi_init override: whc_host_init done; sdk auto wifi_on skipped
+sta task started ...
+wifi_is_running returned ret=0 ...
+wifi_on start attempt=1 mode=sta whc_api=0x9 ...
+[river.wifi.hp] wifi_on start mode=... efuse_key_wait_bypass=armed
+[WLAN-E] Efuse empty! Wifi performance may be affected. Press any key to ignore and continue
+[river.wifi.hp] efuse key wait bypassed
+[river.wifi.hp] wifi_on returned ret=0 efuse_key_wait_bypass=1
+wifi_on returned ret=0 ...
+post-wifi_on sta state reset complete; app owns first connection
+connect attempt=...
+scan start configured_ap=...
+```
+
+Interpretation:
+- if `[river.wifi.hp] wifi_on start` does not appear, the HP shim is not in the
+  flashed image or the log is stale
+- if `[river.wifi.hp] efuse key wait bypassed` appears but `wifi_on returned`
+  still does not appear, the empty-efuse key prompt was bypassed and the
+  remaining stall is later inside HP/WHC Wi-Fi initialization
+- if both HP and AP `wifi_on returned ret=0` appear, Wi-Fi should progress to
+  project scan/connect diagnostics
+
 ## Step H.xiaozhi-client.55 Verification
 
 Confirm the project intercepts the AP-side SDK Wi-Fi init entry and keeps the

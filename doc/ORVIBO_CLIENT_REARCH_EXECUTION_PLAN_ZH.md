@@ -8,6 +8,14 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.56` 绕过 HP 空 efuse 按键等待：
+  - 2026-05-28 11:02 板端日志显示，H.55 后 AP 侧已经跳过 SDK 自动 `wifi_on()`，但项目首次 `wifi_on()` 仍卡在 `whc_api=0x9`。
+  - 同段日志 HP/KM4 侧出现 `[WLAN-E] Efuse empty! Wifi performance may be affected. Press any key to ignore and continue`，并持续出现 `[INIC-A] cur id 0x9; latest id 0x9`，当前问题收敛到 HP/WHC device 侧 `wifi_on()` 内部。
+  - 新增项目侧 HP project hook，将 HP `image2` 的 example 目录指向项目自有 `cmake/river_hp_example`，不修改 `/root/ameba-rtos` SDK 源码。
+  - 新增 `components/river_wifi_hp_shim`，通过 HP 镜像 `--wrap=wifi_on`、`--wrap=LOGUART_INTConfig`、`--wrap=LOGUART_Readable`，仅在 HP `wifi_on()` 调用期间给空 efuse 按键等待返回一次可读状态。
+  - 新增 HP 侧诊断日志 `[river.wifi.hp] wifi_on start ...`、`[river.wifi.hp] efuse key wait bypassed`、`[river.wifi.hp] wifi_on returned ...`。
+  - 完整 `/root/ameba-rtos` build 已通过；final HP image2 符号包含三个 `__wrap_*`，AP image 只保留既有 `__wrap_wifi_init`，不包含 HP efuse bypass 字符串。
+  - 下一步板端验证应确认 HP 日志先出现 `efuse key wait bypassed`，随后 HP/AP 两侧都出现 `wifi_on returned ret=0`，再进入 `connect attempt` / `scan start`；若已 bypass 但仍不返回，则剩余卡点在空 efuse prompt 之后的 HP Wi-Fi 初始化。
 - `Step H.xiaozhi-client.55` 禁止 SDK 自动启动 Wi-Fi：
   - 2026-05-28 10:09 板端日志显示，H.54 后 SDK 默认 Wi-Fi 配置已经恢复，但项目 STA 任务卡在 `wifi_is_running start attempt=1 wlan=0 whc_api=0x4`，同时 SDK 报 `[INIC-A] Host api ipc timeout: cur id 0x9; latest id 0x4`。
   - 这说明 SDK 自动 `wifi_on()` 先占住 WHC API 等待链路，项目侧查询随后被卡住；当前重点是移除 SDK 自动 `wifi_on`，让首次 Wi-Fi 启动只由项目 STA 任务负责。
