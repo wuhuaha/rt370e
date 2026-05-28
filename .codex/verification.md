@@ -1,3 +1,65 @@
+## Step H.xiaozhi-client.55 Verification
+
+Confirm the project intercepts the AP-side SDK Wi-Fi init entry and keeps the
+HP/KM4 device-side SDK init intact:
+```bash
+cd /root/ameba-river
+rg -n "river_wifi_init_override|--wrap=wifi_init|sdk auto wifi_on skipped|__wrap_wifi_init|river_wifi_init_thread" \
+  components/river_cloud/CMakeLists.txt components/river_cloud/river_wifi_init_override.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm final link/symbol placement:
+```bash
+cd /root/ameba-river
+rg -n -- "--wrap=wifi_init" build_RTL8730E/build/build.ninja
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -A \
+  build_RTL8730E/build/project_ap/image/target_img2.axf \
+  build_RTL8730E/build/project_hp/image/target_img2.axf | \
+  rg "(__wrap_wifi_init|wifi_init$|wifi_init_thread|river_wifi_init_thread)"
+```
+
+Observed result on 2026-05-28:
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+- `build.ninja` AP link flags include `-Wl,--wrap=wifi_init`.
+- AP image contains `__wrap_wifi_init` and `river_wifi_init_thread`.
+- HP image still contains SDK `wifi_init` and `wifi_init_thread`.
+
+Post-flash board validation is user-run because current hardware requires
+manual entry into flashing/download mode. After flashing, preserve the boot and
+Wi-Fi initialization log around these lines:
+```text
+sdk wifi_init override active: init WHC only, app owns wifi_on
+sdk wifi_init override: LwIP_Init start
+sdk wifi_init override: LwIP_Init done
+sdk wifi_init override: whc_host_init start
+sdk wifi_init override: whc_host_init done; sdk auto wifi_on skipped
+sta task started ...
+wifi_is_running start attempt=1 wlan=0 whc_api=0x4
+wifi_is_running returned ret=...
+wifi_on start attempt=1 mode=sta whc_api=0x9
+```
+
+Interpretation:
+- if early `[INIC-A] ... cur id 0x9` appears before the project `wifi_on start`,
+  the wrapper did not take effect or the flashed image is stale
+- if `wifi_is_running returned` appears and then `wifi_on start` hangs, the SDK
+  automatic `wifi_on` was removed and the remaining stall is inside the
+  project-owned first `wifi_on()` / WHC API `0x9`
+- if `wifi_on returned ret=0` appears, the next expected logs are
+  `post-wifi_on sta state reset complete`, `connect attempt`, and `scan start`
+
 ## Step H.xiaozhi-client.54 Verification
 
 Confirm SDK Wi-Fi defaults are loaded before project overrides, and that the

@@ -1,13 +1,21 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-09
+Last Updated: 2026-05-28
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.55` 禁止 SDK 自动启动 Wi-Fi：
+  - 2026-05-28 10:09 板端日志显示，H.54 后 SDK 默认 Wi-Fi 配置已经恢复，但项目 STA 任务卡在 `wifi_is_running start attempt=1 wlan=0 whc_api=0x4`，同时 SDK 报 `[INIC-A] Host api ipc timeout: cur id 0x9; latest id 0x4`。
+  - 这说明 SDK 自动 `wifi_on()` 先占住 WHC API 等待链路，项目侧查询随后被卡住；当前重点是移除 SDK 自动 `wifi_on`，让首次 Wi-Fi 启动只由项目 STA 任务负责。
+  - 新增项目侧 `river_wifi_init_override.c`，通过 AP 镜像 `-Wl,--wrap=wifi_init` 拦截 SDK main 的 `wifi_init()`。
+  - AP/WHC host 侧仍执行 `wifi_set_rom2flash()`、`LwIP_Init()`、`whc_host_init()`，但跳过 SDK init 线程里的自动 `wifi_on(RTW_MODE_STA)`。
+  - HP/KM4 镜像仍保留 SDK 原生 `wifi_init` / `wifi_init_thread`，不改变 WHC device 侧初始化。
+  - 完整 `/root/ameba-rtos` build 已通过；final AP image symbols include `__wrap_wifi_init` and `river_wifi_init_thread`，HP image symbols still include SDK `wifi_init` and `wifi_init_thread`。
+  - 下一步板端验证应确认启动日志出现 `sdk auto wifi_on skipped`，且早期不再在项目 `wifi_on start` 前出现 `cur id 0x9`；若随后卡在项目 `wifi_on start ... whc_api=0x9`，剩余问题就收敛到空 efuse/NP 侧首个 `wifi_on()` 阶段。
 - `Step H.xiaozhi-client.49` 屏蔽播放期软件 KWS 误触发 Orvibo TTS 打断：
   - 2026-05-09 16:22 板端日志显示，H.48 已成功阻止普通 VAD 在 speaking 期间直接 stop playback，但随后 TTS/回声仍打开了 KWS gate，并出现连续高于 `300pm` 的软件 KWS 分数。
   - 结合 `hold=2`，`infer=6 score_pm=334 streak=1/2` 与后一帧 `raw=343` 足以解释“播放到温度2后停止”：软件 KWS 会把播放自身误判为唤醒词，随后 `WAKE_DETECTED` 停止 TTS。

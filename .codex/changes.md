@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.55
+- 根据用户提供的 2026-05-28 10:09 板端日志继续定位 Wi-Fi 初始化卡住：
+  - H.54 后 SDK 默认 `wifi_user_config` 已正确加载，`sdk_defaults` 显示 `concurrent=1`、`skb=22/8`、`ampdu=16/20`，项目补丁后的 country/band/tx power 也已生效。
+  - 新日志显示项目 STA 任务已经启动，但只打印 `wifi_is_running start attempt=1 wlan=0 whc_api=0x4`，没有返回。
+  - 同时 SDK 持续打印 `[INIC-A] Host api ipc timeout: cur id 0x9; latest id 0x4`，说明更早的 SDK 自动 `wifi_on()` 已经占住 WHC API 等待链路，项目自己的 `wifi_is_running()` 被后续卡住。
+- 变更：
+  - 新增 `components/river_cloud/river_wifi_init_override.c`，通过链接器 `--wrap=wifi_init` 在 AP/CA32 侧拦截 SDK main 里的 `wifi_init()` 调用。
+  - AP/WHC host 侧仍执行 `wifi_set_rom2flash()`、`LwIP_Init()` 和 `whc_host_init()`，但跳过 SDK `wifi_init_thread()` 里自动调用的 `wifi_on(RTW_MODE_STA)`，改由项目 STA 任务继续拥有首次 `wifi_on()`。
+  - wrapper 增加边界日志：`sdk wifi_init override active`、`LwIP_Init start/done`、`whc_host_init start/done; sdk auto wifi_on skipped`。
+  - CMake 对 AP 镜像新增 `-Wl,--wrap=wifi_init`，并保留既有 `--wrap=ws_client_handshake`。
+- 保持受保护能力不变：
+  - 未修改 SDK 源码、Wi-Fi credential、密码内容、扫描/候选选择、连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或烧录 profile。
+  - HP/KM4 镜像仍保留 SDK 原生 `wifi_init` / `wifi_init_thread`，AP/CA32 镜像才包含项目侧 `__wrap_wifi_init`。
+- Verification for this step:
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final `build.ninja` confirms AP image link flags include `-Wl,--wrap=wifi_init`.
+  - passed: final AP image symbols include `__wrap_wifi_init` and `river_wifi_init_thread`; final HP image symbols still include SDK `wifi_init` and `wifi_init_thread`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.54
 - 根据用户提供的 2026-05-28 09:36 板端日志继续定位 Wi-Fi 无法连接：
   - 日志已显示 `credential[0] ssid=river ssid_len=5 password_len=10`，但仍没有进入 `scan start` / `connect attempt`。

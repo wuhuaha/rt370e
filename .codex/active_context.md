@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.54 修正 Wi-Fi SDK 默认配置加载顺序`
+  - `Step H.xiaozhi-client.55 禁止 SDK 自动启动 Wi-Fi`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,16 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.55` 禁止 SDK 自动启动 Wi-Fi：
+  - 用户 2026-05-28 10:09 板端日志显示，H.54 后 SDK 默认 Wi-Fi 配置已正确加载，但项目 STA 任务卡在 `wifi_is_running start attempt=1 wlan=0 whc_api=0x4`。
+  - 同时 `[INIC-A] Host api ipc timeout: cur id 0x9; latest id 0x4` 持续出现，说明 SDK 自动 `wifi_on()` 已经占住 WHC API 等待链路，项目自己的查询被后续卡住。
+  - 新增项目侧 `river_wifi_init_override.c`，通过 AP 镜像 `-Wl,--wrap=wifi_init` 拦截 SDK main 的 `wifi_init()`。
+  - AP/WHC host 侧仍执行 `wifi_set_rom2flash()`、`LwIP_Init()`、`whc_host_init()`，但跳过 SDK init 线程里的自动 `wifi_on(RTW_MODE_STA)`；首次 `wifi_on()` 继续由 `river_wifi_station` STA 任务负责并打印既有 `whc_api=0x9` 边界日志。
+  - HP/KM4 镜像仍保留 SDK 原生 `wifi_init` / `wifi_init_thread`，不改变 WHC device 侧初始化。
+  - 完整 `/root/ameba-rtos` build 已通过；final AP image symbols include `__wrap_wifi_init` and `river_wifi_init_thread`，HP image symbols still include SDK `wifi_init` and `wifi_init_thread`。
+  - 本步未修改 SDK 源码、Wi-Fi credential、扫描/连接策略、协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或烧录 profile。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.54` 修正 Wi-Fi SDK 默认配置加载顺序：
   - 用户 2026-05-28 09:36 板端日志仍未进入 `scan start` / `connect attempt`；`credential[0] ssid=river ssid_len=5 password_len=10` 已确认 Wi-Fi 凭据仍是 `river` 和 10 字节密码。

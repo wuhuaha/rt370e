@@ -32,6 +32,7 @@ set(private_compile_options)
 
 ameba_list_append(private_sources
     river_wifi_station.c
+    river_wifi_init_override.c
     river_ws_handshake.c
     river_ws_dispatch.c
     river_opus_codec.c
@@ -65,6 +66,7 @@ ameba_add_internal_library(river_cloud
 if(CONFIG_RIVER_ORVIBO_CLIENT_EN AND c_CURRENT_IMAGE)
     ameba_target_link_options(${c_CURRENT_IMAGE}
         "-Wl,--wrap=ws_client_handshake"
+        "-Wl,--wrap=wifi_init"
         p_SCOPE private
     )
 endif()
