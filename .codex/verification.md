@@ -1,3 +1,42 @@
+## Step H.xiaozhi-client.61 Verification
+
+Confirm the DATA1 DMIC mapping and 2ch ASR mainline profile:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-data1|AUDIO_DMIC3|AUDIO_DMIC4|capture board mics applied|RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE" \
+  components/river_voice/river_voice_board.c \
+  components/river_voice/river_voice_capture.c \
+  prj.conf
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+capture boot and speech logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-data1 usage=DMIC primary=DMIC3 secondary=DMIC4 ...
+capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4
+capture profile: 16000 Hz, 16ms, 2ch, usage=DMIC, DMIC3+DMIC4
+audio open: ... capture=16000Hz/2ch/16ms ...
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if speech raises ch0/ch1 and preproc peak, `PDM_DAT1` maps to SDK DATA1 and
+  the hardware input path is fixed.
+- if peaks remain at `0/1`, next test should validate DATA2 (`DMIC5/6`) or
+  inspect whether the schematic `PDM_DAT1` is not routed to the SDK audio DMIC
+  pinmux group used by `/root/ameba-rtos`.
+
 ## Step H.xiaozhi-client.60 Verification
 
 Confirm PDF tooling and DMIC/PDM board profile:

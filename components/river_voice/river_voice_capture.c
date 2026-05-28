@@ -247,6 +247,10 @@ static void river_voice_capture_apply_board_mics(const river_voice_board_array_p
             AudioControl_SetMicBstGain(profile->secondary_mic, profile->secondary_mic_gain);
         }
     }
+    RIVER_LOGI("capture board mics applied: usage=%s ch0=%s ch1=%s",
+               river_voice_board_capture_usage_name(profile->capture_usage),
+               river_voice_board_mic_name(profile->primary_mic),
+               river_voice_board_mic_name(profile->secondary_mic));
 }
 
 static int32_t river_capture_frame_queue_read(river_capture_frame_queue_t *queue, uint8_t *frame)

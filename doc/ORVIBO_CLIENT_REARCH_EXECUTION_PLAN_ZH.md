@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.61` 根据上板 peak 结果切到 DMIC DATA1 验证：
+  - 2026-05-28 17:17 用户日志确认 H.60 新镜像已运行，但持续 `peak=0/1`，说明没有采到有效 PDM 语音能量；当前问题已从 VAD/KWS 收敛到 PDM data pin/channel mapping。
+  - SDK AmebaSmart 的 `DMIC1/2` 使用 `AUDIO_HW_DMIC_DATA0_PIN`，原理图网名为 `PDM_DAT1`，因此本步把板级 profile 改为 `pdm-2mic-data1`，通道改为 `DMIC3/DMIC4`，触发 SDK DATA1。
+  - 当前 active profile 暂时回到 2ch ASR mainline，避免 experimental native-3ch-ref 在硬件定位阶段引入第三通道干扰；AECM 实验代码仍保留。
+  - 新增 `capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4` 日志；下一轮上板应确认 2ch capture 和 speech peak 是否上升。
 - `Step H.xiaozhi-client.60` 根据当前硬件原理图切换采集拓扑到 PDM/DMIC：
   - 已安装/启用 PDF 解析工具链和 PDF skill，并解析 `doc/hard/RTL8730 4寸SCH.pdf`；P08 `RTL8730_MIC/SPK/TH` 可见 `PDM_CLK`、`PDM_DAT1`，当前硬件麦克风链路与旧 EVB AMIC PCB 不同。
   - 旧固件仍硬编码 `AUDIO_CAPTURE_USAGE_AMIC` + `AUDIO_AMIC1/AMIC3`，与 PDM/DMIC 原理图不匹配，能解释“采集计数增长但说话无反应”的现象。

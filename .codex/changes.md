@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.61
+- 根据用户提供的 2026-05-28 17:17 上板日志继续定位 DMIC 无有效语音能量：
+  - 新镜像已确认生效：日志显示 `board=Orvibo-RTL8730E-PDM`，版本为 `2026.05.28.171135`。
+  - 长期 `audio diag` 显示 `peak=0/0/1` 或 `1/0/1`，preproc peak 也只有 `0/1`；这说明问题不是 VAD/KWS 阈值，而是当前 PDM 数据线/通道映射仍没有采到有效麦克风数据。
+  - SDK AmebaSmart 默认 `AUDIO_DMIC1/2` 使用 `AUDIO_HW_DMIC_DATA0_PIN`，而原理图网络名是 `PDM_DAT1`；下一轮应验证 SDK DATA1 对应的 `AUDIO_DMIC3/4`。
+- 变更：
+  - 板级 profile 从 `pdm-2mic-data0` 改为 `pdm-2mic-data1`。
+  - 麦克风通道从 `AUDIO_DMIC1/2` 改为 `AUDIO_DMIC3/4`，用于触发 SDK `AUDIO_HW_DMIC_DATA1_PIN`。
+  - 当前 bring-up profile 从 experimental native-3ch-ref 切回 2ch `RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE`，避免第三路 ref channel 干扰麦克风硬件定位。
+  - capture 打开后新增 `capture board mics applied: usage=... ch0=... ch1=...` 日志，便于上板直接确认实际通道映射。
+- 保持受保护能力不变：
+  - 未删除或弱化 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、AECM 实验代码或 SDK 源码。
+  - AECM 实验代码仍构建保留；仅当前 active profile 回到 2ch ASR mainline 做 PDM 数据线定位。
+- Verification for this step:
+  - passed: source grep confirmed `pdm-2mic-data1`, `AUDIO_DMIC3/4`, ASR mainline profile, and `capture board mics applied`.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.60
 - 根据 `doc/hard/RTL8730 4寸SCH.pdf` 的原理图解析结果继续定位“拿不到声音”：
   - 已安装并人工使用 PDF skill，Python 侧 `pypdf` / `PyMuPDF(fitz)` / `pdfplumber` / `pytesseract` 可用，系统 OCR `tesseract` 可用。

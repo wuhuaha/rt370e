@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.59 收敛空响应的音频前端诊断`
+  - `Step H.xiaozhi-client.61 验证 PDM DAT1 到 DMIC3/DMIC4 映射`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -467,6 +467,10 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.61` follows the 2026-05-28 17:17 board log:
+  - H.60 image was running, but long-term `audio diag peak=` stayed at `0/1`, so the issue is PDM data/channel mapping rather than VAD/KWS scoring.
+  - Board profile now uses `pdm-2mic-data1`, `AUDIO_DMIC3/DMIC4`, and current active profile is 2ch ASR mainline.
+  - Next user-run board validation should confirm `capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4`, `audio open ... capture=16000Hz/2ch/16ms`, and whether speech raises capture/preproc peaks.
 - `Step H.xiaozhi-client.60` switches the current board audio capture profile to PDM/DMIC after parsing `doc/hard/RTL8730 4寸SCH.pdf`.
   - PDF tooling installed/available: `/root/.codex/skills/pdf`, Python `pypdf` / `fitz` / `pdfplumber` / `pytesseract`, and `tesseract`.
   - Schematic P08 `RTL8730_MIC/SPK/TH` shows `PDM_CLK` / `PDM_DAT1`, while previous firmware used AMIC1/AMIC3.
