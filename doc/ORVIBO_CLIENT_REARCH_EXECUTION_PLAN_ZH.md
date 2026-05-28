@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.60` 根据当前硬件原理图切换采集拓扑到 PDM/DMIC：
+  - 已安装/启用 PDF 解析工具链和 PDF skill，并解析 `doc/hard/RTL8730 4寸SCH.pdf`；P08 `RTL8730_MIC/SPK/TH` 可见 `PDM_CLK`、`PDM_DAT1`，当前硬件麦克风链路与旧 EVB AMIC PCB 不同。
+  - 旧固件仍硬编码 `AUDIO_CAPTURE_USAGE_AMIC` + `AUDIO_AMIC1/AMIC3`，与 PDM/DMIC 原理图不匹配，能解释“采集计数增长但说话无反应”的现象。
+  - 板级 profile 现切到 `Orvibo-RTL8730E-PDM`、`AUDIO_CAPTURE_USAGE_DMIC`、`AUDIO_DMIC1/DMIC2`；采集打开时在 `AudioRecord_Init()` 后重新应用 usage/category，避免 SDK open 把 usage 重置回 AMIC。
+  - AMIC boost gain 仅对 AMIC 调用；上板时不应再看到 AMIC1/3 的 boost gain 日志，应看到 `usage=DMIC` 与 SDK `set DMIC clock`。
+  - 完整 `/root/ameba-rtos` build 已通过；下一步用户烧录后重点观察 `audio diag peak=` 在说话时是否上升。
 - `Step H.xiaozhi-client.59` 收敛空响应的音频前端诊断：
   - 2026-05-28 16:17 板端日志显示，Wi-Fi、OTA 和激活已经通过，`access refresh ok` 已出现；用户说话时仍无反应，周期音频日志显示 VAD 一直 `speech=no` 且概率约 `48/47`。
   - 新增 `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY` 并在当前项目配置启用，fixed DSB 输出改为主麦直通，避免 bring-up 阶段双麦直接相加抵消语音。

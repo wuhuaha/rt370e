@@ -465,6 +465,16 @@ or top-of-tree verification target changes.
   - `python3 tools/diag/check_codex_harness.py`
   - `/root/ameba-rtos` SDK build with `Build done`
 
+## Latest Hardware-Audio Slice
+
+- `Step H.xiaozhi-client.60` switches the current board audio capture profile to PDM/DMIC after parsing `doc/hard/RTL8730 4寸SCH.pdf`.
+  - PDF tooling installed/available: `/root/.codex/skills/pdf`, Python `pypdf` / `fitz` / `pdfplumber` / `pytesseract`, and `tesseract`.
+  - Schematic P08 `RTL8730_MIC/SPK/TH` shows `PDM_CLK` / `PDM_DAT1`, while previous firmware used AMIC1/AMIC3.
+  - Board profile now logs `Orvibo-RTL8730E-PDM ... usage=DMIC primary=DMIC1 secondary=DMIC2`.
+  - Capture applies board mic usage/category after `AudioRecord_Init()` because AmebaSmart resets `DEVICE_IN_MIC` opens back to AMIC during stream open.
+  - Latest verification passed: `git diff --check`, `python3 tools/diag/check_codex_harness.py`, and `/root/ameba-rtos` SDK build with `Build done`.
+  - Next user-run board validation: flash manually, confirm `usage=DMIC`, `set DMIC clock`, no AMIC1/3 boost-gain logs, and speech raises `audio diag peak=`.
+
 ## Next Engineering Slice
 
 - Continue Orvibo mainline behavior hardening:

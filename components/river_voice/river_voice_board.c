@@ -1,4 +1,4 @@
-/* 板级语音拓扑实现：集中固化当前 EVB 的双麦阵列参数。 */
+/* 板级语音拓扑实现：集中固化当前硬件的双麦阵列参数。 */
 #include <stdbool.h>
 
 #include "audio/audio_control.h"
@@ -10,19 +10,20 @@
 #define RIVER_LOG_TAG "river.voice.board"
 
 static const river_voice_board_array_profile_t g_river_voice_board_array_profile = {
-    .board_name = "EV8730EA2/EV730EA2",
-    .geometry_name = "linear-2mic-50mm",
+    .board_name = "Orvibo-RTL8730E-PDM",
+    .geometry_name = "pdm-2mic-data0",
     .mic_spacing_mm = 50U,
     .sample_rate = 16000U,
     .frame_ms = 16U,
     .capture_channels = 2U,
-    .primary_mic = AUDIO_AMIC1,
-    .secondary_mic = AUDIO_AMIC3,
-    .aux_mic = AUDIO_AMIC5,
-    .primary_mic_gain = AUDIO_MICBST_GAIN_20DB,
-    .secondary_mic_gain = AUDIO_MICBST_GAIN_20DB,
-    .aux_mic_gain = AUDIO_MICBST_GAIN_5DB,
-    .aux_mic_reserved = true
+    .capture_usage = AUDIO_CAPTURE_USAGE_DMIC,
+    .primary_mic = AUDIO_DMIC1,
+    .secondary_mic = AUDIO_DMIC2,
+    .aux_mic = AUDIO_DMIC3,
+    .primary_mic_gain = AUDIO_MICBST_GAIN_0DB,
+    .secondary_mic_gain = AUDIO_MICBST_GAIN_0DB,
+    .aux_mic_gain = AUDIO_MICBST_GAIN_0DB,
+    .aux_mic_reserved = false
 };
 
 const river_voice_board_array_profile_t *river_voice_board_array_profile(void)
@@ -90,14 +91,29 @@ const char *river_voice_board_mic_gain_name(uint32_t mic_gain)
     }
 }
 
+const char *river_voice_board_capture_usage_name(uint32_t capture_usage)
+{
+    switch (capture_usage) {
+    case AUDIO_CAPTURE_USAGE_AMIC:
+        return "AMIC";
+    case AUDIO_CAPTURE_USAGE_DMIC:
+        return "DMIC";
+    case AUDIO_CAPTURE_USAGE_DMIC_REF_AMIC:
+        return "DMIC_REF_AMIC";
+    default:
+        return "MIC_USAGE?";
+    }
+}
+
 void river_voice_board_dump_array_profile(void)
 {
     const river_voice_board_array_profile_t *profile;
 
     profile = river_voice_board_array_profile();
-    RIVER_LOGI("board array: %s %s primary=%s secondary=%s spacing=%lumm",
+    RIVER_LOGI("board array: %s %s usage=%s primary=%s secondary=%s spacing=%lumm",
                profile->board_name,
                profile->geometry_name,
+               river_voice_board_capture_usage_name(profile->capture_usage),
                river_voice_board_mic_name(profile->primary_mic),
                river_voice_board_mic_name(profile->secondary_mic),
                (unsigned long)profile->mic_spacing_mm);

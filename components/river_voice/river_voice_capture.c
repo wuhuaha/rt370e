@@ -216,6 +216,39 @@ static void river_capture_frame_queue_write(river_capture_frame_queue_t *queue,
     }
 }
 
+static bool river_voice_capture_mic_is_amic(uint32_t mic_category)
+{
+    switch (mic_category) {
+    case AUDIO_AMIC1:
+    case AUDIO_AMIC2:
+    case AUDIO_AMIC3:
+    case AUDIO_AMIC4:
+    case AUDIO_AMIC5:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void river_voice_capture_apply_board_mics(const river_voice_board_array_profile_t *profile)
+{
+    if (profile == NULL) {
+        return;
+    }
+
+    AudioControl_SetMicUsage(profile->capture_usage);
+    AudioControl_SetChannelMicCategory(0, profile->primary_mic);
+    if (river_voice_capture_mic_is_amic(profile->primary_mic)) {
+        AudioControl_SetMicBstGain(profile->primary_mic, profile->primary_mic_gain);
+    }
+    if (profile->capture_channels > 1U) {
+        AudioControl_SetChannelMicCategory(1, profile->secondary_mic);
+        if (river_voice_capture_mic_is_amic(profile->secondary_mic)) {
+            AudioControl_SetMicBstGain(profile->secondary_mic, profile->secondary_mic_gain);
+        }
+    }
+}
+
 static int32_t river_capture_frame_queue_read(river_capture_frame_queue_t *queue, uint8_t *frame)
 {
     if (queue == NULL || !queue->initialized || frame == NULL) {
@@ -308,14 +341,6 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     capture->frame_samples = (profile->sample_rate * profile->frame_ms) / 1000U;
     capture->frame_bytes = capture->frame_samples * capture->channels * sizeof(int16_t);
 
-    AudioControl_SetMicUsage(AUDIO_CAPTURE_USAGE_AMIC);
-    AudioControl_SetChannelMicCategory(0, profile->primary_mic);
-    AudioControl_SetMicBstGain(profile->primary_mic, profile->primary_mic_gain);
-    if (profile->capture_channels > 1U) {
-        AudioControl_SetChannelMicCategory(1, profile->secondary_mic);
-        AudioControl_SetMicBstGain(profile->secondary_mic, profile->secondary_mic_gain);
-    }
-
     capture->record = AudioRecord_Create();
     if (capture->record == 0) {
         return RIVER_ERR_UNSUPPORTED;
@@ -331,6 +356,8 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
         river_voice_capture_close(capture);
         return RIVER_ERR_UNSUPPORTED;
     }
+
+    river_voice_capture_apply_board_mics(profile);
 
     AudioRecord_SetParameters((struct AudioRecord *)capture->record,
                               voice_profile->capture_audio_record_params);
@@ -442,10 +469,11 @@ void river_voice_capture_dump_profile(void)
 
     profile = river_voice_board_array_profile();
     voice_profile = river_voice_profile_active();
-    RIVER_LOGI("capture profile: %lu Hz, %lums, %luch, %s+%s%s",
+    RIVER_LOGI("capture profile: %lu Hz, %lums, %luch, usage=%s, %s+%s%s",
                (unsigned long)profile->sample_rate,
                (unsigned long)profile->frame_ms,
                (unsigned long)voice_profile->capture_channels,
+               river_voice_board_capture_usage_name(profile->capture_usage),
                river_voice_board_mic_name(profile->primary_mic),
                river_voice_board_mic_name(profile->secondary_mic),
                voice_profile->uses_native_capture_ref ? "+REF(native ch3)" : "");

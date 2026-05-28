@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.60
+- 根据 `doc/hard/RTL8730 4寸SCH.pdf` 的原理图解析结果继续定位“拿不到声音”：
+  - 已安装并人工使用 PDF skill，Python 侧 `pypdf` / `PyMuPDF(fitz)` / `pdfplumber` / `pytesseract` 可用，系统 OCR `tesseract` 可用。
+  - 原理图 P08 `RTL8730_MIC/SPK/TH` 显示当前硬件麦克风路径存在 `PDM_CLK`、`PDM_DAT1` 等 PDM/DMIC 网络；P09/P11 可见相关 PDM 数据/时钟引脚区域。
+  - 当前工程此前仍按 EVB AMIC 拓扑配置：`AUDIO_CAPTURE_USAGE_AMIC`、`AUDIO_AMIC1`、`AUDIO_AMIC3`，这与当前硬件 PDM/DMIC 原理图不匹配，是“有采集帧但说话无反应”的强嫌疑。
+- 变更：
+  - `river_voice_board_array_profile_t` 新增 `capture_usage`，把板级麦克风拓扑从 AMIC1/AMIC3 切到 `AUDIO_CAPTURE_USAGE_DMIC` + `AUDIO_DMIC1`/`AUDIO_DMIC2`。
+  - `river_voice_capture_open()` 不再硬编码 AMIC；`AudioRecord_Init()` 后重新应用板级 mic usage/category，避免 AmebaSmart SDK 在 `DEVICE_IN_MIC` open 时把 usage 重置回 AMIC。
+  - AMIC boost gain 只对 AMIC category 调用，DMIC 路径不再打印/执行 `ameba_audio_ctl_set_mic_bst_gain mic: 1/3`。
+  - board/capture profile 日志新增 `usage=DMIC`，便于上板确认当前固件真的走 PDM/DMIC。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+  - 保留 H.59 的 `CONFIG_RIVER_VOICE_DSB_PRIMARY_ONLY=y` 和 audio peak 诊断，作为切到 DMIC 后的第一轮板端验证入口。
+- Verification for this step:
+  - passed: PDF tooling exists (`/root/.codex/skills/pdf`, Python PDF/OCR packages, `tesseract`).
+  - passed: source grep confirmed DMIC board profile and post-`AudioRecord_Init` board mic application.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.59
 - 根据用户提供的 2026-05-28 16:17 板端日志继续定位“说话没有任何反应”：
   - 网络与激活链路已经正常：固定 `device_id=00:e0:4c:b7:23:e2` 生效，Wi-Fi 获取 `192.168.3.32`，OTA 返回 `activation: required=no`，并出现 `access refresh ok`。

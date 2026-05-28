@@ -12,6 +12,7 @@ typedef struct {
     uint32_t sample_rate;
     uint32_t frame_ms;
     uint32_t capture_channels;
+    uint32_t capture_usage;
     uint32_t primary_mic;
     uint32_t secondary_mic;
     uint32_t aux_mic;
@@ -24,6 +25,7 @@ typedef struct {
 const river_voice_board_array_profile_t *river_voice_board_array_profile(void);
 const char *river_voice_board_mic_name(uint32_t mic_category);
 const char *river_voice_board_mic_gain_name(uint32_t mic_gain);
+const char *river_voice_board_capture_usage_name(uint32_t capture_usage);
 void river_voice_board_dump_array_profile(void);
 
 #endif

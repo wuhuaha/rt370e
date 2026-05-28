@@ -1,3 +1,51 @@
+## Step H.xiaozhi-client.60 Verification
+
+Confirm PDF tooling and DMIC/PDM board profile:
+```bash
+cd /root/ameba-river
+test -f /root/.codex/skills/pdf/SKILL.md
+python3 - <<'PY'
+import importlib.util
+for name in ['pypdf', 'fitz', 'pdfplumber', 'pytesseract']:
+    assert importlib.util.find_spec(name), name
+PY
+which tesseract
+rg -n "AUDIO_CAPTURE_USAGE_DMIC|AUDIO_DMIC1|AUDIO_DMIC2|river_voice_capture_apply_board_mics|usage=%s" \
+  include/river/river_voice_board.h \
+  components/river_voice/river_voice_board.c \
+  components/river_voice/river_voice_capture.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+capture the boot and speech logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-data0 usage=DMIC primary=DMIC1 secondary=DMIC2 ...
+capture profile: 16000 Hz, 16ms, 2ch, usage=DMIC, DMIC1+DMIC2
+set DMIC clock
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if boot still prints `ameba_audio_ctl_set_mic_bst_gain mic: 1` or `mic: 3`,
+  the runtime is not using this DMIC image or the SDK reset happened after our
+  board mic application.
+- if capture/preproc peak now rises while speaking, the hardware input path is
+  fixed and the next issue is VAD/KWS threshold/model behavior.
+- if peaks remain near zero, continue with PDM pinmux/data-line mapping and
+  confirm whether the schematic's `PDM_DAT1` corresponds to SDK DMIC data0 or a
+  later DMIC data pair on this package.
+
 ## Step H.xiaozhi-client.59 Verification
 
 Confirm primary-only fixed DSB and audio peak diagnostics:
