@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.58` 固定空 efuse 板 Orvibo Device-Id：
+  - 2026-05-28 13:40 板端日志显示，绑定码 `514285` 对应 `device_id=00:e0:4c:b7:23:e2`；用户在服务端添加后，13:45 重启日志显示 Device-Id 漂移为 `00:e0:4c:b7:23:1a`，服务端重新下发 `379507` 并继续 HTTP 202。
+  - 这证明当前空 efuse 板 runtime STA MAC 不稳定，不能直接作为服务端长期绑定身份。
+  - 新增 `CONFIG_RIVER_ORVIBO_DEVICE_ID`，默认保持空值和既有 runtime-MAC 行为；当前项目配置固定为 `00:e0:4c:b7:23:e2`，匹配用户已添加过 code 的那次身份。
+  - Access identity override 只影响 Orvibo OTA/config/activation/WS identity，不修改 Wi-Fi runtime MAC、Wi-Fi 连接策略、activation payload 语义或受保护语音/KWS 路径。
+  - 下一步板端验证应确认启动即出现 `access identity configured: device_id=00:e0:4c:b7:23:e2`，随后 OTA/activate 不再因重启产生新的 Device-Id。
 - `Step H.xiaozhi-client.57` 增强 Orvibo 激活绑定码诊断：
   - 2026-05-28 11:53 板端日志显示，H.56 后 Wi-Fi 已完成 `wifi_on`、扫描、WPA2 关联和 DHCP，设备拿到 `192.168.3.24`。
   - Access identity 已从启动时全零 MAC 刷新为真实 `device_id=00:e0:4c:b7:23:68`，OTA websocket config 已应用；剩余阻塞点是服务端返回 `device activation required`。

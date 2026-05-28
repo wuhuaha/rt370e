@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.58
+- 根据用户提供的 2026-05-28 13:40 与 13:45 板端日志继续定位激活失败：
+  - 13:40 首次下发绑定码 `514285` 时，access identity 为 `device_id=00:e0:4c:b7:23:e2`。
+  - 用户在服务端添加该 code 后重启，13:45 新日志显示 runtime STA MAC/Device-Id 已漂移为 `00:e0:4c:b7:23:1a`，服务端因此又下发新绑定码 `379507`，`/activate` 继续返回 HTTP 202。
+  - 结论：当前空 efuse 板的运行时 STA MAC 每次启动可能变化，若直接用它作为 Orvibo `Device-Id`，服务端绑定会漂移到“新设备”，用户添加上一轮 code 也无法生效。
+- 变更：
+  - 新增 `CONFIG_RIVER_ORVIBO_DEVICE_ID`，默认空字符串，默认行为仍从 runtime STA MAC 派生 identity。
+  - `include/river/river_orvibo_credentials.h` 导出 `RIVER_ORVIBO_DEVICE_ID`。
+  - `river_orvibo_access_refresh_identity()` 优先使用配置的固定 Device-Id；配置值按 MAC 格式校验，通过同一 MAC 字节派生 `client_id`，保持与原 runtime-MAC 路径一致。
+  - 当前 `prj.conf` 固定 `CONFIG_RIVER_ORVIBO_DEVICE_ID="00:e0:4c:b7:23:e2"`，匹配用户已在服务端添加过绑定码的那次设备身份。
+  - 新增日志 `access identity configured: device_id=... client_id=...`，用于烧录后确认 access 不再跟随空 efuse runtime MAC 漂移。
+- 保持受保护能力不变：
+  - 未修改 Wi-Fi runtime MAC、Wi-Fi credential、扫描/连接策略、DHCP、Orvibo websocket token、activation payload 语义、HMAC key 输出策略、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF、烧录 profile 或 SDK 源码。
+- Verification for this step:
+  - passed: source grep confirmed fixed Device-Id Kconfig/config/header/access path.
+  - passed: generated `.config` and `.config_ca32` contain `CONFIG_RIVER_ORVIBO_DEVICE_ID="00:e0:4c:b7:23:e2"`.
+  - passed: final AP image strings contain `00:e0:4c:b7:23:e2`, `access identity configured`, and invalid-config diagnostic string.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.57
 - 根据用户提供的 2026-05-28 11:53 板端日志继续推进：
   - H.56 后 Wi-Fi 已越过空 efuse prompt 和 `wifi_on()` 卡点，扫描到目标 `river`，完成 WPA2 关联并拿到 `192.168.3.24`。

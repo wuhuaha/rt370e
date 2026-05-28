@@ -1,3 +1,58 @@
+## Step H.xiaozhi-client.58 Verification
+
+Confirm fixed Orvibo Device-Id config and access identity override:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_DEVICE_ID|access identity configured|configured Orvibo Device-Id|parse_device_id_mac|CONFIG_RIVER_ORVIBO_DEVICE_ID" \
+  Kconfig include/river/river_orvibo_credentials.h components/river_cloud/river_orvibo_access.c prj.conf
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm generated config and final image strings:
+```bash
+cd /root/ameba-river
+rg -n 'CONFIG_RIVER_ORVIBO_DEVICE_ID="00:e0:4c:b7:23:e2"' \
+  build_RTL8730E/build/.config build_RTL8730E/build/project_ap/.config_ca32
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "access identity configured|configured Orvibo Device-Id invalid|00:e0:4c:b7:23:e2"
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+preserve the first access identity logs after boot and after Wi-Fi connects:
+```text
+access identity configured: device_id=00:e0:4c:b7:23:e2 client_id=...
+access identity: device_id=00:e0:4c:b7:23:e2 ...
+connected ssid=river ip=...
+OTA activation: ...
+```
+
+Interpretation:
+- if `access identity configured` keeps `00:e0:4c:b7:23:e2` across reboots,
+  server binding is no longer drifting with the empty-efuse runtime STA MAC.
+- because the server already saw code `514285` for this Device-Id, the next
+  expected result after flashing is either activation acceptance (`http=200`) or
+  a new code only if the server-side previous binding was not retained.
+
+Observed result on 2026-05-28:
+- source grep confirmed fixed Device-Id Kconfig/config/header/access path.
+- generated `.config` and `.config_ca32` contain
+  `CONFIG_RIVER_ORVIBO_DEVICE_ID="00:e0:4c:b7:23:e2"`.
+- final AP image strings contain `00:e0:4c:b7:23:e2`,
+  `access identity configured`, and invalid-config diagnostic string.
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
 ## Step H.xiaozhi-client.57 Verification
 
 Confirm activation binding-code diagnostics and refresh-failure status dump:

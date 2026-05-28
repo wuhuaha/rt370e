@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.57 增强 Orvibo 激活绑定码诊断`
+  - `Step H.xiaozhi-client.58 固定空 efuse 板 Orvibo Device-Id`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.58` 固定空 efuse 板 Orvibo Device-Id：
+  - 用户 2026-05-28 13:40 日志显示服务端下发 code `514285` 时，access identity 为 `00:e0:4c:b7:23:e2`；用户添加该 code 后，2026-05-28 13:45 重启日志显示 Device-Id 又漂移为 `00:e0:4c:b7:23:1a`，服务端重新下发 code `379507` 并保持 HTTP 202 pending。
+  - 根因收敛为当前空 efuse 板 runtime STA MAC 每次启动可能变化；如果 Orvibo `Device-Id` 直接跟随 runtime STA MAC，服务端绑定会漂移到不同设备。
+  - 新增 `CONFIG_RIVER_ORVIBO_DEVICE_ID`，默认空值保持既有 runtime-MAC 行为；当前 `prj.conf` 固定为已在服务端添加过 code 的 `00:e0:4c:b7:23:e2`。
+  - `river_orvibo_access_refresh_identity()` 优先使用配置的固定 Device-Id，并用相同 MAC 字节派生 `client_id`，不改变 activation payload 语义。
+  - 本步不修改 Wi-Fi runtime MAC、Wi-Fi credential、扫描/连接策略、DHCP、Orvibo websocket token、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF 或 SDK 源码。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.57` 增强 Orvibo 激活绑定码诊断：
   - 用户 2026-05-28 11:53 板端日志显示，H.56 已解决 Wi-Fi bring-up 卡点：HP 空 efuse prompt 被 bypass，`wifi_on()` 返回，设备扫描并连接 `river`，DHCP 获取 `192.168.3.24`。

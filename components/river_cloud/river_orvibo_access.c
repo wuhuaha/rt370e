@@ -462,9 +462,40 @@ static void river_orvibo_access_format_device_id(const uint8_t mac[6],
              mac[5]);
 }
 
-static void river_orvibo_access_build_client_id_from_mac(const uint8_t mac[6],
-                                                         char *buffer,
-                                                         size_t buffer_size)
+static bool river_orvibo_access_parse_device_id_mac(const char *device_id,
+                                                    uint8_t mac[6])
+{
+    unsigned int bytes[6];
+    int parsed;
+    size_t index;
+
+    if (device_id == NULL || mac == NULL) {
+        return false;
+    }
+    parsed = sscanf(device_id,
+                    "%02x:%02x:%02x:%02x:%02x:%02x",
+                    &bytes[0],
+                    &bytes[1],
+                    &bytes[2],
+                    &bytes[3],
+                    &bytes[4],
+                    &bytes[5]);
+    if (parsed != 6) {
+        return false;
+    }
+    for (index = 0U; index < 6U; ++index) {
+        if (bytes[index] > 0xFFU) {
+            return false;
+        }
+        mac[index] = (uint8_t)bytes[index];
+    }
+    return river_orvibo_access_mac_valid(mac);
+}
+
+static void river_orvibo_access_build_client_id_from_bytes(const uint8_t *data,
+                                                           size_t data_size,
+                                                           char *buffer,
+                                                           size_t buffer_size)
 {
     uint8_t uuid[16];
     uint32_t hash_words[4];
@@ -473,14 +504,14 @@ static void river_orvibo_access_build_client_id_from_mac(const uint8_t mac[6],
     if (buffer == NULL || buffer_size == 0U) {
         return;
     }
-    if (!river_orvibo_access_mac_valid(mac)) {
-        static uint8_t zero_mac[6] = {0U, 0U, 0U, 0U, 0U, 0U};
-        mac = zero_mac;
+    if (data == NULL || data_size == 0U) {
+        buffer[0] = '\0';
+        return;
     }
-    hash_words[0] = river_orvibo_access_fnv1a32(mac, 6U, 0x13579BDFUL);
-    hash_words[1] = river_orvibo_access_fnv1a32(mac, 6U, 0x2468ACE0UL);
-    hash_words[2] = river_orvibo_access_fnv1a32(mac, 6U, 0x55AA11EEUL);
-    hash_words[3] = river_orvibo_access_fnv1a32(mac, 6U, 0xA5A55A5AUL);
+    hash_words[0] = river_orvibo_access_fnv1a32(data, data_size, 0x13579BDFUL);
+    hash_words[1] = river_orvibo_access_fnv1a32(data, data_size, 0x2468ACE0UL);
+    hash_words[2] = river_orvibo_access_fnv1a32(data, data_size, 0x55AA11EEUL);
+    hash_words[3] = river_orvibo_access_fnv1a32(data, data_size, 0xA5A55A5AUL);
     for (index = 0U; index < 4U; ++index) {
         uuid[index * 4U + 0U] = (uint8_t)((hash_words[index] >> 24) & 0xFFU);
         uuid[index * 4U + 1U] = (uint8_t)((hash_words[index] >> 16) & 0xFFU);
@@ -510,11 +541,48 @@ static void river_orvibo_access_build_client_id_from_mac(const uint8_t mac[6],
              uuid[15]);
 }
 
+static void river_orvibo_access_build_client_id_from_mac(const uint8_t mac[6],
+                                                         char *buffer,
+                                                         size_t buffer_size)
+{
+    static const uint8_t zero_mac[6] = {0U, 0U, 0U, 0U, 0U, 0U};
+
+    river_orvibo_access_build_client_id_from_bytes(
+        river_orvibo_access_mac_valid(mac) ? mac : zero_mac,
+        6U,
+        buffer,
+        buffer_size);
+}
+
 static bool river_orvibo_access_refresh_identity(void)
 {
     uint8_t mac[6];
     char device_id[RIVER_ORVIBO_ACCESS_DEVICE_ID_MAX];
     char client_id[RIVER_ORVIBO_ACCESS_CLIENT_ID_MAX];
+
+    if (RIVER_ORVIBO_DEVICE_ID[0] != '\0') {
+        if (!river_orvibo_access_parse_device_id_mac(RIVER_ORVIBO_DEVICE_ID, mac)) {
+            RIVER_LOGW("configured Orvibo Device-Id invalid: %s", RIVER_ORVIBO_DEVICE_ID);
+            river_orvibo_access_set_error("device_id_config_invalid");
+            return false;
+        }
+        river_orvibo_access_copy(device_id, sizeof(device_id), RIVER_ORVIBO_DEVICE_ID);
+        river_orvibo_access_build_client_id_from_mac(mac, client_id, sizeof(client_id));
+        if (strcmp(g_river_orvibo_access.device_id, device_id) != 0 ||
+            strcmp(g_river_orvibo_access.client_id, client_id) != 0) {
+            RIVER_LOGI("access identity configured: device_id=%s client_id=%s",
+                       device_id,
+                       client_id);
+            river_orvibo_access_copy(g_river_orvibo_access.device_id,
+                                     sizeof(g_river_orvibo_access.device_id),
+                                     device_id);
+            river_orvibo_access_copy(g_river_orvibo_access.client_id,
+                                     sizeof(g_river_orvibo_access.client_id),
+                                     client_id);
+        }
+        g_river_orvibo_access.identity_ready = true;
+        return true;
+    }
 
     if (!river_orvibo_access_read_sta_mac(mac)) {
         if (g_river_orvibo_access.device_id[0] == '\0') {

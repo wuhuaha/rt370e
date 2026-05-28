@@ -70,6 +70,16 @@ config RIVER_ORVIBO_SERVER_WAKE_TEXT
       current on-device wake phrase while still matching the target server's
       expected wakeup-word semantics.
 
+config RIVER_ORVIBO_DEVICE_ID
+    string "Orvibo fixed Device-Id"
+    default ""
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Optional stable Device-Id used for OTA/config and activation. Leave empty
+      to derive the identity from the runtime STA MAC. On empty-efuse boards the
+      runtime STA MAC can change between boots, so setting this to a stable
+      MAC-format value keeps server binding from drifting across reboots.
+
 config RIVER_ORVIBO_ACTIVATION_SERIAL_NUMBER
     string "Orvibo optional activation serial number"
     default ""
