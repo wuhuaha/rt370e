@@ -53,7 +53,7 @@ river_status_t river_voice_frontend_init(void)
         RIVER_LOGI("current validation path remains: capture(2mic+ref) -> fixed_dsb/webrtc_aecm(exp) -> silero -> orvibo audio service -> runtime logs");
     } else {
         river_reference_service_dump_profile();
-        RIVER_LOGI("current board path uses AMIC1 + AMIC3 dual mic with software fixed delay-and-sum beamforming");
+        RIVER_LOGI("current board path uses the board DMIC pair with software fixed delay-and-sum beamforming");
         RIVER_LOGI("vad validation path: capture -> fixed_dsb -> silero -> orvibo audio service -> runtime logs");
     }
 #if CONFIG_RIVER_AUDIO_ECHO_DEBUG_EN

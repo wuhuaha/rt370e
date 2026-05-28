@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.63` 强制 AudioRecord 进入 SDK DMIC 初始化路径：
+  - 18:20 用户日志确认 H.62 的 PA 组 pinmux 已运行，但长期 peak 仍接近 `0/1`，且没有看到 SDK `set DMIC clock`。
+  - 复核 SDK 后确认 `DEVICE_IN_MIC` 在 `AudioRecord_Init()` 内会重置为 AMIC usage；项目此前 Init 后再设 DMIC，已经晚于 codec/ADC 初始化。
+  - 本步在 Init 前先应用 board DMIC mapping/pinmux，并把 `record_config.device` 改为 `DEVICE_IN_DMIC_REF_AMIC`，让 SDK open 阶段走 DMIC 初始化。
+  - 当前验证回到 `pdm-2mic-pa-data0` + `DMIC1/DMIC2`，先证明 SDK 原生 DATA0 DMIC 时钟和采样路径能跑通；下一轮上板重点确认 `set DMIC clock` 和说话 peak。
 - `Step H.xiaozhi-client.62` 根据 17:29 上板结果验证 PA 组 PDM pinmux：
   - 用户日志确认 H.61 已实际使用 `DMIC3/DMIC4`、`asr_mainline` 和 `capture=16000Hz/2ch/16ms`，但说话时长期 peak 仍接近 `0/1`，问题继续收敛在 PDM 硬件输入路由。
   - SDK AmebaSmart 默认 DMIC pinmux 使用 PB 组；SDK `mbed_audio_dmic_snr` 示例另有 PA 组 `PA2/PA3/PA4/PA5/PA14`，与当前原理图 `PDM_CLK` / `PDM_DAT1` 在 PA 区域的证据一致。

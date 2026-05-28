@@ -1,3 +1,47 @@
+## Step H.xiaozhi-client.63 Verification
+
+Confirm the SDK DMIC input-device path and current PA DATA0 capture profile:
+```bash
+cd /root/ameba-river
+rg -n "DEVICE_IN_DMIC_REF_AMIC|pdm-2mic-pa-data0|AUDIO_DMIC1|AUDIO_DMIC2|capture dmic pinmux applied|current board path uses the board DMIC" \
+  components/river_voice \
+  include/river
+```
+
+Run static hygiene and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "pdm-2mic-pa-data0|capture dmic pinmux applied|capture board mics applied"
+```
+
+Expected post-flash board validation is user-run because the current NAND
+hardware must be placed into flashing/download mode manually. After flashing,
+capture boot and speech logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa-data0 usage=DMIC primary=DMIC1 secondary=DMIC2 ...
+capture board mics applied: usage=DMIC ch0=DMIC1 ch1=DMIC2
+capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14
+[AudioHal-I] ... set DMIC clock
+audio open: ... capture=16000Hz/2ch/16ms ...
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if SDK `set DMIC clock` appears and speech raises ch0/ch1 plus preproc peak,
+  the capture path is fixed: the missing piece was using the SDK DMIC input
+  device during `AudioRecord_Init()`.
+- if `set DMIC clock` appears but peaks remain near `0/1`, continue with a
+  controlled internal DMIC source scan (`DMIC3/4`, `DMIC5/6`, `DMIC7/8`) now
+  that the SDK DMIC init path is active.
+- if `set DMIC clock` still does not appear, the SDK `DEVICE_IN_DMIC_REF_AMIC`
+  path is not being selected as expected and capture open needs lower-level
+  stream construction diagnostics.
+
 ## Step H.xiaozhi-client.62 Verification
 
 Confirm the PA alternate DMIC pinmux and current DATA1/2ch capture profile:

@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.63
+- 根据用户提供的 2026-05-28 18:20 上板日志继续定位 PDM 无有效语音能量：
+  - H.62 镜像已确认生效：日志出现 `capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`。
+  - 但长期 `audio diag` 仍显示 capture/preproc peak 只有 `0/1` 量级，说明 AP 侧 PA 组 pinmux 不是唯一问题。
+  - 复核 `/root/ameba-rtos` AmebaSmart audio HAL 后确认，`DEVICE_IN_MIC` 在 `AudioRecord_Init()` 内部会把 capture usage 重置为 `AMEBA_AUDIO_CAPTURE_USAGE_AMIC`；此前项目在 `AudioRecord_Init()` 之后才重新设置 DMIC mapping，因此 Init 阶段很可能已经按 AMIC 路径完成 codec/ADC 配置。
+  - 同段用户日志一直没有 SDK `set DMIC clock`，且仍出现 `[AudioRecord_SetParameters] error: record not created.`，与“没有进入真正 DMIC 初始化路径”的判断一致。
+- 变更：
+  - `river_voice_capture_open()` 在 `AudioRecord_Init()` 前先应用 board mic mapping 和 PA 组 DMIC pinmux，并把 `record_config.device` 从 `DEVICE_IN_MIC` 改为 SDK 支持的 `DEVICE_IN_DMIC_REF_AMIC`，强制 `AudioRecord_Init()` 走 DMIC 初始化路径。
+  - Init 后继续保留一次 board mic mapping 和 pinmux 应用，防止 SDK open path 重置控制状态。
+  - 当前硬件验证回到 `pdm-2mic-pa-data0` + `AUDIO_DMIC1/2`：原理图网名 `PDM_DAT1` 很可能只是板级第一根 PDM 数据线命名，不应直接等同 SDK `DATA1`；先验证 SDK 原生 DATA0 DMIC 初始化路径。
+  - 修正 frontend 旧日志，把过期的 `AMIC1 + AMIC3` 描述改为 board DMIC pair，避免串口诊断误导。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+  - 继续保留 H.59 的 capture/preproc peak 诊断和 H.62 的 PA 组 pinmux 验证日志。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: source grep confirmed `DEVICE_IN_DMIC_REF_AMIC`, `pdm-2mic-pa-data0`, and `AUDIO_DMIC1/2`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `pdm-2mic-pa-data0`, `capture dmic pinmux applied`, and `capture board mics applied`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.62
 - 根据用户提供的 2026-05-28 17:29 上板日志继续定位当前 PDM 无有效语音能量：
   - H.61 镜像已确认生效：日志显示 `profile=asr_mainline`、`board=Orvibo-RTL8730E-PDM`、`capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4`、`capture=16000Hz/2ch/16ms`。

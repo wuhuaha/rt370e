@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.62 验证 PA 组 PDM pinmux`
+  - `Step H.xiaozhi-client.63 强制 AudioRecord 走 SDK DMIC 初始化路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -467,6 +467,11 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.63` follows the 2026-05-28 18:20 board log:
+  - H.62 image applied the PA alternate DMIC pinmux, but long-term peak stayed near `0/1`.
+  - SDK review shows `DEVICE_IN_MIC` forces AMIC usage during `AudioRecord_Init()`, so previous post-init DMIC remapping was too late for codec/DMIC clock setup.
+  - Capture now sets board DMIC mapping before init and uses `DEVICE_IN_DMIC_REF_AMIC`; post-init mapping is still retained.
+  - Current test profile is `pdm-2mic-pa-data0` with `DMIC1/DMIC2` plus PA alternate pinmux; user-run validation should look for SDK `set DMIC clock` and speech peak growth.
 - `Step H.xiaozhi-client.62` follows the 2026-05-28 17:29 board log:
   - H.61 image was running with `DMIC3/DMIC4` and `capture=16000Hz/2ch/16ms`, but long-term peak stayed near `0/1`.
   - This points at a hardware pinmux route mismatch rather than VAD/KWS behavior.

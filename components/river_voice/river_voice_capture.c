@@ -350,10 +350,13 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
         return RIVER_ERR_UNSUPPORTED;
     }
 
+    river_voice_capture_apply_board_mics(profile);
+    river_voice_board_apply_capture_pinmux();
+
     record_config.sample_rate = capture->sample_rate;
     record_config.channel_count = capture->channels;
     record_config.format = AUDIO_FORMAT_PCM_16_BIT;
-    record_config.device = DEVICE_IN_MIC;
+    record_config.device = DEVICE_IN_DMIC_REF_AMIC;
     record_config.buffer_bytes = (uint32_t)capture->frame_bytes * 4U;
     
     if (AudioRecord_Init((struct AudioRecord *)capture->record, &record_config, AUDIO_INPUT_FLAG_NONE) != 0) {
