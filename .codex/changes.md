@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.68
+- 根据用户确认的硬件连接收敛 PDM/DMIC 采集路径：
+  - 当前板子数字麦 `PDM_CLK` 接 `PA2`，`PDM_DAT1` 接 `PA4`。
+  - H.67 启动期 sweep 日志显示 DATA1 (`DMIC3/DMIC4`) 是唯一稳定 96/96 非零的路径；DATA0/DATA2/DATA3 主要是启动瞬态后接近全零。
+  - 正常采集仍回到 `DMIC5/DMIC6` 且长期 `audio diag ... peak=0/0/0`，说明需要把 board profile 和 SDK Audio HAL 的 DATA1 管脚宏同时固定，而不是继续只换 AudioControl mic category。
+- 变更：
+  - 新增项目自有 `include/river/river_audio_hw_overrides.h`，先包含 SDK `ameba_audio_hw_usrcfg.h`，再覆盖 `AUDIO_HW_DMIC_CLK_PIN=_PA_2` 与 `AUDIO_HW_DMIC_DATA1_PIN=_PA_4`。
+  - `CMakeLists.txt` 在 AP image2 的 `audio_hal_${c_CURRENT_IMAGE}` 目标创建后延迟注入 `-include river_audio_hw_overrides.h`，只影响 AP Audio HAL 编译，不修改 `/root/ameba-rtos` SDK 源码。
+  - 板级 profile 固定为 `pdm-2mic-pa2-pa4-data1`，主/副麦回到 `AUDIO_DMIC3/DMIC4`。
+  - 板级显式 pinmux 只配置实际硬件使用的 `PA2` 和 `PA4`，日志改为 `capture dmic pinmux applied: clk=PA2 data1=PA4`，不再碰 `PA14`，避免 SWD PAD 警告。
+  - H.67 的启动期 path sweep 保留为 Kconfig 诊断能力，但当前 `prj.conf` 关闭，正常启动不再先扫描四条路径。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source grep confirms `pdm-2mic-pa2-pa4-data1`, `AUDIO_DMIC3/4`, PA2/PA4 pinmux, disabled sweep config, and Audio HAL override hook.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: generated compile commands show `audio_hal_target_img2_ap` is compiled with `-include /root/ameba-river/include/river/river_audio_hw_overrides.h`.
+  - passed: preprocessed AP Audio HAL confirms DMIC clock pinmux uses `_PA_2` and DATA1 pinmux uses `_PA_4`.
+  - not run: board flash/download and serial monitor; current NAND hardware requires manual download mode, so runtime validation is left for user-run flashing.
+  - next: 用户手动下载 H.68 镜像后，确认正常启动不再出现 temporary sweep，且采集日志为 `DMIC3/DMIC4`、`clk=PA2 data1=PA4`；若仍无语音能量，下一步应转向电气/边沿/左右槽位或采样格式验证，而不是继续猜 DATA0-3。
+
 ## Step H.xiaozhi-client.67
 - 根据用户建议，把逐版切换 DATA0/1/2/3 的验证改成一次启动期临时 sweep：
   - 用户手动下载 H.66 后，日志确认 DATA2 镜像实际运行：`capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6`、`capture params applied: ret=0`、SDK `set DMIC clock` 均出现。

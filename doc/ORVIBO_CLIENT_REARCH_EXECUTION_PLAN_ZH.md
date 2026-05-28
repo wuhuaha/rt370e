@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.68` 固定 PA2/PA4 数字麦 DATA1 采集路径：
+  - 用户确认当前板子数字麦为 `PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`。
+  - H.67 sweep 显示 DATA1 (`DMIC3/DMIC4`) 是唯一稳定非零路径；正常采集仍回到 `DMIC5/DMIC6` 并长期 `peak=0/0/0`。
+  - 本步把板级 profile 固定为 `pdm-2mic-pa2-pa4-data1` + `DMIC3/DMIC4`，并用项目自有 AP Audio HAL override 将 SDK `AUDIO_HW_DMIC_CLK_PIN` / `AUDIO_HW_DMIC_DATA1_PIN` 覆盖为 `_PA_2` / `_PA_4`。
+  - 显式 pinmux 只配置 PA2 和 PA4，不再触碰 PA14；H.67 临时 sweep 保留为 Kconfig 诊断能力，但当前 `prj.conf` 已关闭，正常启动不再扫描四条路径。
+  - 静态检查、harness 检查、`/root/ameba-rtos` 完整构建、compile command 检查和 AP Audio HAL 预处理 PA2/PA4 校验均已通过；下一步用户手动下载后确认 `DMIC3/DMIC4`、`clk=PA2 data1=PA4`，并观察说话时 capture/preproc peak。
 - `Step H.xiaozhi-client.67` 启动期扫描 DMIC DATA0-3 采集路径：
   - H.66 用户手动下载后确认 DATA2 实际运行到 `DMIC5/DMIC6`、`capture params applied: ret=0` 和 SDK `set DMIC clock`，但首帧瞬态后稳定 `audio diag` 仍为 `peak=0/0/0`。
   - 本步新增临时启动期 sweep：正式 Orvibo audio capture 打开前延迟 3000ms，随后依次独立打开/读取/关闭 DATA0 (`DMIC1/2`)、DATA1 (`DMIC3/4`)、DATA2 (`DMIC5/6`)、DATA3 (`DMIC7/8`)。

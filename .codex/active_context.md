@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.67 启动期扫描 DMIC DATA0-3 采集路径`
+  - `Step H.xiaozhi-client.68 固定 PA2/PA4 的 DMIC DATA1 采集路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -468,6 +468,20 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.68` fixes the confirmed PA2/PA4 digital mic route:
+  - User confirmed the board wires `PDM_CLK` to `PA2` and `PDM_DAT1` to `PA4`.
+  - H.67 sweep showed DATA1 (`DMIC3/DMIC4`) is the only path with stable
+    nonzero frames, while normal capture still reverted to DATA2
+    (`DMIC5/DMIC6`) and produced long-term zero peaks.
+  - Board profile now uses `pdm-2mic-pa2-pa4-data1` with `DMIC3/DMIC4`.
+  - A project-owned AP Audio HAL override forces
+    `AUDIO_HW_DMIC_CLK_PIN=_PA_2` and `AUDIO_HW_DMIC_DATA1_PIN=_PA_4` without
+    modifying `/root/ameba-rtos`.
+  - Explicit board pinmux now only touches PA2 and PA4, and H.67 boot sweep is
+    disabled in `prj.conf` while remaining available behind Kconfig.
+  - Verification target: confirm `audio_hal_target_img2_ap` receives the
+    override header, preprocessed HAL emits PA2/PA4 pinmux, then user-run board
+    validation checks for `DMIC3/DMIC4` and `clk=PA2 data1=PA4` logs.
 - `Step H.xiaozhi-client.67` adds a temporary boot-time DMIC path sweep:
   - H.66 manual runtime confirmed DATA2 reaches `DMIC5/DMIC6`,
     `capture params applied: ret=0`, and SDK `set DMIC clock`, but after the

@@ -12,15 +12,15 @@
 
 static const river_voice_board_array_profile_t g_river_voice_board_array_profile = {
     .board_name = "Orvibo-RTL8730E-PDM",
-    .geometry_name = "pdm-2mic-pa-data2",
+    .geometry_name = "pdm-2mic-pa2-pa4-data1",
     .mic_spacing_mm = 50U,
     .sample_rate = 16000U,
     .frame_ms = 16U,
     .capture_channels = 2U,
     .capture_usage = AUDIO_CAPTURE_USAGE_DMIC,
-    .primary_mic = AUDIO_DMIC5,
-    .secondary_mic = AUDIO_DMIC6,
-    .aux_mic = AUDIO_DMIC3,
+    .primary_mic = AUDIO_DMIC3,
+    .secondary_mic = AUDIO_DMIC4,
+    .aux_mic = AUDIO_DMIC5,
     .primary_mic_gain = AUDIO_MICBST_GAIN_0DB,
     .secondary_mic_gain = AUDIO_MICBST_GAIN_0DB,
     .aux_mic_gain = AUDIO_MICBST_GAIN_0DB,
@@ -117,11 +117,8 @@ void river_voice_board_apply_capture_pinmux(void)
 
 #if defined(CONFIG_AMEBASMART) && defined(PINMUX_FUNCTION_DMIC)
     Pinmux_Config(_PA_2, PINMUX_FUNCTION_DMIC);
-    Pinmux_Config(_PA_3, PINMUX_FUNCTION_DMIC);
     Pinmux_Config(_PA_4, PINMUX_FUNCTION_DMIC);
-    Pinmux_Config(_PA_5, PINMUX_FUNCTION_DMIC);
-    Pinmux_Config(_PA_14, PINMUX_FUNCTION_DMIC);
-    RIVER_LOGI("capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14");
+    RIVER_LOGI("capture dmic pinmux applied: clk=PA2 data1=PA4");
 #else
     RIVER_LOGW("capture dmic pinmux skipped: unsupported target");
 #endif

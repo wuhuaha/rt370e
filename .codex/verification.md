@@ -1,3 +1,78 @@
+## Step H.xiaozhi-client.68 Verification
+
+Confirm the PA2/PA4 DATA1 board profile, disabled boot sweep, and project-owned
+Audio HAL override hook:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-pa2-pa4-data1|AUDIO_DMIC3|AUDIO_DMIC4|clk=PA2 data1=PA4|RIVER_VOICE_CAPTURE_PATH_SWEEP_EN|river_audio_hw_overrides|RIVER_AUDIO_HW_OVERRIDES_HEADER|audio_hal_\\$\\{c_CURRENT_IMAGE\\}" \
+  prj.conf CMakeLists.txt include/river/river_audio_hw_overrides.h \
+  components/river_voice/river_voice_board.c
+```
+
+Run static hygiene, harness, latest-SDK build, and compile/preprocess checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+rg -n "river_audio_hw_overrides.h" \
+  build_RTL8730E/build/compile_commands.json
+```
+
+Confirm the AP Audio HAL saw PA2/PA4 after preprocessing:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import json, pathlib
+ccdb = pathlib.Path("build_RTL8730E/build/compile_commands.json")
+entries = json.loads(ccdb.read_text())
+audio_hal = [e for e in entries if "audio_hal_target_img2_ap" in e.get("output", "")]
+missing = [e["file"] for e in audio_hal
+           if "/root/ameba-river/include/river/river_audio_hw_overrides.h" not in e["command"]]
+preprocessed = pathlib.Path(
+    "build_RTL8730E/build/project_ap/make/image2/audio/audio_hal/"
+    "CMakeFiles/audio_hal_target_img2_ap.dir/amebasmart/"
+    "ameba_audio_stream_capture.i")
+text = preprocessed.read_text(errors="ignore")
+checks = {
+    "all_audio_hal_has_override": bool(audio_hal) and not missing,
+    "clk_pa2": "Pinmux_Config((0x02), (17));" in text,
+    "data1_pa4": "Pinmux_Config((0x04), (17));" in text,
+}
+print(checks)
+raise SystemExit(0 if all(checks.values()) else 1)
+PY
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- `audio_hal_target_img2_ap` has `-include ...river_audio_hw_overrides.h`
+- the preprocessed HAL contains PA2 for DMIC clock and PA4 for DATA1
+
+Manual board validation after entering download mode:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected runtime logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa2-pa4-data1 usage=DMIC primary=DMIC3 secondary=DMIC4 ...
+capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4
+capture dmic pinmux applied: clk=PA2 data1=PA4
+capture params applied: ret=0 params=cap_mode=no_afe_pure_data
+```
+
+Interpretation:
+- no `temporary capture path sweep` logs should appear in the normal boot.
+- if capture/preproc peaks still stay at zero while speaking, stop changing
+  DATA0-3 routing and validate PDM clock/data electrically plus DMIC edge/slot
+  and sample-format assumptions.
+
 ## Step H.xiaozhi-client.67 Verification
 
 Confirm the temporary DMIC DATA0-3 sweep is compiled in:
