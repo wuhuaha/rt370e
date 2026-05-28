@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.67
+- 根据用户建议，把逐版切换 DATA0/1/2/3 的验证改成一次启动期临时 sweep：
+  - 用户手动下载 H.66 后，日志确认 DATA2 镜像实际运行：`capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6`、`capture params applied: ret=0`、SDK `set DMIC clock` 均出现。
+  - DATA2 仍表现为首帧瞬态 `peak=19782/20240/0` 后长期 `audio diag ... peak=0/0/0 pre ... peak=0`，说明需要更快比较 DATA0-3 的稳定采样窗口。
+- 变更：
+  - 新增临时配置 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_EN`、`CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_FRAMES`、`CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_WARMUP_FRAMES`、`CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_START_DELAY_MS`，当前 `prj.conf` 默认启用 sweep，启动后延迟 3000ms，采样 8 帧 warmup + 96 帧测量。
+  - `river_orvibo_audio_open()` 在正式 `river_voice_capture_open()` 前调用一次 `river_voice_capture_run_path_sweep()`。
+  - sweep 依次验证 `pdm-2mic-pa-data0` (`DMIC1/2`)、DATA1 (`DMIC3/4`)、DATA2 (`DMIC5/6`)、DATA3 (`DMIC7/8`)；每条路径独立 `AudioRecord_Create/Init/Start/SetParameters/Read/Stop/Destroy`，打印 `capture path sweep result` 的 status、首帧峰值、测量峰值、非零帧数、短读/超时/错误计数。
+  - sweep 读循环使用非阻塞 `AudioRecord_Read(..., false)` 和轮询上限，避免某条无数据路径卡住启动；失败路径也缓存 result，扫完后恢复进入正常 Orvibo 音频链路。
+  - 正常 `audio diag` 周期会重放最多 6 次 `capture path sweep replay`，避免串口 monitor 错过 3 秒延迟后的启动期 sweep 日志。
+  - 将 `AGENTS.md` 与 `.codex/active_context.md` 的硬件策略同步为本轮用户规则：未显式要求时只构建并提供手动下载/串口验证命令。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source grep confirms sweep config/logs, replay logs, and DATA0-3 candidates.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `temporary capture path sweep delay`, `temporary capture path sweep start`, `capture path sweep result`, `capture path sweep replay`, and `pdm-2mic-pa-data0..3`.
+  - passed: after repo-level harness updates, reran `git diff --check` and `python3 tools/diag/check_codex_harness.py`.
+  - not run: board flash/download and serial monitor; current turn follows manual-download hardware policy.
+  - next: 用户手动下载 H.67 镜像后，对着麦克风说话，比较四条 `capture path sweep result` 或 `capture path sweep replay` 的 measured `peak` 与 `nonzero`。
+
 ## Step H.xiaozhi-client.66
 - 根据 H.65 DATA1 上板结果继续扫描 DMIC source routing：
   - H.65 已证明 `DMIC3/DMIC4` 不再全零，但只有 `20-40` 量级低底噪，仍无有效语音能量、`speech=no`。
@@ -16,8 +39,9 @@
   - passed: source/image grep confirms `pdm-2mic-pa-data2`, `AUDIO_DMIC5/6`, `capture params applied`, `capture dmic pinmux applied`, and `capture board mics applied`.
   - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
   - blocked: automatic project NAND flash/download reached the board and wrote `km4_boot_all.bin`, but failed while writing `km0_km4_ca32_app.bin` at `addr=002d7800`, `size=2048`, result `b'\xe2'`.
-  - not run: serial monitor/runtime validation because download did not complete.
-  - next: 用户需手动重新进入下载模式并下载该 H.66 镜像；下载成功后观察 `DMIC5/DMIC6`、`capture params applied: ret=0`，以及说话时 capture/preproc peak 是否恢复。
+  - observed after user manual download: H.66 runtime reached `DMIC5/DMIC6`, `capture params applied: ret=0`, and SDK `set DMIC clock`; Wi-Fi/OTA still worked.
+  - observed: DATA2 produced an initial transient around `peak=19782/20240/0`, then long-term `audio diag` stayed at `peak=0/0/0 pre ... peak=0`, `speech=no`.
+  - next: replace one-profile-per-build probing with a temporary boot-time DATA0-3 sweep.
 
 ## Step H.xiaozhi-client.65
 - 根据 H.64 下载后串口 monitor 结果继续定位 DMIC source routing：

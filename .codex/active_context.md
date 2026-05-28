@@ -11,15 +11,14 @@ or top-of-tree verification target changes.
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
-  - Codex should attempt after successful builds; if download fails due to board
-    mode or serial availability, do not change code to work around it and ask
-    the user to perform manual download:
+  - User-run board validation unless the user explicitly asks Codex to flash in
+    the current turn:
     `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000'`
 - Active monitor command:
-  - Codex should attempt after successful download:
+  - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.66 扫描 PA DATA2 DMIC5/DMIC6 采集路径`
+  - `Step H.xiaozhi-client.67 启动期扫描 DMIC DATA0-3 采集路径`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -469,6 +468,15 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.67` adds a temporary boot-time DMIC path sweep:
+  - H.66 manual runtime confirmed DATA2 reaches `DMIC5/DMIC6`,
+    `capture params applied: ret=0`, and SDK `set DMIC clock`, but after the
+    startup transient the stable `audio diag` peak remains `0/0/0`.
+  - The new sweep runs once before normal Orvibo audio capture opens and scans
+    DATA0 (`DMIC1/2`), DATA1 (`DMIC3/4`), DATA2 (`DMIC5/6`), and DATA3
+    (`DMIC7/8`) in separate AudioRecord open/read/close cycles.
+  - Validation should compare `capture path sweep result` measured peaks and
+    `nonzero` counts across all four paths while speaking near the microphones.
 - `Step H.xiaozhi-client.66` scans the PA DATA2 DMIC source path:
   - H.65 DATA1 (`DMIC3/DMIC4`) produced low-level nonzero noise but still no
     useful speech energy.
@@ -479,9 +487,10 @@ or top-of-tree verification target changes.
     passed.
   - Automatic NAND download reached the board but failed during
     `km0_km4_ca32_app.bin` at `addr=002d7800`, result `b'\xe2'`; runtime monitor
-    did not run.
-  - Next manual validation should confirm `capture params applied: ret=0`,
-    `DMIC5/DMIC6`, and whether speech raises capture/preproc peaks.
+    did not run in Codex.
+  - User manual runtime confirmed `DMIC5/DMIC6`, `capture params applied: ret=0`,
+    and SDK `set DMIC clock`; after a startup transient, stable peaks remained
+    `0/0/0`.
 - `Step H.xiaozhi-client.65` scans the PA DATA1 DMIC source path:
   - H.64 build/download succeeded and runtime capture still produced persistent
     `0/0/0` peaks despite corrected SDK AudioRecord sequencing.

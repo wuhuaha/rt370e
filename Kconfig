@@ -163,6 +163,37 @@ config RIVER_VOICE_DSB_PRIMARY_ONLY
       bring-up boards where the secondary mic polarity, placement, or channel
       map may cancel speech when the two channels are averaged directly.
 
+config RIVER_VOICE_CAPTURE_PATH_SWEEP_EN
+    bool "Run temporary DMIC capture path sweep at boot"
+    default n
+    help
+      Temporarily scan DMIC DATA0..DATA3 at boot before the Orvibo audio
+      service opens its normal capture path. Each candidate opens its own
+      AudioRecord instance, captures a short window, prints per-channel peak
+      metrics, then closes the instance. Disable after board routing is found.
+
+config RIVER_VOICE_CAPTURE_PATH_SWEEP_FRAMES
+    int "Temporary DMIC capture path sweep measured frames"
+    range 8 256
+    default 96
+    depends on RIVER_VOICE_CAPTURE_PATH_SWEEP_EN
+
+config RIVER_VOICE_CAPTURE_PATH_SWEEP_WARMUP_FRAMES
+    int "Temporary DMIC capture path sweep warmup frames"
+    range 0 64
+    default 8
+    depends on RIVER_VOICE_CAPTURE_PATH_SWEEP_EN
+
+config RIVER_VOICE_CAPTURE_PATH_SWEEP_START_DELAY_MS
+    int "Temporary DMIC capture path sweep start delay in ms"
+    range 0 10000
+    default 0
+    depends on RIVER_VOICE_CAPTURE_PATH_SWEEP_EN
+    help
+      Delay before the temporary boot-time sweep starts. This gives a serial
+      monitor time to attach after download/reset so the early sweep logs are
+      not missed.
+
 choice RIVER_VOICE_PREPROC_PROFILE
     prompt "Local voice pre-processing profile"
     default RIVER_VOICE_PREPROC_PROFILE_ASR_MAINLINE

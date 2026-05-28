@@ -8,11 +8,16 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.67` 启动期扫描 DMIC DATA0-3 采集路径：
+  - H.66 用户手动下载后确认 DATA2 实际运行到 `DMIC5/DMIC6`、`capture params applied: ret=0` 和 SDK `set DMIC clock`，但首帧瞬态后稳定 `audio diag` 仍为 `peak=0/0/0`。
+  - 本步新增临时启动期 sweep：正式 Orvibo audio capture 打开前延迟 3000ms，随后依次独立打开/读取/关闭 DATA0 (`DMIC1/2`)、DATA1 (`DMIC3/4`)、DATA2 (`DMIC5/6`)、DATA3 (`DMIC7/8`)。
+  - 正常 `audio diag` 周期会重放 `capture path sweep replay`，避免串口 monitor 错过启动期 sweep 日志。
+  - 静态检查、harness 检查、`/root/ameba-rtos` 完整构建和 AP 镜像字符串确认已通过；上板重点比较四条 `capture path sweep result` / `capture path sweep replay` 的测量 `peak` 与 `nonzero`，不要只看 `first_peak`。
 - `Step H.xiaozhi-client.66` 扫描 PA DATA2 DMIC5/DMIC6 采集路径：
   - H.65 DATA1 (`DMIC3/DMIC4`) 有低底噪但仍无有效语音能量；本步继续按同一方法扫描 SDK DATA2。
   - 板级 profile 切到 `pdm-2mic-pa-data2` + `DMIC5/DMIC6`，保留 `DEVICE_IN_DMIC_REF_AMIC`、PA 组 pinmux、H.64 Start 后参数下发顺序和 `capture params applied` 诊断。
   - 静态检查、harness 检查、`/root/ameba-rtos` 完整构建和 AP 镜像字符串确认已通过；自动 NAND 下载在写 `km0_km4_ca32_app.bin` 的 `addr=002d7800` 时返回 `b'\xe2'`，因此串口 runtime 未运行。
-  - 需要用户手动重新下载该镜像；上板重点确认 `capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6`，以及说话时 capture/preproc peak 是否恢复。
+  - 用户手动下载后确认 `capture board mics applied: usage=DMIC ch0=DMIC5 ch1=DMIC6`、`capture params applied: ret=0` 和 SDK `set DMIC clock`；但长期 `audio diag` 仍为 `peak=0/0/0`、`speech=no`。
 - `Step H.xiaozhi-client.65` 扫描 PA DATA1 DMIC3/DMIC4 采集路径：
   - H.64 已完成构建、下载和串口观察；采集线程运行、帧数增长，但 capture/preproc peak 仍为 `0/0/0` / `0`。
   - 本步在保留 H.64 的 `AudioRecord_Start()` 后下发参数顺序、`DEVICE_IN_DMIC_REF_AMIC` 和 PA 组 pinmux 的前提下，把板级 profile 切到 `pdm-2mic-pa-data1` + `DMIC3/DMIC4`。

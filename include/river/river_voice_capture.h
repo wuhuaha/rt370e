@@ -33,6 +33,8 @@ typedef struct {
 } river_voice_capture_stats_t;
 
 river_status_t river_voice_capture_open(river_voice_capture_t *capture);
+void river_voice_capture_run_path_sweep(void);
+void river_voice_capture_dump_path_sweep_results(void);
 int32_t river_voice_capture_read(river_voice_capture_t *capture, void *buffer, size_t bytes);
 void river_voice_capture_close(river_voice_capture_t *capture);
 void river_voice_capture_get_stats(river_voice_capture_stats_t *stats);

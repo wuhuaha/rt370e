@@ -1,3 +1,68 @@
+## Step H.xiaozhi-client.67 Verification
+
+Confirm the temporary DMIC DATA0-3 sweep is compiled in:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_VOICE_CAPTURE_PATH_SWEEP|temporary capture path sweep|capture path sweep result|pdm-2mic-pa-data[0-3]|AUDIO_DMIC[1-8]" \
+  Kconfig prj.conf components/river_voice/river_voice_capture.c \
+  components/river_voice/river_orvibo_audio_service.c include/river/river_voice_capture.h
+```
+
+Run static hygiene, harness, latest-SDK build, and image string checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "temporary capture path sweep delay|temporary capture path sweep start|capture path sweep result|capture path sweep replay|pdm-2mic-pa-data[0-3]"
+```
+
+Observed on 2026-05-28:
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: source grep confirms sweep config/logs, replay logs, and DATA0-3
+  candidates.
+- passed: latest-SDK full build using `/root/ameba-rtos`, with `Build done`.
+- passed: AP image strings contain `temporary capture path sweep delay`,
+  `temporary capture path sweep start`, `capture path sweep result`,
+  `capture path sweep replay`, and `pdm-2mic-pa-data0..3`.
+- passed: after repo-level harness updates, reran `git diff --check` and
+  `python3 tools/diag/check_codex_harness.py`.
+- not run: board flash/download and serial monitor in this turn; use the
+  manual validation command below after entering download mode.
+
+Manual board validation:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected sweep logs before normal audio open:
+```text
+temporary capture path sweep start: candidates=4 warmup=8 measure=96 params=cap_mode=no_afe_pure_data
+capture path sweep result: path=pdm-2mic-pa-data0 pair=DMIC1/DMIC2 ... peak=.../... nonzero=...
+capture path sweep result: path=pdm-2mic-pa-data1 pair=DMIC3/DMIC4 ... peak=.../... nonzero=...
+capture path sweep result: path=pdm-2mic-pa-data2 pair=DMIC5/DMIC6 ... peak=.../... nonzero=...
+capture path sweep result: path=pdm-2mic-pa-data3 pair=DMIC7/DMIC8 ... peak=.../... nonzero=...
+temporary capture path sweep done; normal capture will open next
+capture path sweep replay: path=pdm-2mic-pa-data0 pair=DMIC1/DMIC2 ...
+capture path sweep replay: path=pdm-2mic-pa-data1 pair=DMIC3/DMIC4 ...
+capture path sweep replay: path=pdm-2mic-pa-data2 pair=DMIC5/DMIC6 ...
+capture path sweep replay: path=pdm-2mic-pa-data3 pair=DMIC7/DMIC8 ...
+```
+
+Interpretation:
+- ignore `first_peak` alone because DATA0/DATA2 have shown startup transients.
+- prefer the path whose measured `peak` and `nonzero` count rise during real
+  speech after warmup.
+- if all measured peaks stay zero or low-noise, move below AudioRecord routing
+  to pin/clock validation against the PA/PB DMIC pin tables and schematic.
+
 ## Step H.xiaozhi-client.66 Verification
 
 Confirm the PA DATA2 DMIC source scan profile while preserving the H.64
@@ -38,8 +103,11 @@ Observed on 2026-05-28:
 - blocked: automatic NAND download reached `/dev/ttyUSB0` and completed
   `km4_boot_all.bin`, but failed during `km0_km4_ca32_app.bin` at
   `addr=002d7800`, `size=2048`, with result `b'\xe2'`.
-- not run: monitor/runtime validation; please manually download this image and
-  then capture the post-boot audio diagnostics.
+- observed after manual download: runtime reached `DMIC5/DMIC6`,
+  `capture params applied: ret=0`, and SDK `set DMIC clock`; Wi-Fi/OTA remained
+  normal.
+- observed: DATA2 had a startup transient around `peak=19782/20240/0`, then
+  long-term `audio diag` stayed at `peak=0/0/0 pre ... peak=0`, `speech=no`.
 
 Expected post-flash logs:
 ```text
