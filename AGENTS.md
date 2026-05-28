@@ -18,10 +18,12 @@
 
 ## Hardware Flashing Policy
 - The current NAND hardware requires manually entering flashing/download mode.
-- Unless the user explicitly asks in the current turn, do not run flash tools or
-  serial runtime monitors against the board; after a successful build, report
-  that the image is ready and let the user perform flashing and board runtime
-  validation.
+- After a successful build, attempt the project flash/download flow and serial
+  runtime validation automatically.
+- If flash/download fails because the board is not in download mode, the serial
+  device is unavailable, or another host-side flashing issue occurs, do not make
+  code changes to work around that failure; report the failure and ask the user
+  to perform manual download/flashing.
 - It is still acceptable to update project-owned flash profiles/wrappers and to
   document the exact command and expected logs for user-run validation.
 

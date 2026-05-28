@@ -367,12 +367,27 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
     river_voice_capture_apply_board_mics(profile);
     river_voice_board_apply_capture_pinmux();
 
-    AudioRecord_SetParameters((struct AudioRecord *)capture->record,
-                              voice_profile->capture_audio_record_params);
-
     if (AudioRecord_Start((struct AudioRecord *)capture->record) != 0) {
         river_voice_capture_close(capture);
         return RIVER_ERR_UNSUPPORTED;
+    }
+    capture->started = 1;
+
+    river_voice_capture_apply_board_mics(profile);
+    river_voice_board_apply_capture_pinmux();
+
+    {
+        int32_t params_ret;
+
+        params_ret = AudioRecord_SetParameters((struct AudioRecord *)capture->record,
+                                               voice_profile->capture_audio_record_params);
+        RIVER_LOGI("capture params applied: ret=%ld params=%s",
+                   (long)params_ret,
+                   voice_profile->capture_audio_record_params);
+        if (params_ret != 0) {
+            river_voice_capture_close(capture);
+            return RIVER_ERR_UNSUPPORTED;
+        }
     }
 
     {
@@ -398,7 +413,6 @@ river_status_t river_voice_capture_open(river_voice_capture_t *capture)
         return RIVER_ERR_IO;
     }
 
-    capture->started = 1;
     return RIVER_OK;
 }
 

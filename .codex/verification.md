@@ -1,3 +1,63 @@
+## Step H.xiaozhi-client.64 Verification
+
+Confirm the SDK-compatible AudioRecord sequencing and new params diagnostic:
+```bash
+cd /root/ameba-river
+rg -n "AudioRecord_Start|AudioRecord_SetParameters|capture params applied|DEVICE_IN_DMIC_REF_AMIC|pdm-2mic-pa-data0" \
+  components/river_voice/river_voice_capture.c \
+  components/river_voice/river_voice_board.c
+```
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+strings build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | \
+  rg "capture params applied|pdm-2mic-pa-data0|capture dmic pinmux applied|capture board mics applied"
+```
+
+After a successful build, Codex should attempt the project download/flash and
+runtime monitor flow automatically:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Expected post-flash logs:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa-data0 usage=DMIC primary=DMIC1 secondary=DMIC2 ...
+capture board mics applied: usage=DMIC ch0=DMIC1 ch1=DMIC2
+capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14
+capture params applied: ret=0 params=cap_mode=no_afe_pure_data
+audio open: ... capture=16000Hz/2ch/16ms ...
+audio diag: mode=idle cap=... peak=<ch0>/<ch1>/<ch2> pre=... peak=<mono> vad=... speech=... prob=...
+```
+
+Interpretation:
+- if `capture params applied: ret=0` appears and speech raises capture/preproc
+  peak, the previous Start-before-params issue was the active capture blocker.
+- if params succeeds but peaks remain `0/0/0`, continue hardware input routing:
+  try controlled DMIC source/pinmux scans with the now-correct SDK call order.
+- if download/flash fails due to board mode or serial availability, do not make
+  workaround code changes; ask the user to manually download this image.
+
+Observed result on 2026-05-28:
+- `git diff --check`, `python3 tools/diag/check_codex_harness.py`, source grep,
+  `/root/ameba-rtos` build, and final AP image string checks passed.
+- `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000` completed with
+  `Finished PASS`.
+- Serial monitor connected after download. Runtime status confirmed capture is
+  running and frame counts increase, but `audio diag` / `river audio status`
+  still show capture/preproc peak at `0/0/0` / `0`.
+- Next validation should keep this SDK call order and scan DMIC source routing,
+  starting from PA DATA1 (`DMIC3/DMIC4`).
+
 ## Step H.xiaozhi-client.63 Verification
 
 Confirm the SDK DMIC input-device path and current PA DATA0 capture profile:

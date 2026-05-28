@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.64` 将 AudioRecord 参数下发移到 Start 后：
+  - 18:33 用户日志确认 H.63 已运行到 `AudioHal ... rx start`，但 `[AudioRecord_SetParameters] error: record not created.` 仍存在，且初始瞬态后长期 `peak=0/0/0`。
+  - 复核 SDK 示例后确认 `speechmind`、`arecord`、`pcrecord` 都按 `AudioRecord_Init()` -> `AudioRecord_Start()` -> `AudioRecord_SetParameters()` 顺序调用。
+  - 本步保持 `DEVICE_IN_DMIC_REF_AMIC`、`pdm-2mic-pa-data0`、`DMIC1/DMIC2` 和 PA 组 pinmux 不变，只把参数下发移到 Start 后，并新增 `capture params applied: ret=... params=...`。
+  - Start 后再重放 board mic mapping 和 PA pinmux；构建和 `/dev/ttyUSB0` NAND 下载已通过，但串口 monitor 仍显示 capture/preproc peak 为 `0/0/0` / `0`。
+  - 下一轮保持 H.64 的 SDK 调用顺序，继续扫描 PA DATA1 (`DMIC3/DMIC4`) 等 DMIC source routing。
 - `Step H.xiaozhi-client.63` 强制 AudioRecord 进入 SDK DMIC 初始化路径：
   - 18:20 用户日志确认 H.62 的 PA 组 pinmux 已运行，但长期 peak 仍接近 `0/1`，且没有看到 SDK `set DMIC clock`。
   - 复核 SDK 后确认 `DEVICE_IN_MIC` 在 `AudioRecord_Init()` 内会重置为 AMIC usage；项目此前 Init 后再设 DMIC，已经晚于 codec/ADC 初始化。

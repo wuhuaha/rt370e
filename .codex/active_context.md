@@ -11,13 +11,15 @@ or top-of-tree verification target changes.
 - Active build command:
   - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
-  - User-run only for current NAND hardware after manually entering flashing mode:
+  - Codex should attempt after successful builds; if download fails due to board
+    mode or serial availability, do not change code to work around it and ask
+    the user to perform manual download:
     `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 /root/ameba-river/tools/river_flash.py -p /dev/ttyUSB0 -b 1500000'`
 - Active monitor command:
-  - User-run only unless explicitly requested:
+  - Codex should attempt after successful download:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.63 强制 AudioRecord 走 SDK DMIC 初始化路径`
+  - `Step H.xiaozhi-client.64 将 AudioRecord 参数下发移到 Start 后`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -467,6 +469,22 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.64` follows the 2026-05-28 18:33 board log:
+  - H.63 image is running and applies DMIC1/DMIC2 plus PA alternate pinmux, but
+    `AudioRecord_SetParameters` still fails with `record not created` and
+    capture peaks fall to persistent `0/0/0` after an initial transient.
+  - SDK examples call `AudioRecord_Init()` -> `AudioRecord_Start()` ->
+    `AudioRecord_SetParameters()`, so capture now follows that order.
+  - After Start, capture replays board DMIC mapping and PA pinmux, then logs
+    `capture params applied: ret=... params=...` for board confirmation.
+  - Verification passed: static checks, harness check, latest-SDK build, image
+    string check, and `/dev/ttyUSB0` NAND download all succeeded.
+  - Runtime monitor after download still showed capture/preproc peaks at
+    `0/0/0` / `0`; next hardware-audio step should keep this SDK call order and
+    scan DMIC source routing, starting with PA DATA1 (`DMIC3/DMIC4`).
+  - Per user preference, after successful builds Codex should attempt flash and
+    monitor automatically; if download fails due to board mode/serial, do not
+    change code and ask the user to manually download.
 - `Step H.xiaozhi-client.63` follows the 2026-05-28 18:20 board log:
   - H.62 image applied the PA alternate DMIC pinmux, but long-term peak stayed near `0/1`.
   - SDK review shows `DEVICE_IN_MIC` forces AMIC usage during `AudioRecord_Init()`, so previous post-init DMIC remapping was too late for codec/DMIC clock setup.

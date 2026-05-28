@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.64
+- 根据用户提供的 2026-05-28 18:33 上板日志继续定位 DMIC 采集全零：
+  - H.63 镜像已确认生效：日志显示 `capture board mics applied: usage=DMIC ch0=DMIC1 ch1=DMIC2`、`capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`、`AudioHal ... rx start`。
+  - 首帧出现一次较高瞬态 `peak=19614/20243/0`，随后长期 `peak=0/0/0`，说明当前仍在采集驱动/HAL 输入路径，而不是 VAD/KWS 阈值问题。
+  - 同段日志仍有 `[AudioRecord_SetParameters] error: record not created.`；复核 `/root/ameba-rtos` SDK 示例后确认 `speechmind`、`arecord`、`pcrecord` 均按 `AudioRecord_Init()` -> `AudioRecord_Start()` -> `AudioRecord_SetParameters()` 顺序调用。
+- 变更：
+  - `river_voice_capture_open()` 将 `AudioRecord_SetParameters()` 移到 `AudioRecord_Start()` 之后，匹配 SDK 示例顺序，避免 Start 前 stream 尚未创建导致参数下发失败。
+  - Start 成功后立即设置 `capture->started=1`，确保后续参数下发失败时 close 路径会正常 `AudioRecord_Stop()` / destroy。
+  - Start 后再重放一次 board DMIC mapping 和 PA 组 pinmux，覆盖 SDK Start 路径可能重置 mic/category/pinmux 的情况。
+  - 新增确定性日志 `capture params applied: ret=... params=...`，下一轮上板可以直接确认 `cap_mode=no_afe_pure_data` 是否真正应用成功。
+  - 按用户新要求更新 `AGENTS.md`：后续构建成功后默认自动尝试项目下载/串口 runtime validation；若下载失败，不改代码绕过，直接提示用户手动下载。
+- 保持受保护能力不变：
+  - 未修改 DMIC1/2 当前映射、`DEVICE_IN_DMIC_REF_AMIC`、PA 组 pinmux、VAD/KWS、tensor dump、alignment replay、board/local parity、KWS 模型/阈值、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source grep confirms Start-before-SetParameters order and `capture params applied` diagnostic.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `capture params applied`, `pdm-2mic-pa-data0`, `capture dmic pinmux applied`, and `capture board mics applied`.
+  - passed: project NAND flash/download completed on `/dev/ttyUSB0` with `Finished PASS`.
+  - observed: serial monitor connected after download; runtime `river audio status` showed capture running and frame counts increasing, but capture/preproc peak remained `0/0/0` / `0`, so the Start/SetParameters order fix alone did not restore DMIC audio energy.
+  - next: with SDK call order fixed, continue controlled DMIC source scan starting from PA DATA1 (`DMIC3/DMIC4`).
+
 ## Step H.xiaozhi-client.63
 - 根据用户提供的 2026-05-28 18:20 上板日志继续定位 PDM 无有效语音能量：
   - H.62 镜像已确认生效：日志出现 `capture dmic pinmux applied: group=pa_alt pins=PA2,PA3,PA4,PA5,PA14`。
