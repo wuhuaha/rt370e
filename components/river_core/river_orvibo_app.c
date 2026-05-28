@@ -872,6 +872,7 @@ static void river_orvibo_app_check_wifi(void)
         RIVER_LOGI("waiting wifi: status=%s ssid=%s",
                    river_wifi_station_status_name(),
                    river_wifi_station_ssid());
+        river_wifi_station_dump_status();
     }
 }
 

@@ -1,3 +1,63 @@
+## Step H.xiaozhi-client.54 Verification
+
+Confirm SDK Wi-Fi defaults are loaded before project overrides, and that the
+new pre-`wifi_on` stall diagnostics exist:
+```bash
+cd /root/ameba-river
+rg -n "wifi_set_user_config|sdk_defaults|project patch applied|concurrent=|wifi_is_running start|whc_api=0x4|wifi_task=|river_wifi_station_dump_status" \
+  components/river_cloud/river_wifi_station.c components/river_core/river_orvibo_app.c
+```
+
+Expected source result:
+- `river_wifi_station_patch_user_config_once()` calls `wifi_set_user_config()`
+  before writing project overrides
+- logs include `user cfg source=sdk_defaults` and `user cfg source=patch_after`
+- user config logs expose non-zero SDK defaults such as `skb`, `ampdu`, and
+  `concurrent`
+- STA task logs `sta task started`, `wifi_is_running start ... whc_api=0x4`,
+  and `wifi_is_running returned ...`
+- periodic `waiting wifi` also emits `river_wifi_station_dump_status()`
+
+Run static hygiene, harness, and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Observed result on 2026-05-28:
+- source grep confirmed `wifi_set_user_config()`, `sdk_defaults`, project patch
+  logs, `wifi_is_running ... whc_api=0x4`, and periodic Wi-Fi status dump.
+- `git diff --check` passed.
+- `python3 tools/diag/check_codex_harness.py` passed.
+- `/root/ameba-rtos` build completed with `Build done`.
+
+Post-flash board validation is user-run because current hardware requires
+manual entry into flashing/download mode. After flashing, preserve the boot and
+Wi-Fi initialization log around these lines:
+```text
+user cfg source=patch_entry ...
+user cfg source=sdk_defaults ... concurrent=1 ... skb=22/8 ... ampdu=16/20 ...
+sdk defaults loaded then project patch applied before wifi_on ...
+user cfg source=patch_after country=3030(00) band=2.4g+5g(0x03) tx_pwr_sel=1 ...
+sta task started ...
+wifi_is_running start attempt=1 wlan=0 whc_api=0x4
+wifi_is_running returned ret=...
+wifi_on start attempt=1 mode=sta whc_api=0x9 ...
+```
+
+Interpretation:
+- if `wifi_is_running start` appears but no returned line follows, preserve the
+  nearby `[INIC-*]` timeout; the task is stuck in WHC API `0x4`
+- if `wifi_on start` appears but no returned line follows, preserve the nearby
+  `[WLAN-E] Efuse empty...` and `[INIC-*] cur id 0x9`; the task is stuck in SDK
+  `wifi_on()` / WHC API `0x9`
+- if `wifi_on returned ret=0` appears, the next expected logs are
+  `post-wifi_on sta state reset complete`, `connect attempt`, then `scan start`
+
 ## Step H.xiaozhi-client.53 Verification
 
 Confirm the project flash wrapper defaults to NAND for the current hardware:

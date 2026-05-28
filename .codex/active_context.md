@@ -17,7 +17,7 @@ or top-of-tree verification target changes.
   - User-run only unless explicitly requested:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.53 将默认烧录模式切到当前 NAND 硬件`
+  - `Step H.xiaozhi-client.54 修正 Wi-Fi SDK 默认配置加载顺序`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -34,6 +34,16 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.54` 修正 Wi-Fi SDK 默认配置加载顺序：
+  - 用户 2026-05-28 09:36 板端日志仍未进入 `scan start` / `connect attempt`；`credential[0] ssid=river ssid_len=5 password_len=10` 已确认 Wi-Fi 凭据仍是 `river` 和 10 字节密码。
+  - 新日志中的 `user cfg source=patch_before` 显示 `country=0000(..)`、`band=unknown(0x00)`，且 SDK 关键默认字段仍为 0，说明项目在 SDK 默认 `wifi_set_user_config()` 填充前就覆盖了 `wifi_user_config`。
+  - `river_wifi_station_patch_user_config_once()` 现在先调用 SDK 弱符号 `wifi_set_user_config()`，打印 `sdk_defaults`，再叠加项目侧 country/band/tx power/reconnect/IPS/LPS 覆盖，避免完整 SDK 默认配置丢失。
+  - Wi-Fi user config 日志新增 `concurrent_enabled`、`softap_addr_offset_idx`、`skb_num_np/ap`、`rx/tx_ampdu_num`、`ampdu_rx/tx_enable`、`ap_sta_num`、`wifi_wpa_mode_force`、`probe_hidden_ap_on_passive_ch`、shortcut、keepalive、no-beacon timeout。
+  - STA 任务入口新增 `sta task started`；调用 `wifi_is_running(STA_WLAN_INDEX)` 前后会记录 `whc_api=0x4`、attempt、ret、elapsed，用于区分卡在 `wifi_is_running` 还是卡在 `wifi_on`。
+  - `river_wifi_station_dump_status()` 增加 `wifi_task`、loop count、`wifi_is_running` 状态/attempt/ret/elapsed；上层每 3 秒 `waiting wifi` 后会同步 dump 详细 Wi-Fi 状态。
+  - 本步未修改 Wi-Fi credential、密码内容、扫描/连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF、烧录 profile 或 SDK 源码。
+  - 当前 NAND 硬件需要手动进入烧录模式；Codex 只构建并通知用户，不主动烧录或串口 monitor。
 
 - `Step H.xiaozhi-client.53` 将默认烧录模式切到当前 NAND 硬件：
   - 用户 2026-05-27 20:10 烧录失败日志显示 wrapper 选了 `RTL8730E_NOR.rdev`，而 Flash 工具实际探测到 `MemoryType: NAND`、GD5F1GM7U、`1Gb/128MB`。

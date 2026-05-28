@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.54
+- 根据用户提供的 2026-05-28 09:36 板端日志继续定位 Wi-Fi 无法连接：
+  - 日志已显示 `credential[0] ssid=river ssid_len=5 password_len=10`，但仍没有进入 `scan start` / `connect attempt`。
+  - `user cfg source=patch_before` 中 `country=0000(..)`、`band=unknown(0x00)`、`concurrent/ampdu/skb` 等 SDK 默认字段实际未初始化，说明项目在 SDK 默认 `wifi_set_user_config()` 填充前就覆盖了 `wifi_user_config`。
+  - 日志仍反复出现 `[INIC-A] Host api ipc timeout: cur id 0x9`，对应 SDK `WHC_API_WIFI_ON`；同时烧录/启动日志显示 `WiFiMAC: FF:FF:FF:FF:FF:FF` 和 `[WLAN-E] Efuse empty!...`，空 efuse 仍是独立风险点。
+- 变更：
+  - `components/river_cloud/river_wifi_station.c` 现在先显式调用 SDK 弱符号 `wifi_set_user_config()`，打印 `sdk_defaults`，再叠加项目侧 country/band/tx power/reconnect/IPS/LPS 覆盖，避免把完整 SDK 默认配置清成 0。
+  - Wi-Fi user config 日志新增关键默认字段：`concurrent_enabled`、`softap_addr_offset_idx`、`skb_num_np/ap`、`rx/tx_ampdu_num`、`ampdu_rx/tx_enable`、`ap_sta_num`、`wifi_wpa_mode_force`、`probe_hidden_ap_on_passive_ch`、shortcut、keepalive、no-beacon timeout。
+  - STA 任务入口新增 `sta task started` 日志，并在调用 `wifi_is_running(STA_WLAN_INDEX)` 前后记录 `whc_api=0x4`、attempt、ret、elapsed；如果任务卡在该 IPC，周期状态能显示 `wifi_is_running=pending` 和 elapsed。
+  - `river_wifi_station_dump_status()` 增加 `wifi_task`、loop count、`wifi_is_running` 状态/attempt/ret/elapsed，并保留 `wifi_on` 状态。
+  - `components/river_core/river_orvibo_app.c` 在每 3 秒 `waiting wifi` 日志后调用 `river_wifi_station_dump_status()`，让用户串口日志持续显示 Wi-Fi 初始化卡点。
+- 保持受保护能力不变：
+  - 未修改 Wi-Fi credential、密码内容、扫描/候选选择、连接策略、DHCP、Orvibo 协议、音频链路、VAD、KWS、tensor dump、alignment replay、board/local parity、AEC/BF、烧录 profile 或 SDK 源码。
+- Verification for this step:
+  - passed: source grep confirmed SDK defaults are loaded before project overrides and the new `wifi_is_running`/status diagnostics are present.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - board runtime validation remains user-run only because the current NAND hardware must be placed into flashing/download mode manually.
+
 ## Step H.xiaozhi-client.53
 - 根据用户提供的 2026-05-27 20:10 烧录失败日志修正项目默认烧录模式：
   - 烧录 wrapper 输出显示使用了 `/root/ameba-river/board/rtl8730e/profiles/RTL8730E_NOR.rdev`。

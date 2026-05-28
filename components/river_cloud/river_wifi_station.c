@@ -38,6 +38,7 @@
 extern int (*p_wifi_do_fast_connect)(void);
 extern int (*p_store_fast_connect_info)(unsigned int data1, unsigned int data2);
 extern int wifi_set_ips_internal(u8 enable);
+extern void wifi_set_user_config(void);
 extern struct wifi_user_conf wifi_user_config;
 
 typedef struct {
@@ -60,15 +61,22 @@ typedef struct {
     bool sdk_fast_connect_profile_cleared;
     bool startup_sta_state_cleared;
     bool sdk_user_config_patched;
+    bool task_started;
+    bool wifi_is_running_pending;
     bool wifi_on_pending;
     bool wifi_on_seen_success;
     rtos_task_t task;
     uint32_t connect_attempts;
     uint32_t connect_successes;
     uint32_t connect_failures;
+    uint32_t task_loop_count;
+    uint32_t wifi_is_running_attempts;
+    uint32_t wifi_is_running_start_ms;
+    uint32_t wifi_is_running_last_elapsed_ms;
     uint32_t wifi_on_attempts;
     uint32_t wifi_on_start_ms;
     uint32_t wifi_on_last_elapsed_ms;
+    int wifi_is_running_last_result;
     int wifi_on_last_result;
     int last_error;
     river_wifi_credential_t credentials[RIVER_WIFI_STA_MAX_CREDENTIALS];
@@ -264,6 +272,23 @@ static void river_wifi_station_log_user_config(const char *source)
                (unsigned int)wifi_user_config.ips_enable,
                (unsigned int)wifi_user_config.ips_ctrl_by_usr,
                (unsigned int)wifi_user_config.lps_enable);
+    RIVER_LOGI("user cfg source=%s concurrent=%u softap_offset=%u skb=%ld/%ld ampdu=%u/%u ampdu_en=%u/%u ap_sta=%u wpa=%u hidden_probe=%u shortcut=%u/%u keepalive=%u no_beacon=%u",
+               source,
+               (unsigned int)wifi_user_config.concurrent_enabled,
+               (unsigned int)wifi_user_config.softap_addr_offset_idx,
+               (long)wifi_user_config.skb_num_np,
+               (long)wifi_user_config.skb_num_ap,
+               (unsigned int)wifi_user_config.rx_ampdu_num,
+               (unsigned int)wifi_user_config.tx_ampdu_num,
+               (unsigned int)wifi_user_config.ampdu_rx_enable,
+               (unsigned int)wifi_user_config.ampdu_tx_enable,
+               (unsigned int)wifi_user_config.ap_sta_num,
+               (unsigned int)wifi_user_config.wifi_wpa_mode_force,
+               (unsigned int)wifi_user_config.probe_hidden_ap_on_passive_ch,
+               (unsigned int)wifi_user_config.tx_shortcut_enable,
+               (unsigned int)wifi_user_config.rx_shortcut_enable,
+               (unsigned int)wifi_user_config.keepalive_interval,
+               (unsigned int)wifi_user_config.no_beacon_disconnect_time);
 }
 
 static void river_wifi_station_format_ssid(const struct rtw_ssid *ssid, char *buffer, size_t buffer_size)
@@ -528,7 +553,9 @@ static void river_wifi_station_patch_user_config_once(void)
         return;
     }
 
-    river_wifi_station_log_user_config("patch_before");
+    river_wifi_station_log_user_config("patch_entry");
+    wifi_set_user_config();
+    river_wifi_station_log_user_config("sdk_defaults");
 
     wifi_user_config.country_code[0] = '0';
     wifi_user_config.country_code[1] = '0';
@@ -544,8 +571,47 @@ static void river_wifi_station_patch_user_config_once(void)
     wifi_user_config.lps_enable = 0;
 
     g_river_wifi_station.sdk_user_config_patched = true;
-    RIVER_LOGI("sdk user config patched before wifi_on: country=00 band=2.4g+5g tx_pwr_sel=1 fast_reconnect=0 auto_reconnect=0 ips=0 lps=0");
+    RIVER_LOGI("sdk defaults loaded then project patch applied before wifi_on: country=00 band=2.4g+5g tx_pwr_sel=1 fast_reconnect=0 auto_reconnect=0 ips=0 lps=0");
     river_wifi_station_log_user_config("patch_after");
+}
+
+static int river_wifi_station_query_wifi_is_running(void)
+{
+    uint32_t start_ms;
+    uint32_t end_ms;
+    uint32_t elapsed_ms;
+    int running;
+    bool log_start;
+
+    start_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    g_river_wifi_station.wifi_is_running_pending = true;
+    g_river_wifi_station.wifi_is_running_start_ms = start_ms;
+    g_river_wifi_station.wifi_is_running_attempts++;
+
+    log_start = (g_river_wifi_station.wifi_is_running_attempts <= 4U) ||
+                (!g_river_wifi_station.wifi_on_seen_success) ||
+                (!g_river_wifi_station.connected);
+    if (log_start) {
+        RIVER_LOGI("wifi_is_running start attempt=%lu wlan=%u whc_api=0x4",
+                   (unsigned long)g_river_wifi_station.wifi_is_running_attempts,
+                   (unsigned int)STA_WLAN_INDEX);
+    }
+    running = wifi_is_running(STA_WLAN_INDEX);
+
+    end_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    elapsed_ms = end_ms - start_ms;
+    g_river_wifi_station.wifi_is_running_pending = false;
+    g_river_wifi_station.wifi_is_running_last_result = running;
+    g_river_wifi_station.wifi_is_running_last_elapsed_ms = elapsed_ms;
+    if (log_start ||
+        (running == 0) ||
+        (elapsed_ms >= 1000U)) {
+        RIVER_LOGI("wifi_is_running returned ret=%d elapsed_ms=%lu",
+                   running,
+                   (unsigned long)elapsed_ms);
+    }
+
+    return running;
 }
 
 static int river_wifi_station_wifi_on_sta(void)
@@ -1339,9 +1405,18 @@ static void river_wifi_station_task(void *param)
     int result;
 
     (void)param;
+    g_river_wifi_station.task_started = true;
+    RIVER_LOGI("sta task started priority=%u stack=%u retry_ms=%u",
+               (unsigned int)RIVER_WIFI_STA_TASK_PRIORITY,
+               (unsigned int)RIVER_WIFI_STA_TASK_STACK,
+               (unsigned int)RIVER_WIFI_STA_RETRY_MS);
 
     while (1) {
-        if (!wifi_is_running(STA_WLAN_INDEX)) {
+        int wifi_running;
+
+        g_river_wifi_station.task_loop_count++;
+        wifi_running = river_wifi_station_query_wifi_is_running();
+        if (!wifi_running) {
             river_wifi_station_force_sdk_fast_connect_off();
             river_wifi_station_patch_user_config_once();
             result = river_wifi_station_wifi_on_sta();
@@ -1654,6 +1729,12 @@ const char *river_wifi_station_status_name(void)
     if (!g_river_wifi_station.initialized) {
         return "disabled";
     }
+    if (g_river_wifi_station.wifi_on_pending ||
+        g_river_wifi_station.wifi_is_running_pending ||
+        (!g_river_wifi_station.wifi_on_seen_success &&
+         g_river_wifi_station.wifi_on_attempts > 0U)) {
+        return "starting";
+    }
     if (g_river_wifi_station.connected) {
         return "connected";
     }
@@ -1665,20 +1746,31 @@ const char *river_wifi_station_status_name(void)
 
 void river_wifi_station_dump_status(void)
 {
+    uint32_t wifi_is_running_elapsed_ms = g_river_wifi_station.wifi_is_running_last_elapsed_ms;
     uint32_t wifi_on_elapsed_ms = g_river_wifi_station.wifi_on_last_elapsed_ms;
 
+    if (g_river_wifi_station.wifi_is_running_pending) {
+        wifi_is_running_elapsed_ms = (uint32_t)rtos_time_get_current_system_time_ms() -
+                                     g_river_wifi_station.wifi_is_running_start_ms;
+    }
     if (g_river_wifi_station.wifi_on_pending) {
         wifi_on_elapsed_ms = (uint32_t)rtos_time_get_current_system_time_ms() -
                              g_river_wifi_station.wifi_on_start_ms;
     }
 
-    RIVER_LOGI("status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d wifi_on=%s attempts=%lu ret=%d elapsed_ms=%lu",
+    RIVER_LOGI("status=%s ssid=%s attempts=%lu success=%lu fail=%lu last_err=%d wifi_task=%s loops=%lu wifi_is_running=%s attempts=%lu ret=%d elapsed_ms=%lu wifi_on=%s attempts=%lu ret=%d elapsed_ms=%lu",
                river_wifi_station_status_name(),
                river_wifi_station_ssid(),
                (unsigned long)g_river_wifi_station.connect_attempts,
                (unsigned long)g_river_wifi_station.connect_successes,
                (unsigned long)g_river_wifi_station.connect_failures,
                g_river_wifi_station.last_error,
+               g_river_wifi_station.task_started ? "started" : "not_started",
+               (unsigned long)g_river_wifi_station.task_loop_count,
+               g_river_wifi_station.wifi_is_running_pending ? "pending" : "idle",
+               (unsigned long)g_river_wifi_station.wifi_is_running_attempts,
+               g_river_wifi_station.wifi_is_running_last_result,
+               (unsigned long)wifi_is_running_elapsed_ms,
                g_river_wifi_station.wifi_on_pending ? "pending" :
                    (g_river_wifi_station.wifi_on_seen_success ? "ok" : "not_done"),
                (unsigned long)g_river_wifi_station.wifi_on_attempts,
