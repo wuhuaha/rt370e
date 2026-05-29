@@ -106,25 +106,55 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
      - 电压域、pull-up/down、默认态、测点
      - SDK 默认配置是否仍指向 reference board
 
-4. 外部资料检索：
+4. 关键器件身份归一化：
+   - 不把 PDF 抽取文本、OCR 字符串或 value 字段直接当成最终型号。很多原理图会把符号类别、型号、封装、厂家缩写、规格备注写在同一行。
+   - 对固件相关关键器件必须输出归一化记录：
+     - refdes
+     - 归一化型号/part number
+     - 厂商/品牌（如果可确认）
+     - 封装
+     - 电路角色
+     - 原理图页/页名
+     - 原始 value 字符串
+     - 关键引脚和网名
+     - 对应 BSP/HAL/driver owner
+     - 本地/在线 datasheet、SDK 文档、参考实现链接
+     - 可信度
+   - 推断器件身份时要结合硬件上下文，而不是写固定正则：
+     - refdes 类型、符号管脚名、封装、邻近阻容/电感/二极管、供电网、连接器方向、sheet 名称、网名、同类重复电路、本地 datasheet/BOM、用户说明、外部资料检索结果。
+   - 示例：`U/AXS2033/QFN8/AXS` 应理解为 `U` 类芯片，归一化型号 `AXS2033`，封装/丝印上下文 `QFN8/AXS`，电路角色为单声道 AB/D 类音频功放；还要用 U7 管脚 `SD/BYPASS/INP/INN/OUTP/VDD/GND/OUTN` 和 AXS2033 资料交叉确认。
+   - 如果只能较可靠推断，必须标注为“假设”，说明证据、风险和下一步验证。
+   - 每份报告必须在靠前位置包含：
+     - `关键器件矩阵`：SoC、boot flash、电源、时钟、音频输入/输出、显示/触摸、无线/子 MCU、连接器、传感器、保护/电平转换等。
+     - `引脚接线图谱`：从 SoC/HAL 可见信号到 net、器件管脚、连接器和测点的完整路径。
+
+5. 外部资料检索：
    - 芯片 datasheet/reference manual
    - SDK 使用说明和示例
    - eval-board 原理图
    - vendor app note / errata / forum
+   - 优秀开源实现和开发文档，例如 Linux driver、Zephyr/RTOS API、LVGL porting、厂商 SDK 示例、boot/flash 工具源码。
+   - 论文、教程、视频只作为低可信度学习资料，用于解释概念或测试方法，不能替代本板原理图证据。
+   - 报告中要单独列 `外部参考资料库`：
+     - 官方 datasheet/reference manual
+     - 厂商 SDK/文档/示例
+     - 开源实现
+     - 教程/论文/视频
+     - 每条都写明可信度、用途和限制
 
-5. 交叉验证：
+6. 交叉验证：
    - net name vs datasheet pinmux
    - schematic vs SDK 示例
    - 用户运行日志 vs 硬件连接
    - OCR 结果 vs 视觉复核
 
-6. 缺失信息处理：
+7. 缺失信息处理：
    - 把缺失资料、缺失确认项、阻塞影响列成表。
    - 对关键缺失项提出澄清问题。
    - 如果有较可靠的猜测，必须标成“假设”，给出可信度、依据、风险和验证步骤。
    - 如果存在多个可能方案，列出候选方案和最低风险验证路径。
 
-7. 避坑指南 / 注意事项 / 上手建议：
+8. 避坑指南 / 注意事项 / 上手建议：
    - 每份报告都要包含这个独立章节，位置应靠前，让新接手的软件同事先看到高概率踩坑点。
    - 这部分内容必须来自外部主资料、SDK 示例/默认值、datasheet/app note/errata、原理图深度分析或本地运行记录；不要写泛泛而谈的经验口号。
    - 每条建议要说明：主题、为什么容易错、证据、对固件质量/bring-up 效率的影响、可信度、第一步低风险检查或编码防护。
@@ -132,15 +162,19 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 上手建议应包含首读文件、首跑命令、预期日志、诊断命令和“测到什么之前不要改什么”的 guardrail。
    - 仍然停留在硬件/BSP/HAL/driver 层，不写产品交互、业务播放流程或应用会话策略。
 
-8. Markdown 输出：
+9. Markdown 输出：
    - 摘要
    - 报告边界
    - 证据索引
+   - 固件工程师入口地图
+   - 关键器件矩阵
+   - 引脚接线图谱
    - 工程师提供资料索引
    - 缺失信息和澄清问题
    - 假设/候选方案
    - 固件同事快速上手
    - 避坑指南 / 注意事项 / 上手建议
+   - 外部参考资料库
    - MCU pin map
    - 外设块说明
    - 电源/复位/启动约束
@@ -149,13 +183,14 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 如果本地固件仓库或 SDK 可见，还要给出实现绑定点：override header、CMake/build target、Kconfig、HAL API、诊断命令和建议归属的源码文件。
    - 产品硬件报告正文不得包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容应放在 skill 文件、项目流程说明或普通变更记录里。
 
-9. 交互式 HTML 输出：
+10. 交互式 HTML 输出：
    - 每次生成 Markdown 报告时，默认生成同名 `.html` 伴随文档，例如 `xxx.md` 对应 `xxx.html`。
    - HTML 必须默认可离线打开：CSS、JavaScript、SVG 均内联，不依赖 CDN、远程字体、外部 JS 框架或联网资源。
    - HTML 内容必须与 Markdown 证据对齐：报告边界、证据编号、缺失信息、假设、source notes、scope audit 不能变成另一套说法。
    - 应充分利用 HTML 优势提升阅读效率：
      - 固定目录、全局搜索/过滤、可折叠章节。
-     - 证据表、pin map、避坑表可排序或过滤。
+     - 关键器件矩阵、引脚接线图谱、证据表、pin map、避坑表可排序或过滤。
+     - 关键器件卡片和连接器/引脚图，让固件同事能快速定位“哪个型号、哪个管脚、哪个网名、归哪个 driver”。
      - 构建/烧录/诊断命令提供复制按钮。
      - 板级验证 checklist 可勾选，并用 `localStorage` 记住状态。
      - 用状态/可信度 badge 显示 A/B/C/D 证据、风险等级和未闭合项。
@@ -167,12 +202,12 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 交互设计要面向嵌入式工程师阅读密集技术资料：高对比、响应式、键盘可访问、字体可读、表格/图形尺寸稳定，不做纯装饰图，不隐藏关键结论。
    - 不允许 HTML 额外扩展业务层、产品交互、云端协议、会话策略或 UI 行为。
 
-10. 完整性检查：
+11. 完整性检查：
    - 音频输出不能只写“有功放”，要覆盖 HAL 可见播放设备、SoC line-out/I2S、功放输入/输出、增益电阻/输入电容、SD/mute/mode、喇叭连接器、回采/参考网络、测量路径和常见无声故障树。
    - 显示/触摸不能只写“有 LCD”，要覆盖 panel connector、DSI lane/timing/init table、power/reset/backlight、touch bus/address/IRQ/reset、probe 证据和缺失 timing。
    - 对传感器、无线子系统、电源、boot strap、flash 也要给出 HAL/BSP 可执行的配置项和验证方法。
 
-11. 范围自检：
+12. 范围自检：
    - 交付前搜索云端、业务、会话、TTS/STT、产品交互等词，确认它们没有被写成硬件结论。
    - 避坑/建议章节要再次检查：每一条都必须能追溯证据、能减少具体固件错误或 bring-up 时间，不要保留没有证据的通用建议。
    - 对每个音频、显示、输入路径，确认描述从 SoC/HAL/driver 可见接口开始，到 pin、net、器件、连接器、测点或验证步骤结束。

@@ -1586,3 +1586,11 @@ python3 /root/ameba-rtos/ameba.py build -p
 ## 14. 下一步
 
 Step H 已完成接入、激活、hello/listen/abort/TTS 下行、最小 MCP、TTS 播放边界硬化、uplink 发送背压保护、app 控制/音频队列隔离、协议控制帧失败恢复/skip 收敛、WebSocket poll/send 串行化、连接失败 backoff、TTS 播放背压防护、手动 access refresh 诊断入口、24k/60ms TTS payload envelope 扩容、默认无 WebSocket subprotocol 握手、24k->48k 播放采样率适配、listening 复入/唤醒词打断闭环、WebSocket 入站超时恢复、access 真实身份门控、active SDK default 收敛、OTA/MCP 自描述元数据统一收敛，以及 hello 服务端 AEC 声明语义修正，并已通过实板推进到 XiaoZhi-compatible server hello、listening uplink、TTS 下行播放、H.19 栈修复验证和 H.20 TTS-close 竞态收敛验证。下一步优先完成板侧 OTA 身份、默认无 subprotocol 握手和 `server_aec=no` hello 日志复验，并继续收敛下行采样率协商与 v2/v3 包络兼容的剩余静态风险。
+
+## Step H.xiaozhi-client.81 - 补齐硬件报告关键器件和接线图谱
+
+- 本地 `schematic-pcb-firmware-guide` skill 增加关键器件身份归一化流程，要求结合 refdes、管脚、封装、网名、周边电路、本地 datasheet、用户资料和外部资料推断型号，不把 PDF/OCR raw value 直接当最终型号。
+- skill 模板新增固件工程师入口地图、关键器件矩阵、引脚接线图谱和外部参考资料库，HTML companion 需要同步提供可搜索/过滤的器件表、接线表和来源可追溯图示。
+- 使用最新 skill 完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 和 `.html`，显式覆盖 `RTL8730EAM`、`MSM261DDB021`、`AXS2033`、`GD5F1GM7UEYIGR`、`A113F-15025WUA-R01`、`STI9287C`、`BL702C-10-Q2H`、`TMI3411`、`TMI6050-33`、`EY404-CF42F1`、`FPC512-10-RL-TA-01` 等关键型号。
+- 报告新增可执行接线图谱：`PA2/PA4 DATA1 -> DMIC3/DMIC4`、`LINEOUT_LN/LP -> AXS2033 -> CN2`、`PB25 -> MUTE/SD`、CN6 DSI/touch/backlight、U11 QSPI NAND 和 BL702 UART/boot/reset。
+- 本步只改文档和本地 skill，不修改固件源码、SDK、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。

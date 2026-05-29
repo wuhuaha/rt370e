@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.80 优化 Orvibo TTS 播放抗欠载`
+  - `Step H.xiaozhi-client.81 补齐硬件报告关键器件和接线图谱`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.81` 补齐硬件报告关键器件和接线图谱：
+  - 本地 `schematic-pcb-firmware-guide` skill 增加“关键器件身份归一化”和“引脚接线图谱”流程，要求不能把 PDF/OCR raw value 直接当最终型号，要结合 refdes、管脚、封装、网名、周边电路、本地 datasheet、用户资料和外部资料推断。
+  - skill 模板新增 `Firmware Engineer Entry Map`、`Critical Component Matrix`、`Pin Wiring / Net Connection Atlas` 和 `External Reference Library`，并要求 HTML 同步提供可搜索/过滤的器件表、接线表和来源可追溯图示。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，明确像 `U/AXS2033/QFN8/AXS` 这类 raw value 应归一化为型号 `AXS2033`、封装/丝印上下文和功能角色，而不是用固定正则硬拆。
+  - 使用最新规则完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 和同名 HTML，新增固件工程师入口地图、关键器件矩阵、引脚接线图谱、外部参考资料库、音频/LCD/NAND/BL702 路径图和 HTML 搜索/排序/checklist。
+  - 报告显式覆盖关键型号和接线：`RTL8730EAM`、`MSM261DDB021`、`AXS2033`、`GD5F1GM7UEYIGR`、`A113F-15025WUA-R01`、`STI9287C`、`BL702C-10-Q2H`、`TMI3411`、`TMI6050-33`、`EY404-CF42F1`、`FPC512-10-RL-TA-01`，并把 `PA2/PA4 DATA1 -> DMIC3/DMIC4`、`LINEOUT_LN/LP -> AXS2033 -> CN2`、`PB25 -> MUTE/SD`、CN6 DSI/touch/backlight、U11 QSPI NAND 和 BL702 UART/boot/reset 路径写成可执行 handoff。
+  - 本步只改文档和本地 skill，不修改固件源码、SDK、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+  - HTML static parser、离线依赖检查、关键型号/章节 grep、scope grep、helper `py_compile`、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行固件 build/flash。
 
 - `Step H.xiaozhi-client.80` 优化 Orvibo TTS 播放抗欠载：
   - `orvibo_tts` 播放 period 从 16 个 60ms 应用帧收敛为 4 帧，降低 Ameba AudioTrack IRQ 路径中大 DMA period 带来的 underrun/xrun 风险。

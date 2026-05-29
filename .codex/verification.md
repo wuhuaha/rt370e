@@ -29600,6 +29600,50 @@ Diagnostic interpretation:
 - if `wakeword hit:` appears only once but `wake bridge:` or later wake handling repeats, investigate state/event duplication above the KWS layer
 - if many `kws gate close:` lines show high `gate_best_pm` near or above `thresh_pm` even during obvious non-wake audio, the deployed model itself is likely over-firing on board
 
+## Step H.xiaozhi-client.81 - hardware guide component matrix and wiring atlas
+
+Review the regenerated hardware guide, HTML companion, and skill docs:
+```bash
+cd /root/ameba-river
+rg -n "关键器件矩阵|引脚接线图谱|外部参考资料库|AXS2033|GD5F1GM7UEYIGR|BL702C-10-Q2H|STI9287C|TMI6050-33|TMI3411|EY404-CF42F1|A113F-15025WUA-R01|FPC512-10-RL-TA-01|MSM261DDB021|DMIC3/DMIC4|PB25|LINEOUT_LN" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html \
+  doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md
+```
+
+Expected result:
+- the Markdown and HTML both include the firmware engineer entry map, critical component matrix, pin wiring/net atlas, and external reference library
+- key models are explicit rather than buried in raw schematic value strings
+- audio input/output, LCD/touch/backlight, NAND, and BL702 paths include SoC pins, nets, destination pins/components, firmware meaning, and evidence IDs
+
+Run HTML/static checks:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from html.parser import HTMLParser
+from pathlib import Path
+p = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html')
+HTMLParser().feed(p.read_text(encoding='utf-8'))
+s = p.read_text(encoding='utf-8')
+for bad in ['<script src=', '<link rel="stylesheet"', 'fonts.googleapis', 'unpkg', 'jsdelivr', 'cdn']:
+    assert bad not in s, bad
+print('html offline checks passed')
+PY
+python3 -m py_compile /root/.codex/skills/schematic-pcb-firmware-guide/scripts/*.py
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- HTML parses successfully
+- the HTML remains self-contained with no CDN, remote font, external JS, or external CSS dependency
+- helper scripts compile
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Firmware build is not required for this docs-only step because no source,
+Kconfig, build script, linker script, flash profile, or SDK file changed.
+
 ## Step H.xiaozhi-client.35 - MCP error semantics and volume range guard
 
 Confirm the volume-only MCP path now rejects invalid tool calls with JSON-RPC

@@ -17063,6 +17063,33 @@
   - `git diff --check` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
 
+## Step H.xiaozhi-client.81
+- 补齐 `schematic-pcb-firmware-guide` 的关键器件识别和接线图谱能力：
+  - 本地 skill 新增“关键器件身份归一化”流程，要求从 refdes、symbol pin、package、net name、周边电路、本地 datasheet、用户说明和外部资料综合推断型号。
+  - 明确 raw value 不能直接当最终型号，例如 `U/AXS2033/QFN8/AXS` 应归一化为 `AXS2033`、封装/丝印上下文和单声道 AB/D 类功放角色。
+  - report template 新增 `Firmware Engineer Entry Map`、`Critical Component Matrix`、`Pin Wiring / Net Connection Atlas` 和 `External Reference Library`。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，要求 HTML 也提供关键器件表、接线图谱和来源可追溯图示。
+- 使用最新版 skill 完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`：
+  - 新增固件工程师入口地图、关键器件矩阵、引脚接线图谱、外部参考资料库。
+  - 关键型号显式写入：`RTL8730EAM`、`MSM261DDB021`、`AXS2033`、`GD5F1GM7UEYIGR`、`A113F-15025WUA-R01`、`STI9287C`、`BL702C-10-Q2H`、`TMI3411`、`TMI6050-33`、`EY404-CF42F1`、`FPC512-10-RL-TA-01`。
+  - 关键接线显式写入：`PA2/PA4 DATA1 -> DMIC3/DMIC4`、`LINEOUT_LN/LP -> AXS2033 IN-/IN+ -> CN2`、`PB25 -> MUTE/SD`、CN6 DSI/touch/backlight、U11 QSPI NAND、BL702 UART/reset/boot。
+  - 外部资料按官方/厂商、本地 datasheet、厂商 SDK、开源实现、教程/应用笔记分类，并标注可信度和使用限制。
+- 同步重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html`：
+  - 增加关键器件表、引脚接线表、搜索、排序、copy 命令、`localStorage` checklist。
+  - 增加音频输入/输出、LCD/touch/backlight、NAND/BL702 的来源可追溯 SVG 路径图。
+  - 保持自包含 HTML，无 CDN、远程字体或外部 JS/CSS 依赖。
+- 设计边界：
+  - 本步只改文档和本地 skill，不修改固件源码、SDK、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+  - 报告继续定位为硬件资料到 BSP/HAL/driver 的 handoff，不把业务播放、产品交互、会话或网络策略写成硬件结论。
+- Verification for this step:
+  - `rg` 关键章节/型号/接线检查通过。
+  - HTML parser 通过。
+  - HTML 离线依赖检查通过，无 `<script src>`、外部 stylesheet、CDN 或远程字体。
+  - helper scripts `python3 -m py_compile` 通过。
+  - `git diff --check` 通过。
+  - `python3 tools/diag/check_codex_harness.py` 通过。
+  - docs-only step; firmware build/flash/monitor not required.
+
 ## Step H.xiaozhi-client.9
 - 收敛 Orvibo TTS 下行播放 backpressure：
   - TTS playback buffer 从 12 帧提高到 16 帧，利用当前板端更充足内存吸收常见服务端下行 burst。
