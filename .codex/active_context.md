@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.76 从零重生成硬件固件说明书并收敛报告边界`
+  - `Step H.xiaozhi-client.77 按硬件报告复核音频适配并调满输出音量`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.77` 按硬件报告复核音频适配并调满输出音量：
+  - 使用最新版硬件固件说明书复核语音输入/输出绑定：输入保持已验证 `PDM_CLK=PA2`、`PDM_DAT1=PA4`、DATA1、`AUDIO_DMIC3/DMIC4`、`pdm-2mic-pa2-pa4-data1`；输出保持 `Audio HAL speaker/LINEOUT -> LINEOUT_LN/LP -> AXS2033 -> CN2`，功放控制为 `PB25/MUTE`。
+  - 本轮没有发现报告缺口阻塞音频播放实现，因此未继续修改 skill 或硬件报告正文。
+  - `self.audio_speaker` 本地默认音量改为 `100`；Orvibo audio open 在 `AudioService_Init()` 后设置硬件音量 `1.00f/1.00f`；下行播放 `volume_left/right`、`river playback tone` 和 echo 调试路径硬件音量均改为 `1.00f`。
+  - `/root/ameba-rtos` 完整 build 通过；AP image 字符串和 AP Audio HAL 预处理确认 PA2/PA4/PB25 覆盖仍生效。
+  - 按用户本轮明确要求尝试 `/dev/ttyUSB0` NAND 烧录；工具打开串口但在进入下载模式阶段失败：`Enter download mode fail: ErrType.SYS_PROTO`，未开始写 flash。
+  - 本步不修改 SDK 源码、采集拓扑、VAD/KWS、tensor dump、alignment replay、board/local parity、协议 wire format 或业务/会话策略。
 
 - `Step H.xiaozhi-client.76` 从零重生成硬件固件说明书并收敛报告边界：
   - 使用最新版 `schematic-pcb-firmware-guide` 和 `pdf` 辅助流程重新清点 `doc/hard/`，并重新渲染/复核电源、RTL8730E、PDM/IR/LINEOUT/AXS2033、LCD/touch/backlight、GPIO/NAND、BL702/Zigbee 和 TH FPC 关键页。

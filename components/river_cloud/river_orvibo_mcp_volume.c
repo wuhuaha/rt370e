@@ -13,7 +13,7 @@
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.orvibo.mcp"
 
-static uint8_t g_river_orvibo_volume_percent = 80U;
+static uint8_t g_river_orvibo_volume_percent = 100U;
 
 static void river_orvibo_mcp_add_id(cJSON *root, const cJSON *id_obj)
 {

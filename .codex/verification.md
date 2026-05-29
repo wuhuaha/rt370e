@@ -1,3 +1,67 @@
+## Step H.xiaozhi-client.77 Verification
+
+Review the hardware-report audio conclusions and current firmware binding points:
+```bash
+cd /root/ameba-river
+rg -n "PDM|DMIC|PA2|PA4|LINEOUT|AXS2033|PB25|功放|扬声器|speaker|LINEOUTL|LINEOUTR|MUTE|SD" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md
+rg -n "AUDIO_HW_DMIC|AUDIO_HW_AMPLIFIER|PB_25|PA_2|PA_4|pdm-2mic-pa2-pa4-data1|AUDIO_DMIC3|AUDIO_DMIC4|PB25|MUTE|LINEOUT|RIVER_ORVIBO_PLAYBACK_VOLUME" \
+  include components CMakeLists.txt
+```
+
+Confirm max-volume source changes:
+```bash
+cd /root/ameba-river
+rg -n "g_river_orvibo_volume_percent|RIVER_ORVIBO_PLAYBACK_VOLUME|config\\.volume_left|config\\.volume_right|RIVER_DIAG_PLAYBACK_TONE_HW_VOLUME|RIVER_VOICE_ECHO_PLAYBACK_HW_VOLUME|AudioControl_SetHardwareVolume" \
+  components/river_cloud/river_orvibo_mcp_volume.c \
+  components/river_voice/river_orvibo_audio_service.c \
+  components/river_diag/river_diag_cmd.c \
+  components/river_voice/river_voice_echo.c
+```
+
+Build with the canonical SDK:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm image strings and AP Audio HAL preprocessing:
+```bash
+cd /root/ameba-river
+strings build_RTL8730E/build/project_ap/image/ap_image_all.bin | \
+  rg -n "volume set: percent=%u gain=%.2f|orvibo mcp: volume=%u|playback tone start|pdm-2mic-pa2-pa4-data1|clk=PA2 data1=PA4|PB25/MUTE|diag_tone"
+
+rg -n "_PB_25|AUDIO_HW_AMPLIFIER_PIN|board_amp_pin|amp_info\\.pinmux|_PA_2|_PA_4|AUDIO_HW_DMIC_CLK_PIN|AUDIO_HW_DMIC_DATA1_PIN|dmic|DMIC|data1|clock|clk" \
+  build_RTL8730E/build/project_ap/make/image2/audio/audio_hal \
+  -g '*.i' -g '*.s' -g '*.ii'
+```
+
+Run repository hygiene:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Attempt flash because this turn explicitly requested it:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed on 2026-05-29:
+- passed: hardware report and source grep confirm input remains `PA2/PA4 DATA1 -> DMIC3/DMIC4`, and output remains `LINEOUT_LN/LP -> AXS2033 -> CN2` with `PB25/MUTE`.
+- passed: max-volume source grep shows MCP default `100U`, Orvibo playback hardware/software volume `1.00f`, diagnostic tone hardware volume `1.00f`, and echo hardware volume `1.00f`.
+- passed: `/root/ameba-rtos` build completed with `Build done`.
+- passed: AP image strings contain `pdm-2mic-pa2-pa4-data1`, `clk=PA2 data1=PA4`, MCP volume status/set strings, `diag_tone`, and `PB25/MUTE`.
+- passed: AP Audio HAL preprocessed output contains DMIC DATA1 `Pinmux_Config((0x04), (17))`, DMIC clock `Pinmux_Config((0x02), (17))`, and amplifier `board_amp_pin = (0x39)` / `amp_info.pinmux = (0x39)`, matching `_PA_4`, `_PA_2`, and `_PB_25`.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- attempted: flash wrapper selected project NAND profile and opened `/dev/ttyUSB0`, but failed before download with `Enter download mode fail: ErrType.SYS_PROTO` / `Download prepare fail` / `Finished FAIL: ErrType.SYS_PROTO`; no flash write occurred.
+
 ## Step H.xiaozhi-client.76 Verification
 
 Regenerate a fresh hardware artifact inventory with the schematic/PCB skill helper:

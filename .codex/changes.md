@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.77
+- 根据最新版硬件固件说明书复核语音输入/输出适配：
+  - 语音输入继续保持已验证路径：`PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`、Audio HAL DATA1、`AUDIO_DMIC3/DMIC4`、`pdm-2mic-pa2-pa4-data1`。
+  - AP Audio HAL override 仍覆盖 `AUDIO_HW_DMIC_CLK_PIN=_PA_2`、`AUDIO_HW_DMIC_DATA1_PIN=_PA_4`、`AUDIO_HW_AMPLIFIER_PIN=_PB_25`，匹配硬件报告里的 `PB25/MUTE -> AXS2033 SHUT/SD`。
+  - 本轮未发现硬件报告缺口阻塞音频播放开发，因此没有继续修改 skill 或硬件报告正文。
+- 按“扬声器音量小”要求把输出侧默认音量拉满：
+  - `self.audio_speaker` MCP 本地默认音量从 `80` 改为 `100`。
+  - Orvibo audio open 在 `AudioService_Init()` 后立即调用 `AudioControl_SetHardwareVolume(1.00f, 1.00f)`。
+  - Orvibo 下行播放配置的 `volume_left/right` 从 `0.8f` 改为统一常量 `1.00f`。
+  - 本地 `river playback tone` 诊断和 echo 调试路径的硬件播放音量也改为 `1.00f`，便于上板排查时默认按最大硬件音量验证。
+- 保持边界：
+  - 不修改 `/root/ameba-rtos` SDK 源码。
+  - 不改麦克风采集拓扑、VAD/KWS、tensor dump、alignment replay、board/local parity、协议 wire format 或业务/会话策略。
+- Verification for this step:
+  - passed: source/hardware-report cross-check confirms PA2/PA4 DATA1 capture and PB25 amplifier override are still the active binding.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `pdm-2mic-pa2-pa4-data1`, `clk=PA2 data1=PA4`, `volume set: percent=%u gain=%.2f`, `orvibo mcp: volume=%u`, `diag_tone`, and `PB25/MUTE`.
+  - passed: AP Audio HAL preprocessing confirms DMIC DATA1 pinmux uses `0x04` (`_PA_4`), DMIC clock uses `0x02` (`_PA_2`), and amplifier `board_amp_pin` / `amp_info.pinmux` uses `0x39` (`_PB_25`).
+  - attempted: `python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000`; flash tool opened `/dev/ttyUSB0` but failed before download with `Enter download mode fail: ErrType.SYS_PROTO`, so no image write occurred.
+
 ## Step H.xiaozhi-client.76
 - 按用户要求用最新版 `schematic-pcb-firmware-guide` 从零重生成硬件固件说明书：
   - 重新清点 `doc/hard/` 主原理图、丝印图、PDM 麦资料、AXS2033 功放资料、LCD/ST7102 init table、Sitronix touch 手册和源码包。

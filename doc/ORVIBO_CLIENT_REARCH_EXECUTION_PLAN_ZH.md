@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.77` 按硬件报告复核音频适配并调满输出音量：
+  - 根据 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 复核当前语音输入/输出绑定，输入仍为已验证 `PA2/PA4 DATA1 -> DMIC3/DMIC4`，输出仍为 `Audio HAL speaker/LINEOUT -> AXS2033 -> CN2` 且功放控制为 `PB25/MUTE`。
+  - 本轮报告已经足够支撑实现，未继续修改 skill 或硬件报告正文。
+  - 将 MCP 本地默认音量调到 `100`，并把 Orvibo playback、diagnostic tone、echo 调试路径的硬件/软件播放音量统一调到 `1.00f`。
+  - `/root/ameba-rtos` 完整构建通过；AP image 字符串和 AP Audio HAL 预处理确认 PA2/PA4/PB25 绑定仍生效。
+  - 按用户本轮要求尝试 `/dev/ttyUSB0` NAND 烧录；烧录工具打开串口后在进入下载模式阶段失败，报 `ErrType.SYS_PROTO`，未写入 flash。
 - `Step H.xiaozhi-client.76` 从零重生成硬件固件说明书并收敛报告边界：
   - 使用最新版 `schematic-pcb-firmware-guide` 重新清点 `doc/hard/`，重新渲染/复核电源、RTL8730E、PDM/IR/LINEOUT/AXS2033、LCD/touch/backlight、GPIO/NAND、BL702/Zigbee 和 TH FPC 关键页。
   - 完整替换 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，定位为硬件资料到 BSP/HAL/driver 的 handoff，覆盖证据表、资料索引、缺失澄清、假设方案、pin map、外设块、bring-up checklist、故障特征、风险和 scope audit。

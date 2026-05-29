@@ -48,6 +48,7 @@
 #define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_MONO_MAX * 2U)
 #define RIVER_ORVIBO_DOWNLINK_BUFFER_HIGH_WATER_PCT 95U
 #define RIVER_ORVIBO_TTS_BUFFER_FRAMES         16U
+#define RIVER_ORVIBO_PLAYBACK_VOLUME           1.00f
 #define RIVER_ORVIBO_DIAG_LOG_INTERVAL_MS      5000U
 #define RIVER_ORVIBO_PLAYBACK_DRAIN_POLL_MS    20U
 #define RIVER_ORVIBO_RTOS_OK                   0
@@ -450,6 +451,7 @@ static river_status_t river_orvibo_audio_open(void)
     const river_voice_board_array_profile_t *board = river_voice_board_array_profile();
 
     AudioService_Init();
+    AudioControl_SetHardwareVolume(RIVER_ORVIBO_PLAYBACK_VOLUME, RIVER_ORVIBO_PLAYBACK_VOLUME);
     AudioControl_SetCaptureVolume(board->capture_channels, RIVER_ORVIBO_CAPTURE_VOLUME);
     AudioControl_SetCaptureHpfFc(0, RIVER_ORVIBO_CAPTURE_HPF_FC);
 
@@ -879,8 +881,8 @@ static river_status_t river_orvibo_audio_start_playback_if_needed(uint32_t sampl
     config.bits_per_sample = 16U;
     config.playback_frame_bytes = mono_bytes * 2U;
     config.buffer_frame_count = RIVER_ORVIBO_TTS_BUFFER_FRAMES;
-    config.volume_left = 0.8f;
-    config.volume_right = 0.8f;
+    config.volume_left = RIVER_ORVIBO_PLAYBACK_VOLUME;
+    config.volume_right = RIVER_ORVIBO_PLAYBACK_VOLUME;
     config.reference_export = true;
     config.reference_channels = 1U;
     config.reference_frame_bytes = mono_bytes;
