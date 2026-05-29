@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.73 生成 RTL8730E 4 寸板硬件固件说明书`
+  - `Step H.xiaozhi-client.74 收敛硬件报告边界并补齐 LCD/功放说明`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.74` 收敛硬件报告边界并补齐 LCD/功放说明：
+  - 根据用户反馈，报告边界明确为硬件资料到 BSP/HAL/driver 的交接，不擅自定义云端、业务协议、产品交互或应用层播放/会话方案。
+  - 本地 `schematic-pcb-firmware-guide` skill 新增 report boundary 和 final scope audit 规则，并增强 report template 的 hardware path、firmware boundary、BSP/HAL/driver interface、Scope Audit 和 audio/display/touch 完整性提示。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 纳入用户补充的 `doc/hard/LCD/`：ST7102 480x480 init table、Sitronix touch driver 移植手册和 `ST_TDDI_TPDriver_v45.00.260402` 源码包。
+  - 报告补齐 LCD/touch：ST7102 init table 的 `SSD_LANE(1,0)` 与原理图 D0/D1 两条 data lane 路由存在待确认冲突；Sitronix I2C `0x55` 仅作为源包候选地址，完整 lane rate/porch/reset/touch 地址仍需澄清。
+  - 报告补齐 AXS2033 音频输出硬件路径、gain/输入高通/SD 电压区间/BTL 输出/回采网络，并指出本板 `MUTE=PB25` 与 SDK 默认 `AUDIO_HW_AMPLIFIER_PIN=_PB_19` 不匹配。
+  - 新增 `.gitignore` 规则忽略 Windows `*:Zone.Identifier` 元数据，并用 `.gitattributes` 对 `doc/hard/LCD/**` 关闭 whitespace 检查，避免改写供应商原始资料格式。
+  - 本步只改文档和本地 skill，不修改固件源码、SDK 源码、VAD/KWS、tensor dump、alignment replay、board/local parity、协议或运行策略。
 
 - `Step H.xiaozhi-client.73` 生成 RTL8730E 4 寸板硬件固件说明书：
   - 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 下主原理图、丝印图、MSM261DDB021 PDM 麦 datasheet 和 AXS2033 功放 datasheet。

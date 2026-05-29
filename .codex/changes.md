@@ -16990,3 +16990,23 @@
   - `git diff --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos`
+
+## Step H.xiaozhi-client.74
+- 继续迭代 `schematic-pcb-firmware-guide` 和 RTL8730E 4 寸板硬件固件说明书：
+  - 按用户反馈明确报告边界：本文服务于硬件资料到 BSP/HAL/驱动开发的交接，不擅自定义云端、业务协议、产品交互或应用层播放/会话方案。
+  - 本地 skill `SKILL.md` 新增 report boundary 和 final scope audit 规则，要求结论停在 BSP/HAL/driver、pinmux、电源时序、板级测点和验证。
+  - skill 模板新增 `Report boundary`、`Hardware path`、`Firmware boundary`、`BSP/HAL/driver interface`、`Scope Audit` 和外设完整性提示，强制 audio output/display/touch 写完整硬件路径。
+  - 报告新增“报告边界和读者”章节，明确读者是 BSP/HAL/driver/pinmux/电源时序/板级验证软件同事，并给出 `Audio HAL speaker route -> LINEOUT -> AXS2033 -> CN2 speaker` 这种硬件层写法。
+  - 报告纳入用户补充的 `doc/hard/LCD/`：ST7102 480x480 init table、Sitronix touch driver 移植手册和 `ST_TDDI_TPDriver_v45.00.260402` 源码包。
+  - LCD/touch 结论从“缺资料”更新为：已有 ST7102/Sitronix 本地资料，但 DSI `SSD_LANE(1,0)` 与原理图 D0/D1 两条 data lane 路由存在待确认冲突；Sitronix 源包 `reg=<0x55>` 只是优先 probe 候选，完整 lane rate/porch/reset/touch 地址仍需澄清。
+  - 补全 AXS2033 功放说明：`Audio HAL speaker/internal codec line-out -> LINEOUT_LN/LP -> C76/C153 + R56/R57 -> AXS2033 -> CN2`，并记录 gain 估算、输入高通、SD 电压区间、BTL 输出和回采网络。
+  - 新增关键 BSP/HAL 风险：原理图 `MUTE` 接 RTL8730E `PB25`，但 SDK 默认 `AUDIO_HW_AMPLIFIER_PIN` 是 `_PB_19`，当前项目 audio override 只覆盖 DMIC PA2/PA4；音频输出 bring-up 必须确认 PB25 功放控制。
+  - 新增 `.gitignore` 规则忽略 Windows `*:Zone.Identifier`，避免把用户补充资料包的下载元数据纳入版本控制；新增 `.gitattributes` 对 `doc/hard/LCD/**` 关闭 whitespace 检查，避免改写供应商原始资料格式。
+- 设计边界：
+  - 本步只改文档和本地 skill，不修改固件源码、SDK 源码、VAD/KWS、tensor dump、alignment replay、board/local parity、协议或运行策略。
+  - 功放和 LCD 的建议均停在 BSP/HAL/driver、板级测点和资料缺口，不定义业务播放流程。
+- Verification for this step:
+  - `git diff --check` passed
+  - `git diff --cached --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - docs-only step; firmware build not required because no source/Kconfig/build script/SDK file changed

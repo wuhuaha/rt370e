@@ -1,0 +1,355 @@
+1. DTS 
+Refer to sample.dtsi. Accordin to platform GPIO number to modify 'irq-gpio' and 'rst-gpio'.
+Note: You can use gpio_to_irq() to map the 'irq-gpio' number to its IRQ number
+
+2. Select the platform, bus type and boot type from sitronix_ts.h
+
+Platform:
+	#define SITRONIX_PLATFORM_NORMAL
+	//#define SITRONIX_PLATFORM_SPRD
+	//#define SITRONIX_PLATFORM_MTK_TDP
+	//#define SITRONIX_PLATFORM_QUALCOMM_DRM
+
+BUS interface:
+	#define SITRONIX_INTERFACE_I2C
+	//#define SITRONIX_INTERFACE_SPI
+
+Boot type:	define SITRONIX_TP_WITH_FLASH for flash boot, otherwise for host download.
+	#define SITRONIX_TP_WITH_FLASH
+	For host download usage, put dump file (firmware + CFG) into the foloder or request_firmware().
+	The folder depends on platform.
+
+
+3. Kernel log will contains following messages after adding the touch device driver:
+
+<6>[   31.029470] [ST MSG] Sitronix ST7123 Touch Driver v43.00.220505
+<6>[   31.029532] [ST MSG] sitronix_ts_spi_parse_dt: SPI max frequency = 8000000.
+<6>[   31.029641] [ST MSG] sitronix_ts_spi_parse_dt: Interrupt GPIO = 143. (flag=0)
+<6>[   31.029674] [ST MSG] sitronix_ts_spi_parse_dt: Reset GPIO = 145. (flag=0)
+<6>[   31.029681] [ST MSG] sitronix_ts_spi_parse_dt: SPI Mode = 3.
+<6>[   31.039394] [ST MSG] start of sitronix_ts_probe
+<6>[   31.039403] [ST MSG] sitronix_ts_reset_device: Hardware Reset device.
+<6>[   31.055312] [ST MSG] IC SFR VER = 0x43
+<6>[   31.056484] [ST MSG] Display id = 0x80 0xA0 0xFB
+<6>[   31.062006] [ST MSG] TOUCH_FW_INFO offset = 0xDFA4
+<6>[   31.062016] [ST MSG] fwOff = 0x0
+<6>[   31.062024] [ST MSG] fwSize = 0xDFB8
+<6>[   31.062033] [ST MSG] fwInfoOff = 0xDFA4
+<6>[   31.062041] [ST MSG] cfgFlashOff = 0x10000
+<6>[   31.062049] [ST MSG] cfgDramOff = 0x300
+<6>[   31.062057] [ST MSG] cfgSize = 0xA7C
+<6>[   31.062067] [ST MSG] sitronix_ts_reset_device: Hardware Reset device.
+<6>[   31.463548] [ST MSG] sitronix_spi_hdl_fw success
+<6>[   31.516634] [ST MSG] buf = 0, 0, 0, 0, 2, D0, 6, 40
+<6>[   31.516663] [ST MSG] Status register = 0.
+<6>[   31.517213] [ST MSG] FW Version (hex) = 2
+<6>[   31.517825] [ST MSG] FW revision (hex) = 1 17 1 17
+<6>[   31.519438] [ST MSG] Customer Info (hex) = 0 0 6 1
+<6>[   31.520500] [ST MSG] Resolution = 720 x 1600
+<6>[   31.521036] [ST MSG] Max touches = 10.
+<6>[   31.521573] [ST MSG] Chip ID = 0x83.
+<6>[   31.535712] [ST MSG] X_chs = 18.
+<6>[   31.535740] [ST MSG] Y_chs = 32.
+<6>[   31.536281] [ST MSG] Misc. Info = 0x8F.
+
+Note:
+[ST MSG] IC SFR VER = 0x43 
+The IC SFR verison could be 0x43 or other number. If the value of IC SFR VER is 0x00 or 0xFF, the communication bus (SPI or I2C) might not be ready.
+
+[ST MSG] FW revision (hex) = 1 17 1 17
+If the revision is in different format, the firmware could be incorrect. Please update the firmware.
+
+If messages are correct, but the touch function did not work. Please contact with FAE for touch performance tuning.
+
+
+3. Smart wakeup (SWK) feature
+If the SWK was not supported, comment #define SITRONIX_SUPPORT_SWU of sitronix_ts.h to disable SWK.
+
+SWK gesutre and key code mapping:
+typedef enum {
+	ST_KEY_GESTURE_POWER		= KEY_POWER,
+	ST_KEY_GESTURE_LEFT		= KEY_LEFT,
+	ST_KEY_GESTURE_RIGHT		= KEY_RIGHT,
+	ST_KEY_GESTURE_UP		= KEY_UP,
+	ST_KEY_GESTURE_DOWN		= KEY_DOWN,
+	ST_KEY_GESTURE_TWO_FINGER_DOWN	= KEY_DOWN,
+	ST_KEY_GESTURE_U		= KEY_U,
+	ST_KEY_GESTURE_O		= KEY_O,
+	ST_KEY_GESTURE_E		= KEY_E,
+	ST_KEY_GESTURE_M		= KEY_M,
+	ST_KEY_GESTURE_W		= KEY_W,
+	ST_KEY_GESTURE_L		= KEY_L,
+	ST_KEY_GESTURE_S		= KEY_S,
+	ST_KEY_GESTURE_V		= KEY_V,
+	ST_KEY_GESTURE_Z		= KEY_Z,
+	ST_KEY_GESTURE_C		= KEY_C
+} SWU_KEYCODE;
+
+SWK ON/OFF¡G
+The function, int sitronix_mode_switch(int modeID, bool flag), is in sitronix_st7123_utility.c.
+
+The 'modeID' of SWK is 1. 
+Set the 'flag' as 'true' to enable SWK, 'false' to disable SWK.
+
+The touch device creates both 'sysfs' and 'device node' to enable or disable SWK:
+	(1) /sys/sitronix_ts_attrs/stmodeswitch
+		"echo 01 00 > /sys/sitronix_ts_attrs/stmodeswitch"    //disable SWK
+		"echo 01 01 > /sys/sitronix_ts_attrs/stmodeswitch"    //enable SWK
+
+	(2) /proc/sitronix/swu
+		"echo off > /proc/sitronix/swu"	//disable SWK
+		"echo on > /proc/sitronix/swu"	//enable SWK
+		
+
+4.Self test
+
+	After executing the Self test, normal / open / short / STD (RAW data stability) test will be performed.
+	Settings and functions are located in sitronix_ts_test.c
+	After execution, a test file will be created:
+	#define ST_SELFTEST_LOG_PATH "/sdcard/ST_SELFTEST_LOG.txt"
+
+	Currently existing external test entry points:
+	
+	[Method 1]
+	/sys/sitronix_ts_attrs/stselftest
+	"echo 1 > /sys/sitronix_ts_attrs/stselftest" starts the test
+	"cat /sys/sitronix_ts_attrs/stselftest" check the test results
+
+	[Method 2]
+	/proc/sitronix/stselftest"
+	"echo 1 > /proc/sitronix/stselftest"	starts the test
+	"cat /proc/sitronix/stselftest"		check the test results
+	
+	Or the program calls: void sitronix_touch_selftest(void) to start the test
+	int sitronix_selftest_result_read(void) Get test results, 1 ok, 0 fail
+
+	Modify the test condition value:
+	- According to the applied TDDI IC (ST7123/ST7121P/ST7123P...), open the following define of the corresponding IC in sitronix_ts_test.c and block other IC define (such as opening SITRONIX_TEST_ST7123).
+
+		 #define SITRONIX_TEST_ST7123
+		// #define SITRONIX_TEST_ST7121P
+		// #define SITRONIX_TEST_ST7121PH
+		// #define SITRONIX_TEST_ST7123P
+		// #define SITRONIX_TEST_ST77921
+		// #define SITRONIX_TEST_ST7102
+
+	- ST7123:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st7123.h, and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st7123.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st7123.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+	- ST7121P:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st7121p.h, and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st7121p.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st7121p.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+	- ST7121PH:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st7121ph.h, and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st7121ph.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st7121ph.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+	- ST7123P:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st7123p.h and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st7123p.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st7123p.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+	- ST77921:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st77921.h and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st77921.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st77921.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+	- ST7102:
+		a. Open #define ST_REQUEST_SELF_TEST_INI in sitronix_ts_test_st7102.h and load the ini file in request_firmware mode.
+			The default test criteria file name is "st_selftest_criteria.ini" and can be set by #define ST_SELFTEST_INI_PATH.
+			If it is not enabled, the default define value in sitronix_ts_test_st7102.h is used.
+		b. Adjust the default test criterias: (set in sitronix_ts_test_st7102.h, the setting value can be relaxed according to the mass production criteria value of the module)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+
+	Note: If the platform cannot write files directly, enable #define ST_SELFTEST_EN_GKI in sitronix_ts_test_st****.h to output results via seq_file.
+
+		"echo 1 > /proc/sitronix/stselftest"  						Start the self-test
+		"cat /proc/sitronix/stselftest"		 	 					View the test results
+		"cat /proc/sitronix/stselftest > /data/selftest_rst.log"	Export the test results to a file
+		"echo 0 > /proc/sitronix/stselftest"	 					Release self-test resource
+
+5. Touch performance tuning
+Please proivde root privilege and SOP of kernel image upgrading for TP tuning.
+
+
+6. The GRIP function is used for handling the rotaion of the device.
+The funcion, int sitronix_mode_switch_value(int modeID, bool flag, unsigned char value), is in sitronix_st7123_utility.c.
+The 'modeID' of GRIP is 7. 
+Set the 'flag' as 'true' to enable SWK, 'false' to disable SWK.
+Set the 'value' for rotation, the degree is in clockwise.
+typedef enum {
+	ST_MODE_GRIP_ROTATE_0		=	0,
+	ST_MODE_GRIP_ROTATE_90		=	1,
+	ST_MODE_GRIP_ROTATE_180		=	2,
+	ST_MODE_GRIP_ROTATE_270		=	3,	
+} ST_MODE_GRIP_ROTATE_VALUE;
+
+The deivce nodes for GRIP are:
+	(1)/sys/sitronix_ts_attrs/stmodeswitch
+		"echo 07 0 > /sys/sitronix_ts_attrs/stmodeswitch"			//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_0
+		"echo 07 1 > /sys/sitronix_ts_attrs/stmodeswitch" 			//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_90
+		"echo 07 2 > /sys/sitronix_ts_attrs/stmodeswitch"			//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_180
+		"echo 07 3 > /sys/sitronix_ts_attrs/stmodeswitch"			//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_270
+		"echo 07 {not 0 1 2 3} > /sys/sitronix_ts_attrs/stmodeswitch"	//Trun off GRIP
+
+	(2)/proc/sitronix/grip
+		"echo 0 > /proc/sitronix/grip"		//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_0
+		"echo 90 > /proc/sitronix/grip"		//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_90
+		"echo 180 > /proc/sitronix/grip"	//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_180
+		"echo 270 > /proc/sitronix/grip"	//Turn on GRIP, set value as ST_MODE_GRIP_ROTATE_270
+		"echo on > /proc/sitronix/grip"		//Turn on GRIP, keep the last rotation.
+		"echo off > /proc/sitronix/grip"	//Trun off GRIP
+
+
+
+7. /proc/sitronix/headphone
+	adb shell "echo on > /proc/sitronix/headphone"	//enable headphone suppression
+	adb shell "echo off > /proc/sitronix/headphone"	//disable headphone suppression
+
+8.  /proc/sitronix/glove
+	adb shell "echo on > /proc/sitronix/glove"	//enable GLOVE mode
+	adb shell "echo off > /proc/sitronix/glove"	//disable GLOVE mode
+
+9. /proc/sitronix/stproximity
+
+	(The driver "Sitronix TDDI Touch Driver v43.00.240328" supports the ST7121P proximity function)
+
+	Simply compile with #define SITRONIX_SUPPORT_PROXIMITY enabled.
+
+	Currently, the driver provides a node toggle for proximity.
+	/proc/sitronix/stproximity
+
+	Usage is as follows:
+
+	(1) Enable proximity function:
+		adb shell "echo 1 > /proc/sitronix/stproximity"
+
+	(2) Disable proximity function:
+		adb shell "echo 0 > /proc/sitronix/stproximity"
+
+	(3) Enable proximity function when the screen is off. Proximity only works when the screen is asleep. Executing this command will cause the driver to enter sleep mode (after `sitroinx_ts_suspend`) under the `display driver 11` command, enabling proximity functionality.
+		adb shell "echo 2 > /proc/sitronix/stproximity"
+
+	The execution status is as follows:
+	(1) When the screen is on, proximity will be enabled, and the kernel log will print status 0, 1, 2, or 3. 0 indicates no detection, 1 to 3 indicate the distance to the TP (Touch Panel), 1 indicates an object is detected approaching, and 3 indicates the object is on the screen.
+	(2) When the screen is off, proximity will be enabled, and the kernel log will print status 4 or 5. 4 indicates the object is on the screen, and 5 indicates the object is away.
+
+	When the screen is on:
+	----------------------------------------------------------------------------------
+	<6>[967.791493] [ST MSG] monitor sensing counter: 25 a6
+	<6>[969.209460] [ST MSG] size = 2, cmd = 1
+	<6>[ 969.213393] [ST MSG] sitronix_ts_proximity_enable On
+	<6>[ 969.796337] [ST MSG] monitor sensing counter: 26 94
+	<6>[ 977.765275] [ST MSG] proximity status: 1
+	<6>[ 977.793522] [ST MSG] proximity status: 2
+	<6>[ 977.934862] [ST MSG] proximity status: 3
+	<6>[ 978.951444] [ST MSG] proximity status: 0
+	<6>[ 981.515466] [ST MSG] proximity status: 1
+	<6>[ 981.543707] [ST MSG] proximity status: 2
+	<6>[ 981.685555] [ST MSG] proximity status: 3
+	<6>[ 982.243562] [ST MSG] proximity status: 0
+	<6>[ 985.881372] [ST MSG] monitor sensing counter: 2e 1e
+	----------------------------------------------------------------------------------
+
+	When the screen is off:
+	----------------------------------------------------------------------------------
+	<6>[ 1020.035610] [ST MSG] sitronix_mode_restore success
+	<6>[ 1020.586186] [ST MSG] size = 2, cmd = 2
+	<6>[  1020.586222] [ST MSG] Enable Proximity Sensing in suspend
+	<6>[ 1020.586248] [ST MSG] sitronix_ts_proximity_control_sensing : 1
+	<6>[ 1020.665466] [ST MSG] proximity status: 5
+	<6>[ 1030.514751] [ST MSG] proximity status: 4
+	<6>[ 1031.331761] [ST MSG] proximity status: 5
+	<6>[ 1033.824948] [ST MSG] proximity status: 4
+	<6>[ 1034.752644] [ST MSG] proximity status: 5
+	----------------------------------------------------------------------------------
+
+	Customers can find the The `sitronix_ts_report_proximity()` function implements the events to be reported.
+
+	CFG Settings:
+		Enable Bit(2):ProxEn in IF_Setting2
+		
+	
+10. Sensor Key Functionality
+
+	(The driver "Sitronix TDDI Touch Driver v43.00.240717" supports Sensor Key functionality)
+
+	Enable #define SITRONIX_SENSOR_KEY during compilation. To change the Sensor Key mapping, modify the contents of sitronix_sensor_key_arrar[] in sitronix_ts.c:
+		static sitronix_sensor_key_t sitronix_sensor_key_array[] = {
+			{KEY_BACK}, // bit 0
+			{KEY_HOME}, // bit 1
+			{KEY_MENU}, // bit 2
+		};
+
+
+11. SWK Single/Double Tap Mode Switching
+
+	Enable SWK Single Tap (single-click wake-up): echo 1 > /proc/sitronix/stswktapmode
+	Enable SWK Double Tap (double-click wake-up): echo 2 > /proc/sitronix/stswktapmode
+
+	(Single-click and double-click wake-up functions cannot coexist)
+
+
+12. SWK Mode Selection
+
+	Enable SWK Preset Gestures:
+		echo 0 > /proc/sitronix/stswkselect
+	Enable SWK Signel Tap:
+		echo 1 > /proc/sitronix/stswkselect
+	Enable SWK Double Tap:
+		echo 2 > /proc/sitronix/stswkselect
+	Enable SWK Slide (swipe gestures: up, down, left, right):
+		echo 3 > /proc/sitronix/stswkselect
+
+	(When selecting 1~3, other gestures are invalid.)
+
+
+13. Retrieve current FW mode settings
+
+	cat /proc/sitronix/stmodeswitch
+	modeID = 1, flag = on //SWK status
+	modeID = 2, flag = off //Glove, glove mode
+	modeID = 3, flag = off //Charge, charging mode
+	modeID = 4, flag = off //NFC
+	modeID = 5, flag = off //Reserved, reserved
+	modeID = 6, flag = off //Headphone, headphone mode
+	modeID = 7, flag = `on, value = 0 //Grip; value is the clockwise rotation angle, 0 = degree 0, 1 = degree 90, 2 = drgree 180, 3 = degree 270`
+
+14. Accessing Display Driver CMD (for Debug Only)
+
+	a. Display Driver CMD can be written to or read from via `/proc/sitronix/stdrivercmd` or `/sys/sitronix_ts_attrs/stdrivercmd`.
+	b. Read Driver CMD: (Read back 2 bytes of content from 0Ah)
+		echo "r a 2" > /proc/sitronix/stdrivercmd
+	c. Write Driver CMD: (Write 2 bytes of content from 0Ah)
+		echo "w a 1 2" > /proc/sitronix/stdrivercmd //The number of bytes written must be a multiple of 2
+	d. Note: When reading and writing Driver CMD via nodes, some Driver CMDs can only be written to, not read from.	
+
+========================================================================
+

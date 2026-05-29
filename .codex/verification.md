@@ -1673,11 +1673,13 @@ Run documentation hygiene checks:
 ```bash
 cd /root/ameba-river
 git diff --check
+git diff --cached --check
 python3 tools/diag/check_codex_harness.py
 ```
 
 Expected result:
 - no whitespace errors
+- no staged whitespace errors
 - the harness script exits with `check_codex_harness: all checks passed`
 
 Firmware build note:
@@ -29171,3 +29173,33 @@ Expected result:
 - valid volume calls still succeed and board-side logs show `volume set: percent=30`
 - invalid calls return clear JSON-RPC `error.message` on the server side
 - invalid negative volume never changes the local cached volume to a wrapped high value
+
+## Step H.xiaozhi-client.74 - hardware guide scope and audio/LCD completeness
+
+Review the updated hardware guide and skill docs:
+```bash
+cd /root/ameba-river
+rg -n "边界|报告边界和读者|AUDIO_HW_AMPLIFIER_PIN|PB25|SSD_LANE|Sitronix|ST7102|ST_TDDI|0x55|AXS2033|Hardware path|Report boundary|Scope Audit" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md \
+  doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md
+```
+
+Expected result:
+- the guide states the report boundary as hardware-to-BSP/HAL/driver handoff
+- the audio output section describes the HAL-visible speaker/LINEOUT route, AXS2033 gain/SD/BTL details, PB25 MUTE, and SDK default `_PB_19` mismatch
+- the LCD/touch section cites the ST7102 init table, Sitronix guide, and `ST_TDDI_TPDriver_v45.00.260402`; it flags lane/timing/address gaps and treats `0x55` only as a probe candidate
+- the docs include scope-audit wording that prevents product/business/cloud/session flows from being written as hardware conclusions
+
+Run docs/static hygiene checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Firmware build is not required for this docs-only step because no source,
+Kconfig, build script, linker script, or SDK file changed.

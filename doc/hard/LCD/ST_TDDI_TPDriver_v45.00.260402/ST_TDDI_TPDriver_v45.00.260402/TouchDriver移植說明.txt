@@ -1,0 +1,365 @@
+1.DTS 
+	請根據sample.dtsi內的範例，需改irq-gpio與rst-gpio成客戶平台上的GPIO號碼
+	PS: irq-gpio 會在程式內用 gpio_to_irq 轉成 IRQ number
+
+ 
+2.整機測試時，請先確認 開機是否有類似以下訊息
+
+	IC SFR VER = 0x43， 若為 0或0xFF，表示通訊有異常
+
+	預設開啟 #define ST_UPGRADE_USE_REQUESTFW_BUF
+	請將固件 dump (FW+CFG) 放置於 request_firmware 目錄下, 資料夾位置依平台有所差異。
+	預設檔案名稱為7123.dump，若需修改，請修改ST_REQUESTFW_DF_PATH名稱。
+	若沒出現sitronix_spi_hdl_fw success ，代表host download 過程有錯誤
+
+	若FW revision (hex) = 1 17 1 15，不是這種格式，代表FW 內容有誤，需更新固件
+	若以上資訊都有，但無觸控，表示FAE還需要再調適touch 效果(稱CFG)
+	PS：初版driver 上的 FW、CFG 不一定適用客戶模組，可能要等調適完成後再替換固件
+
+	<6>[   31.029470] [ST MSG] Sitronix ST7123 Touch Driver v43.00.220505
+	<6>[   31.029532] [ST MSG] sitronix_ts_spi_parse_dt: SPI max frequency = 8000000.
+	<6>[   31.029641] [ST MSG] sitronix_ts_spi_parse_dt: Interrupt GPIO = 143. (flag=0)
+	<6>[   31.029674] [ST MSG] sitronix_ts_spi_parse_dt: Reset GPIO = 145. (flag=0)
+	<6>[   31.029681] [ST MSG] sitronix_ts_spi_parse_dt: SPI Mode = 3.
+	<6>[   31.039394] [ST MSG] start of sitronix_ts_probe
+	<6>[   31.039403] [ST MSG] sitronix_ts_reset_device: Hardware Reset device.
+	<6>[   31.055312] [ST MSG] IC SFR VER = 0x43
+	<6>[   31.056484] [ST MSG] Display id = 0x80 0xA0 0xFB
+	<6>[   31.062006] [ST MSG] TOUCH_FW_INFO offset = 0xDFA4
+	<6>[   31.062016] [ST MSG] fwOff = 0x0
+	<6>[   31.062024] [ST MSG] fwSize = 0xDFB8
+	<6>[   31.062033] [ST MSG] fwInfoOff = 0xDFA4
+	<6>[   31.062041] [ST MSG] cfgFlashOff = 0x10000
+	<6>[   31.062049] [ST MSG] cfgDramOff = 0x300
+	<6>[   31.062057] [ST MSG] cfgSize = 0xA7C
+	<6>[   31.062067] [ST MSG] sitronix_ts_reset_device: Hardware Reset device.
+	<6>[   31.463548] [ST MSG] sitronix_spi_hdl_fw success
+	<6>[   31.516634] [ST MSG] buf = 0, 0, 0, 0, 2, D0, 6, 40
+	<6>[   31.516663] [ST MSG] Status register = 0.
+	<6>[   31.517213] [ST MSG] FW Version (hex) = 2
+	<6>[   31.517825] [ST MSG] FW revision (hex) = 1 17 1 17
+	<6>[   31.519438] [ST MSG] Customer Info (hex) = 0 0 6 1
+	<6>[   31.520500] [ST MSG] Resolution = 720 x 1600
+	<6>[   31.521036] [ST MSG] Max touches = 10.
+	<6>[   31.521573] [ST MSG] Chip ID = 0x83.
+	<6>[   31.535712] [ST MSG] X_chs = 18.
+	<6>[   31.535740] [ST MSG] Y_chs = 32.
+	<6>[   31.536281] [ST MSG] Misc. Info = 0x8F.
+
+
+3智能喚醒(手勢喚醒)
+	PS：若手機不支援智能喚醒，請將位於sitronix_ts.h 的  #define SITRONIX_SUPPORT_SWU 註解
+	智能喚醒 的手勢與上報 key code，位於sitronix_ts.h 的 SWU_KEYCODE ，可自行修改對應key code
+
+	typedef enum {
+		ST_KEY_GESTURE_POWER		= KEY_POWER,
+		ST_KEY_GESTURE_LEFT		= KEY_LEFT,
+		ST_KEY_GESTURE_RIGHT		= KEY_RIGHT,
+		ST_KEY_GESTURE_UP		= KEY_UP,
+		ST_KEY_GESTURE_DOWN		= KEY_DOWN,
+		ST_KEY_GESTURE_TWO_FINGER_DOWN	= KEY_DOWN,
+		ST_KEY_GESTURE_U		= KEY_U,
+		ST_KEY_GESTURE_O		= KEY_O,
+		ST_KEY_GESTURE_E		= KEY_E,
+		ST_KEY_GESTURE_M		= KEY_M,
+		ST_KEY_GESTURE_W		= KEY_W,
+		ST_KEY_GESTURE_L		= KEY_L,
+		ST_KEY_GESTURE_S		= KEY_S,
+		ST_KEY_GESTURE_V		= KEY_V,
+		ST_KEY_GESTURE_Z		= KEY_Z,
+		ST_KEY_GESTURE_C		= KEY_C
+	} SWU_KEYCODE;
+
+	開關：
+	函數位於 utility.c 的 int sitronix_mode_switch(int modeID, bool flag)
+	modeID 為1 時， 可用 flag 切換智能喚醒狀態，預設為開啟
+
+
+目前已存在的對外串口：
+1、/sys/sitronix_ts_attrs/stmodeswitch
+	echo 01 00 > /sys/sitronix_ts_attrs/stmodeswitch    關閉智能喚醒功能
+	echo 01 01 > /sys/sitronix_ts_attrs/stmodeswitch    開啟智能喚醒功能
+
+2、/proc/sitronix/swu
+	"echo off > /proc/sitronix/swu"		關閉智能喚醒功能
+	"echo on > /proc/sitronix/swu"		開啟智能喚醒功能
+	可用程式對此proc寫 on/off
+	若需其他串口，請自行建立並呼叫 sitronix_mode_switch
+
+4.Self測試
+
+	執行Self測試後會進行 normal / open / short / STD (RAW data穩定度)測試
+	設定與函數都位於 sitronix_ts_test.c內
+	執行後會建立測試檔案：
+	#define ST_SELFTEST_LOG_PATH "/sdcard/ST_SELFTEST_LOG.txt"
+
+	目前已存在的對外串口：
+	串口1
+	/sys/sitronix_ts_attrs/stselftest
+	"echo 1 > /sys/sitronix_ts_attrs/stselftest"	啟動測試
+	"cat /sys/sitronix_ts_attrs/stselftest"		看測試結果
+
+	串口2
+	/proc/sitronix/stselftest"
+	"echo 1 > /proc/sitronix/stselftest"	啟動測試
+	"cat /proc/sitronix/stselftest"		看測試結果
+
+	或是程式呼叫：void sitronix_touch_selftest(void)  啟動測試
+	int sitronix_selftest_result_read(void)		獲取測試結果 ,1 ok , 0 fail
+	
+	
+
+	修改測試條件值：
+		- 依應用之 TDDI IC(ST7123/ST7121P/ST7123P...)，在 sitronix_ts_test.c 打開下列對應 IC 的 define 並屏蔽其它 IC define(如打開 SITRONIX_TEST_ST7123)。
+	
+		 #define SITRONIX_TEST_ST7123
+		// #define SITRONIX_TEST_ST7121P
+		// #define SITRONIX_TEST_ST7121PH
+		// #define SITRONIX_TEST_ST7123P
+		// #define SITRONIX_TEST_ST77921
+		// #define SITRONIX_TEST_ST7102
+
+		- ST7123:
+			a. 在sitronix_ts_test_st7123.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 sitronix_ts_test_st7123.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+		- ST7121P:
+			a. 在sitronix_ts_test_st7121p.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 sitronix_ts_test_st7121p.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+		- ST7121PH:
+			a. 在sitronix_ts_test_st7121ph.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 sitronix_ts_test_st7121ph.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+		- ST7123P:
+			a. 在sitronix_ts_test_st7123p.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 sitronix_ts_test_st7123p.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+		- ST77921:
+			a. 在sitronix_ts_test_st77921.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 在sitronix_ts_test_st77921.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+		- ST7102:
+			a. 在sitronix_ts_test_st7102.h 開啟 #define ST_REQUEST_SELF_TEST_INI，由request_firmware方式載入ini檔，
+				預設測試條件檔名為"st_selftest_criteria.ini"，可由#define ST_SELFTEST_INI_PATH設定。
+				若未開啟，則使用會出現錯誤。
+			b. 調整預設測試卡控條件: (在 在sitronix_ts_test_st7102.h 裡設定，設定值以模組廠量產卡控值再放寬一些即可)
+				- Normal Rawdata Test:		ST_SELFTEST_NORMAL_MIN, ST_SELFTEST_NORMAL_MAX
+				- Open Test: 				ST_SELFTEST_OPEN_MUX_ON_MIN
+				- Short Test: 				ST_SELFTEST_SHORT_MAX				
+				- STD Test: 				ST_SELFTEST_STD_MAX		
+			c. 可Skip Node測試(for Open / Normal / STD) [test_disable_sensor]
+				-每一個BYTE代表8個Node, 設0x01為跳過不測，設為0x00為需測試。
+	
+	*註： 若平台無法直接寫檔，可在 sitronix_ts_test_st****.h 開啟#define ST_SELFTEST_EN_GKI，由 seq_file 輸出結果。
+		"echo 1 > /proc/sitronix/stselftest"	啟動測試
+		"cat /proc/sitronix/stselftest"			看測試結果
+		"cat /proc/sitronix/stselftest > /data/selftest_rst.log"	導出測試結果
+		"echo 0 > /proc/sitronix/stselftest"	釋放測試資源
+			
+5.調適環境
+	若可以提供手機給原廠調適
+	請讓 image 具有 adb root 權限 ，可以remount requestfw 所用的資料夾
+	並提供更新 kernel image的方式。以方便後續調適
+
+6.grip 旋轉手機
+	函數位於 utility.c 的 int sitronix_mode_switch_value(int modeID, bool flag, unsigned char value);
+	modeID 為7 時， 可用 flag 與 value 切換手機旋轉狀態，預設為關閉
+	flag: true , 開啟功能
+	flag: false ,關閉功能
+	value 如下
+	typedef enum {
+		ST_MODE_GRIP_ROTATE_0		=	0,
+		ST_MODE_GRIP_ROTATE_90		=	1,
+		ST_MODE_GRIP_ROTATE_180		=	2,
+		ST_MODE_GRIP_ROTATE_270		=	3,	
+	} ST_MODE_GRIP_ROTATE_VALUE;
+
+	目前已存在的對外串口：
+	6.1、/sys/sitronix_ts_attrs/stmodeswitch
+		echo 07 0 > /sys/sitronix_ts_attrs/stmodeswitch    開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_0
+		echo 07 1 > /sys/sitronix_ts_attrs/stmodeswitch    開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_90
+		echo 07 2 > /sys/sitronix_ts_attrs/stmodeswitch    開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_180
+		echo 07 3 > /sys/sitronix_ts_attrs/stmodeswitch    開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_270
+		echo 07 {not 0 1 2 3} > /sys/sitronix_ts_attrs/stmodeswitch    關閉grip功能
+
+	6.2、/proc/sitronix/grip
+		"echo 0 > /proc/sitronix/grip"		 開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_0
+		"echo 90 > /proc/sitronix/grip"		 開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_90
+		"echo 180 > /proc/sitronix/grip"	 開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_180
+		"echo 270 > /proc/sitronix/grip"	 開啟grip功能，並設為 ST_MODE_GRIP_ROTATE_270
+		"echo on > /proc/sitronix/grip"		 開啟grip功能，方向為上一次設定的方向
+		"echo off > /proc/sitronix/grip"	 關閉grip功能
+		可用程式對此proc寫 0/90/180/270/on/off
+		若需其他串口，請自行建立並呼叫 sitronix_mode_switch_value
+
+	6.3 確認目前開啟狀態
+		>adb shell cat /proc/sitronix/stmodeswitch
+			modeID = 7 , flag = on , value = 0
+			
+		modeID = 7為目前Grip狀態(flag)及設定方向(value)。
+		value :
+			ST_MODE_GRIP_ROTATE_0		=	0,
+			ST_MODE_GRIP_ROTATE_90		=	1,
+			ST_MODE_GRIP_ROTATE_180		=	2,
+			ST_MODE_GRIP_ROTATE_270		=	3,	
+		
+7. /proc/sitronix/headphone
+	adb shell "echo on > /proc/sitronix/headphone"	開啟耳機線抑制功能
+	adb shell "echo off > /proc/sitronix/headphone"	關閉耳機線抑制功能
+
+8.  /proc/sitronix/glove
+	adb shell "echo on > /proc/sitronix/glove"	開啟手套功能
+	adb shell "echo off > /proc/sitronix/glove"	關閉手套功能
+
+9. /proc/sitronix/stproximity
+	
+	(驅動 "Sitronix TDDI Touch Driver v43.00.240328" 可以支持 ST7121P proximity功能)
+	
+	開啟 #define SITRONIX_SUPPORT_PROXIMITY編譯即可。
+	
+	目前驅動有提供節點開關proximity功能。
+	/proc/sitronix/stproximity
+
+	使用方式如下：
+
+	(1) 開啟 proximity功能：
+	adb shell "echo 1 > /proc/sitronix/stproximity"
+
+	(2)關閉 proximity功能：
+	adb shell "echo 0 > /proc/sitronix/stproximity"
+
+	(3)滅屏時啟用 proximity 功能。 proximity需要在sleep out 時才有動作。
+	執行這個指令，驅動會在滅屏狀況(sitroinx_ts_suspend之後)下display driver 11 指令，讓display進入 sleep out，此時才會有proximity功能。
+
+	adb shell "echo 2 > /proc/sitronix/stproximity"
+
+	執行狀況如下：
+	(1) 亮屏時開啟 proximity，會在kernel log打印狀態 0, 1, 2, 或3。 0表是未偵測，1到3表示與TP距離狀態，1表示偵測到有物體靠近，3表示已貼到屏上。
+	(2) 滅屏時啟用 proximity，會在kernel log打印狀態4或5。4表示貼在屏上，5表示離開。
+
+	亮屏時：
+	---------------------------------------------------------------------------
+	<6>[   967.791493] [ST MSG] monitor sensing counter: 25 a6
+	<6>[   969.209460] [ST MSG] size = 2, cmd = 1
+	<6>[   969.213393] [ST MSG] sitronix_ts_proximity_enable On
+	<6>[   969.796337] [ST MSG] monitor sensing counter: 26 94
+	<6>[   977.765275] [ST MSG] proximity status: 1
+	<6>[   977.793522] [ST MSG] proximity status: 2
+	<6>[   977.934862] [ST MSG] proximity status: 3
+	<6>[   978.951444] [ST MSG] proximity status: 0
+	<6>[   981.515466] [ST MSG] proximity status: 1
+	<6>[   981.543707] [ST MSG] proximity status: 2
+	<6>[   981.685555] [ST MSG] proximity status: 3
+	<6>[   982.243562] [ST MSG] proximity status: 0
+	<6>[   985.881372] [ST MSG] monitor sensing counter: 2e 1e
+	---------------------------------------------------------------------------
+
+	滅屏時：
+	---------------------------------------------------------------------------
+	<6>[  1020.035610] [ST MSG] sitronix_mode_restore success
+	<6>[  1020.586186] [ST MSG] size = 2, cmd = 2
+	<6>[  1020.586222] [ST MSG] Enable Proximity Sensing in suspend
+	<6>[  1020.586248] [ST MSG] sitronix_ts_proximity_control_sensing : 1
+	<6>[  1020.665466] [ST MSG] proximity status: 5
+	<6>[  1030.514751] [ST MSG] proximity status: 4
+	<6>[  1031.331761] [ST MSG] proximity status: 5
+	<6>[  1033.824948] [ST MSG] proximity status: 4
+	<6>[  1034.752644] [ST MSG] proximity status: 5
+	---------------------------------------------------------------------------
+
+	客戶可在 sitroinx_ts.c 的 sitronix_ts_report_proximity() 內實作想要上報的事件。
+	
+	CFG 設定：
+		開啟 IF_Setting2 的 Bit(2):ProxEn
+
+10. Sensor Key 功能
+	
+	(驅動 "Sitronix TDDI Touch Driver v43.00.240717" 可以支持 Sensor Key 功能)
+	
+	開啟 #define SITRONIX_SENSOR_KEY 編譯即可。
+	
+	如需要更改 Sensor Key mapping，可從 sitronix_ts.c 裡面修改 sitronix_sensor_key_arrar[] 的內容：
+		static sitronix_sensor_key_t sitronix_sensor_key_array[] = {
+			{KEY_BACK}, // bit 0
+			{KEY_HOME}, // bit 1
+			{KEY_MENU}, // bit 2
+		};
+
+11. SWK Single/Double Tap 模式切換功能
+
+	開啟 SWK Single Tap(單擊喚醒): echo 1 > /proc/sitronix/stswktapmode
+	開啟 SWK Double Tap(雙擊喚醒): echo 2 > /proc/sitronix/stswktapmode
+
+	(單擊與雙擊喚醒功能不能同時存在)
+
+
+12. SWK 模式選擇功能
+
+	開啟 SWK 預設手勢	: 
+		echo 0 > /proc/sitronix/stswkselect
+	開啟 SWK Signel Tap	: 
+		echo 1 > /proc/sitronix/stswkselect
+	開啟 SWK Double Tap	: 
+		echo 2 > /proc/sitronix/stswkselect
+	開啟 SWK Slide(滑動手勢，上、下、左、右):
+		echo 3 > /proc/sitronix/stswkselect
+	
+	(選擇 1 ~ 3時，其他手勢無效。)
+	
+13. 回讀目前FW各mode設定值
+	cat /proc/sitronix/stmodeswitch
+		modeID = 1 , flag = on					//SWK狀態
+		modeID = 2 , flag = off					//Glove, 手套模式
+		modeID = 3 , flag = off					//Charge, 充電模式
+		modeID = 4 , flag = off					//NFC 
+		modeID = 5 , flag = off					//Reserved, 保留未用
+		modeID = 6 , flag = off					//Headphone, 耳機線模式
+		modeID = 7 , flag = on , value = 0		//Grip; value為順時針旋轉角度, 0 = degree 0, 1 = degree 90, 2 = drgree 180,  3 = degree 270 
+
+14. 下 Display Driver CMD 功能(for Debug Only)
+	a. 可透過 /proc/sitronix/stdrivercmd 或 /sys/sitronix_ts_attrs/stdrivercmd 寫或讀 Display Driver CMD。
+	b. 讀 Driver CMD：(回讀 0Ah 內容 2 個 bytes)
+		echo "r a 2" > /proc/sitronix/stdrivercmd
+	c. 寫 Driver CMD：(寫入 0Ah 內容 2 個 bytes)
+		echo "w a 1 2" > /proc/sitronix/stdrivercmd			//寫入的 Data 個數要為 2 的倍數
+	d. 注意：透過節點讀寫 Driver CMD 方式，部分 Driver CMD 只能寫入，無法讀出內容。
+========================================================================
+
+其他問題可找微信ID： weilchen99 (阿亮) /petitk (小K)
+感謝！

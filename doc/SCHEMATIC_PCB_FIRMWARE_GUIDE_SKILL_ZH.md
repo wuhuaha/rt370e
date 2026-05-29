@@ -14,6 +14,8 @@
 - 板级验证 checklist
 - 可追溯证据表和可信度
 
+报告边界需要明确：这是“硬件资料 -> BSP/HAL/驱动开发”的交接文档，不是业务方案设计文档。可以写 SDK/HAL API、pinmux、driver config、boot logs、测量方法和开发建议；不要擅自把云端协议、产品交互、应用会话、业务播放流程等写成硬件结论。运行日志里若出现业务名，只能作为验证背景，结论必须回到硬件或 HAL/driver 层。建议写 `HAL speaker route -> LINEOUT -> amplifier -> speaker`，不要写某个业务音源到喇叭的产品流程。
+
 ## 外部调研结论
 
 已检索到的外部方向主要分为三类：
@@ -94,6 +96,11 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - flash/PSRAM/eMMC/SDIO
    - UART/I2C/SPI/I2S/PDM/ADC/PWM/GPIO
    - sensor/audio/display/RF/USB/buttons/LEDs
+   - 外部连接器和混合信号块必须写完整硬件路径，例如：
+     - `HAL/SoC-visible signal -> pin/net -> analog/power component -> connector/device`
+     - enable/reset/interrupt/mute/shutdown polarity
+     - 电压域、pull-up/down、默认态、测点
+     - SDK 默认配置是否仍指向 reference board
 
 4. 外部资料检索：
    - 芯片 datasheet/reference manual
@@ -115,6 +122,7 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
 
 7. Markdown 输出：
    - 摘要
+   - 报告边界
    - 证据索引
    - 工程师提供资料索引
    - 缺失信息和澄清问题
@@ -124,6 +132,16 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 电源/复位/启动约束
    - firmware checklist
    - 风险和未知项
+
+8. 完整性检查：
+   - 音频输出不能只写“有功放”，要覆盖 HAL 可见播放设备、SoC line-out/I2S、功放输入/输出、增益电阻/输入电容、SD/mute/mode、喇叭连接器、回采/参考网络、测量路径和常见无声故障树。
+   - 显示/触摸不能只写“有 LCD”，要覆盖 panel connector、DSI lane/timing/init table、power/reset/backlight、touch bus/address/IRQ/reset、probe 证据和缺失 timing。
+   - 对传感器、无线子系统、电源、boot strap、flash 也要给出 HAL/BSP 可执行的配置项和验证方法。
+
+9. 范围自检：
+   - 交付前搜索云端、业务、会话、TTS/STT、产品交互等词，确认它们没有被写成硬件结论。
+   - 对每个音频、显示、输入路径，确认描述从 SoC/HAL/driver 可见接口开始，到 pin、net、器件、连接器、测点或验证步骤结束。
+   - 如果某句话在规定应用行为，要改写成硬件能力、BSP/HAL 配置或板级验证方法。
 
 ## 证据可信度
 
@@ -150,7 +168,7 @@ Skill 使用 A/B/C/D 四级：
 - PDM 麦克风：`PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`、SDK DATA1/DMIC3/4 映射。
 - NAND flash：型号、容量、启动/烧录 profile、日志识别点。
 - Wi-Fi 空 efuse：Device-Id 固定、HP efuse prompt bypass、Wi-Fi bring-up 日志边界。
-- 音频播放和参考回路：I2S/codec/功放控制脚、播放参考 buffer 风险。
+- HAL 音频输出和参考回路：I2S/codec/LINEOUT/功放控制脚、板级参考网络风险。
 - 按键、LED、触摸、显示和其他 GPIO 的 active polarity。
 
 这类报告应保存在 `doc/` 下，作为软件同事后续改驱动和定位板级问题的入口。

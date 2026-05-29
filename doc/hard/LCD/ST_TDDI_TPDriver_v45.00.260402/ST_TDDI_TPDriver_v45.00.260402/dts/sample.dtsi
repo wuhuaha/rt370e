@@ -1,0 +1,25 @@
+I2C:
+
+example :
+			sitronix@55 {
+				compatible = "sitronix_ts";
+				reg = <0x55>;
+				...
+				irq-gpio = <0x1c 0x8f 0x0>;
+				rst-gpio = <0x1c 0x91 0x0>;
+			}
+
+SPI:
+
+example:
+		
+			sitronix_ts_spi@0 {
+				compatible = "sitronix_ts";
+				reg = <0>;
+				spi-max-frequency = <0x7a1200>;
+				irq-gpio = <0x1c 0x8f 0x0>;
+				rst-gpio = <0x1c 0x91 0x0>;				
+				spi-cpol = <0x1>;
+				spi-cpha = <0x1>;
+			};		
+			
