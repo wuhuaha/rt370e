@@ -1,3 +1,185 @@
+## Step H.xiaozhi-client.79 Verification
+
+Validate the generated HTML companion structure and offline constraints:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+from html.parser import HTMLParser
+p = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html')
+text = p.read_text()
+class P(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.ids = []
+        self.scripts = 0
+        self.styles = 0
+    def handle_starttag(self, tag, attrs):
+        d = dict(attrs)
+        if 'id' in d:
+            self.ids.append(d['id'])
+        if tag == 'script':
+            self.scripts += 1
+        if tag == 'style':
+            self.styles += 1
+parser = P()
+parser.feed(text)
+for item in ['overview','paths','evidence','missing','quickstart','pitfalls','pinmap','peripherals','checklist','risks']:
+    assert item in parser.ids, item
+for needle in ['localStorage', 'copy-btn', 'sortable', 'globalSearch', '<svg', 'PDM 输入路径', '扬声器输出路径', 'LCD / Touch 拓扑', 'NAND / BL702 启动边界']:
+    assert needle in text, needle
+for banned in ['https://cdn', 'http://cdn', 'fonts.googleapis', '<script src=', '<link rel="stylesheet"']:
+    assert banned not in text, banned
+print('html static structure ok', len(text), 'bytes', parser.scripts, 'script', parser.styles, 'style')
+PY
+```
+
+Validate Markdown/HTML evidence parity and scope boundary:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+md = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md').read_text()
+html = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html').read_text()
+for eid in [f'E{i}' for i in range(1, 20)]:
+    assert eid in md, ('md', eid)
+    assert eid in html, ('html', eid)
+for phrase in ['Quick Start For Firmware Engineers', 'Pitfalls / Attention Points / Getting Started Advice']:
+    assert phrase in md, phrase
+for phrase in ['快速上手', '避坑指南', 'Board Validation Checklist', 'Scope Audit']:
+    assert phrase in html, phrase
+print('md/html evidence parity ok')
+PY
+
+rg -n "Skill|skill|agent|提示词|工具开发 changelog|本轮|刚刚|上一轮|云端|业务|会话|TTS|STT|cloud|session|assistant|UI|产品交互" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html || true
+```
+
+Validate browser interaction with local `file://` HTML:
+```bash
+cd /root/ameba-river
+npx --yes playwright@1.53.0 --version
+npx --yes playwright@1.53.0 install chromium
+mkdir -p tmp/html_report_check
+npx --yes playwright@1.53.0 screenshot --full-page \
+  file:///root/ameba-river/doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html \
+  tmp/html_report_check/rtl8730e_hardware_guide.png
+
+cat > /tmp/check_hw_html.js <<'JS'
+const fs = require('fs');
+const path = require('path');
+const npxRoot = path.join(process.env.HOME || '/root', '.npm', '_npx');
+const candidates = fs.existsSync(npxRoot)
+  ? fs.readdirSync(npxRoot).map(name => path.join(npxRoot, name, 'node_modules', 'playwright'))
+  : [];
+const playwrightPath = candidates.find(p => fs.existsSync(p));
+if (!playwrightPath) throw new Error('playwright package not found under ' + npxRoot);
+const { chromium } = require(playwrightPath);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.goto('file:///root/ameba-river/doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html');
+  await page.fill('#globalSearch', 'AXS2033');
+  const visibleAfterSearch = await page.locator('.doc-section:not(.is-hidden)').count();
+  if (visibleAfterSearch < 1) throw new Error('search hid every section');
+  await page.fill('#globalSearch', '');
+  await page.click('.segments button[data-view="checklist"]');
+  const hiddenPaths = await page.locator('#paths.is-hidden').count();
+  const checklistVisible = await page.locator('#checklist:not(.is-hidden)').count();
+  if (!hiddenPaths || !checklistVisible) throw new Error('view filtering failed');
+  await page.click('#checks input[data-check="audio-cfg"]');
+  const summary = await page.textContent('#checkSummary');
+  if (!summary || !summary.includes('1 / 10')) throw new Error('checklist state failed: ' + summary);
+  await page.click('#resetChecks');
+  const reset = await page.textContent('#checkSummary');
+  if (!reset || !reset.includes('0 / 10')) throw new Error('checklist reset failed: ' + reset);
+  const localStored = await page.evaluate(() => localStorage.getItem('rtl8730e-hw-guide-checklist-v1'));
+  if (!localStored) throw new Error('localStorage key missing');
+  await browser.close();
+  console.log('playwright interaction ok:', visibleAfterSearch, summary.trim(), reset.trim());
+})().catch(err => { console.error(err); process.exit(1); });
+JS
+node /tmp/check_hw_html.js
+
+cat > /tmp/screenshot_hw_html.js <<'JS'
+const fs = require('fs');
+const path = require('path');
+const npxRoot = path.join(process.env.HOME || '/root', '.npm', '_npx');
+const candidates = fs.existsSync(npxRoot)
+  ? fs.readdirSync(npxRoot).map(name => path.join(npxRoot, name, 'node_modules', 'playwright'))
+  : [];
+const playwrightPath = candidates.find(p => fs.existsSync(p));
+if (!playwrightPath) throw new Error('playwright package not found under ' + npxRoot);
+const { chromium } = require(playwrightPath);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const desktop = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  await desktop.goto('file:///root/ameba-river/doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html');
+  await desktop.screenshot({ path: 'tmp/html_report_check/rtl8730e_hardware_guide_desktop.png', fullPage: true });
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  await mobile.goto('file:///root/ameba-river/doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html');
+  await mobile.screenshot({ path: 'tmp/html_report_check/rtl8730e_hardware_guide_mobile.png', fullPage: true });
+  await browser.close();
+  console.log('screenshots ok');
+})().catch(err => { console.error(err); process.exit(1); });
+JS
+node /tmp/screenshot_hw_html.js
+
+cat > /tmp/check_hw_html_scroll.js <<'JS'
+const fs = require('fs');
+const path = require('path');
+const npxRoot = path.join(process.env.HOME || '/root', '.npm', '_npx');
+const candidates = fs.existsSync(npxRoot)
+  ? fs.readdirSync(npxRoot).map(name => path.join(npxRoot, name, 'node_modules', 'playwright'))
+  : [];
+const playwrightPath = candidates.find(p => fs.existsSync(p));
+if (!playwrightPath) throw new Error('playwright package not found under ' + npxRoot);
+const { chromium } = require(playwrightPath);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  await page.goto('file:///root/ameba-river/doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html');
+  const before = await page.evaluate(() => ({
+    x: scrollX,
+    wrapCanScroll: document.querySelector('.table-wrap').scrollWidth > document.querySelector('.table-wrap').clientWidth
+  }));
+  await page.evaluate(() => window.scrollTo(400, 0));
+  const after = await page.evaluate(() => ({
+    x: scrollX,
+    wrapCanScroll: document.querySelector('.table-wrap').scrollWidth > document.querySelector('.table-wrap').clientWidth
+  }));
+  if (after.x !== 0) throw new Error('page horizontally scrolled: ' + JSON.stringify({ before, after }));
+  if (!after.wrapCanScroll) throw new Error('table wrapper lost internal horizontal scroll');
+  await browser.close();
+  console.log('mobile horizontal behavior ok:', JSON.stringify({ before, after }));
+})().catch(err => { console.error(err); process.exit(1); });
+JS
+node /tmp/check_hw_html_scroll.js
+```
+
+Run helper and repository hygiene:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/new_evidence_table.py \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: static parser printed `html static structure ok`, with one inline style and one inline script.
+- passed: the generated HTML has no CDN, remote font, external stylesheet, or external script dependency.
+- passed: Markdown/HTML evidence parity printed `md/html evidence parity ok`; E1-E19 are present in both files.
+- passed: scope grep only found product/business/UI/session terms in explicit report-boundary or scope-audit wording.
+- passed: Playwright opened the local `file://` HTML, captured desktop/mobile screenshots, verified search, view filtering, checklist `localStorage`, checklist reset, and mobile horizontal behavior.
+- note: the validation container has no CJK fonts installed, so Playwright screenshots render Chinese glyphs as missing boxes in that environment; the HTML includes common system CJK font fallbacks and remains self-contained.
+- passed: `python3 -m py_compile` for skill helper scripts.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, or serial monitor; this was a documentation/skill-instruction update with no firmware source, Kconfig, build script, linker script, or SDK file changed.
+
 ## Step H.xiaozhi-client.78 Verification
 
 Regenerate a fresh artifact inventory for the report pass:

@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.78 为硬件报告 skill 增加避坑/上手建议并重生成报告`
+  - `Step H.xiaozhi-client.79 为硬件报告 skill 增加交互式 HTML 伴随文档`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.79` 为硬件报告 skill 增加交互式 HTML 伴随文档：
+  - 本地 `schematic-pcb-firmware-guide` skill 默认输出从单一 Markdown 扩展为 Markdown + 同名离线交互式 HTML。
+  - skill 模板新增 `Interactive HTML Companion` 要求：HTML 自包含、内容与 Markdown 证据编号一致、无 CDN/远程字体/外部框架，并包含 sticky TOC、搜索/过滤、可折叠章节、可排序表格、copy 命令、`localStorage` checklist 和来源可追溯 SVG/CSS 可视化。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，明确 HTML 不允许额外扩展业务层、产品交互、云端协议、会话策略或 UI 行为。
+  - 新增 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html`，覆盖概览指标、PDM 输入路径图、speaker/AXS2033 输出路径图、LCD/touch 拓扑图、NAND/BL702 启动边界图、证据表、缺失/假设、快速上手命令、避坑表、pin map、外设块、board-validation checklist、风险和 scope audit。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 增加 HTML 伴随文档入口，`doc/README.md` 增加 HTML 索引。
+  - 本步只改文档和本地 skill，不修改固件源码、SDK、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+  - HTML static parser、Markdown/HTML evidence parity、scope grep、Playwright 本地 `file://` 交互检查、desktop/mobile screenshot、helper `py_compile`、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行固件 build/flash。
 
 - `Step H.xiaozhi-client.78` 为硬件报告 skill 增加避坑/上手建议并重生成报告：
   - 本地 `schematic-pcb-firmware-guide` skill 增加 `Extract pitfalls and getting-started advice` 流程，要求每份硬件固件 handoff 报告提炼证据可追溯的“避坑指南 / 注意事项 / 上手建议”。

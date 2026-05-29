@@ -3,6 +3,7 @@
 日期：2026-05-29
 对象：Orvibo RTL8730E 4 寸板，主原理图 `RTOS_4InchLCD` / `MixPad4_RTL8730`，Rev `V0.1`，日期 `2026-05-06`。
 目的：把 `doc/hard/` 中的原理图、丝印图、器件资料、SDK 默认值和本项目绑定点整理成固件同事可执行的 BSP/HAL/driver handoff。
+交互版：同目录 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html` 提供离线搜索、过滤、硬件路径图和 board-validation checklist，内容与本 Markdown 证据编号保持一致。
 
 ## Summary
 

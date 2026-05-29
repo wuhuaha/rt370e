@@ -2,7 +2,7 @@
 
 ## 目标
 
-为软件同事提供一个可复用流程：从原理图 PDF、PCB 截图、图片、BOM 或 EDA 导出开始，结合 OCR、视觉检查、外部芯片资料和 SDK 示例，输出面向固件开发的 Markdown 使用说明书。
+为软件同事提供一个可复用流程：从原理图 PDF、PCB 截图、图片、BOM 或 EDA 导出开始，结合 OCR、视觉检查、外部芯片资料和 SDK 示例，输出面向固件开发的 Markdown 使用说明书，并同步生成同名的离线交互式 HTML 文档。
 
 核心产物不是电气设计审查结论，而是固件同事能直接使用的资料：
 
@@ -13,6 +13,7 @@
 - 预期启动日志
 - 板级验证 checklist
 - 避坑指南 / 注意事项 / 上手建议
+- 交互式 HTML 阅读版：搜索、过滤、可视化硬件路径、可勾选 checklist
 - 可追溯证据表和可信度
 
 报告边界需要明确：这是“硬件资料 -> BSP/HAL/驱动开发”的交接文档，不是业务方案设计文档。可以写 SDK/HAL API、pinmux、driver config、boot logs、测量方法和开发建议；不要擅自把云端协议、产品交互、应用会话、业务播放流程等写成硬件结论。运行日志里若出现业务名，只能作为验证背景，结论必须回到硬件或 HAL/driver 层。建议写 `HAL speaker route -> LINEOUT -> amplifier -> speaker`，不要写某个业务音源到喇叭的产品流程。
@@ -50,6 +51,8 @@
 ```text
 使用 $schematic-pcb-firmware-guide 分析 doc/hard/xxx.pdf，输出面向固件同事的 Markdown 硬件说明书。
 ```
+
+默认情况下，skill 还会在 Markdown 同目录生成同名 `.html` 交互版。如果只需要 Markdown，需要明确说明“仅生成 Markdown”。
 
 也可以给出更具体要求：
 
@@ -146,16 +149,35 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 如果本地固件仓库或 SDK 可见，还要给出实现绑定点：override header、CMake/build target、Kconfig、HAL API、诊断命令和建议归属的源码文件。
    - 产品硬件报告正文不得包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容应放在 skill 文件、项目流程说明或普通变更记录里。
 
-9. 完整性检查：
+9. 交互式 HTML 输出：
+   - 每次生成 Markdown 报告时，默认生成同名 `.html` 伴随文档，例如 `xxx.md` 对应 `xxx.html`。
+   - HTML 必须默认可离线打开：CSS、JavaScript、SVG 均内联，不依赖 CDN、远程字体、外部 JS 框架或联网资源。
+   - HTML 内容必须与 Markdown 证据对齐：报告边界、证据编号、缺失信息、假设、source notes、scope audit 不能变成另一套说法。
+   - 应充分利用 HTML 优势提升阅读效率：
+     - 固定目录、全局搜索/过滤、可折叠章节。
+     - 证据表、pin map、避坑表可排序或过滤。
+     - 构建/烧录/诊断命令提供复制按钮。
+     - 板级验证 checklist 可勾选，并用 `localStorage` 记住状态。
+     - 用状态/可信度 badge 显示 A/B/C/D 证据、风险等级和未闭合项。
+   - 应加入来源可追溯的可视化：
+     - 音频输入/输出完整硬件路径图。
+     - LCD/touch、NAND/boot、BL702、I2C 总线等拓扑图。
+     - 电源/复位/下载时序、风险矩阵或 bring-up 路线图。
+   - 可视化优先用确定的 inline SVG/CSS 画出来；只有当位图能显著提升理解，且不会虚构未验证硬件时，才调用生图 skill。
+   - 交互设计要面向嵌入式工程师阅读密集技术资料：高对比、响应式、键盘可访问、字体可读、表格/图形尺寸稳定，不做纯装饰图，不隐藏关键结论。
+   - 不允许 HTML 额外扩展业务层、产品交互、云端协议、会话策略或 UI 行为。
+
+10. 完整性检查：
    - 音频输出不能只写“有功放”，要覆盖 HAL 可见播放设备、SoC line-out/I2S、功放输入/输出、增益电阻/输入电容、SD/mute/mode、喇叭连接器、回采/参考网络、测量路径和常见无声故障树。
    - 显示/触摸不能只写“有 LCD”，要覆盖 panel connector、DSI lane/timing/init table、power/reset/backlight、touch bus/address/IRQ/reset、probe 证据和缺失 timing。
    - 对传感器、无线子系统、电源、boot strap、flash 也要给出 HAL/BSP 可执行的配置项和验证方法。
 
-10. 范围自检：
+11. 范围自检：
    - 交付前搜索云端、业务、会话、TTS/STT、产品交互等词，确认它们没有被写成硬件结论。
    - 避坑/建议章节要再次检查：每一条都必须能追溯证据、能减少具体固件错误或 bring-up 时间，不要保留没有证据的通用建议。
    - 对每个音频、显示、输入路径，确认描述从 SoC/HAL/driver 可见接口开始，到 pin、net、器件、连接器、测点或验证步骤结束。
    - 如果某句话在规定应用行为，要改写成硬件能力、BSP/HAL 配置或板级验证方法。
+   - HTML 交互控件要在本地文件打开模式下可用；即使 JavaScript 关闭，关键结论、证据表、风险和 checklist 仍应可见。
 
 ## 证据可信度
 

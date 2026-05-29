@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.79
+- 迭代 `schematic-pcb-firmware-guide`，把硬件固件 handoff 的默认输出从单一 Markdown 扩展为 Markdown + 同名离线交互式 HTML：
+  - 本地 skill `SKILL.md` 描述更新为生成 firmware-oriented Markdown guide plus self-contained interactive HTML companion。
+  - skill 模板 `references/report_template.md` 新增 `Interactive HTML Companion` 章节，要求 HTML 离线自包含、内容与 Markdown 证据一致、具备 sticky TOC、搜索/过滤、可折叠章节、可排序表格、copy 命令、localStorage checklist 和来源可追溯的 SVG/CSS 可视化。
+  - 项目说明 `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，明确默认生成同名 `.html`，并禁止 HTML 额外扩展业务层、产品交互、云端协议、会话策略或 UI 行为。
+- 使用最新版规则完整更新当前硬件报告交付物：
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 增加同名 HTML 伴随文档入口，正文继续保持硬件资料到 BSP/HAL/driver 的 handoff 边界。
+  - 新增 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html`，单文件内联 CSS/JS/SVG，不依赖 CDN、远程字体或外部框架，可直接用浏览器打开。
+  - HTML 包含概览指标、PDM 输入路径图、speaker/AXS2033 输出路径图、LCD/touch 拓扑图、NAND/BL702 启动边界图、证据表、缺失/假设表、快速上手命令、避坑表、pin map、外设块、board-validation checklist、风险和 scope audit。
+  - 交互能力包括全局搜索、视图切换、表格排序/过滤、命令复制按钮、checklist 勾选状态 `localStorage` 保存、移动端响应式布局和宽表格内部横向滚动。
+  - `doc/README.md` 增加 HTML 伴随文档入口。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: HTML static parser check confirms required sections, one inline style, one inline script, no CDN/remote font/script dependency, and required SVG/interaction markers.
+  - passed: Markdown/HTML evidence parity check confirms E1-E19 are present in both files.
+  - passed: scope grep found product/business/UI/session terms only in explicit boundary/scope-audit wording.
+  - passed: Node Playwright opened the local `file://` HTML, verified search, view filtering, checklist `localStorage`, reset behavior, desktop/mobile screenshots, and mobile horizontal behavior.
+  - passed: `python3 -m py_compile` for skill helper scripts.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - not run: firmware build, flash/download, or serial monitor; this is a docs/skill-instruction update with no firmware source, build configuration, linker script, or SDK file changed.
+
 ## Step H.xiaozhi-client.78
 - 迭代 `schematic-pcb-firmware-guide`，要求每份硬件固件 handoff 报告都包含“快速上手”和“避坑指南 / 注意事项 / 上手建议”：
   - 本地 skill `SKILL.md` 新增 `Extract pitfalls and getting-started advice` 流程，要求从外部主资料、SDK 示例/默认值、datasheet/app note/errata、原理图深度分析和本地运行记录中提炼高概率踩坑点。

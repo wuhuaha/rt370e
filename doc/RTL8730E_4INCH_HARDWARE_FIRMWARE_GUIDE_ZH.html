@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTL8730E 4 寸板硬件固件说明书</title>
+  <style>
+    :root {
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --panel-soft: #eef3f2;
+      --ink: #16212b;
+      --muted: #5c6975;
+      --line: #d8e0e3;
+      --strong: #0b5c6b;
+      --ok: #17845d;
+      --warn: #a36500;
+      --risk: #b73535;
+      --violet: #5c4f8f;
+      --code: #111922;
+      --shadow: 0 10px 24px rgba(18, 33, 43, 0.08);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.58;
+      letter-spacing: 0;
+      overflow-x: hidden;
+    }
+    a { color: var(--strong); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -48px;
+      padding: 8px 12px;
+      background: var(--ink);
+      color: #fff;
+      z-index: 20;
+      border-radius: 6px;
+    }
+    .skip-link:focus { top: 12px; }
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      overflow: auto;
+      padding: 20px 18px;
+      background: #111922;
+      color: #e7edf0;
+      border-right: 1px solid #273540;
+    }
+    .brand {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+    .brand strong { font-size: 17px; }
+    .brand span { color: #aebbc4; font-size: 13px; }
+    .toc {
+      display: grid;
+      gap: 4px;
+    }
+    .toc a {
+      display: block;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: #dbe6ea;
+      font-size: 14px;
+    }
+    .toc a:hover, .toc a.active {
+      background: #22313b;
+      color: #fff;
+      text-decoration: none;
+    }
+    .main {
+      min-width: 0;
+      padding: 0 0 40px;
+    }
+    .top {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(246, 247, 248, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+    .top-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 18px 24px;
+    }
+    h1, h2, h3, h4 {
+      margin: 0;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h1 { font-size: 28px; }
+    h2 { font-size: 22px; margin-bottom: 12px; }
+    h3 { font-size: 17px; margin-bottom: 8px; }
+    h4 { font-size: 15px; margin-bottom: 6px; }
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 900px;
+    }
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      min-width: 360px;
+    }
+    .search {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 12px;
+      border: 1px solid #bfcbd0;
+      border-radius: 6px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    .segments {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .segments button, .copy-btn, .small-btn {
+      border: 1px solid #bfcbd0;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .segments button.active, .segments button:hover, .copy-btn:hover, .small-btn:hover {
+      border-color: var(--strong);
+      color: var(--strong);
+      background: #edf8f7;
+    }
+    .content {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    section {
+      scroll-margin-top: 116px;
+      margin-bottom: 28px;
+    }
+    .section-band {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .summary-grid, .metric-grid, .path-grid, .block-grid, .risk-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .path-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .block-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .risk-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card, .metric, details, .diagram, .command, .check-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-width: 0;
+    }
+    .metric {
+      min-height: 112px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+    }
+    .metric .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--strong);
+    }
+    .muted { color: var(--muted); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .badge.a { color: #07583b; background: #dff5eb; border-color: #b8e3cf; }
+    .badge.b { color: #775000; background: #fff2cf; border-color: #e8cf8b; }
+    .badge.c { color: #6a3f00; background: #fbe6d0; border-color: #e4bc91; }
+    .badge.d { color: #772424; background: #f8dddd; border-color: #e8b9b9; }
+    .badge.info { color: #164b63; background: #e2f2f6; border-color: #b9dae2; }
+    .badge.violet { color: #3e326f; background: #eeeafa; border-color: #cec6ea; }
+    table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: #eef3f2;
+      font-size: 13px;
+      color: #263642;
+      cursor: pointer;
+      position: sticky;
+      top: 101px;
+      z-index: 2;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      overflow: auto;
+      border-radius: var(--radius);
+      min-width: 0;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    code {
+      padding: 1px 4px;
+      background: #eef2f3;
+      border-radius: 4px;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e9f2f5;
+      background: var(--code);
+      border-radius: 6px;
+      padding: 12px;
+      overflow: auto;
+    }
+    .command {
+      display: grid;
+      gap: 8px;
+      background: #fdfefe;
+    }
+    .command-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    details[open] summary { margin-bottom: 10px; }
+    .diagram {
+      min-height: 260px;
+      display: grid;
+      gap: 8px;
+    }
+    svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      background: #fbfcfd;
+      border: 1px solid #e2e8ea;
+      border-radius: 6px;
+    }
+    .svg-label, .svg-small {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+    }
+    .svg-label { font-size: 13px; fill: #17212b; }
+    .svg-small { font-size: 11px; fill: #5c6975; }
+    .svg-box { fill: #ffffff; stroke: #8ba4ad; stroke-width: 1.3; rx: 6; }
+    .svg-box.accent { fill: #e8f5f2; stroke: #17845d; }
+    .svg-box.warn { fill: #fff5dd; stroke: #a36500; }
+    .svg-box.risk { fill: #fbe7e7; stroke: #b73535; }
+    .svg-line { stroke: #0b5c6b; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    .svg-line.warn { stroke: #a36500; }
+    .svg-line.risk { stroke: #b73535; }
+    .check-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .check-item {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+    .check-item input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+    }
+    .progress {
+      height: 10px;
+      background: #e5ebee;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--ok);
+      transition: width 160ms ease;
+    }
+    .empty {
+      display: none;
+      padding: 20px;
+      border: 1px dashed #b9c6cc;
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: #fff;
+    }
+    .is-hidden { display: none !important; }
+    .footnote {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    @media (max-width: 1020px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+      }
+      .toc {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .top { position: static; }
+      th { position: static; }
+      .top-inner { grid-template-columns: 1fr; }
+      .toolbar { min-width: 0; }
+      .segments { justify-content: flex-start; }
+      section { scroll-margin-top: 24px; }
+    }
+    @media (max-width: 760px) {
+      h1 { font-size: 23px; }
+      h2 { font-size: 20px; }
+      .content, .top-inner { padding-left: 14px; padding-right: 14px; }
+      .summary-grid, .metric-grid, .path-grid, .block-grid, .risk-grid, .check-list {
+        grid-template-columns: 1fr;
+      }
+      .toc { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .sidebar, .top, .copy-btn, .segments { display: none; }
+      .shell { display: block; }
+      .content { max-width: none; }
+      section { break-inside: avoid; }
+      body { background: #fff; }
+      .section-band, .card, .metric, .diagram, details { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="目录">
+      <div class="brand">
+        <strong>RTL8730E 4 寸板</strong>
+        <span>硬件资料到 BSP/HAL/driver handoff</span>
+      </div>
+      <nav class="toc" id="toc">
+        <a href="#overview">概览</a>
+        <a href="#paths">硬件路径</a>
+        <a href="#evidence">证据索引</a>
+        <a href="#missing">缺失与假设</a>
+        <a href="#quickstart">快速上手</a>
+        <a href="#pitfalls">避坑指南</a>
+        <a href="#pinmap">Pin Map</a>
+        <a href="#peripherals">外设块</a>
+        <a href="#checklist">验证 Checklist</a>
+        <a href="#risks">风险与来源</a>
+      </nav>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="top">
+        <div class="top-inner">
+          <div>
+            <h1>RTL8730E 4 寸板硬件固件说明书</h1>
+            <p class="subtitle">基于 `doc/hard/`、`/root/ameba-rtos` SDK、当前项目绑定点和已记录的实板验证。边界停在 BSP/HAL/driver、pinmux、电源复位、下载和板级测量。</p>
+          </div>
+          <div class="toolbar" role="search">
+            <input class="search" id="globalSearch" type="search" placeholder="搜索 PA2、AXS2033、LCD、NAND、E8..." aria-label="搜索文档">
+            <div class="segments" aria-label="视图">
+              <button type="button" class="active" data-view="all">全部</button>
+              <button type="button" data-view="paths">路径</button>
+              <button type="button" data-view="evidence">证据</button>
+              <button type="button" data-view="pitfalls">避坑</button>
+              <button type="button" data-view="checklist">验证</button>
+              <button type="button" data-view="sources">来源</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <noscript>
+          <div class="section-band">JavaScript 关闭时，正文、表格、SVG 路径图和 checklist 仍可阅读；搜索、排序、复制和勾选状态保存不可用。</div>
+        </noscript>
+        <div id="emptyState" class="empty">没有匹配当前搜索和视图过滤的内容。</div>
+
+        <section id="overview" class="doc-section" data-view="all paths evidence pitfalls checklist sources" data-index="summary overview pdm pa2 pa4 lineout axs2033 nand lcd touch bl702 th ir rf">
+          <div class="section-band">
+            <h2>概览</h2>
+            <div class="metric-grid">
+              <div class="metric">
+                <span class="badge a">A / 已闭合</span>
+                <div class="value">PA2 / PA4</div>
+                <div>PDM_CLK 接 PA2，PDM_DAT1 接 PA4；DATA1 对应 DMIC3/DMIC4。</div>
+              </div>
+              <div class="metric">
+                <span class="badge a">A / 已绑定</span>
+                <div class="value">PB25</div>
+                <div>功放 AXS2033 的 SHUT/SD 控制网名 MUTE，项目覆盖为 `_PB_25`。</div>
+              </div>
+              <div class="metric">
+                <span class="badge b">B / 待确认</span>
+                <div class="value">DSI lane</div>
+                <div>原理图 D0/D1 两条 data lane，ST7102 init table 写 `SSD_LANE(1,0)`。</div>
+              </div>
+              <div class="metric">
+                <span class="badge a">A / 下载边界</span>
+                <div class="value">NAND</div>
+                <div>板上 GD5F1GM7UEYIGR SPI NAND，当前硬件使用 NAND profile。</div>
+              </div>
+            </div>
+            <div class="summary-grid" style="margin-top:12px">
+              <div class="card">
+                <h3>音频输入</h3>
+                <p>`CN7 -> PDM_CLK/PDM_DAT1 -> PA2/PA4 -> Audio HAL DATA1 -> DMIC3/DMIC4 -> AudioRecord`。已由实板记录证明能产生有效语音输入。</p>
+              </div>
+              <div class="card">
+                <h3>音频输出</h3>
+                <p>`Audio HAL speaker -> APP_LINE_OUT -> LINEOUT_LN/LP -> AXS2033 -> CN2 speaker`。当前默认播放音量已调到满量程。</p>
+              </div>
+              <div class="card">
+                <h3>报告边界</h3>
+                <p>本文只给硬件到 BSP/HAL/driver 的实现信息、测点和风险，不把产品交互、网络服务策略或应用会话写成硬件结论。</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="paths" class="doc-section" data-view="all paths" data-index="signal path audio pdm speaker lineout lcd touch nand bl702 i2c boot">
+          <h2>硬件路径图</h2>
+          <div class="path-grid">
+            <div class="diagram">
+              <h3>PDM 输入路径</h3>
+              <svg viewBox="0 0 720 270" role="img" aria-labelledby="pdmTitle pdmDesc">
+                <title id="pdmTitle">PDM microphone capture path</title>
+                <desc id="pdmDesc">CN7 PDM clock and data route to RTL8730E PA2 and PA4, then to Audio HAL DATA1 and DMIC3/DMIC4.</desc>
+                <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#0b5c6b"></path></marker></defs>
+                <rect class="svg-box" x="20" y="76" width="130" height="74"></rect>
+                <text class="svg-label" x="44" y="106">CN7 MIC/IR</text>
+                <text class="svg-small" x="42" y="128">PDM_CLK / PDM_DAT1</text>
+                <path class="svg-line" d="M150 112 H235"></path>
+                <rect class="svg-box accent" x="235" y="36" width="140" height="64"></rect>
+                <text class="svg-label" x="268" y="66">PA2</text>
+                <text class="svg-small" x="258" y="84">DMIC clock</text>
+                <rect class="svg-box accent" x="235" y="136" width="140" height="64"></rect>
+                <text class="svg-label" x="268" y="166">PA4</text>
+                <text class="svg-small" x="258" y="184">DMIC DATA1</text>
+                <path class="svg-line" d="M375 68 H455"></path>
+                <path class="svg-line" d="M375 168 H455"></path>
+                <rect class="svg-box" x="455" y="76" width="110" height="74"></rect>
+                <text class="svg-label" x="475" y="106">Audio HAL</text>
+                <text class="svg-small" x="476" y="128">DATA1</text>
+                <path class="svg-line" d="M565 112 H635"></path>
+                <rect class="svg-box accent" x="635" y="76" width="68" height="74"></rect>
+                <text class="svg-label" x="648" y="106">DMIC3</text>
+                <text class="svg-label" x="648" y="126">DMIC4</text>
+                <text class="svg-small" x="24" y="228">证据：E1/E2/E4/E5/E7。帧计数不是充分条件，先看 peak 和 PDM 波形。</text>
+              </svg>
+            </div>
+
+            <div class="diagram">
+              <h3>扬声器输出路径</h3>
+              <svg viewBox="0 0 760 270" role="img" aria-labelledby="spkTitle spkDesc">
+                <title id="spkTitle">Speaker output path</title>
+                <desc id="spkDesc">Audio HAL speaker route goes through line-out differential outputs, AXS2033 amplifier, and CN2 speaker connector.</desc>
+                <rect class="svg-box" x="18" y="74" width="120" height="72"></rect>
+                <text class="svg-label" x="38" y="104">HAL speaker</text>
+                <text class="svg-small" x="40" y="126">APP_LINE_OUT</text>
+                <path class="svg-line" d="M138 110 H214"></path>
+                <rect class="svg-box accent" x="214" y="50" width="140" height="112"></rect>
+                <text class="svg-label" x="240" y="84">RTL8730E</text>
+                <text class="svg-small" x="232" y="108">LINEOUTLN / LP</text>
+                <text class="svg-small" x="232" y="130">differential</text>
+                <path class="svg-line" d="M354 110 H430"></path>
+                <rect class="svg-box" x="430" y="50" width="130" height="112"></rect>
+                <text class="svg-label" x="462" y="82">C/R network</text>
+                <text class="svg-small" x="452" y="108">C76/C153</text>
+                <text class="svg-small" x="452" y="130">R56/R57 39K</text>
+                <path class="svg-line" d="M560 110 H620"></path>
+                <rect class="svg-box warn" x="620" y="50" width="120" height="112"></rect>
+                <text class="svg-label" x="648" y="82">AXS2033</text>
+                <text class="svg-small" x="646" y="108">IN+/IN-</text>
+                <text class="svg-small" x="646" y="130">OUTP/OUTN</text>
+                <path class="svg-line warn" d="M680 50 V22 H480 V50"></path>
+                <rect class="svg-box warn" x="474" y="6" width="120" height="32"></rect>
+                <text class="svg-small" x="492" y="27">PB25 / MUTE / SD</text>
+                <path class="svg-line" d="M740 110 H752"></path>
+                <text class="svg-label" x="652" y="205">CN2 speaker</text>
+                <text class="svg-small" x="22" y="232">证据：E6/E8/E9/E10。CN2 是 BTL 差分输出，测量时不要把任一端当地。</text>
+              </svg>
+            </div>
+
+            <div class="diagram">
+              <h3>LCD / Touch 拓扑</h3>
+              <svg viewBox="0 0 760 300" role="img" aria-labelledby="lcdTitle lcdDesc">
+                <title id="lcdTitle">LCD and touch topology</title>
+                <desc id="lcdDesc">RTL8730E DSI lanes, I2C, reset, IRQ and backlight signals connect to CN6 LCD and Sitronix touch.</desc>
+                <rect class="svg-box" x="24" y="72" width="150" height="120"></rect>
+                <text class="svg-label" x="66" y="105">RTL8730E</text>
+                <text class="svg-small" x="50" y="130">DSI D0/D1/CLK</text>
+                <text class="svg-small" x="50" y="150">PB10/PB11 I2C</text>
+                <text class="svg-small" x="50" y="170">PA9/PA10 IRQ/RST</text>
+                <path class="svg-line" d="M174 110 H306"></path>
+                <path class="svg-line warn" d="M174 150 H306"></path>
+                <path class="svg-line" d="M174 170 H306"></path>
+                <rect class="svg-box accent" x="306" y="70" width="150" height="124"></rect>
+                <text class="svg-label" x="352" y="104">CN6</text>
+                <text class="svg-small" x="330" y="130">MIPI DSI + TP</text>
+                <text class="svg-small" x="330" y="150">VCC / reset</text>
+                <text class="svg-small" x="330" y="170">backlight pins</text>
+                <path class="svg-line" d="M456 110 H580"></path>
+                <rect class="svg-box warn" x="580" y="44" width="140" height="82"></rect>
+                <text class="svg-label" x="616" y="78">ST7102 LCD</text>
+                <text class="svg-small" x="602" y="100">lane count unresolved</text>
+                <path class="svg-line warn" d="M456 156 H580"></path>
+                <rect class="svg-box" x="580" y="150" width="140" height="82"></rect>
+                <text class="svg-label" x="610" y="184">Sitronix TP</text>
+                <text class="svg-small" x="610" y="206">0x55 candidate</text>
+                <text class="svg-small" x="24" y="256">证据：E13/E14/E15。背光前先确认 power/reset/DSI/TE，touch 地址要 scan。</text>
+              </svg>
+            </div>
+
+            <div class="diagram">
+              <h3>NAND / BL702 启动边界</h3>
+              <svg viewBox="0 0 760 300" role="img" aria-labelledby="bootTitle bootDesc">
+                <title id="bootTitle">NAND flashing and BL702 boot boundary</title>
+                <desc id="bootDesc">RTL8730E boots from SPI NAND; BL702 has a separate power, reset, UART and boot strap path.</desc>
+                <rect class="svg-box" x="28" y="82" width="145" height="90"></rect>
+                <text class="svg-label" x="70" y="116">RTL8730E</text>
+                <text class="svg-small" x="58" y="140">PC1-PC6 QSPI</text>
+                <path class="svg-line" d="M173 126 H300"></path>
+                <rect class="svg-box accent" x="300" y="82" width="145" height="90"></rect>
+                <text class="svg-label" x="335" y="116">GD5F1G NAND</text>
+                <text class="svg-small" x="332" y="140">1Gb / 128MB</text>
+                <rect class="svg-box" x="28" y="206" width="145" height="56"></rect>
+                <text class="svg-label" x="58" y="239">flash wrapper</text>
+                <path class="svg-line" d="M100 206 V172"></path>
+                <rect class="svg-box warn" x="548" y="64" width="150" height="130"></rect>
+                <text class="svg-label" x="596" y="96">BL702</text>
+                <text class="svg-small" x="574" y="122">UART1 PB20/PB19</text>
+                <text class="svg-small" x="574" y="144">RESET PA13</text>
+                <text class="svg-small" x="574" y="166">BOOT PA15 low</text>
+                <path class="svg-line warn" d="M173 108 C290 30, 430 30, 548 108"></path>
+                <text class="svg-small" x="230" y="38">Zigbee_PWR_ON / reset / boot strap</text>
+                <text class="svg-small" x="24" y="284">证据：E11/E12/E16/E17。当前硬件用 NAND profile；BL702 正常启动保持 BOOT_BL702 低。</text>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <section id="evidence" class="doc-section" data-view="all evidence" data-index="evidence index confidence source E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17 E18 E19">
+          <h2>证据索引</h2>
+          <div class="table-wrap">
+            <table class="sortable searchable">
+              <thead><tr><th>ID</th><th>结论</th><th>来源</th><th>类型</th><th>可信度</th><th>备注</th></tr></thead>
+              <tbody>
+                <tr><td>E1</td><td>`PDM_CLK` 接 `PA2`，`PDM_DAT1` 接 `PA4`</td><td>`doc/hard/RTL8730 4寸SCH.pdf` P09/P11；用户说明</td><td>schematic + user fact</td><td><span class="badge a">A</span></td><td>原理图与用户说明一致。</td></tr>
+                <tr><td>E2</td><td>DATA1 对应 `AUDIO_DMIC3/DMIC4`</td><td>`ameba_audio_stream_capture.c`</td><td>SDK</td><td><span class="badge a">A</span></td><td>DATA0/1/2/3 分别对应 DMIC1/2、3/4、5/6、7/8。</td></tr>
+                <tr><td>E3</td><td>SDK 默认 DMIC/amp pins 是 reference-board 配置</td><td>`ameba_audio_hw_usrcfg.h`</td><td>SDK</td><td><span class="badge a">A</span></td><td>本板必须项目覆盖。</td></tr>
+                <tr><td>E4</td><td>项目覆盖 PDM 和功放 pin</td><td>`include/river/river_audio_hw_overrides.h`、`CMakeLists.txt`</td><td>code</td><td><span class="badge a">A</span></td><td>AP Audio HAL 编译时 `-include`。</td></tr>
+                <tr><td>E5</td><td>PA2/PA4 DATA1 已实板验证能采到有效语音</td><td>`.codex/changes.md` Step H.xiaozhi-client.69</td><td>runtime</td><td><span class="badge a">A</span></td><td>VAD/KWS 底层链路有输入。</td></tr>
+                <tr><td>E6</td><td>当前输出音量默认已调满</td><td>`river_orvibo_mcp_volume.c`、audio service、diag、echo</td><td>code</td><td><span class="badge a">A</span></td><td>MCP 默认 100，播放 volume 1.00f。</td></tr>
+                <tr><td>E7</td><td>MSM261DDB021 是 PDM 数字麦</td><td>`MSM261DDB021_Rev1.0.pdf`</td><td>datasheet</td><td><span class="badge a">A</span></td><td>VDD 1.6-3.6V，标准 clock 1.1-4.8MHz。</td></tr>
+                <tr><td>E8</td><td>AXS2033 SD 电压区间决定 shutdown/AB/D 模式</td><td>`AXS2033.pdf`；ChipSourceTek</td><td>datasheet + vendor web</td><td><span class="badge a">A/B</span></td><td>SD 不是简单 enable。</td></tr>
+                <tr><td>E9</td><td>`LINEOUTLN/LP` 接 AXS2033，输出到 CN2</td><td>`RTL8730 4寸SCH.pdf` P08</td><td>schematic</td><td><span class="badge a">A</span></td><td>CN2 是 BTL/differential speaker output。</td></tr>
+                <tr><td>E10</td><td>`PB25 -> MUTE -> AXS2033 SHUT/SD`</td><td>`RTL8730 4寸SCH.pdf` P08/P11</td><td>schematic</td><td><span class="badge a">A</span></td><td>经 R20/R21/C69/C71。</td></tr>
+                <tr><td>E11</td><td>板上 SPI NAND 为 `GD5F1GM7UEYIGR`</td><td>原理图 P11；GigaDevice page</td><td>schematic + vendor web</td><td><span class="badge a">A/B</span></td><td>1Gb SPI NAND，原理图标注 128MB。</td></tr>
+                <tr><td>E12</td><td>Realtek Image Tool 区分 NAND/NOR profile</td><td>Realtek Ameba IoT Image Tool docs</td><td>vendor docs</td><td><span class="badge b">B</span></td><td>项目 wrapper 固定当前硬件 NAND profile。</td></tr>
+                <tr><td>E13</td><td>CN6 路由 MIPI DSI D0/D1/CLK、touch 和背光</td><td>原理图 P10</td><td>schematic</td><td><span class="badge a">A</span></td><td>Connector `A113F-15025WUA-R01`。</td></tr>
+                <tr><td>E14</td><td>ST7102 init table 写 `SSD_LANE(1,0)`</td><td>`ST7102_480480_60hz_0109_tp 3ms .txt`</td><td>vendor init table</td><td><span class="badge b">B</span></td><td>与原理图两 lane 路由需澄清。</td></tr>
+                <tr><td>E15</td><td>Sitronix 示例地址 `0x55`，IRQ falling，RST active-low</td><td>Sitronix 手册、`sample.dtsi`</td><td>vendor guide/source</td><td><span class="badge b">B</span></td><td>Ameba 侧需迁移验证。</td></tr>
+                <tr><td>E16</td><td>BL702 支持 BLE/Zigbee/Thread，UART1 连接 RTL8730E</td><td>原理图 P12；Bouffalo Lab</td><td>schematic + vendor web</td><td><span class="badge a">A/B</span></td><td>协议/波特率缺失。</td></tr>
+                <tr><td>E17</td><td>BL702 GPIO28 boot strap：0 Flash，1 UART</td><td>原理图 P12</td><td>schematic</td><td><span class="badge a">A</span></td><td>默认保持 `BOOT_BL702` 低。</td></tr>
+                <tr><td>E18</td><td>TH FPC 只暴露 3.3V 和 I2C</td><td>原理图 P13</td><td>schematic</td><td><span class="badge a">A</span></td><td>无传感器型号/地址。</td></tr>
+                <tr><td>E19</td><td>RTL8730E Hardware Design Guide 可做交叉参考</td><td>Realtek RTL8730E Hardware Design Guide R2.3</td><td>vendor docs</td><td><span class="badge b">B</span></td><td>不替代本板原理图。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="missing" class="doc-section" data-view="all evidence sources" data-index="missing clarification hypothesis lcd timing touch th cn7 mic axs2033 bl702 pinmux">
+          <h2>缺失与假设</h2>
+          <div class="block-grid">
+            <div class="card">
+              <h3>缺失信息</h3>
+              <div class="table-wrap">
+                <table class="sortable searchable">
+                  <thead><tr><th>项目</th><th>影响</th><th>当前判断</th><th>可信度</th><th>建议检查</th></tr></thead>
+                  <tbody>
+                    <tr><td>LCD 完整 timing sheet</td><td>决定 DSI host 配置</td><td>ST7102 init 可做初始命令表，lane 数不能写死</td><td><span class="badge b">B</span></td><td>屏厂资料 + DSI D0/D1 验证</td></tr>
+                    <tr><td>Touch 地址/chip id/CFG</td><td>决定 probe 和固件加载</td><td>`0x55` 是优先候选</td><td><span class="badge b">B</span></td><td>reset 后 scan 和读 chip id</td></tr>
+                    <tr><td>TH 传感器型号</td><td>缺寄存器驱动依据</td><td>外接 I2C 模块</td><td><span class="badge c">C</span></td><td>BOM/丝印/总线 scan</td></tr>
+                    <tr><td>CN7 MIC/IR 小板</td><td>影响 L/R 槽位和 IR 电流</td><td>两颗 PDM 麦共享 DATA1</td><td><span class="badge b">B</span></td><td>提供小板原理图，单麦近场测试</td></tr>
+                    <tr><td>AXS2033 SD 实测电压</td><td>决定功放模式</td><td>PB25 high 可能进入 D 类防破音模式</td><td><span class="badge b">B</span></td><td>测 U7 pin1 across boot/idle/tone</td></tr>
+                    <tr><td>BL702 协议/波特率</td><td>Zigbee 驱动阻塞</td><td>UART1 连接明确，协议未知</td><td><span class="badge b">B</span></td><td>固件 owner 提供协议，抓 boot log</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <h3>候选方案</h3>
+              <div class="table-wrap">
+                <table class="sortable searchable">
+                  <thead><tr><th>假设</th><th>依据</th><th>风险</th><th>路径</th><th>验证</th></tr></thead>
+                  <tbody>
+                    <tr><td>双 PDM 麦共享 DATA1 左右边沿</td><td>E1/E2/E7</td><td>左右声道可能反</td><td>保持 DMIC3/DMIC4，通道顺序留 board config</td><td>分别遮挡/轻敲两颗麦</td></tr>
+                    <tr><td>PB25 high 让 AXS2033 工作</td><td>E8/E10</td><td>SD 分压/RC 可能落入中间区间</td><td>命名为 amp SD/mode control</td><td>tone 时测 U7 pin1</td></tr>
+                    <tr><td>Touch 与 TH 共用 PB10/PB11</td><td>E13/E18</td><td>地址冲突或 reset 干扰</td><td>scan 后再注册 driver</td><td>连接/断开 FPC 比较 scan</td></tr>
+                    <tr><td>LCD lane/timing 做成 board config</td><td>E13/E14</td><td>写死错误 lane 导致白屏</td><td>暴露 lane_count/lane_rate/porch/init</td><td>背光前测 DSI LP/HS/TE</td></tr>
+                    <tr><td>BL702 默认从 Flash 启动</td><td>E17</td><td>默认高会卡 UART boot</td><td>BOOT 默认低，升级临时拉高</td><td>复位后抓 BL702 log</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="quickstart" class="doc-section" data-view="all checklist" data-index="quick start build flash logs diagnostics measurement playback tone">
+          <h2>快速上手</h2>
+          <div class="block-grid">
+            <div class="command">
+              <div class="command-head"><h3>构建</h3><button class="copy-btn" type="button">复制</button></div>
+              <pre><code>cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh &gt;/dev/null
+python3 /root/ameba-rtos/ameba.py build -p</code></pre>
+            </div>
+            <div class="command">
+              <div class="command-head"><h3>NAND 下载</h3><button class="copy-btn" type="button">复制</button></div>
+              <pre><code>cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000</code></pre>
+            </div>
+            <div class="command">
+              <div class="command-head"><h3>本地播放验证</h3><button class="copy-btn" type="button">复制</button></div>
+              <pre><code>river playback tone 1000 1000 25
+river playback status</code></pre>
+            </div>
+            <div class="card">
+              <h3>首看日志</h3>
+              <p>`pdm-2mic-pa2-pa4-data1`、`DMIC3/DMIC4`、`capture dmic pinmux applied: clk=PA2 data1=PA4`、`[AudioHal-I] ... set DMIC clock`。</p>
+              <p>音频输出日志应能看到 `playback tone start`、`PB25/MUTE`、`playback drain complete`。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="pitfalls" class="doc-section" data-view="all pitfalls" data-index="pitfalls 注意事项 上手 sdk default pdm data1 axs2033 cn2 lcd touch nand bl702 th ir rf">
+          <h2>避坑指南 / 注意事项 / 上手建议</h2>
+          <div class="table-wrap">
+            <table class="sortable searchable">
+              <thead><tr><th>主题</th><th>为什么容易错</th><th>证据</th><th>固件影响</th><th>可信度</th><th>第一步检查</th></tr></thead>
+              <tbody>
+                <tr><td>SDK 默认音频引脚</td><td>usrcfg 是 reference-board 默认</td><td>E1-E4/E10</td><td>麦克风无输入、功放不使能</td><td><span class="badge a">A</span></td><td>确认 AP Audio HAL `-include` 覆盖头。</td></tr>
+                <tr><td>`PDM_DAT1` 不是 DATA0</td><td>DATA1 对应 DMIC3/DMIC4</td><td>E1/E2/E5</td><td>帧增长但 peak 长期为 0</td><td><span class="badge a">A</span></td><td>日志必须出现 `DMIC3/DMIC4`。</td></tr>
+                <tr><td>PDM 有帧不等于有语音</td><td>pinmux/clock/data 错也可能持续给帧</td><td>E5/E7</td><td>误判为模型/阈值问题</td><td><span class="badge a">A</span></td><td>先看 peak 和 PDM_CLK/PDM_DAT1。</td></tr>
+                <tr><td>PDM clock 模式</td><td>MSM261DDB021 clock 区间有模式差异</td><td>E7</td><td>采样质量和功耗判断偏差</td><td><span class="badge a">A</span></td><td>逻辑分析仪测实际 PDM clock。</td></tr>
+                <tr><td>AXS2033 SD</td><td>SD 电压区间选择 shutdown/AB/D 模式</td><td>E8/E10</td><td>小声、失真、无声难定位</td><td><span class="badge a">A</span></td><td>播放时测 U7 pin1。</td></tr>
+                <tr><td>CN2 BTL 差分输出</td><td>SPKP/SPKN 都是输出端</td><td>E9</td><td>示波器接法错误或短路风险</td><td><span class="badge a">A</span></td><td>差分测 CN2。</td></tr>
+                <tr><td>当前固件已经满音量</td><td>MCP 默认 100，播放 1.00f</td><td>E6</td><td>继续改上层音量收益低</td><td><span class="badge a">A</span></td><td>优先测 U7 SD、gain、LINEOUT。</td></tr>
+                <tr><td>LCD lane 冲突</td><td>原理图两 lane，init table 写 1 lane</td><td>E13/E14</td><td>白屏/花屏且难定位</td><td><span class="badge b">B</span></td><td>lane_count 做 board config。</td></tr>
+                <tr><td>触摸 `0x55` 只是候选</td><td>示例地址不等于实板事实</td><td>E15</td><td>probe 失败或误绑</td><td><span class="badge b">B</span></td><td>上电 reset 后 scan。</td></tr>
+                <tr><td>Touch/TH 可能共享 I2C</td><td>TP I2C 与 TH I2C 通过串阻关联</td><td>E13/E18</td><td>地址冲突、reset 干扰</td><td><span class="badge b">B</span></td><td>记录所有 ACK 后再绑定。</td></tr>
+                <tr><td>NAND/NOR profile 混用</td><td>Realtek 工具区分 profile</td><td>E11/E12</td><td>烧录失败或地址错误</td><td><span class="badge a">A</span></td><td>当前默认命令使用 NAND。</td></tr>
+                <tr><td>BL702 boot strap</td><td>GPIO28 高进入 UART boot</td><td>E16/E17</td><td>Zigbee 子系统不启动</td><td><span class="badge a">A</span></td><td>正常 boot 保持低。</td></tr>
+                <tr><td>背光掩盖 DSI 问题</td><td>白屏不等于 DSI init 成功</td><td>E13/E14</td><td>误判 backlight</td><td><span class="badge b">B</span></td><td>先确认 power/reset/DSI/TE。</td></tr>
+                <tr><td>TH 无型号</td><td>只有 FPC 网名</td><td>E18</td><td>写错驱动污染总线调试</td><td><span class="badge a">A</span></td><td>只做 scan 和澄清。</td></tr>
+                <tr><td>IR 不是普通 LED</td><td>5V rail、限流和 NMOS 驱动</td><td>schematic P08/P11</td><td>GPIO toggle 不能代表有效发射</td><td><span class="badge b">B</span></td><td>确认 PA3 PWM/IR mux。</td></tr>
+                <tr><td>RF/tx power 边界</td><td>匹配和法规属于硬件/RF 边界</td><td>E19 + RF path</td><td>合规和性能风险</td><td><span class="badge b">B</span></td><td>变更前硬件/RF review。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="pinmap" class="doc-section" data-view="all evidence paths" data-index="pin map pa2 pa4 pb25 pa14 pa16 pb10 pb11 pa9 pa10 nand bl702 uart lcd touch">
+          <h2>MCU / SoC Pin Map</h2>
+          <div class="table-wrap">
+            <table class="sortable searchable">
+              <thead><tr><th>功能</th><th>Net</th><th>MCU Pin</th><th>实例/用途</th><th>证据</th><th>Firmware Action</th></tr></thead>
+              <tbody>
+                <tr><td>PDM clock</td><td>`PDM_CLK`</td><td>PA2</td><td>DMIC CLK</td><td>E1/E2</td><td>`AUDIO_HW_DMIC_CLK_PIN=_PA_2`</td></tr>
+                <tr><td>PDM data</td><td>`PDM_DAT1`</td><td>PA4</td><td>DMIC DATA1</td><td>E1/E2/E5</td><td>使用 `AUDIO_DMIC3/DMIC4`</td></tr>
+                <tr><td>Amp SD/mode</td><td>`MUTE`</td><td>PB25</td><td>AXS2033 SHUT/SD</td><td>E8/E10</td><td>`AUDIO_HW_AMPLIFIER_PIN=_PB_25`，测 U7 pin1</td></tr>
+                <tr><td>LCD power</td><td>`LCD_PWR_ON`</td><td>PB26</td><td>LCD 3.3V enable</td><td>P05/P11</td><td>DSI/touch 前上电</td></tr>
+                <tr><td>LCD reset</td><td>`RST_LCD`</td><td>PA14</td><td>GPIO reset</td><td>P10</td><td>按 panel 时序控制</td></tr>
+                <tr><td>Backlight PWM</td><td>`LCD_BL_PWM`</td><td>PA16</td><td>PWM/GPIO</td><td>P10</td><td>panel init 后再开</td></tr>
+                <tr><td>Touch IRQ</td><td>`TP_INT`</td><td>PA9</td><td>GPIO IRQ</td><td>P10/E15</td><td>falling 候选，实测确认</td></tr>
+                <tr><td>Touch reset</td><td>`TP_RST`</td><td>PA10</td><td>GPIO reset</td><td>P10/E15</td><td>active-low 候选，reset 后读 chip id</td></tr>
+                <tr><td>Touch/TH I2C</td><td>`TP_SDA2/SCL2` / `TH_I2C_*`</td><td>PB10/PB11</td><td>I2C</td><td>E13/E15/E18</td><td>先 scan，地址可配置</td></tr>
+                <tr><td>SPI NAND</td><td>`FLASH_QSPI_*`</td><td>PC1-PC6</td><td>QSPI NAND</td><td>E11</td><td>使用 NAND boot/download profile</td></tr>
+                <tr><td>BL702 reset</td><td>`RST_BL702`</td><td>PA13</td><td>GPIO</td><td>P11/P12</td><td>默认释放，复位拉低再释放</td></tr>
+                <tr><td>BL702 boot</td><td>`BOOT_BL702`</td><td>PA15</td><td>GPIO28 strap</td><td>E17</td><td>默认低；下载时临时拉高</td></tr>
+                <tr><td>UART1 BL702</td><td>`RTL8730_TX1/RX1`</td><td>PB20/PB19</td><td>UART1</td><td>E16</td><td>协议/波特率由 Zigbee owner 提供</td></tr>
+                <tr><td>IR TX</td><td>`IR_TX`</td><td>PA3</td><td>PWM/IR candidate</td><td>P08/P11</td><td>先确认 mux 和电流限制</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="peripherals" class="doc-section" data-view="all paths" data-index="peripheral blocks power reset boot audio capture output lcd touch bl702 wifi th ir debug">
+          <h2>外设块说明</h2>
+          <div class="block-grid">
+            <details open><summary>Power / Reset / Boot</summary><p>固件可控制 LCD/Zigbee 子电源 enable，但不能假设 `CHIP_EN` reset 会清空所有外设电源状态。LCD/Zigbee 上电顺序要和 reset/boot strap 串行。</p></details>
+            <details open><summary>SPI NAND / Flashing</summary><p>`U11 GD5F1GM7UEYIGR` 走 PC1-PC6 QSPI。当前硬件应使用项目 NAND profile，profile mismatch 先检查 wrapper 和下载模式。</p></details>
+            <details open><summary>PDM Microphone / Audio Capture</summary><p>路径为 CN7 `PDM_CLK/PDM_DAT1` 到 RTL8730E `PA2/PA4`，再到 Audio HAL DATA1 `DMIC3/DMIC4`。问题定位先看 peak 和 PDM 波形。</p></details>
+            <details open><summary>Speaker / AXS2033 / Audio Output</summary><p>`AMEBA_AUDIO_DEVICE_SPEAKER -> APP_LINE_OUT -> LINEOUT_LN/LP -> C76/C153 + R56/R57 -> AXS2033 -> CN2`。无声排查顺序：playback status、U7 VDD、U7 SD、LINEOUT、OUTP/OUTN、CN2。</p></details>
+            <details><summary>LCD / Backlight / Touch</summary><p>CN6 包含 DSI D0/D1/CLK、LCD power/reset/backlight、touch I2C/IRQ/reset。lane/timing 未闭合，touch `0x55` 只是候选。</p></details>
+            <details><summary>BL702 Zigbee Subsystem</summary><p>`Zigbee_PWR_ON -> VCC_3V3_Z -> BOOT_BL702 low -> release RST_BL702 -> UART1`。协议、波特率和升级流程仍需 owner 提供。</p></details>
+            <details><summary>Wi-Fi / BT RF</summary><p>RF matching 和天线选择属硬件/RF 边界。country、tx power 和 empty efuse fallback 涉及合规，变更前要硬件/RF review。</p></details>
+            <details><summary>TH Sensor / IR / Debug</summary><p>TH 只有 I2C FPC 线索；IR 需 PWM/载波和电流限制确认；CN1 暴露 USB/UART0，当前下载需要手动进入 download mode。</p></details>
+          </div>
+        </section>
+
+        <section id="checklist" class="doc-section" data-view="all checklist" data-index="checklist validation bring-up audio capture output lcd touch bl702 flash th">
+          <h2>Board Validation Checklist</h2>
+          <div class="check-panel">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px">
+              <div><strong id="checkSummary">0 / 0</strong><div class="muted">状态保存在本地浏览器</div></div>
+              <button class="small-btn" id="resetChecks" type="button">清空勾选</button>
+            </div>
+            <div class="progress" aria-hidden="true"><span id="checkProgress"></span></div>
+            <div class="check-list" id="checks" style="margin-top:12px">
+              <label class="check-item"><input type="checkbox" data-check="audio-cfg"><span>构建期确认 `_PA_2`、`_PA_4`、`_PB_25` 覆盖进入 AP Audio HAL。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="capture-log"><span>启动日志出现 `pdm-2mic-pa2-pa4-data1`、`DMIC3/DMIC4` 和 `set DMIC clock`。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="capture-peak"><span>说话/敲击时 capture/preproc peak 明显上升；异常先测 PDM_CLK/PDM_DAT1。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="tone"><span>运行 `river playback tone 1000 1000 25`，确认 playback start/drain/stop。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="amp-sd"><span>测 U7 VDD、U7 pin1 SD、LINEOUT_LN/LP、OUTP/OUTN 和 CN2。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="lcd"><span>LCD 先验证 `VCC_3V3_LCD`、reset、DSI LP/HS/TE，再启背光。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="touch"><span>Touch 供电和 reset 后 scan PB10/PB11，优先确认 `0x55` 和 chip id。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="bl702"><span>BL702 正常启动保持 `BOOT_BL702` low，释放 reset 后抓 UART1 log。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="th"><span>TH 只做 I2C scan；型号/地址确认前不写固定寄存器驱动。</span></label>
+              <label class="check-item"><input type="checkbox" data-check="flash"><span>手动进入 download mode 后使用 NAND wrapper，期望识别 GD5F1GM7U 并 `Finished PASS`。</span></label>
+            </div>
+          </div>
+        </section>
+
+        <section id="risks" class="doc-section" data-view="all sources" data-index="risk unknown source notes audit lcd touch axs2033 pdm th bl702 rf">
+          <h2>风险与来源</h2>
+          <div class="risk-grid">
+            <div class="card"><span class="badge b">B</span><h3>LCD lane/timing</h3><p>可能导致白屏、花屏或误判背光。需要 panel timing sheet，并保持 lane config 可变。</p></div>
+            <div class="card"><span class="badge b">B</span><h3>AXS2033 SD</h3><p>SD 电压未实测，功放可能处于错误模式。需要跨状态测 U7 pin1。</p></div>
+            <div class="card"><span class="badge b">B</span><h3>PDM L/R</h3><p>槽位/顺序未由小板资料闭合。需要单麦近场测试，并将 mapping 保存在 board config。</p></div>
+            <div class="card"><span class="badge a">A</span><h3>BL702 protocol</h3><p>UART 协议、波特率和升级流程缺失，Zigbee feature 不能安全集成。</p></div>
+          </div>
+
+          <div class="block-grid" style="margin-top:12px">
+            <div class="card">
+              <h3>本地资料</h3>
+              <ul>
+                <li>`doc/hard/RTL8730 4寸SCH.pdf`</li>
+                <li>`doc/hard/RTL8730_4寸_丝印图.pdf`</li>
+                <li>`doc/hard/1.01.070080 MSM261DDB021_Rev1.0.pdf`</li>
+                <li>`doc/hard/AXS2033.pdf`</li>
+                <li>`doc/hard/LCD/ST7102_480480_60hz_0109_tp 3ms .txt`</li>
+                <li>`doc/hard/LCD/Sitronix Touch Driver 移植手册.pdf`</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>SDK / 项目绑定点</h3>
+              <ul>
+                <li>`/root/ameba-rtos/component/audio/audio_hal/amebasmart/`</li>
+                <li>`/root/ameba-rtos/component/soc/usrcfg/amebasmart/include/ameba_audio_hw_usrcfg.h`</li>
+                <li>`include/river/river_audio_hw_overrides.h`</li>
+                <li>`components/river_voice/river_voice_board.c`</li>
+                <li>`components/river_diag/river_diag_cmd.c`</li>
+                <li>`tools/river_flash.py`</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="section-band" style="margin-top:12px">
+            <h3>Scope Audit</h3>
+            <p>音频输出只描述 HAL-visible speaker route 到 LINEOUT、AXS2033 和 CN2；音频输入只描述 PDM pins 到 Audio HAL DMIC categories。显示/触摸通过 DSI/I2C/reset/backlight、init evidence 和 board validation 描述。避坑建议均绑定 schematic、datasheet、SDK、项目源码、runtime records 或明确假设。本文不把产品交互、应用会话行为、网络服务策略或 UI flow 作为硬件结论。</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const search = document.getElementById('globalSearch');
+      const sections = Array.from(document.querySelectorAll('.doc-section'));
+      const empty = document.getElementById('emptyState');
+      const viewButtons = Array.from(document.querySelectorAll('.segments button[data-view]'));
+      const tocLinks = Array.from(document.querySelectorAll('.toc a'));
+      let activeView = 'all';
+
+      function textOf(node) {
+        return (node.textContent || '').toLowerCase();
+      }
+
+      function applyFilters() {
+        const q = (search.value || '').trim().toLowerCase();
+        let visible = 0;
+        sections.forEach(section => {
+          const views = (section.getAttribute('data-view') || 'all').split(/\s+/);
+          const viewOk = activeView === 'all' || views.includes(activeView);
+          const searchOk = !q || textOf(section).includes(q) || (section.getAttribute('data-index') || '').toLowerCase().includes(q);
+          section.classList.toggle('is-hidden', !(viewOk && searchOk));
+          if (viewOk && searchOk) visible += 1;
+        });
+        document.querySelectorAll('table.searchable tbody tr').forEach(row => {
+          const qOk = !q || textOf(row).includes(q);
+          row.classList.toggle('is-hidden', !qOk);
+        });
+        empty.style.display = visible ? 'none' : 'block';
+      }
+
+      search.addEventListener('input', applyFilters);
+      viewButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          viewButtons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeView = btn.dataset.view;
+          applyFilters();
+        });
+      });
+
+      document.querySelectorAll('table.sortable th').forEach((th, index) => {
+        th.addEventListener('click', () => {
+          const table = th.closest('table');
+          const tbody = table.querySelector('tbody');
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          const asc = th.dataset.sort !== 'asc';
+          rows.sort((a, b) => {
+            const av = textOf(a.children[index] || a);
+            const bv = textOf(b.children[index] || b);
+            return asc ? av.localeCompare(bv, 'zh-Hans-CN') : bv.localeCompare(av, 'zh-Hans-CN');
+          });
+          table.querySelectorAll('th').forEach(h => delete h.dataset.sort);
+          th.dataset.sort = asc ? 'asc' : 'desc';
+          rows.forEach(row => tbody.appendChild(row));
+        });
+      });
+
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const code = btn.closest('.command').querySelector('code').textContent;
+          try {
+            await navigator.clipboard.writeText(code);
+            const old = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => { btn.textContent = old; }, 1200);
+          } catch (err) {
+            btn.textContent = '复制失败';
+            setTimeout(() => { btn.textContent = '复制'; }, 1200);
+          }
+        });
+      });
+
+      const checkKey = 'rtl8730e-hw-guide-checklist-v1';
+      const checks = Array.from(document.querySelectorAll('#checks input[type="checkbox"]'));
+      const progress = document.getElementById('checkProgress');
+      const summary = document.getElementById('checkSummary');
+      function loadChecks() {
+        let state = {};
+        try { state = JSON.parse(localStorage.getItem(checkKey) || '{}'); } catch (err) { state = {}; }
+        checks.forEach(item => { item.checked = !!state[item.dataset.check]; });
+        updateChecks();
+      }
+      function saveChecks() {
+        const state = {};
+        checks.forEach(item => { state[item.dataset.check] = item.checked; });
+        localStorage.setItem(checkKey, JSON.stringify(state));
+        updateChecks();
+      }
+      function updateChecks() {
+        const done = checks.filter(item => item.checked).length;
+        const total = checks.length;
+        summary.textContent = done + ' / ' + total;
+        progress.style.width = total ? ((done / total) * 100).toFixed(0) + '%' : '0';
+      }
+      checks.forEach(item => item.addEventListener('change', saveChecks));
+      document.getElementById('resetChecks').addEventListener('click', () => {
+        checks.forEach(item => { item.checked = false; });
+        saveChecks();
+      });
+      loadChecks();
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id));
+        });
+      }, { rootMargin: '-30% 0px -60% 0px', threshold: 0.01 });
+      sections.forEach(section => observer.observe(section));
+
+      applyFilters();
+    }());
+  </script>
+</body>
+</html>

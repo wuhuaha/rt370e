@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.79` 为硬件报告 skill 增加交互式 HTML 伴随文档：
+  - `schematic-pcb-firmware-guide` 默认输出扩展为 Markdown + 同名离线交互式 HTML；模板新增 `Interactive HTML Companion`，要求自包含、证据对齐、无外部依赖、无业务层扩展。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，要求 HTML 提供搜索/过滤、可排序表格、copy 命令、`localStorage` checklist 和来源可追溯的 SVG/CSS 可视化。
+  - 新增 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.html`，覆盖硬件路径图、证据表、缺失/假设、快速上手、避坑、pin map、外设块、board-validation checklist、风险和 scope audit。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 与 `doc/README.md` 增加 HTML 伴随文档入口。
+  - 本步只改文档和本地 skill，不修改固件源码或 SDK；HTML static/parser、证据一致性、scope grep、Playwright 本地交互/截图、helper `py_compile`、`git diff --check` 和 harness 检查均通过。
 - `Step H.xiaozhi-client.78` 为硬件报告 skill 增加避坑/上手建议并重生成报告：
   - `schematic-pcb-firmware-guide` 新增“避坑指南 / 注意事项 / 上手建议”生成规则：从外部主资料、SDK 默认值/示例、datasheet/app note/errata、原理图深度分析和本地运行记录中提炼可追溯 guardrail。
   - 报告模板新增 `Quick Start For Firmware Engineers` 和 `Pitfalls / Attention Points / Getting Started Advice`，每条建议要求说明为什么容易错、证据、影响、可信度和第一步低风险检查。
