@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.76` 从零重生成硬件固件说明书并收敛报告边界：
+  - 使用最新版 `schematic-pcb-firmware-guide` 重新清点 `doc/hard/`，重新渲染/复核电源、RTL8730E、PDM/IR/LINEOUT/AXS2033、LCD/touch/backlight、GPIO/NAND、BL702/Zigbee 和 TH FPC 关键页。
+  - 完整替换 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，定位为硬件资料到 BSP/HAL/driver 的 handoff，覆盖证据表、资料索引、缺失澄清、假设方案、pin map、外设块、bring-up checklist、故障特征、风险和 scope audit。
+  - 报告正文不再包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog。
+  - 业务层、产品交互、会话、UI、网络服务策略等只作为范围外说明出现，不作为硬件结论或开发方案。
+  - 本步只改文档和项目内 skill 使用说明，不修改固件源码或 SDK；fresh report structure check、scope grep、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均已通过。
 - `Step H.xiaozhi-client.75` 接入本地音频播放诊断并绑定 PB25 功放控制：
   - 根据硬件报告把 Audio HAL amplifier pin 从 SDK 默认 `_PB_19` 覆盖到本板 `_PB_25`，对应 `PB25/MUTE -> AXS2033 SHUT/SD`。
   - `river playback` 新增 `tone [freq_hz] [duration_ms] [level_pct]` 纯本地诊断命令；默认 `river playback tone 1000 1000 25`，验证边界停在 `Audio HAL speaker/LINEOUT -> AXS2033 -> CN2 speaker`。

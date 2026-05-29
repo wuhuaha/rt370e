@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.75 接入本地音频播放诊断并绑定 PB25 功放控制`
+  - `Step H.xiaozhi-client.76 从零重生成硬件固件说明书并收敛报告边界`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.76` 从零重生成硬件固件说明书并收敛报告边界：
+  - 使用最新版 `schematic-pcb-firmware-guide` 和 `pdf` 辅助流程重新清点 `doc/hard/`，并重新渲染/复核电源、RTL8730E、PDM/IR/LINEOUT/AXS2033、LCD/touch/backlight、GPIO/NAND、BL702/Zigbee 和 TH FPC 关键页。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 已完整替换为面向 BSP/HAL/driver 的硬件 handoff 报告，包含证据表、资料索引、缺失澄清、假设方案、pin map、外设块、bring-up checklist、故障特征、风险和 scope audit。
+  - 报告正文不包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容仅记录在 skill/项目说明和正常变更记录中。
+  - 报告继续覆盖已验证的 PDM `PA2/PA4 DATA1 -> DMIC3/DMIC4`、AXS2033 speaker/LINEOUT/PB25 SD、NAND、LCD/DSI/touch、BL702、TH、IR、Wi-Fi/BT RF、电源/复位/boot 和板级验证路径。
+  - 业务层、产品交互、会话、UI、网络服务策略等只作为范围外说明出现，不作为硬件结论或开发方案。
+  - 本步只改文档和项目内 skill 使用说明；不修改固件源码、SDK 源码、构建配置、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+  - `git diff --check`、fresh report structure check、scope grep 和 `python3 tools/diag/check_codex_harness.py` 均已通过；未执行固件 build/flash/monitor。
 
 - `Step H.xiaozhi-client.75` 接入本地音频播放诊断并绑定 PB25 功放控制：
   - AP Audio HAL override 现在同时覆盖数字麦 PA2/PA4 和功放脚：`AUDIO_HW_AMPLIFIER_PIN=_PB_25`，匹配原理图 `PB25/MUTE -> AXS2033 SHUT/SD`。

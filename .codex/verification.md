@@ -1,3 +1,64 @@
+## Step H.xiaozhi-client.76 Verification
+
+Regenerate a fresh hardware artifact inventory with the schematic/PCB skill helper:
+```bash
+cd /root/ameba-river
+rm -rf tmp/hard_fresh_report_inventory
+python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py \
+  doc/hard/*.pdf 'doc/hard/LCD/Sitronix Touch Driver 移植手册.pdf' \
+  --out tmp/hard_fresh_report_inventory --render-pages 1-13 --markdown
+```
+
+Validate the generated report structure and product-report boundary:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+text = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md').read_text()
+for needle in [
+    '## Summary',
+    '## Report Boundary',
+    '## Evidence Index',
+    '## Artifact Inventory',
+    '## Engineer-Supplied References',
+    '## Missing Inputs And Clarifications',
+    '## Hypotheses / Candidate Solutions',
+    '## MCU / SoC Pin Map',
+    '### Speaker / AXS2033 / Audio Output',
+    '## Firmware Bring-Up Checklist',
+    '## Scope Audit',
+]:
+    assert needle in text, needle
+for banned in ['Skill Iteration Record', 'agent 工作过程', '提示词', '工具开发 changelog']:
+    assert banned not in text, banned
+print('fresh hardware report structure ok')
+PY
+
+if rg -n "Skill|skill|agent|提示词|迭代|changelog|本轮|刚刚|上一轮" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md; then
+  exit 1
+fi
+rg -n "云端|业务|会话|TTS|STT|cloud|session|assistant|UI|产品交互" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md
+```
+
+Run repository hygiene:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: `pdf_artifact_inventory.py` regenerated fresh text/render inventory under `tmp/hard_fresh_report_inventory`.
+- passed: manual review of rendered pages covered power, RTL8730E power/clock/USB, PDM/IR/LINEOUT/AXS2033, LCD/touch/backlight, GPIO/NAND, BL702/Zigbee, and TH FPC.
+- passed: report structure check printed `fresh hardware report structure ok`.
+- passed: scope grep found no skill/process terms in `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`.
+- passed: business/application terms are only present in explicit out-of-scope/scope-audit wording.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, or serial monitor; this was a documentation/skill-instruction update with no firmware source changes.
+
 ## Step H.xiaozhi-client.75 Verification
 
 Build with the canonical SDK:

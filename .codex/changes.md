@@ -1,5 +1,27 @@
 # Change Log
 
+## Step H.xiaozhi-client.76
+- 按用户要求用最新版 `schematic-pcb-firmware-guide` 从零重生成硬件固件说明书：
+  - 重新清点 `doc/hard/` 主原理图、丝印图、PDM 麦资料、AXS2033 功放资料、LCD/ST7102 init table、Sitronix touch 手册和源码包。
+  - 重新渲染并复核关键页：电源、RTL8730E 供电/时钟/USB、PDM/IR/LINEOUT/AXS2033、LCD/touch/backlight、GPIO/NAND、BL702/Zigbee、TH FPC。
+  - 重新交叉检查 `/root/ameba-rtos` AmebaSmart Audio HAL、usrcfg 默认 pin、render/control 路径和项目绑定点。
+- 完整替换 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`：
+  - 报告定位为硬件资料到 BSP/HAL/driver 的 handoff，不承载 skill 过程、agent 工作流、提示词、迭代记录或工具开发 changelog。
+  - 保留 `Summary`、`Report Boundary`、`Evidence Index`、`Artifact Inventory`、`Engineer-Supplied References`、`Missing Inputs And Clarifications`、`Hypotheses / Candidate Solutions`、`MCU / SoC Pin Map`、`Peripheral Blocks`、`Firmware Bring-Up Checklist`、`Failure Signatures`、`Risks And Unknowns`、`Source Notes`、`Scope Audit`。
+  - 报告覆盖 PDM `PA2/PA4 DATA1 -> DMIC3/DMIC4`、AXS2033 speaker/LINEOUT/PB25 SD、NAND、LCD/DSI/touch、BL702、TH、IR、Wi-Fi/BT RF、电源/复位/boot 和各自验证步骤。
+  - 业务层、产品交互、会话、UI、网络服务策略等只作为范围外说明出现，不作为硬件结论或开发方案。
+- 同步迭代项目内 skill 使用说明：
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 增加规则：产品硬件报告正文不得包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容应放在 skill 文件、项目流程说明或普通变更记录里。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、构建配置、VAD/KWS、tensor dump、alignment replay、board/local parity、协议逻辑或烧录 profile。
+- Verification for this step:
+  - passed: fresh hardware report structure check.
+  - passed: scope grep found no skill/process terms in the product report.
+  - passed: business/application terms only appear in explicit out-of-scope/scope-audit wording.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - not run: firmware build, flash/download, or serial monitor; this is a documentation/skill-instruction update with no firmware source change.
+
 ## Step H.xiaozhi-client.75
 - 根据硬件固件说明书实际接入板级音频输出：
   - AP Audio HAL override 新增 `AUDIO_HW_AMPLIFIER_PIN=_PB_25`，让 SDK amplifier GPIO 控制本板 `PB25/MUTE`，不再沿用 AmebaSmart reference board 默认 `_PB_19`。

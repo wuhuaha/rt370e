@@ -133,6 +133,7 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - firmware checklist
    - 风险和未知项
    - 如果本地固件仓库或 SDK 可见，还要给出实现绑定点：override header、CMake/build target、Kconfig、HAL API、诊断命令和建议归属的源码文件。
+   - 产品硬件报告正文不得包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容应放在 skill 文件、项目流程说明或普通变更记录里。
 
 8. 完整性检查：
    - 音频输出不能只写“有功放”，要覆盖 HAL 可见播放设备、SoC line-out/I2S、功放输入/输出、增益电阻/输入电容、SD/mute/mode、喇叭连接器、回采/参考网络、测量路径和常见无声故障树。
