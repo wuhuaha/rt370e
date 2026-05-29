@@ -36,6 +36,9 @@
 - 路径：`/root/.codex/skills/schematic-pcb-firmware-guide`
 - 名称：`schematic-pcb-firmware-guide`
 - 用途：原理图/PCB/硬件 PDF 到固件开发说明书。
+- 当前 helper：
+  - `scripts/new_evidence_table.py`：生成证据表骨架。
+  - `scripts/pdf_artifact_inventory.py`：在无 Poppler 环境下批量清点 PDF/图片、提取文本、渲染指定页面。
 
 ## 使用方式
 
@@ -77,6 +80,14 @@
    - 提取可选中文本和表格
    - 对扫描件或截图跑 OCR
    - 必要时裁剪、放大、二值化、锐化后复核
+   - 如果环境缺少 Poppler，或需要批量清点多份 PDF/图片，可以使用 helper：
+
+```bash
+python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py \
+  doc/hard/*.pdf --out tmp/hard_skill_inventory --render-pages 5-13 --markdown
+```
+
+   该 helper 会用 PyMuPDF/Pillow 生成 artifact inventory、提取文本，并按需渲染页面，适合作为报告 Evidence Index 的输入。
 
 3. 重点块识别：
    - MCU/SoC pin、boot strap、reset、power sequence

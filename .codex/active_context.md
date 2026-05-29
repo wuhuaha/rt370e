@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.72 增强原理图/PCB skill 的资料补充和缺失澄清流程`
+  - `Step H.xiaozhi-client.73 生成 RTL8730E 4 寸板硬件固件说明书`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.73` 生成 RTL8730E 4 寸板硬件固件说明书：
+  - 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 下主原理图、丝印图、MSM261DDB021 PDM 麦 datasheet 和 AXS2033 功放 datasheet。
+  - 新增报告 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，覆盖证据表、artifact inventory、缺失信息/澄清问题、假设/候选方案、MCU pin map、外设块、启动/验证 checklist 和风险列表。
+  - 报告把 PA2/PA4 + DATA1 (`DMIC3/DMIC4`) 标为已验证音频采集方案，并把 LCD/touch、TH sensor、AXS2033 SD 电压、BL702 协议等未闭合项列入 clarifications。
+  - 本次使用过程中迭代增强本地 skill：新增 `scripts/pdf_artifact_inventory.py`，用于无 Poppler 环境下批量清点 PDF/图片、提取文本、渲染指定页面。
+  - 本步只改文档、skill 和 repo hygiene；不修改固件源码、SDK 源码、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
 
 - `Step H.xiaozhi-client.72` 增强原理图/PCB skill 的资料补充和缺失澄清流程：
   - `schematic-pcb-firmware-guide` 现在明确支持工程师提前提供 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL。

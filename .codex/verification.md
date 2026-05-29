@@ -1,3 +1,50 @@
+## Step H.xiaozhi-client.73 Verification
+
+Validate the schematic/PCB skill helper and current hardware artifact inventory:
+```bash
+cd /root/ameba-river
+python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py \
+  doc/hard/*.pdf --out tmp/hard_skill_inventory --render-pages 5-13 --markdown
+python3 -m py_compile \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/new_evidence_table.py
+```
+
+Validate the generated report structure:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+text = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md').read_text()
+for needle in [
+    'Evidence Index',
+    'Missing Inputs And Clarifications',
+    'Hypotheses / Candidate Solutions',
+    'PDM_CLK -> RTL8730E PA2',
+    'DMIC3/DMIC4',
+    'Firmware Bring-Up Checklist',
+    'Skill Iteration Record',
+]:
+    assert needle in text, needle
+print('report structure ok')
+PY
+```
+
+Run repository hygiene:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: `pdf_artifact_inventory.py` generated a Markdown artifact table and `tmp/hard_skill_inventory/artifact_inventory.json` for all `doc/hard/*.pdf`.
+- passed: skill helper scripts compile with `py_compile`.
+- passed: report structure check printed `report structure ok`.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash, or serial monitor; this was a documentation/skill iteration step with no firmware source change.
+
 ## Step H.xiaozhi-client.72 Verification
 
 Validate the updated schematic/PCB firmware-guide skill:

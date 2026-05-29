@@ -1,5 +1,30 @@
 # Change Log
 
+## Step H.xiaozhi-client.73
+- 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 硬件资料：
+  - 纳入 `RTL8730 4寸SCH.pdf`、`RTL8730_4寸_丝印图.pdf`、`1.01.070080 MSM261DDB021_Rev1.0.pdf`、`AXS2033.pdf`。
+  - 用 PyMuPDF 提取文本和渲染关键页面，用 Tesseract/OCR 辅助无文本层丝印图。
+  - 交叉复核 `/root/ameba-rtos` AmebaSmart audio HAL、DMIC usrcfg 和 DMIC clock header。
+  - 检索/核对 Realtek Ameba docs、GigaDevice、Bouffalo Lab、ChipSourceTek 等外部资料，外部网页仅作为型号/能力补充证据，关键结论仍以本地原理图、SDK 和实板日志为准。
+- 新增硬件固件说明书：`doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`。
+  - 覆盖 Evidence Index、Artifact Inventory、Engineer-Supplied References、Missing Inputs And Clarifications、Hypotheses / Candidate Solutions、MCU pin map、peripheral blocks、bring-up checklist、risks/source notes。
+  - 明确当前板子的 PDM 采集方案为 `PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`、SDK DATA1/`DMIC3/DMIC4`、项目 AP Audio HAL override，并引用 H.69 实板验证。
+  - 列出 LCD/touch panel 资料、TH sensor 型号、AXS2033 SD 电压、BL702 协议/波特率等缺失输入和建议验证路径。
+- 迭代增强本地 skill：
+  - 新增 `/root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py`，用于无 Poppler 环境下批量清点 PDF/图片、提取文本、渲染指定页面、输出 JSON/Markdown inventory。
+  - 更新 skill `SKILL.md` 和项目说明 `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md`，记录 helper 用法。
+- 文档入口和仓库卫生：
+  - `doc/README.md` 增加硬件说明书和 skill 说明入口。
+  - `.gitignore` 忽略 `tmp/`，避免提交 OCR/渲染中间产物。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、构建配置、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: `pdf_artifact_inventory.py` can inventory `doc/hard/*.pdf` and render selected pages.
+  - passed: `py_compile` for skill helper scripts.
+  - passed: report structure check confirms required sections.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.72
 - 根据用户补充要求增强 `schematic-pcb-firmware-guide` skill：
   - Core workflow 增加“工程师提前提供资料位置”入口，支持 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL 作为优先证据源。

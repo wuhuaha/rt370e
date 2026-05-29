@@ -1,4 +1,5 @@
 build_*/
+tmp/
 menuconfig/
 soc_info.json
 .venv-silero-convert/

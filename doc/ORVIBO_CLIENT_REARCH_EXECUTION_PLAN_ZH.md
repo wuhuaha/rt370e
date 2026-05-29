@@ -8,6 +8,13 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.73` 生成 RTL8730E 4 寸板硬件固件说明书：
+  - 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 下原理图/丝印图/datasheet。
+  - 新增 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，把主板硬件资料整理为固件可执行的 pinmux、接口、启动顺序、预期日志、缺失信息、假设方案和 board validation checklist。
+  - 关键结论：`PDM_CLK -> PA2`、`PDM_DAT1 -> PA4` 对应 SDK DATA1/`DMIC3/DMIC4`，且已由 H.69 实板验证；后续音频问题不要再回到 DATA0-3 路径猜测。
+  - 报告同步列出 LCD/touch panel 资料、TH sensor 型号、AXS2033 SD 电压、BL702 协议/波特率等需要硬件或外设 owner 澄清的内容。
+  - 本次使用过程中增强本地 skill，新增 `pdf_artifact_inventory.py`，用于无 Poppler 环境下批量清点 PDF/图片、提取文本和渲染页面。
+  - 本步不改固件源码或 SDK。
 - `Step H.xiaozhi-client.72` 增强原理图/PCB skill 的资料补充和缺失澄清流程：
   - `schematic-pcb-firmware-guide` 现在明确支持工程师提前提供 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL。
   - 报告模板新增工程师资料索引、缺失信息/澄清问题和假设/候选方案章节。
