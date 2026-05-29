@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.71
+- 根据用户要求调研原理图/PCB 分析类外部 workflow，并创建本地 Codex skill：
+  - 新增本地 skill：`/root/.codex/skills/schematic-pcb-firmware-guide`。
+  - Skill 覆盖 `PDF/图片 -> OCR/视觉分析 -> 外部 datasheet/reference manual/SDK 示例检索 -> 可追溯 Markdown 固件说明书` 流程。
+  - 内置证据可信度 A/B/C/D，要求区分用户事实、OCR 结果、视觉推断、官方资料和实板日志。
+  - 内置报告模板 `references/report_template.md`、外部工具选择说明 `references/external_tools.md` 和证据表脚本 `scripts/new_evidence_table.py`。
+- 新增项目文档 `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md`：
+  - 记录外部调研结论、skill 路径、使用方式、输出结构和后续 Orvibo RTL8730E 板分析建议。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、构建配置、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: skill frontmatter/resources exist.
+  - passed: `new_evidence_table.py` can generate a Markdown evidence table.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.70
 - 按 H.69 实板验证结论删除本轮临时采集路径扫描内容，只保留已验证通过的 PA2/PA4 DATA1 方案：
   - 删除 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_*` Kconfig 项和 `prj.conf` 中的禁用占位配置。

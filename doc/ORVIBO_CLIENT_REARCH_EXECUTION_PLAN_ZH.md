@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.71` 新增原理图/PCB 固件说明书分析 skill：
+  - 本地 skill 路径：`/root/.codex/skills/schematic-pcb-firmware-guide`。
+  - 目标流程：`PDF/图片 -> OCR/视觉分析 -> 外部 datasheet/reference manual/SDK 示例检索 -> 可追溯 Markdown 固件说明书`。
+  - 项目文档：`doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md`，用于后续把硬件资料整理为固件同事可直接使用的 pinmux、驱动配置、风险和验证 checklist。
+  - 本步不改固件源码或 SDK。
 - `Step H.xiaozhi-client.70` 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案：
   - H.69 已实板验证 PA2/PA4 + DATA1 (`DMIC3/DMIC4`) + AP Audio HAL override 为有效语音路径：采集/预处理峰值非零，VAD/KWS、server STT/TTS 均已跑通。
   - 删除 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_*`、启动期 DATA0-3 sweep、sweep replay 日志和相关公开函数。

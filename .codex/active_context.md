@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.70 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案`
+  - `Step H.xiaozhi-client.71 新增原理图/PCB 固件说明书分析 skill`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.71` 新增原理图/PCB 固件说明书分析 skill：
+  - 本地 skill 路径：`/root/.codex/skills/schematic-pcb-firmware-guide`。
+  - 目标流程：`PDF/图片 -> OCR/视觉分析 -> 外部 datasheet/reference manual/SDK 示例检索 -> 可追溯 Markdown 固件说明书`。
+  - 项目文档：`doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md`。
+  - 本步不改固件源码或 SDK，只新增 Codex 本地能力和项目使用说明。
 
 - `Step H.xiaozhi-client.70` 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案：
   - H.69 已实板验证 PA2/PA4 + DATA1 (`DMIC3/DMIC4`) + AP Audio HAL override 为有效语音路径：采集/预处理峰值非零，VAD/KWS、server STT/TTS 均已跑通。

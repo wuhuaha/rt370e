@@ -1,3 +1,41 @@
+## Step H.xiaozhi-client.71 Verification
+
+Validate the local schematic/PCB firmware-guide skill:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+p = Path('/root/.codex/skills/schematic-pcb-firmware-guide/SKILL.md')
+text = p.read_text()
+assert text.startswith('---\n')
+assert 'name: schematic-pcb-firmware-guide' in text
+assert 'description:' in text
+for rel in [
+    'references/report_template.md',
+    'references/external_tools.md',
+    'scripts/new_evidence_table.py',
+    'agents/openai.yaml',
+]:
+    assert (p.parent / rel).exists(), rel
+print('skill skeleton ok')
+PY
+
+python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/new_evidence_table.py \
+  "PDM_DAT1 connects to PA4|local schematic P08|schematic|A|visual + net label"
+```
+
+Run repository hygiene after documenting the workflow:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: skill skeleton and bundled resources exist.
+- passed: `new_evidence_table.py` generated a Markdown evidence table.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.70 Verification
 
 Confirm the temporary DATA0-3 sweep code/config is gone:
