@@ -12,6 +12,7 @@
 - 驱动配置建议
 - 预期启动日志
 - 板级验证 checklist
+- 避坑指南 / 注意事项 / 上手建议
 - 可追溯证据表和可信度
 
 报告边界需要明确：这是“硬件资料 -> BSP/HAL/驱动开发”的交接文档，不是业务方案设计文档。可以写 SDK/HAL API、pinmux、driver config、boot logs、测量方法和开发建议；不要擅自把云端协议、产品交互、应用会话、业务播放流程等写成硬件结论。运行日志里若出现业务名，只能作为验证背景，结论必须回到硬件或 HAL/driver 层。建议写 `HAL speaker route -> LINEOUT -> amplifier -> speaker`，不要写某个业务音源到喇叭的产品流程。
@@ -120,13 +121,23 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 如果有较可靠的猜测，必须标成“假设”，给出可信度、依据、风险和验证步骤。
    - 如果存在多个可能方案，列出候选方案和最低风险验证路径。
 
-7. Markdown 输出：
+7. 避坑指南 / 注意事项 / 上手建议：
+   - 每份报告都要包含这个独立章节，位置应靠前，让新接手的软件同事先看到高概率踩坑点。
+   - 这部分内容必须来自外部主资料、SDK 示例/默认值、datasheet/app note/errata、原理图深度分析或本地运行记录；不要写泛泛而谈的经验口号。
+   - 每条建议要说明：主题、为什么容易错、证据、对固件质量/bring-up 效率的影响、可信度、第一步低风险检查或编码防护。
+   - 优先覆盖 SDK reference board 默认值不匹配、active-low 极性、boot strap、下载 profile、总线地址不确定、lane/timing 冲突、功放 mute/mode/gain、差分输出测量、电源/复位顺序、共享总线、缺 pull-up 和测量陷阱。
+   - 上手建议应包含首读文件、首跑命令、预期日志、诊断命令和“测到什么之前不要改什么”的 guardrail。
+   - 仍然停留在硬件/BSP/HAL/driver 层，不写产品交互、业务播放流程或应用会话策略。
+
+8. Markdown 输出：
    - 摘要
    - 报告边界
    - 证据索引
    - 工程师提供资料索引
    - 缺失信息和澄清问题
    - 假设/候选方案
+   - 固件同事快速上手
+   - 避坑指南 / 注意事项 / 上手建议
    - MCU pin map
    - 外设块说明
    - 电源/复位/启动约束
@@ -135,13 +146,14 @@ python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_in
    - 如果本地固件仓库或 SDK 可见，还要给出实现绑定点：override header、CMake/build target、Kconfig、HAL API、诊断命令和建议归属的源码文件。
    - 产品硬件报告正文不得包含 skill 自身实现、agent 工作过程、提示词、迭代记录或工具开发 changelog；这些内容应放在 skill 文件、项目流程说明或普通变更记录里。
 
-8. 完整性检查：
+9. 完整性检查：
    - 音频输出不能只写“有功放”，要覆盖 HAL 可见播放设备、SoC line-out/I2S、功放输入/输出、增益电阻/输入电容、SD/mute/mode、喇叭连接器、回采/参考网络、测量路径和常见无声故障树。
    - 显示/触摸不能只写“有 LCD”，要覆盖 panel connector、DSI lane/timing/init table、power/reset/backlight、touch bus/address/IRQ/reset、probe 证据和缺失 timing。
    - 对传感器、无线子系统、电源、boot strap、flash 也要给出 HAL/BSP 可执行的配置项和验证方法。
 
-9. 范围自检：
+10. 范围自检：
    - 交付前搜索云端、业务、会话、TTS/STT、产品交互等词，确认它们没有被写成硬件结论。
+   - 避坑/建议章节要再次检查：每一条都必须能追溯证据、能减少具体固件错误或 bring-up 时间，不要保留没有证据的通用建议。
    - 对每个音频、显示、输入路径，确认描述从 SoC/HAL/driver 可见接口开始，到 pin、net、器件、连接器、测点或验证步骤结束。
    - 如果某句话在规定应用行为，要改写成硬件能力、BSP/HAL 配置或板级验证方法。
 

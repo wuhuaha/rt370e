@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.77 按硬件报告复核音频适配并调满输出音量`
+  - `Step H.xiaozhi-client.78 为硬件报告 skill 增加避坑/上手建议并重生成报告`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.78` 为硬件报告 skill 增加避坑/上手建议并重生成报告：
+  - 本地 `schematic-pcb-firmware-guide` skill 增加 `Extract pitfalls and getting-started advice` 流程，要求每份硬件固件 handoff 报告提炼证据可追溯的“避坑指南 / 注意事项 / 上手建议”。
+  - skill 模板新增 `Quick Start For Firmware Engineers` 和 `Pitfalls / Attention Points / Getting Started Advice`，每条建议需要包含为什么容易错、证据、固件影响、可信度和第一步低风险检查。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步记录中文使用规则，强调这部分内容用于提高开发效率、降低踩坑概率、提升 BSP/HAL/driver 代码质量，不写泛泛经验或产品/业务行为。
+  - 使用新规则完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，新增快速上手和避坑表，覆盖音频、NAND、LCD/touch、BL702、TH、IR、RF 等高概率错误点。
+  - 本步只改文档和本地 skill，不修改固件源码、SDK、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+  - `pdf_artifact_inventory.py` 重新清点 `doc/hard/`，report structure/scope 检查、helper `py_compile`、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行固件 build/flash。
 
 - `Step H.xiaozhi-client.77` 按硬件报告复核音频适配并调满输出音量：
   - 使用最新版硬件固件说明书复核语音输入/输出绑定：输入保持已验证 `PDM_CLK=PA2`、`PDM_DAT1=PA4`、DATA1、`AUDIO_DMIC3/DMIC4`、`pdm-2mic-pa2-pa4-data1`；输出保持 `Audio HAL speaker/LINEOUT -> LINEOUT_LN/LP -> AXS2033 -> CN2`，功放控制为 `PB25/MUTE`。

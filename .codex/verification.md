@@ -1,3 +1,74 @@
+## Step H.xiaozhi-client.78 Verification
+
+Regenerate a fresh artifact inventory for the report pass:
+```bash
+cd /root/ameba-river
+rm -rf tmp/hard_pitfalls_inventory
+python3 /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py \
+  doc/hard/*.pdf 'doc/hard/LCD/Sitronix Touch Driver 移植手册.pdf' \
+  --out tmp/hard_pitfalls_inventory --render-pages 5-13 --markdown
+```
+
+Validate the regenerated report structure and product-report boundary:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+from pathlib import Path
+text = Path('doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md').read_text()
+required = [
+    '## Summary',
+    '## Report Boundary',
+    '## Evidence Index',
+    '## Artifact Inventory',
+    '## Engineer-Supplied References',
+    '## Missing Inputs And Clarifications',
+    '## Hypotheses / Candidate Solutions',
+    '## Quick Start For Firmware Engineers',
+    '## Pitfalls / Attention Points / Getting Started Advice',
+    '## MCU / SoC Pin Map',
+    '### PDM Microphone / Audio Capture',
+    '### Speaker / AXS2033 / Audio Output',
+    '## Firmware Bring-Up Checklist',
+    '## Scope Audit',
+]
+for needle in required:
+    assert needle in text, needle
+for banned in ['Skill Iteration Record', 'agent 工作过程', '提示词', '工具开发 changelog', '本轮', '刚刚', '上一轮']:
+    assert banned not in text, banned
+print('hardware report structure and scope text ok')
+PY
+
+rg -n "Skill|skill|agent|提示词|迭代|changelog|本轮|刚刚|上一轮" \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md || true
+
+rg -n "避坑|注意事项|上手|Pitfalls|Quick Start|First Check|Guardrail" \
+  /root/.codex/skills/schematic-pcb-firmware-guide/SKILL.md \
+  /root/.codex/skills/schematic-pcb-firmware-guide/references/report_template.md \
+  doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md \
+  doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md
+```
+
+Run helper and repository hygiene:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/new_evidence_table.py \
+  /root/.codex/skills/schematic-pcb-firmware-guide/scripts/pdf_artifact_inventory.py
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: `pdf_artifact_inventory.py` regenerated text/render inventory under `tmp/hard_pitfalls_inventory`.
+- passed: the report was fully regenerated with `Quick Start For Firmware Engineers` and `Pitfalls / Attention Points / Getting Started Advice`.
+- passed: the pitfall table contains concrete evidence-backed guardrails for audio input/output, NAND flashing, LCD/touch, BL702, TH, IR and RF boundaries.
+- passed: report structure check printed `hardware report structure and scope text ok`.
+- passed: scope grep found no skill/process terms in the product report.
+- passed: `python3 -m py_compile` for skill helper scripts.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, or serial monitor; this was a documentation/skill-instruction update with no firmware source, Kconfig, build script, linker script, or SDK file changed.
+
 ## Step H.xiaozhi-client.77 Verification
 
 Review the hardware-report audio conclusions and current firmware binding points:

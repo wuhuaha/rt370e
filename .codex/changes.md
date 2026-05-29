@@ -1,5 +1,26 @@
 # Change Log
 
+## Step H.xiaozhi-client.78
+- 迭代 `schematic-pcb-firmware-guide`，要求每份硬件固件 handoff 报告都包含“快速上手”和“避坑指南 / 注意事项 / 上手建议”：
+  - 本地 skill `SKILL.md` 新增 `Extract pitfalls and getting-started advice` 流程，要求从外部主资料、SDK 示例/默认值、datasheet/app note/errata、原理图深度分析和本地运行记录中提炼高概率踩坑点。
+  - 报告模板 `references/report_template.md` 新增 `Quick Start For Firmware Engineers` 和 `Pitfalls / Attention Points / Getting Started Advice`，并要求每条建议写出证据、影响、可信度和第一步低风险检查。
+  - 项目说明 `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步新增中文规则，强调这部分内容必须提高开发效率、降低踩坑概率，不能写泛泛经验口号，也不能越界定义产品/业务行为。
+- 用最新版规则完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`：
+  - 重新基于 `doc/hard/` PDF/text、`/root/ameba-rtos` SDK、当前项目源码和外部供应商资料整理报告，而不是局部追加旧报告。
+  - 新增 `Quick Start For Firmware Engineers`，列出首读章节、首跑构建/烧录命令、首看日志、首测测点和“测到什么之前不要改什么”。
+  - 新增 `Pitfalls / Attention Points / Getting Started Advice` 表，覆盖 SDK reference-board 默认音频引脚、PDM DATA1/DMIC3/4、PDM frame 不等于有效语音、MSM261DDB021 clock、AXS2033 SD 模式、BTL 差分输出、当前满音量、小声排查、LCD lane 冲突、Sitronix `0x55` 候选地址、NAND/NOR profile、BL702 boot strap、Touch/TH 共享 I2C、背光误判、TH 缺型号、IR 和 RF 设置边界。
+  - 报告继续保持硬件资料到 BSP/HAL/driver 的 handoff 边界，不把产品交互、网络服务策略、应用会话或 UI 行为写成硬件结论。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、Kconfig、构建脚本、烧录 profile、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: `pdf_artifact_inventory.py` 重新清点 `doc/hard/*.pdf` 和 Sitronix 手册，生成 `tmp/hard_pitfalls_inventory/`。
+  - passed: report structure check confirms `Quick Start For Firmware Engineers` and `Pitfalls / Attention Points / Getting Started Advice` are present.
+  - passed: scope grep found no skill/process iteration terms in the product report.
+  - passed: `python3 -m py_compile` for skill helper scripts.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - not run: firmware build/flash/monitor; this is a docs/skill-instruction update with no firmware source or build configuration change.
+
 ## Step H.xiaozhi-client.77
 - 根据最新版硬件固件说明书复核语音输入/输出适配：
   - 语音输入继续保持已验证路径：`PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`、Audio HAL DATA1、`AUDIO_DMIC3/DMIC4`、`pdm-2mic-pa2-pa4-data1`。

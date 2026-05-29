@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.78` 为硬件报告 skill 增加避坑/上手建议并重生成报告：
+  - `schematic-pcb-firmware-guide` 新增“避坑指南 / 注意事项 / 上手建议”生成规则：从外部主资料、SDK 默认值/示例、datasheet/app note/errata、原理图深度分析和本地运行记录中提炼可追溯 guardrail。
+  - 报告模板新增 `Quick Start For Firmware Engineers` 和 `Pitfalls / Attention Points / Getting Started Advice`，每条建议要求说明为什么容易错、证据、影响、可信度和第一步低风险检查。
+  - 完整重生成 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，新增快速上手和避坑表，覆盖音频输入/输出、NAND profile、LCD lane/timing、Sitronix touch、BL702 boot strap、TH/IR/RF 边界等高概率错误点。
+  - 本步只改文档和本地 skill，不修改固件源码或 SDK；report structure/scope 检查、helper `py_compile`、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均已通过。
 - `Step H.xiaozhi-client.77` 按硬件报告复核音频适配并调满输出音量：
   - 根据 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 复核当前语音输入/输出绑定，输入仍为已验证 `PA2/PA4 DATA1 -> DMIC3/DMIC4`，输出仍为 `Audio HAL speaker/LINEOUT -> AXS2033 -> CN2` 且功放控制为 `PB25/MUTE`。
   - 本轮报告已经足够支撑实现，未继续修改 skill 或硬件报告正文。
