@@ -1,3 +1,52 @@
+## Step H.xiaozhi-client.69 Verification
+
+Flash the H.68 PA2/PA4 image to the NAND board:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed on 2026-05-29:
+- the flash tool reported `MemoryType: NAND`, `FlashModel: GD5F1GM7U`,
+  `FlashCapacity: 1Gb/128MB`
+- `km4_boot_all.bin` downloaded successfully
+- `km0_km4_ca32_app.bin` downloaded successfully
+- final result: `Finished PASS`
+
+Monitor runtime logs:
+```bash
+cd /root/ameba-river
+python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000
+```
+
+Observed runtime evidence:
+```text
+audio diag: mode=listening ... peak=29/36/0 pre=... peak=29 ... speech=no
+audio diag: mode=listening ... peak=33/43/0 pre=... peak=33 ... speech=yes
+server stt: text=...
+server llm: emotion=...
+orvibo state: listening -> speaking reason=tts_start
+playback start: stream=orvibo_tts rate=48000Hz ...
+orvibo access: ready=yes ... http=200 ... version=2026.05.28.210112
+orvibo audio: running=yes ... speech=8/8 ... kws=8040/0 ... enc=1341/0 dec=136/0
+capture_service=running frame=1024B 16000Hz/2ch/16ms ... reads=8040 wait_to=0
+kws status: ... hits=3 triggers=1 ...
+```
+
+Interpretation:
+- H.68 fixed the previously silent capture path: stable capture/preproc peaks
+  are now nonzero, VAD sees speech, KWS has triggered, and server STT/TTS works.
+- Future work should treat PA2/PA4 + DATA1 (`DMIC3/DMIC4`) as the verified
+  hardware path and move to quality tuning instead of DATA0-3 path guessing.
+
+Post-validation hygiene:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
 ## Step H.xiaozhi-client.68 Verification
 
 Confirm the PA2/PA4 DATA1 board profile, disabled boot sweep, and project-owned

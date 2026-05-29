@@ -1,5 +1,29 @@
 # Change Log
 
+## Step H.xiaozhi-client.69
+- 执行 H.68 镜像的实板 NAND 下载与串口运行验证：
+  - 下载命令：`export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000`。
+  - Flash 工具识别当前硬件为 `MemoryType: NAND`、`GD5F1GM7U`、`1Gb/128MB`。
+  - `km4_boot_all.bin` 和 `km0_km4_ca32_app.bin` 均下载完成，最终 `Finished PASS`。
+  - monitor 命令：`python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`。
+- 运行观察：
+  - H.68 版本 `2026.05.28.210112` 已启动，`orvibo access: ready=yes`，Wi-Fi 连接 `river`，`has_ipv4=yes`。
+  - `audio diag` 不再是长期 `peak=0/0/0`，出现 `peak=29/36`、`33/43`、`44/49`、`153/154` 等非零采集/预处理峰值。
+  - VAD 已检测到语音：`speech=yes`、`speech=8/8`，并触发 `user_speech_started/user_speech_ended`。
+  - KWS 已触发一次：`hits=3 triggers=1`，`wake_text=欧管家`，说明板端 KWS 前端也拿到有效输入。
+  - 服务端链路已跑通：出现 `server stt`、`server llm`、`server_sentence_start`、TTS 播放启动和 playback drain/stop。
+  - `river orvibo status` 显示 `access ready=yes`、`protocol sessions=1/1`、`audio running=yes`、`capture_service=running frame=1024B 16000Hz/2ch/16ms reads=8040 wait_to=0`。
+- 结论：
+  - PA2/PA4 + `DMIC3/DMIC4` + AP Audio HAL override 的采集方向已被实板验证为有效语音路径。
+  - 后续不应继续在 DATA0-3 上猜路径；若还要优化识别质量，应转向 VAD/KWS 阈值、麦克风槽位/极性、AGC/增益、AEC/播放参考溢出、串口日志降噪等质量问题。
+- 保持受保护能力不变：
+  - 本步只记录下载/运行结果，不修改固件代码、SDK 源码、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: project NAND flash on `/dev/ttyUSB0` completed with `Finished PASS`.
+  - passed: serial monitor confirmed Wi-Fi/access ready, nonzero audio peaks, VAD speech detection, KWS trigger, server STT/TTS, and playback.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.68
 - 根据用户确认的硬件连接收敛 PDM/DMIC 采集路径：
   - 当前板子数字麦 `PDM_CLK` 接 `PA2`，`PDM_DAT1` 接 `PA4`。

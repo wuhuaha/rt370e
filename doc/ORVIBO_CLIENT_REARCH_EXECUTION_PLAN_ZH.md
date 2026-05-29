@@ -1,13 +1,19 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-28
+Last Updated: 2026-05-29
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.69` 实板验证 PA2/PA4 数字麦采集链路：
+  - Codex 按用户本轮要求执行 `/dev/ttyUSB0` NAND 下载，Flash 工具识别 `GD5F1GM7U`、`1Gb/128MB`，`km4_boot_all.bin` 和 `km0_km4_ca32_app.bin` 均下载完成，最终 `Finished PASS`。
+  - 串口 monitor 确认 H.68 版本 `2026.05.28.210112` 启动，Wi-Fi/access ready，`capture_service=running frame=1024B 16000Hz/2ch/16ms reads=8040 wait_to=0`。
+  - `audio diag` 已出现稳定非零采集/预处理峰值，例如 `peak=29/36`、`33/43`、`44/49`、`153/154`；VAD 出现 `speech=yes` / `speech=8/8`。
+  - 服务端链路已跑通：出现 `server stt`、`server llm`、TTS 播放和 drain/stop；KWS 也记录 `hits=3 triggers=1`。
+  - 结论：PA2/PA4 + DATA1 (`DMIC3/DMIC4`) 已实板验证为有效采集路径，后续转向语音质量、VAD/KWS 阈值、槽位/极性/增益和播放参考等调优问题。
 - `Step H.xiaozhi-client.68` 固定 PA2/PA4 数字麦 DATA1 采集路径：
   - 用户确认当前板子数字麦为 `PDM_CLK -> PA2`、`PDM_DAT1 -> PA4`。
   - H.67 sweep 显示 DATA1 (`DMIC3/DMIC4`) 是唯一稳定非零路径；正常采集仍回到 `DMIC5/DMIC6` 并长期 `peak=0/0/0`。

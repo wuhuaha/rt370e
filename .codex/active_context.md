@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.68 固定 PA2/PA4 的 DMIC DATA1 采集路径`
+  - `Step H.xiaozhi-client.69 实板验证 PA2/PA4 数字麦采集链路`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -468,6 +468,20 @@ or top-of-tree verification target changes.
 
 ## Latest Hardware-Audio Slice
 
+- `Step H.xiaozhi-client.69` validates the PA2/PA4 route on hardware:
+  - Codex flashed H.68 to `/dev/ttyUSB0` with the project NAND profile; the
+    tool identified `GD5F1GM7U` NAND and completed with `Finished PASS`.
+  - Serial monitor confirmed nonzero capture/preproc peaks such as `29/36`,
+    `33/43`, `44/49`, and `153/154`, replacing the previous persistent
+    `0/0/0` capture symptom.
+  - Runtime reached VAD speech detection, KWS trigger (`hits=3 triggers=1`),
+    server STT/LLM/TTS, and playback start/drain/stop.
+  - `river orvibo status` confirmed `access ready=yes`, Wi-Fi connected with
+    IPv4, `capture_service=running frame=1024B 16000Hz/2ch/16ms`, and
+    `reads=8040 wait_to=0`.
+  - PA2/PA4 + DATA1 (`DMIC3/DMIC4`) is now the verified hardware capture path;
+    future work should focus on voice quality/tuning rather than DATA0-3 path
+    selection.
 - `Step H.xiaozhi-client.68` fixes the confirmed PA2/PA4 digital mic route:
   - User confirmed the board wires `PDM_CLK` to `PA2` and `PDM_DAT1` to `PA4`.
   - H.67 sweep showed DATA1 (`DMIC3/DMIC4`) is the only path with stable
