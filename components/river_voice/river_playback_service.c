@@ -157,10 +157,9 @@ static river_status_t river_playback_service_compute_buffer_bytes(
     }
 
     /*
-     * AudioTrack_GetMinBufferBytes() already reports the SDK's minimum whole
-     * track buffer size. buffer_frame_count models how many application audio
-     * frames we want queued, so take the larger of the two budgets instead of
-     * multiplying the SDK minimum again.
+     * On the AmebaGreen2 IRQ route AudioTrackConfig.buffer_bytes becomes the
+     * DMA period budget. Keep it separate from manual start prefill so a large
+     * jitter cushion does not also create a large xrun threshold.
      */
     desired_buffer_bytes64 =
         (uint64_t)config->playback_frame_bytes * (uint64_t)desired_frame_count;
@@ -360,7 +359,8 @@ static void river_playback_service_prime_started_track_locked(void)
 }
 
 static bool river_playback_service_write_silence_locked(size_t silence_bytes,
-                                                        const char *reason)
+                                                        const char *reason,
+                                                        bool log_success)
 {
     size_t written_total = 0U;
 
@@ -394,12 +394,14 @@ static bool river_playback_service_write_silence_locked(size_t silence_bytes,
         written_total += (size_t)write_result;
     }
 
-    RIVER_LOGI("playback drain tail pad: stream=%s reason=%s silence=%luB",
-               g_river_playback_service.stats.stream_name[0] != '\0' ?
-                   g_river_playback_service.stats.stream_name :
-                   "-",
-               reason != NULL ? reason : "-",
-               (unsigned long)silence_bytes);
+    if (log_success) {
+        RIVER_LOGI("playback drain tail pad: stream=%s reason=%s silence=%luB",
+                   g_river_playback_service.stats.stream_name[0] != '\0' ?
+                       g_river_playback_service.stats.stream_name :
+                       "-",
+                   reason != NULL ? reason : "-",
+                   (unsigned long)silence_bytes);
+    }
     return true;
 }
 
@@ -849,6 +851,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
     size_t track_buffer_bytes;
     size_t desired_buffer_bytes;
     size_t active_track_buffer_bytes;
+    size_t sdk_track_capacity_bytes;
     uint32_t category_type;
     river_status_t status;
     bool reused_track;
@@ -963,8 +966,10 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
 
     river_playback_service_prepare_output_locked();
     river_playback_service_apply_volume_locked();
-    active_track_buffer_bytes =
-        (size_t)g_river_playback_service.prepared_track_config.buffer_bytes;
+    sdk_track_capacity_bytes = (size_t)AudioTrack_GetBufferSize(g_river_playback_service.track);
+    active_track_buffer_bytes = sdk_track_capacity_bytes != 0U ?
+                                    sdk_track_capacity_bytes :
+                                    (size_t)g_river_playback_service.prepared_track_config.buffer_bytes;
     AudioTrack_SetStartThresholdBytes(g_river_playback_service.track,
                                       (int32_t)track_buffer_bytes);
     RIVER_LOGI("playback start backend call: stream=%s ref=%s reuse=%s",
@@ -989,7 +994,7 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
     g_river_playback_service.stats.track_buffer_bytes = active_track_buffer_bytes;
     g_river_playback_service.stats.start_count++;
     river_playback_service_set_state_locked(RIVER_PLAYBACK_RUNNING);
-    RIVER_LOGI("playback start: stream=%s rate=%luHz frame=%lums frame_bytes=%luB min=%luB target=%luB track=%luB ref=%s reuse=%s deferred=%s",
+    RIVER_LOGI("playback start: stream=%s rate=%luHz frame=%lums frame_bytes=%luB min=%luB period=%luB target=%luB track=%luB prefill=%luB ref=%s reuse=%s deferred=%s",
                g_river_playback_service.stats.stream_name[0] != '\0' ?
                    g_river_playback_service.stats.stream_name :
                    "-",
@@ -997,8 +1002,10 @@ river_status_t river_playback_service_start_stream(const river_playback_stream_c
                (unsigned long)config->frame_ms,
                (unsigned long)config->playback_frame_bytes,
                (unsigned long)min_buffer_bytes,
+               (unsigned long)track_buffer_bytes,
                (unsigned long)desired_buffer_bytes,
                (unsigned long)active_track_buffer_bytes,
+               (unsigned long)g_river_playback_service.start_threshold_bytes,
                config->reference_export ? "yes" : "no",
                reused_track ? "yes" : "no",
                g_river_playback_service.start_deferred ? "yes" : "no");
@@ -1210,6 +1217,53 @@ river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, c
     return status;
 }
 
+river_status_t river_playback_service_fill_silence_if_buffer_below(size_t low_water_bytes,
+                                                                   size_t fill_bytes,
+                                                                   const char *reason)
+{
+    size_t buffered_bytes = 0U;
+    size_t buffer_size = 0U;
+    river_status_t status = RIVER_ERR_NOT_FOUND;
+
+    if (low_water_bytes == 0U || fill_bytes == 0U) {
+        return RIVER_ERR_ARG;
+    }
+    if (!g_river_playback_service.initialized) {
+        return RIVER_ERR_NOT_FOUND;
+    }
+    if (rtos_mutex_take(g_river_playback_service.lock,
+                        RIVER_PLAYBACK_SERVICE_HOT_CONTROL_WAIT_MS) != RTK_SUCCESS) {
+        return RIVER_ERR_BUSY;
+    }
+
+    if (g_river_playback_service.stats.state == RIVER_PLAYBACK_RUNNING &&
+        g_river_playback_service.track != NULL &&
+        g_river_playback_service.track_started &&
+        !g_river_playback_service.start_deferred &&
+        river_playback_service_update_buffer_stats_locked(&buffered_bytes,
+                                                          &buffer_size) &&
+        buffer_size != 0U) {
+        size_t effective_low_water = low_water_bytes;
+
+        if (effective_low_water >= buffer_size) {
+            effective_low_water = buffer_size / 2U;
+        }
+        if (fill_bytes <= buffer_size &&
+            buffered_bytes < effective_low_water &&
+            buffered_bytes <= (buffer_size - fill_bytes)) {
+            status = river_playback_service_write_silence_locked(fill_bytes,
+                                                                 reason,
+                                                                 false) ?
+                         RIVER_OK :
+                         RIVER_ERR_IO;
+        }
+        (void)river_playback_service_update_buffer_stats_locked(NULL, NULL);
+    }
+
+    rtos_mutex_give(g_river_playback_service.lock);
+    return status;
+}
+
 river_status_t river_playback_service_wait_idle_ex(uint32_t timeout_ms,
                                                    uint32_t poll_ms,
                                                    const char *reason)
@@ -1254,7 +1308,8 @@ river_status_t river_playback_service_wait_idle_ex(uint32_t timeout_ms,
         if (!tail_pad_written) {
             (void)river_playback_service_write_silence_locked(
                 g_river_playback_service.config.playback_frame_bytes,
-                reason);
+                reason,
+                true);
             tail_pad_written = true;
         }
 

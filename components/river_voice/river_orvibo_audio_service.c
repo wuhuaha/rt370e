@@ -47,7 +47,10 @@
     (((RIVER_ORVIBO_DOWNLINK_MAX_RATE_HZ * RIVER_ORVIBO_OPUS_FRAME_MS) / 1000U) * sizeof(int16_t))
 #define RIVER_ORVIBO_DOWNLINK_STEREO_MAX       (RIVER_ORVIBO_DOWNLINK_MONO_MAX * 2U)
 #define RIVER_ORVIBO_DOWNLINK_BUFFER_HIGH_WATER_PCT 95U
-#define RIVER_ORVIBO_TTS_BUFFER_FRAMES         16U
+#define RIVER_ORVIBO_TTS_PERIOD_FRAMES         4U
+#define RIVER_ORVIBO_TTS_LOW_WATER_FRAMES      8U
+#define RIVER_ORVIBO_TTS_SILENCE_FILL_FRAMES   1U
+#define RIVER_ORVIBO_TTS_REF_HISTORY_MS        10000U
 #define RIVER_ORVIBO_PLAYBACK_VOLUME           1.00f
 #define RIVER_ORVIBO_DIAG_LOG_INTERVAL_MS      5000U
 #define RIVER_ORVIBO_PLAYBACK_DRAIN_POLL_MS    20U
@@ -88,6 +91,7 @@ typedef struct {
     uint32_t playback_stream_sample_rate;
     uint32_t playback_stream_frame_ms;
     size_t playback_stream_mono_bytes;
+    uint64_t last_tts_gap_fill_ms;
     uint32_t uplink_sequence;
     uint32_t capture_ok;
     uint32_t capture_fail;
@@ -109,6 +113,9 @@ typedef struct {
     uint32_t resample_fail;
     uint32_t playback_write_ok;
     uint32_t playback_write_fail;
+    uint32_t playback_write_recovered;
+    uint32_t playback_gap_fill_ok;
+    uint32_t playback_gap_fill_fail;
     uint32_t downlink_backpressure_events;
     uint32_t downlink_backpressure_high_water;
     size_t downlink_buffered_bytes;
@@ -123,6 +130,8 @@ typedef struct {
 } river_orvibo_audio_context_t;
 
 static river_orvibo_audio_context_t g_river_orvibo_audio;
+
+static void river_orvibo_audio_tts_gap_guard(void);
 
 static void river_orvibo_audio_emit(const river_orvibo_audio_event_t *event)
 {
@@ -282,7 +291,7 @@ static void river_orvibo_audio_log_diag_if_needed(void)
         return;
     }
     g_river_orvibo_audio.last_diag_log_ms = now_ms;
-    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu peak=%u/%u/%u pre=%lu/%lu peak=%u vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu play=%lu/%lu bp_evt=%lu buf=%lu/%lu",
+    RIVER_LOGI("audio diag: mode=%s cap=%lu/%lu peak=%u/%u/%u pre=%lu/%lu peak=%u vad=%lu/%lu speech=%s prob=%u/%u kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu play=%lu/%lu recover=%lu gap=%lu/%lu bp_evt=%lu buf=%lu/%lu",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned long)g_river_orvibo_audio.capture_ok,
                (unsigned long)g_river_orvibo_audio.capture_fail,
@@ -311,6 +320,9 @@ static void river_orvibo_audio_log_diag_if_needed(void)
                (unsigned long)g_river_orvibo_audio.last_playback_sample_rate,
                (unsigned long)g_river_orvibo_audio.playback_write_ok,
                (unsigned long)g_river_orvibo_audio.playback_write_fail,
+               (unsigned long)g_river_orvibo_audio.playback_write_recovered,
+               (unsigned long)g_river_orvibo_audio.playback_gap_fill_ok,
+               (unsigned long)g_river_orvibo_audio.playback_gap_fill_fail,
                (unsigned long)g_river_orvibo_audio.downlink_backpressure_events,
                (unsigned long)g_river_orvibo_audio.downlink_buffered_bytes,
                (unsigned long)g_river_orvibo_audio.downlink_buffer_size_bytes);
@@ -591,6 +603,7 @@ static void river_orvibo_audio_task(void *param)
             river_orvibo_audio_try_encode(g_river_orvibo_audio.enhanced_buffer,
                                           enhanced_bytes);
         }
+        river_orvibo_audio_tts_gap_guard();
         river_orvibo_audio_log_diag_if_needed();
     }
 
@@ -880,13 +893,13 @@ static river_status_t river_orvibo_audio_start_playback_if_needed(uint32_t sampl
     config.playback_channels = 2U;
     config.bits_per_sample = 16U;
     config.playback_frame_bytes = mono_bytes * 2U;
-    config.buffer_frame_count = RIVER_ORVIBO_TTS_BUFFER_FRAMES;
+    config.buffer_frame_count = RIVER_ORVIBO_TTS_PERIOD_FRAMES;
     config.volume_left = RIVER_ORVIBO_PLAYBACK_VOLUME;
     config.volume_right = RIVER_ORVIBO_PLAYBACK_VOLUME;
     config.reference_export = true;
     config.reference_channels = 1U;
     config.reference_frame_bytes = mono_bytes;
-    config.reference_history_ms = 600U;
+    config.reference_history_ms = RIVER_ORVIBO_TTS_REF_HISTORY_MS;
     config.disable_track_reuse = true;
     config.defer_start_until_prefilled = false;
     if (river_playback_service_start_stream(&config) != RIVER_OK) {
@@ -897,6 +910,7 @@ static river_status_t river_orvibo_audio_start_playback_if_needed(uint32_t sampl
     g_river_orvibo_audio.playback_stream_sample_rate = sample_rate;
     g_river_orvibo_audio.playback_stream_frame_ms = frame_duration_ms;
     g_river_orvibo_audio.playback_stream_mono_bytes = mono_bytes;
+    g_river_orvibo_audio.last_tts_gap_fill_ms = 0U;
     river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_PLAYBACK_STARTED);
     return RIVER_OK;
 }
@@ -934,6 +948,59 @@ static void river_orvibo_audio_downlink_buffer_high_water(size_t playback_bytes)
                    (unsigned long)stats.buffer_size_bytes,
                    (unsigned long)high_water_bytes,
                    (unsigned long)g_river_orvibo_audio.downlink_backpressure_events);
+    }
+}
+
+static void river_orvibo_audio_tts_gap_guard(void)
+{
+    uint64_t now_ms;
+    uint32_t guard_interval_ms;
+    size_t playback_frame_bytes;
+    size_t low_water_bytes;
+    size_t fill_bytes;
+    river_status_t status;
+
+    if (g_river_orvibo_audio.mode != RIVER_ORVIBO_AUDIO_MODE_SPEAKING ||
+        !g_river_orvibo_audio.playback_started ||
+        g_river_orvibo_audio.playback_stream_mono_bytes == 0U ||
+        g_river_orvibo_audio.playback_stream_frame_ms == 0U) {
+        return;
+    }
+
+    now_ms = (uint64_t)rtos_time_get_current_system_time_ms();
+    guard_interval_ms = g_river_orvibo_audio.playback_stream_frame_ms;
+    if (g_river_orvibo_audio.last_tts_gap_fill_ms != 0U &&
+        now_ms >= g_river_orvibo_audio.last_tts_gap_fill_ms &&
+        (now_ms - g_river_orvibo_audio.last_tts_gap_fill_ms) < guard_interval_ms) {
+        return;
+    }
+    g_river_orvibo_audio.last_tts_gap_fill_ms = now_ms;
+
+    playback_frame_bytes = g_river_orvibo_audio.playback_stream_mono_bytes * 2U;
+    low_water_bytes = playback_frame_bytes * RIVER_ORVIBO_TTS_LOW_WATER_FRAMES;
+    fill_bytes = playback_frame_bytes * RIVER_ORVIBO_TTS_SILENCE_FILL_FRAMES;
+    status = river_playback_service_fill_silence_if_buffer_below(
+        low_water_bytes,
+        fill_bytes,
+        "orvibo_tts_gap_guard");
+    if (status == RIVER_OK) {
+        g_river_orvibo_audio.playback_gap_fill_ok++;
+        if (g_river_orvibo_audio.playback_gap_fill_ok <= 3U ||
+            (g_river_orvibo_audio.playback_gap_fill_ok % 20U) == 0U) {
+            RIVER_LOGI("tts gap guard filled silence: frame=%lu low=%lu fill=%lu count=%lu",
+                       (unsigned long)playback_frame_bytes,
+                       (unsigned long)low_water_bytes,
+                       (unsigned long)fill_bytes,
+                       (unsigned long)g_river_orvibo_audio.playback_gap_fill_ok);
+        }
+    } else if (status != RIVER_ERR_NOT_FOUND && status != RIVER_ERR_BUSY) {
+        g_river_orvibo_audio.playback_gap_fill_fail++;
+        if (g_river_orvibo_audio.playback_gap_fill_fail <= 3U ||
+            (g_river_orvibo_audio.playback_gap_fill_fail % 20U) == 0U) {
+            RIVER_LOGW("tts gap guard fill failed: status=%d count=%lu",
+                       (int)status,
+                       (unsigned long)g_river_orvibo_audio.playback_gap_fill_fail);
+        }
     }
 }
 
@@ -1050,6 +1117,21 @@ river_status_t river_orvibo_audio_service_handle_downlink(
                                      playback_mono_bytes,
                                      true) != RIVER_OK) {
         g_river_orvibo_audio.playback_write_fail++;
+        RIVER_LOGW("orvibo tts write failed; restart and retry one frame");
+        river_orvibo_audio_service_stop_playback("orvibo_tts_write_failed");
+        if (river_orvibo_audio_start_playback_if_needed(playback_sample_rate,
+                                                        frame_duration_ms,
+                                                        playback_mono_bytes) == RIVER_OK &&
+            river_playback_service_write((const uint8_t *)g_river_orvibo_audio.downlink_stereo,
+                                         playback_mono_bytes * 2U,
+                                         (const uint8_t *)g_river_orvibo_audio.downlink_playback_pcm,
+                                         playback_mono_bytes,
+                                         true) == RIVER_OK) {
+            g_river_orvibo_audio.playback_write_ok++;
+            g_river_orvibo_audio.playback_write_recovered++;
+            return RIVER_OK;
+        }
+        g_river_orvibo_audio.playback_write_fail++;
         return RIVER_ERR_IO;
     }
     g_river_orvibo_audio.playback_write_ok++;
@@ -1066,6 +1148,7 @@ void river_orvibo_audio_service_prepare_tts_playback(void)
     g_river_orvibo_audio.playback_stream_sample_rate = 0U;
     g_river_orvibo_audio.playback_stream_frame_ms = 0U;
     g_river_orvibo_audio.playback_stream_mono_bytes = 0U;
+    g_river_orvibo_audio.last_tts_gap_fill_ms = 0U;
     RIVER_LOGI("orvibo audio: tts playback prepared");
 }
 
@@ -1096,13 +1179,14 @@ void river_orvibo_audio_service_stop_playback(const char *reason)
         g_river_orvibo_audio.playback_stream_sample_rate = 0U;
         g_river_orvibo_audio.playback_stream_frame_ms = 0U;
         g_river_orvibo_audio.playback_stream_mono_bytes = 0U;
+        g_river_orvibo_audio.last_tts_gap_fill_ms = 0U;
         river_orvibo_audio_emit_simple(RIVER_ORVIBO_AUDIO_EVENT_PLAYBACK_FINISHED);
     }
 }
 
 void river_orvibo_audio_service_dump_status(void)
 {
-    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu peak=%u/%u/%u preproc=%lu/%lu peak=%u vad_cnt=%lu/%lu speech=%lu/%lu suppress=%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
+    RIVER_LOGI("orvibo audio: running=%s mode=%s task_stack=%u vad=%s prob=%u/%u capture=%lu/%lu peak=%u/%u/%u preproc=%lu/%lu peak=%u vad_cnt=%lu/%lu speech=%lu/%lu suppress=%lu kws=%lu/%lu enc=%lu/%lu dec=%lu/%lu rs=%lu/%lu/%lu rate=%lu/%lu->%lu playback=%s write=%lu/%lu recover=%lu gap=%lu/%lu bp_evt=%lu bp_high=%lu buf=%lu/%lu",
                g_river_orvibo_audio.running ? "yes" : "no",
                river_orvibo_audio_mode_name(g_river_orvibo_audio.mode),
                (unsigned int)RIVER_ORVIBO_AUDIO_TASK_STACK,
@@ -1137,6 +1221,9 @@ void river_orvibo_audio_service_dump_status(void)
                g_river_orvibo_audio.playback_started ? "started" : "stopped",
                (unsigned long)g_river_orvibo_audio.playback_write_ok,
                (unsigned long)g_river_orvibo_audio.playback_write_fail,
+               (unsigned long)g_river_orvibo_audio.playback_write_recovered,
+               (unsigned long)g_river_orvibo_audio.playback_gap_fill_ok,
+               (unsigned long)g_river_orvibo_audio.playback_gap_fill_fail,
                (unsigned long)g_river_orvibo_audio.downlink_backpressure_events,
                (unsigned long)g_river_orvibo_audio.downlink_backpressure_high_water,
                (unsigned long)g_river_orvibo_audio.downlink_buffered_bytes,

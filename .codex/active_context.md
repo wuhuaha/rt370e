@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.79 为硬件报告 skill 增加交互式 HTML 伴随文档`
+  - `Step H.xiaozhi-client.80 优化 Orvibo TTS 播放抗欠载`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.80` 优化 Orvibo TTS 播放抗欠载：
+  - `orvibo_tts` 播放 period 从 16 个 60ms 应用帧收敛为 4 帧，降低 Ameba AudioTrack IRQ 路径中大 DMA period 带来的 underrun/xrun 风险。
+  - 保持 `defer_start_until_prefilled=false`，因为历史板端验证已证明该 SDK 路径不支持“先 write 再 start”，会导致 `AudioTrack write: invalid state(1)`。
+  - 播放运行中新增低水位静音桥接，只在 track 已 start、buffer 低于阈值且有实际空余时补 1 帧静音；阈值会按 SDK 实际 buffer 容量收敛。
+  - TTS 写入失败时增加一次本地 stop/start + retry 当前帧；TTS playback reference history 扩到 10s，降低 `playback ref overflow` 噪声。
+  - audio diag/status 新增 `recover` 和 `gap=ok/fail` 计数，方便后续上板判断桥接与恢复是否触发。
+  - `git diff --check`、deferred-start guard grep 和 `/root/ameba-rtos` 完整 build 均通过；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.79` 为硬件报告 skill 增加交互式 HTML 伴随文档：
   - 本地 `schematic-pcb-firmware-guide` skill 默认输出从单一 Markdown 扩展为 Markdown + 同名离线交互式 HTML。

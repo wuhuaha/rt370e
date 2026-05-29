@@ -34,7 +34,7 @@ typedef struct {
     uint32_t playback_channels;
     uint32_t bits_per_sample;
     size_t playback_frame_bytes;
-    /* Target application-side queued frames, not a multiplier on SDK minBuffer. */
+    /* SDK AudioTrack buffer_bytes budget, expressed in application frames. */
     uint32_t buffer_frame_count;
     /* Some short streams need a clean AudioTrack because SDK flush is unsupported. */
     bool disable_track_reuse;
@@ -104,6 +104,9 @@ river_status_t river_playback_service_interrupt_stream_ex(const char *reason);
 river_status_t river_playback_service_flush_stream_ex(const char *reason);
 river_status_t river_playback_service_recover_stream_ex(const char *reason);
 river_status_t river_playback_service_set_ducking_ex(bool enabled, float gain, const char *reason);
+river_status_t river_playback_service_fill_silence_if_buffer_below(size_t low_water_bytes,
+                                                                   size_t fill_bytes,
+                                                                   const char *reason);
 river_status_t river_playback_service_wait_idle_ex(uint32_t timeout_ms,
                                                    uint32_t poll_ms,
                                                    const char *reason);

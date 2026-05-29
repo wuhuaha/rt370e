@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.80
+- 收敛 Orvibo TTS 播放尾段欠载/截断风险，保持低风险路径：
+  - `orvibo_tts` 的 `AudioTrackConfig.buffer_bytes` 从 16 个 60ms 应用帧收敛为 4 帧，用更小 DMA period 降低 SDK IRQ 路径的 xrun/underrun 敏感窗口。
+  - 明确不启用 `defer_start_until_prefilled`：历史上 Ameba 该路径已上板验证不支持“先 write 再 start”，会触发 `AudioTrack write: invalid state(1)`。
+  - 播放运行中增加低水位静音桥接：只在 track 已 start、buffer 低于阈值且有实际空余时补 1 帧静音，并按 SDK 实际 buffer 容量收敛阈值，避免小容量场景过度填充。
+  - TTS 写入失败时增加一次本地 restart + retry 当前帧，减少单次 `AudioTrack_Write` 异常导致整句尾部丢失。
+  - TTS playback reference history 从 600ms 扩到 10s，减少 `playback ref overflow` 噪声日志，不改变 reference/AEC 数据格式。
+  - audio diag/status 增加 `recover` 和 `gap=ok/fail` 计数，便于上板区分真实播放写失败、静音桥接和普通 buffer 状态。
+- 设计边界：
+  - 不修改 SDK 源码，不改变 XiaoZhi-compatible wire format、Opus payload 结构、VAD/KWS、tensor dump、alignment replay、board/local parity 或 AEC/BF 主路径。
+  - 保持已验证的 `AudioTrack_Start() -> AudioTrack_Write()` 顺序，不回到不兼容的 deferred-write 起播方案。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `rg -n "start_prefill|TTS_PREFILL|defer_start_until_prefilled = true|compute_start_threshold" include components` returned no matches.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`.
+
 ## Step H.xiaozhi-client.79
 - 迭代 `schematic-pcb-firmware-guide`，把硬件固件 handoff 的默认输出从单一 Markdown 扩展为 Markdown + 同名离线交互式 HTML：
   - 本地 skill `SKILL.md` 描述更新为生成 firmware-oriented Markdown guide plus self-contained interactive HTML companion。

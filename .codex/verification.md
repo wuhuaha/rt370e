@@ -1,3 +1,43 @@
+## Step H.xiaozhi-client.80 Verification
+
+Run static hygiene and confirm the unsafe deferred-start path is not enabled:
+```bash
+cd /root/ameba-river
+git diff --check
+rg -n "start_prefill|TTS_PREFILL|defer_start_until_prefilled = true|compute_start_threshold" include components
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the `rg` command returns no matches
+- Orvibo TTS keeps `defer_start_until_prefilled = false`
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Boot the board and wait for Orvibo access/connection readiness.
+2. Trigger several short and medium TTS replies, especially two-sentence replies like "好的，已经为你打开..."。
+3. Watch `playback start:` and `audio diag:` lines.
+```
+
+Expected result:
+- `playback start:` shows a smaller `period=` than the previous 16-frame TTS buffer and `deferred=no`
+- `AudioTrack write: invalid state(1)` does not appear
+- `playback ref overflow` should be materially reduced
+- `audio diag` exposes `recover=` and `gap=ok/fail` for follow-up analysis if a tail gap still occurs
+
 ## Step H.xiaozhi-client.79 Verification
 
 Validate the generated HTML companion structure and offline constraints:
