@@ -8,6 +8,12 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.75` 接入本地音频播放诊断并绑定 PB25 功放控制：
+  - 根据硬件报告把 Audio HAL amplifier pin 从 SDK 默认 `_PB_19` 覆盖到本板 `_PB_25`，对应 `PB25/MUTE -> AXS2033 SHUT/SD`。
+  - `river playback` 新增 `tone [freq_hz] [duration_ms] [level_pct]` 纯本地诊断命令；默认 `river playback tone 1000 1000 25`，验证边界停在 `Audio HAL speaker/LINEOUT -> AXS2033 -> CN2 speaker`。
+  - 本步同步迭代 `schematic-pcb-firmware-guide`：当仓库/SDK 可见时，报告必须列出 override header、build hook/target、Kconfig/HAL API、诊断命令和建议归属源码文件。
+  - `/root/ameba-rtos` 完整构建通过；AP 镜像包含 tone 诊断字符串；AP Audio HAL 预处理确认 `0x39` 即 `_PB_25` 已进入 `board_amp_pin` 和 `amp_info.pinmux`。
+  - 未烧录/串口 monitor；按当前 NAND 硬件策略，除非用户当前回合明确要求，否则由用户手动下载并验证喇叭、U7 pin1 和 LINEOUT/CN2 波形。
 - `Step H.xiaozhi-client.73` 生成 RTL8730E 4 寸板硬件固件说明书：
   - 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 下原理图/丝印图/datasheet。
   - 新增 `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md`，把主板硬件资料整理为固件可执行的 pinmux、接口、启动顺序、预期日志、缺失信息、假设方案和 board validation checklist。

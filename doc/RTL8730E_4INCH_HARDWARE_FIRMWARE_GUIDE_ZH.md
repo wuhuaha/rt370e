@@ -12,7 +12,7 @@
 - BL702 Zigbee 子系统由 RTL8730E 控制电源、复位、boot strap 和 UART1。原理图写明 `GPIO28: 0 boot from Flash, 1 boot from Uart`，固件必须避免误拉高 `BOOT_BL702` 进入 UART boot。
 - LCD/触摸资料已补充：本地新增 ST7102 480x480 init table 和 Sitronix touch driver 移植手册。原理图路由了 DSI `D0/D1/CLK` 两条 data lane，但 init table 写 `SSD_LANE(1,0)`；固件实现前需要向屏厂确认该屏实际使用 1-lane 还是 2-lane，以及完整 DSI timing。
 - 温湿度传感器通过 CN5 FPC 暴露 `TH_I2C_SDA/SCL` 和 3.3V，但原理图未给外接传感器型号、地址和中断脚。固件需要硬件同事补充模块资料或上电 I2C scan。
-- 音频输出硬件路径是 RTL8730E 内部 Audio HAL speaker/LINEOUT route -> `LINEOUT_LN/LP` 差分线 -> `C76/C153 + R56/R57` 输入网络 -> AXS2033 -> CN2 喇叭。AXS2033 `SHUT/SD` 由 `MUTE` 网控制，原理图连接到 RTL8730E `PB25`；SDK 默认功放脚是 `_PB_19`，项目当前 audio override 只改了 PDM PA2/PA4，因此 BSP/HAL 配置需要特别核对 `AUDIO_HW_AMPLIFIER_PIN` 或等效 PB25 控制路径。
+- 音频输出硬件路径是 RTL8730E 内部 Audio HAL speaker/LINEOUT route -> `LINEOUT_LN/LP` 差分线 -> `C76/C153 + R56/R57` 输入网络 -> AXS2033 -> CN2 喇叭。AXS2033 `SHUT/SD` 由 `MUTE` 网控制，原理图连接到 RTL8730E `PB25`；SDK 默认功放脚是 `_PB_19`，项目已在 AP Audio HAL override 中把 `AUDIO_HW_AMPLIFIER_PIN` 覆盖为 `_PB_25`，并新增纯本地 `river playback tone` 诊断命令用于 speaker/LINEOUT/功放链路验证。
 
 ## 报告边界和读者
 
@@ -38,13 +38,14 @@
 | E11 | LCD 接口为 MIPI DSI + touch I2C + backlight PWM | `doc/hard/RTL8730 4寸SCH.pdf` P10 | schematic | A | 后续由 E16-E18 补充 ST7102/Sitronix 资料，但 lane/timing/address 仍需确认。 |
 | E12 | 丝印图标注 `MixPad4_RTL8730 V1A 20260506`，CN7 `MIC/IR`，CN5 `TH`，T2 Wi-Fi，T3 Zigbee | `doc/hard/RTL8730_4寸_丝印图.pdf` p2 渲染/OCR | visual/OCR | B | 丝印无文本层，低于原理图可信度。 |
 | E13 | AXS2033 输入网络使用 `R56/R57=39K` 和 `C76/C153=0.1uF`；按 datasheet 公式估算电压增益约 9.09 倍 / 19.2dB，输入高通截止约 40.8Hz | `doc/hard/RTL8730 4寸SCH.pdf` P08；`doc/hard/AXS2033.pdf` p8 | schematic + datasheet | B | datasheet 示例为 22K -> 23.4dB；本板 39K 是按公式推算，需要实际响度验证。 |
-| E14 | 原理图 `MUTE` 连接 RTL8730E `PB25`，SDK 默认 `AUDIO_HW_AMPLIFIER_PIN` 是 `_PB_19` | `doc/hard/RTL8730 4寸SCH.pdf` P08/P11；`/root/ameba-rtos/component/soc/usrcfg/amebasmart/include/ameba_audio_hw_usrcfg.h:19` | schematic + SDK | A | 项目当前 `river_audio_hw_overrides.h` 未覆盖功放脚。 |
+| E14 | 原理图 `MUTE` 连接 RTL8730E `PB25`，SDK 默认 `AUDIO_HW_AMPLIFIER_PIN` 是 `_PB_19` | `doc/hard/RTL8730 4寸SCH.pdf` P08/P11；`/root/ameba-rtos/component/soc/usrcfg/amebasmart/include/ameba_audio_hw_usrcfg.h:19` | schematic + SDK | A | 若不覆盖，SDK 会控制 reference-board 功放脚。 |
 | E15 | AmebaSmart Audio HAL 的 speaker 输出走内部 codec line-out 差分模式，创建 stream out 时默认 `AMEBA_AUDIO_DEVICE_SPEAKER` | `/root/ameba-rtos/component/audio/audio_hal/amebasmart/primary_audio_hw_stream_out.c:508`；`ameba_audio_stream_render.c:508` / `:270` | SDK | A | `AMEBA_AUDIO_DEVICE_SPEAKER` -> `APP_LINE_OUT`，对 DAC L/R line-out 设 `DIFF` 并 unmute。 |
 | E16 | ST7102 init table 标注 480x480/60Hz，启用 TE，`SSD_MODE(1,1)`，`0x11` 后延时 250ms，`0x29` 后延时 200ms | `doc/hard/LCD/ST7102_480480_60hz_0109_tp 3ms .txt` | vendor init table | B | 文本未给完整 porch/lane rate/reset timing；文件名和命令表支持 panel bring-up 初始依据。 |
 | E17 | ST7102 init table 写 `SSD_LANE(1,0)`，但原理图 CN6 路由 DSI D0/D1/CLK | `doc/hard/LCD/ST7102_480480_60hz_0109_tp 3ms .txt`；`doc/hard/RTL8730 4寸SCH.pdf` P10 | init table + schematic | B | 这是需要硬件/屏厂澄清的 lane 配置冲突，不应由软件静默选择。 |
 | E18 | Sitronix touch driver 手册适用 ST7123/ST7121P/ST7123P/ST7102，支持 I2C/SPI；I2C 建议 400kHz，SPI 建议 8MHz，IRQ falling/active-low，RST active-low | `doc/hard/LCD/Sitronix Touch Driver 移植手册.pdf` p1/p4/p5/p10/p18 | vendor guide | B | 手册偏 Linux 移植说明；GPIO 编号、地址和 firmware 文件仍需按本板实测。 |
 | E19 | Sitronix 源码包 `sample.dtsi` 给出 I2C `compatible="sitronix_ts"`、`reg=<0x55>`；SPI 示例 `spi-max-frequency=<0x7a1200>` 即 8MHz、mode 3 | `doc/hard/LCD/ST_TDDI_TPDriver_v45.00.260402/.../dts/sample.dtsi` | vendor source bundle | B | `0x55` 可作为优先 probe 候选，但不能替代上电 scan。 |
 | E20 | Sitronix porting guide/source 要求选择平台、I2C/SPI、flash boot/host download；正常 probe 会打印 IC SFR/Display ID/Chip ID，驱动源码使用 falling IRQ 并含 ST7102 self-test header | `TouchDriver_PortingGuide.txt`；`touchscreen/sitronix_ts/sitronix_ts.c`；`sitronix_ts_test_st7102.h` | vendor source bundle | B | Linux driver 结构不能直接照搬到 Ameba，但寄存器访问、reset/IRQ、固件下载、自检和预期日志可迁移参考。 |
+| E21 | 项目 AP Audio HAL override 已覆盖功放脚为 `_PB_25`，诊断命令提供本地 speaker/LINEOUT tone 测试 | `include/river/river_audio_hw_overrides.h`；`CMakeLists.txt`；`components/river_diag/CMakeLists.txt`；`components/river_diag/river_diag_cmd.c` | code | A | 覆盖通过 AP `audio_hal_${c_CURRENT_IMAGE}` target 的 `-include` 注入；命令为 `river playback tone [freq_hz] [duration_ms] [level_pct]`。 |
 
 ## Artifact Inventory
 
@@ -79,7 +80,7 @@
 | TH FPC 外接温湿度传感器型号和 I2C 地址 | 没有型号无法写 sensor driver | CN5 是外接 TH 模块，3.3V + I2C | C | 硬件提供模块 BOM；固件 scan `TH_I2C`。 |
 | CN7 上 MIC/IR 小板的实际麦克风数量、L/R 接法、供电脚定义 | 影响 PDM 左右槽位、双麦相位、波束形成 | MSM261DDB021 双麦，DATA 复用一根 PDM_DAT1，L/R 一高一低 | B | 硬件提供小板原理图；逻辑分析 PDM CLK/DATA 和 L/R。 |
 | `MUTE` 到 AXS2033 `SHUT/SD` 的实际电压范围和上电默认态 | SD 不是简单 enable，电压区间决定 D 类/AB/关断；错误电平会导致无声、噪声或 POP | `PB25 -> MUTE -> R20/R21/C69/C71 -> SHUT`，GPIO high 可能进入 D 类防破音模式 | B | 示波器测 U7 pin1；确认 boot、idle、Audio HAL stream start、standby/stop 四个状态。 |
-| Ameba BSP/HAL 是否已把功放脚从 SDK 默认 `_PB_19` 改为本板 `PB25` | 直接影响 Audio HAL 自动 enable/disable 功放；错脚会出现 LINEOUT 有信号但喇叭无声 | 当前项目 override 只见 DMIC PA2/PA4，未见 `AUDIO_HW_AMPLIFIER_PIN` 覆盖 | A | 软件检查编译宏或 map；若使用 HAL 自动控制，覆盖为 `_PB_25` 或实现等效 PB25 控制。 |
+| `PB25/MUTE` 到 AXS2033 `SHUT/SD` 的实板电压是否与预期一致 | 代码已把 SDK 功放脚改为 PB25，但 SD 不是单纯 enable，仍需确认 GPIO high/low 对应的 AXS2033 工作区间 | `AUDIO_HW_AMPLIFIER_PIN=_PB_25` 使 Audio HAL 自动控制 PB25；GPIO high 可能进入 D 类防破音模式 | B | 示波器测 U7 pin1；确认 boot、idle、`river playback tone`、standby/stop 四个状态。 |
 | BL702 固件/协议和 UART 波特率 | 决定 Zigbee 子系统启动、升级和通信协议 | RTL8730 UART1 透传到 BL702 GPIO14/15 | B | Zigbee 固件负责人提供协议；串口探测 boot log。 |
 | Realtek RTL8730E 完整 pinmux/reference manual | 可进一步核验所有 PA/PB/PC 复用功能 | 本地 SDK 已足够确认当前 DMIC 和 audio HAL | B | 如要扩展 LCD/IR/Zigbee，补官方 pinmux 表。 |
 
@@ -106,7 +107,7 @@
 | Zigbee power enable | `Zigbee_PWR_ON` | RTL8730E `PA5` pin 8 | GPIO | 3.3V control | 电源页 U3 EN | P05/P09 | 网络/功耗策略中显式管理 BL702 电源。 |
 | UART1 to BL702 | `RTL8730_TX1/RX1` | `PB20/PB19` pins 67/66 | UART1 | 3.3V | RX/TX 各有 10K 上拉到 3.3V_Z | P11/P12 | RTL8730 TX1 -> BL702 RX1，RTL8730 RX1 <- BL702 TX1。 |
 | UART0 / base interface | `RTL8730_TX0/RX0` | `PB24/PB23` pins 73/72 | UART0 | 3.3V | R54/R55 10K 上拉到 VCC_3V3_Z | P05/P11 | 保留为底板/调试通信，避免与 console 冲突。 |
-| Amp SD/mode | `MUTE` | `PB25` pin 96 | GPIO / Audio HAL amplifier pin | 3.3V control to U7 SD | R20 100R + R21 10K/C69/C71 | E7/E14 | BSP/HAL 应核对 `AUDIO_HW_AMPLIFIER_PIN=_PB_25` 或等效 PB25 控制；按“AXS2033 SD/mode”而不是普通 mute 命名。 |
+| Amp SD/mode | `MUTE` | `PB25` pin 96 | GPIO / Audio HAL amplifier pin | 3.3V control to U7 SD | R20 100R + R21 10K/C69/C71 | E7/E14/E21 | 项目已覆盖 `AUDIO_HW_AMPLIFIER_PIN=_PB_25`；按“AXS2033 SD/mode”而不是普通 mute 命名，并实测 U7 pin1。 |
 | LCD power enable | `LCD_PWR_ON` | `PB26` pin 97 | GPIO | 3.3V control | 电源页 U4 EN | P05/P11 | DSI/touch 初始化前先上 LCD 3.3V；失败时先测 CN6 VCCIO/VCC3/VCC5/VCC_TP。 |
 | LCD reset | `RST_LCD` / `Reset_LCD` | `PA14` pin 16 | GPIO | 3.3V_LCD | R34 100K pull-up，R35 1K 串 | P10/E16 | 按 panel 时序拉低/释放；当前缺精确 reset pulse，需从屏厂资料或实测补齐。 |
 | Backlight PWM | `LCD_BL_PWM` | `PA16` pin 18 | PWM/GPIO | 3.3V control, 5V boost | R42 100R，R43 10K pulldown | P10 | 初始化完 panel 后打开 PWM；默认低关背光，避免白屏/花屏误判为背光问题。 |
@@ -185,10 +186,12 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
   - `SD/SHUT` 电压区间：`<0.35V` shutdown，`1.2-1.5V` AB 类，`1.7-2.1V` D 类防破音关闭，`>2.3V` D 类防破音模式 1。
 - BSP/HAL boundary：
   - Realtek SDK 默认 speaker route 已对应内部 line-out，不需要 I2S 外部 codec，除非硬件改版。
-  - SDK 默认功放脚 `AUDIO_HW_AMPLIFIER_PIN=_PB_19` 与本板 `MUTE=PB25` 不匹配。当前项目 `include/river/river_audio_hw_overrides.h` 只覆盖 DMIC pin；音频输出 bring-up 必须核对是否已通过编译宏或其他 board code 控制 PB25。
+  - SDK 默认功放脚 `AUDIO_HW_AMPLIFIER_PIN=_PB_19` 与本板 `MUTE=PB25` 不匹配；当前项目已在 [include/river/river_audio_hw_overrides.h](/root/ameba-river/include/river/river_audio_hw_overrides.h) 覆盖为 `_PB_25`，并由 [CMakeLists.txt](/root/ameba-river/CMakeLists.txt) 注入 AP `audio_hal_${c_CURRENT_IMAGE}` target。
+  - 本地诊断入口为 [components/river_diag/river_diag_cmd.c](/root/ameba-river/components/river_diag/river_diag_cmd.c) 的 `river playback tone [freq_hz] [duration_ms] [level_pct]`；该命令初始化 AudioService，选择 `DEVICE_OUT_SPEAKER`，通过 `river_playback_service` 写入 16kHz/2ch/16-bit 本地 PCM triangle tone。
   - 如果使用 SDK `AmpDummy` GPIO 控制，`enabled=true` 会 GPIO high，`enabled=false` 会 GPIO low；这与 AXS2033 SD 电压模式的关系必须用 U7 pin1 实测确认。
 - Expected HAL-level logs / checks：
   - Audio HAL output creation通常会出现 `startAudioHwStreamOut ...`、`tx start at:...`；项目播放服务会有 `playback start` / `playback stop` / `playback_service` status。
+  - 本地 tone 验证命令示例：`river playback tone 1000 1000 25`。预期项目日志出现 `playback tone start: route=speaker/LINEOUT amp=PB25/MUTE`、`playback start: stream=diag_tone`、`playback drain complete`、`playback stop`。
   - 无声时先分层：HAL output stream 是否写入并 start、LINEOUT_LN/LP 是否有差分波形、PB25/U7 pin1 是否处于目标 SD 区间、U7 VDD 是否 5V、CN2 差分端是否有波形、喇叭/线束是否正常。
 - Risks：
   - 错用 SDK 默认 `_PB_19` 控制功放，会导致 HAL 认为 amplifier enabled，但 U7 `SHUT/SD` 未被正确拉高/拉低。
@@ -274,7 +277,7 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
 | NAND boot/download | U11 SPI NAND 128MB | Flash tool 必须选择 NAND profile | `river_flash.py` 默认 NAND | A |
 | BL702 boot | GPIO28 low Flash, high UART | BL702 boot strap | `BOOT_BL702` 默认低 | A |
 | LCD power | `LCD_PWR_ON` 控 U4 3.3V_LCD，CN6 还有 VCCIO/VCC3/VCC5/VCC_TP pins | panel/touch 上电和 reset 时序未完整给出 | DSI/touch probe 前必须确认 rail 稳定；背光最后打开 | B |
-| AXS2033 SD | `PB25/MUTE` 控 U7 SHUT/SD | SD 电压分多个工作区间，不是单纯 mute | BSP/HAL 要驱动 PB25 并测 U7 pin1 电压 | A/B |
+| AXS2033 SD | `PB25/MUTE` 控 U7 SHUT/SD | SD 电压分多个工作区间，不是单纯 mute | AP Audio HAL override 已绑定 PB25；仍要测 U7 pin1 电压 | A/B |
 
 ## Clocks And Timing
 
@@ -292,7 +295,7 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
 | --- | --- | --- | --- | --- | --- | --- |
 | QSPI NAND | RTL8730E flash controller | `PC1-PC6`, `FLASH_QSPI_*` | GD5F1GM7UEYIGR | CSN on PC6 | NAND boot/download profile | P11 |
 | PDM/DMIC | Audio HAL | PA2 CLK, PA4 DATA1 | MSM261DDB021 mic board | shared data + L/R slot | `DMIC3/DMIC4` | P08/P09/P11 + SDK |
-| Audio output | Audio HAL speaker / internal codec line-out | `LINEOUT_LN/LP`, `PB25/MUTE`, CN2 `SPKP/SPKN` | AXS2033 + 1W speaker | SD voltage mode, BTL output | speaker route -> line-out DIFF；amp pin must match PB25 | P08/P11 + SDK + AXS2033 |
+| Audio output | Audio HAL speaker / internal codec line-out | `LINEOUT_LN/LP`, `PB25/MUTE`, CN2 `SPKP/SPKN` | AXS2033 + 1W speaker | SD voltage mode, BTL output | speaker route -> line-out DIFF；amp pin is `_PB_25`；use `river playback tone` | P08/P11 + SDK + AXS2033 |
 | UART1 | RTL8730 UART1 | `RTL8730_TX1/RX1` | BL702 UART1 | no flow control shown | Zigbee control/protocol | P11/P12 |
 | UART0 | RTL8730 UART0 | `RTL8730_TX0/RX0` | base interface CN1 | no flow control shown | debug/base board | P05/P11 |
 | MIPI DSI | RTL8730 DSI | D0/D1/CLK pairs | ST7102-class LCD panel | panel reset on PA14 | init table present; lane/timing conflict open | P10 + ST7102 init |
@@ -325,9 +328,9 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
    - `TP/TH` 可能共 I2C，绑定驱动前记录总线所有地址。
 
 5. Speaker / audio output:
-   - 确认 BSP/HAL 的功放控制脚是 `PB25/MUTE`，而不是 SDK 默认 `_PB_19`；检查编译宏 `AUDIO_HW_AMPLIFIER_PIN` 或等效板级控制代码。
-   - 用 Audio HAL output stream 或 SDK speaker route 做纯本地 PCM tone 测试，边界停在 `AMEBA_AUDIO_DEVICE_SPEAKER -> APP_LINE_OUT/LINEOUT`。
-   - 测 U7 `VDD=VCC_5V_IN`，测 U7 pin1 `SHUT/SD` 在 boot、idle、stream start、standby/stop 的电压区间。
+   - BSP/HAL 的功放控制脚应为 `PB25/MUTE`，不是 SDK 默认 `_PB_19`；当前项目通过 `AUDIO_HW_AMPLIFIER_PIN=_PB_25` 覆盖到 AP Audio HAL。
+   - 用纯本地 PCM tone 验证，命令：`river playback tone 1000 1000 25`。边界停在 `AMEBA_AUDIO_DEVICE_SPEAKER -> APP_LINE_OUT/LINEOUT -> AXS2033 -> CN2 speaker`。
+   - 测 U7 `VDD=VCC_5V_IN`，测 U7 pin1 `SHUT/SD` 在 boot、idle、tone stream、standby/stop 的电压区间。
    - 若 HAL output stream start/write 正常但无声，依次查 `LINEOUT_LN/LP` 差分波形、U7 IN+/IN-、U7 OUTP/OUTN、CN2 喇叭线束。
    - CN2 是差分/BTL 输出，测试时不要把 `SPK_OUTP` 或 `SPK_OUTN` 当单端对地输出。
 
@@ -342,7 +345,7 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
 | Sitronix touch 地址/固件匹配未闭合 | probe 失败、触摸无响应或固件下载失败 | B | reset 后 scan/读 chip id；以源包 `reg=<0x55>` 为候选但保留可配置地址，并确认 flash boot/host download。 |
 | TH sensor model missing | Cannot know I2C address/register map | A | Provide module BOM or run I2C scan and identify chip marking. |
 | AXS2033 SD voltage not measured | Could leave amp in wrong mode or shutdown | B | Probe U7 pin1 under boot/idle/HAL stream/standby states. |
-| SDK 默认功放脚与本板不匹配 | Audio HAL 自动使能可能控制 `_PB_19` 而非 `PB25/MUTE`，导致 line-out 有信号但喇叭无声 | A | 在 BSP/HAL 配置中覆盖 `AUDIO_HW_AMPLIFIER_PIN=_PB_25` 或实现等效 PB25 控制，并用测量验证。 |
+| PB25 覆盖需实板确认 SD 电压 | 代码已改为控制 `PB25/MUTE`，但仍需确认 U7 `SHUT/SD` 是否落在预期 AXS2033 模式区间 | B | 运行 `river playback tone 1000 1000 25` 时测 U7 pin1，并对比 boot/idle/stop。 |
 | PDM L/R slot/channel order unknown | Beamforming/KWS quality may be suboptimal | B | Per-mic near-field test and optional raw WAV dump. |
 | BL702 protocol unknown | Zigbee feature cannot be integrated safely | A | Provide BL702 firmware protocol and upgrade mode docs. |
 | External web datasheets not all downloaded locally | Some vendor URLs are unstable from CLI | B | Store exact RTL8730E/BL702/GD5F1 datasheets under `doc/hard/` when obtained. |
@@ -366,8 +369,11 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
   - `/root/ameba-rtos/component/soc/usrcfg/amebasmart/include/ameba_audio_hw_usrcfg.h`
   - `/root/ameba-rtos/component/soc/amebasmart/fwlib/include/ameba_audio.h`
 - Project sources:
+  - `CMakeLists.txt`
+  - `components/river_diag/CMakeLists.txt`
   - `components/river_voice/river_voice_board.c`
   - `components/river_voice/river_voice_capture.c`
+  - `components/river_diag/river_diag_cmd.c`
   - `include/river/river_audio_hw_overrides.h`
   - `tools/river_flash.py`
 - External sources checked:
@@ -388,6 +394,11 @@ capture params applied: ret=0 params=cap_mode=no_afe_pure_data
 
 - `SKILL.md` 新增 “Set the report boundary”，明确报告边界停在 BSP/HAL/driver、pinmux、电源时序、板级测点和验证，不擅自引入云端/业务协议/应用交互。
 - `SKILL.md` 要求对每个外部连接器或混合信号块写完整硬件路径，并交叉检查 SDK 默认板级配置是否仍指向 reference board。
+
+本轮把音频输出报告用于实际开发时发现第三个可复用缺口：报告指出了硬件和 SDK 默认值冲突，但没有把本地仓库里的实现绑定点写到足够可执行。因此继续增强本地 skill：
+
+- `SKILL.md` 要求在固件仓库或 SDK 可见时，报告必须列出 exact override header、build hook/target、Kconfig/HAL API、诊断命令和建议归属源码文件。
+- 本文据此补充了 `AUDIO_HW_AMPLIFIER_PIN=_PB_25` 的项目绑定位置、`river playback tone` 本地诊断入口、预期日志和 U7 pin1 测量点。
 - `references/report_template.md` 新增 `Report boundary`、`Hardware path`、`Firmware boundary`、`BSP/HAL/driver interface`、`Board constants and electrical limits`。
 - 模板对 audio output 和 display/touch 增加强制提示：音频输出必须覆盖 HAL-visible playback device、SoC line-out/I2S、功放输入/输出、gain、shutdown/mute/mode、speaker connector、loopback/reference nets 和测点；显示触摸必须覆盖 panel connector、lane 冲突、reset/power/backlight、touch bus/address/IRQ/reset、init-command evidence 和 timing gaps。
 

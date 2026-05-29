@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.74 收敛硬件报告边界并补齐 LCD/功放说明`
+  - `Step H.xiaozhi-client.75 接入本地音频播放诊断并绑定 PB25 功放控制`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,16 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.75` 接入本地音频播放诊断并绑定 PB25 功放控制：
+  - AP Audio HAL override 现在同时覆盖数字麦 PA2/PA4 和功放脚：`AUDIO_HW_AMPLIFIER_PIN=_PB_25`，匹配原理图 `PB25/MUTE -> AXS2033 SHUT/SD`。
+  - `components/river_diag` 增加 audio interface include path，并给 `river playback` 新增纯本地 `tone [freq_hz] [duration_ms] [level_pct]` 诊断命令。
+  - 默认验证命令为 `river playback tone 1000 1000 25`；该命令走 `AudioService_Init`、`DEVICE_OUT_SPEAKER`、`river_playback_service`、16kHz/2ch/16-bit 本地 PCM，不涉及云端、业务播放或会话流程。
+  - 本轮按用户临时要求没有搜索外部资料；报告/skill 迭代只基于当前报告、repo、`/root/ameba-rtos` SDK 和本地构建产物。
+  - `schematic-pcb-firmware-guide` 新增实现绑定点要求：仓库/SDK 可见时，报告必须写出 override header、build hook/target、Kconfig/HAL API、诊断命令和建议归属源码文件。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 已补充 `_PB_25` 绑定、tone 命令、预期日志和 U7 pin1 `SHUT/SD` 测量点。
+  - `/root/ameba-rtos` 完整 build 通过；final AP image 含 `river playback tone`/`diag_tone`/`PB25/MUTE`；AP Audio HAL 预处理确认 `board_amp_pin = (0x39)`、`amp_info.pinmux = (0x39)`。
+  - 未执行烧录和串口 monitor；当前 NAND 硬件策略仍要求用户手动上板验证，除非用户在当前回合明确要求 Codex 烧录。
 
 - `Step H.xiaozhi-client.74` 收敛硬件报告边界并补齐 LCD/功放说明：
   - 根据用户反馈，报告边界明确为硬件资料到 BSP/HAL/driver 的交接，不擅自定义云端、业务协议、产品交互或应用层播放/会话方案。

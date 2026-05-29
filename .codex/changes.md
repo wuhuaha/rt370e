@@ -1,5 +1,31 @@
 # Change Log
 
+## Step H.xiaozhi-client.75
+- 根据硬件固件说明书实际接入板级音频输出：
+  - AP Audio HAL override 新增 `AUDIO_HW_AMPLIFIER_PIN=_PB_25`，让 SDK amplifier GPIO 控制本板 `PB25/MUTE`，不再沿用 AmebaSmart reference board 默认 `_PB_19`。
+  - 保留已验证的 PDM `AUDIO_HW_DMIC_CLK_PIN=_PA_2`、`AUDIO_HW_DMIC_DATA1_PIN=_PA_4`，不修改麦克风采集、VAD/KWS、tensor dump、alignment replay 或 board/local parity 路径。
+  - `components/river_diag` 增加 audio interface include path，用于在诊断命令中直接调用 AudioService/AudioControl。
+  - `river playback` 新增纯本地诊断命令：`river playback tone [freq_hz] [duration_ms] [level_pct]`。
+  - tone 命令初始化 AudioService，选择 `DEVICE_OUT_SPEAKER`，解除 playback/amplifier mute，临时设置硬件音量为 0.80，通过 `river_playback_service` 写入 16kHz/2ch/16-bit 本地 triangle PCM，drain 后 stop 并恢复原硬件音量。
+  - 默认 tone 参数为 `1000Hz / 1000ms / 25%`，参数范围为 `100-4000Hz`、`100-10000ms`、`1-80%`；播放服务忙时命令会拒绝并 dump playback status。
+- 按用户本次临时约束同步迭代 skill/报告，但不固化“开发时禁止外部补充信息”：
+  - 本步没有搜索外部资料；只使用当前报告、repo、`/root/ameba-rtos` SDK 和本地构建产物。
+  - 发现报告缺口：硬件报告指出了 PB25/SDK 默认 `_PB_19` 冲突，但没有强制写出本地实现绑定点。
+  - 本地 `schematic-pcb-firmware-guide` skill 增加规则：当固件仓库或 SDK 可见时，报告要列出 exact override header、build hook/target、Kconfig、HAL API、诊断命令和建议归属源码文件。
+  - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步记录该使用规则。
+  - `doc/RTL8730E_4INCH_HARDWARE_FIRMWARE_GUIDE_ZH.md` 更新音频输出章节，补充 `AUDIO_HW_AMPLIFIER_PIN=_PB_25`、`river playback tone`、预期日志和 U7 pin1 `SHUT/SD` 测量点。
+- 保持边界：
+  - 本步只落地 BSP/HAL/诊断层能力，验证路径停在 `Audio HAL speaker/LINEOUT -> AXS2033 -> CN2 speaker`。
+  - 不新增云端、业务播放、会话或产品交互流程。
+  - 不修改 `/root/ameba-rtos` SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `river playback tone`, `diag_tone`, and `PB25/MUTE`.
+  - passed: AP Audio HAL preprocessed output confirms `board_amp_pin = (0x39)` and `amp_info.pinmux = (0x39)`, matching `_PB_25`.
+  - not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested in the current turn.
+
 ## Step H.xiaozhi-client.73
 - 使用 `schematic-pcb-firmware-guide` 和 `pdf` skill 分析 `doc/hard/` 硬件资料：
   - 纳入 `RTL8730 4寸SCH.pdf`、`RTL8730_4寸_丝印图.pdf`、`1.01.070080 MSM261DDB021_Rev1.0.pdf`、`AXS2033.pdf`。

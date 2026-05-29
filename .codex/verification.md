@@ -1,3 +1,62 @@
+## Step H.xiaozhi-client.75 Verification
+
+Build with the canonical SDK:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Confirm the local playback diagnostic is in the AP image:
+```bash
+cd /root/ameba-river
+strings build_RTL8730E/build/project_ap/image/ap_image_all.bin | \
+  rg -n "diag_tone|river playback tone|playback tone start|PB25/MUTE"
+```
+
+Confirm the AP Audio HAL amplifier pin override reached preprocessing:
+```bash
+cd /root/ameba-river
+rg -n "_PB_25|AUDIO_HW_AMPLIFIER_PIN|board_amp_pin|amp_info\\.pinmux" \
+  build_RTL8730E/build/project_ap/make/image2/audio/audio_hal \
+  -g '*.i' -g '*.s' -g '*.ii'
+```
+
+Run repository hygiene:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected board validation after user-run download:
+```text
+river playback tone 1000 1000 25
+```
+
+Expected logs:
+```text
+[river][diag] playback tone start: route=speaker/LINEOUT amp=PB25/MUTE ...
+playback start: stream=diag_tone ...
+playback drain complete: stream=diag_tone ...
+playback stop: stream=diag_tone ...
+```
+
+Electrical checks:
+- U7 AXS2033 `VDD` should be `VCC_5V_IN`.
+- U7 pin1 `SHUT/SD` should move according to Audio HAL stream state; compare boot, idle, tone playback, and stop.
+- If logs show playback start/write/drain but there is no sound, measure `LINEOUT_LN/LP`, U7 `IN+/IN-`, U7 `OUTP/OUTN`, and CN2. CN2 is BTL/differential; do not treat either speaker terminal as single-ended ground.
+
+Observed on 2026-05-29:
+- passed: initial build attempt exposed missing audio include path in `components/river_diag`; fixed by adding `${c_CMPT_AUDIO_DIR}/interfaces`.
+- passed: second `/root/ameba-rtos` build completed with `Build done`.
+- passed: final AP image strings contain `river playback tone`, `diag_tone`, and `PB25/MUTE`.
+- passed: AP Audio HAL preprocessed `ameba_audio_stream_control.i` contains `board_amp_pin = (0x39)` and `amp_info.pinmux = (0x39)`, matching `_PB_25`.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: flash/download or serial monitor; current turn did not explicitly ask Codex to flash, and NAND board validation remains user-run.
+
 ## Step H.xiaozhi-client.73 Verification
 
 Validate the schematic/PCB skill helper and current hardware artifact inventory:

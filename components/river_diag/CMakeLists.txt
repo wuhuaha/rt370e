@@ -21,6 +21,7 @@ ameba_list_append(private_sources
 
 ameba_list_append(private_includes
     ${RIVER_PROJECT_DIR}/include
+    ${c_CMPT_AUDIO_DIR}/interfaces
 )
 
 ameba_add_internal_library(river_diag
