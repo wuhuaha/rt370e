@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.72
+- 根据用户补充要求增强 `schematic-pcb-firmware-guide` skill：
+  - Core workflow 增加“工程师提前提供资料位置”入口，支持 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL 作为优先证据源。
+  - Core workflow 增加“缺失信息处理”步骤：持续维护 missing/clarification 列表；关键缺失项需向工程师澄清。
+  - 对较可靠猜测要求标成 hypothesis，附可信度、依据、风险、建议方案和验证步骤，避免把推断写成事实。
+  - 报告模板新增 `Engineer-Supplied References`、`Missing Inputs And Clarifications`、`Hypotheses / Candidate Solutions` 三个章节。
+- 更新项目说明 `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md`：
+  - 增加工程师预先指定资料路径的调用示例。
+  - 增加缺失内容处理规则和候选方案输出规则。
+- 保持固件不变：
+  - 本步不修改固件源码、SDK 源码、构建配置、VAD/KWS、tensor dump、alignment replay、board/local parity 或协议逻辑。
+- Verification for this step:
+  - passed: skill frontmatter/resources still valid and updated sections are present.
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.71
 - 根据用户要求调研原理图/PCB 分析类外部 workflow，并创建本地 Codex skill：
   - 新增本地 skill：`/root/.codex/skills/schematic-pcb-firmware-guide`。

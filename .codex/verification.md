@@ -1,3 +1,34 @@
+## Step H.xiaozhi-client.72 Verification
+
+Validate the updated schematic/PCB firmware-guide skill:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+root = Path('/root/.codex/skills/schematic-pcb-firmware-guide')
+skill = (root / 'SKILL.md').read_text()
+template = (root / 'references/report_template.md').read_text()
+assert 'engineer-supplied references' in skill.lower()
+assert 'Missing / Needs clarification' in skill
+assert 'hypothesis' in skill.lower()
+assert 'Engineer-Supplied References' in template
+assert 'Missing Inputs And Clarifications' in template
+assert 'Hypotheses / Candidate Solutions' in template
+print('skill update ok')
+PY
+```
+
+Run repository hygiene after documenting the update:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Observed on 2026-05-29:
+- passed: skill update check printed `skill update ok`.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+
 ## Step H.xiaozhi-client.71 Verification
 
 Validate the local schematic/PCB firmware-guide skill:

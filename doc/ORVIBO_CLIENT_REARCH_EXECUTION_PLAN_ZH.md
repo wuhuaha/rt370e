@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.72` 增强原理图/PCB skill 的资料补充和缺失澄清流程：
+  - `schematic-pcb-firmware-guide` 现在明确支持工程师提前提供 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL。
+  - 报告模板新增工程师资料索引、缺失信息/澄清问题和假设/候选方案章节。
+  - 对缺失内容要求列出影响、当前最佳猜测、可信度、建议 owner/check；对可靠猜测必须标 hypothesis 并给验证路径。
+  - 本步不改固件源码或 SDK。
 - `Step H.xiaozhi-client.71` 新增原理图/PCB 固件说明书分析 skill：
   - 本地 skill 路径：`/root/.codex/skills/schematic-pcb-firmware-guide`。
   - 目标流程：`PDF/图片 -> OCR/视觉分析 -> 外部 datasheet/reference manual/SDK 示例检索 -> 可追溯 Markdown 固件说明书`。

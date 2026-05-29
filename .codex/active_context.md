@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.71 新增原理图/PCB 固件说明书分析 skill`
+  - `Step H.xiaozhi-client.72 增强原理图/PCB skill 的资料补充和缺失澄清流程`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.72` 增强原理图/PCB skill 的资料补充和缺失澄清流程：
+  - `schematic-pcb-firmware-guide` 现在明确支持工程师提前提供 datasheet、SDK 示例、EDA 导出、设计笔记、运行日志、本地路径或 URL。
+  - 报告模板新增工程师资料索引、缺失信息/澄清问题和假设/候选方案章节。
+  - 对缺失内容要求列出影响、当前最佳猜测、可信度、建议 owner/check；对可靠猜测必须标 hypothesis 并给验证路径。
+  - 本步不改固件源码或 SDK。
 
 - `Step H.xiaozhi-client.71` 新增原理图/PCB 固件说明书分析 skill：
   - 本地 skill 路径：`/root/.codex/skills/schematic-pcb-firmware-guide`。
