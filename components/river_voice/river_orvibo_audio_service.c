@@ -119,7 +119,6 @@ typedef struct {
     uint16_t vad_probability_q15;
     uint16_t vad_probability_raw_q15;
     uint64_t last_diag_log_ms;
-    uint32_t sweep_replay_logs;
 } river_orvibo_audio_context_t;
 
 static river_orvibo_audio_context_t g_river_orvibo_audio;
@@ -314,10 +313,6 @@ static void river_orvibo_audio_log_diag_if_needed(void)
                (unsigned long)g_river_orvibo_audio.downlink_backpressure_events,
                (unsigned long)g_river_orvibo_audio.downlink_buffered_bytes,
                (unsigned long)g_river_orvibo_audio.downlink_buffer_size_bytes);
-    if (g_river_orvibo_audio.sweep_replay_logs < 6U) {
-        g_river_orvibo_audio.sweep_replay_logs++;
-        river_voice_capture_dump_path_sweep_results();
-    }
 }
 
 static bool river_orvibo_audio_speaking_uplink_allowed(void)
@@ -457,8 +452,6 @@ static river_status_t river_orvibo_audio_open(void)
     AudioService_Init();
     AudioControl_SetCaptureVolume(board->capture_channels, RIVER_ORVIBO_CAPTURE_VOLUME);
     AudioControl_SetCaptureHpfFc(0, RIVER_ORVIBO_CAPTURE_HPF_FC);
-
-    river_voice_capture_run_path_sweep();
 
     if (river_voice_capture_open(&g_river_orvibo_audio.capture) != RIVER_OK) {
         return RIVER_ERR_UNSUPPORTED;

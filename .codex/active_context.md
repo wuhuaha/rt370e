@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.69 实板验证 PA2/PA4 数字麦采集链路`
+  - `Step H.xiaozhi-client.70 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -35,6 +35,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.70` 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案：
+  - H.69 已实板验证 PA2/PA4 + DATA1 (`DMIC3/DMIC4`) + AP Audio HAL override 为有效语音路径：采集/预处理峰值非零，VAD/KWS、server STT/TTS 均已跑通。
+  - 本步删除 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_*`、DATA0-3 boot sweep、sweep replay 日志和相关公开函数。
+  - 当前固件只保留正常采集路径：`pdm-2mic-pa2-pa4-data1`、`AUDIO_DMIC3/DMIC4`、`AUDIO_HW_DMIC_CLK_PIN=_PA_2`、`AUDIO_HW_DMIC_DATA1_PIN=_PA_4`、`capture dmic pinmux applied: clk=PA2 data1=PA4`。
+  - 当前回合只做构建验证；如需上板，按 Active flash/monitor command 手动下载和串口验证，或由用户再次明确要求 Codex 烧录。
 
 - `Step H.xiaozhi-client.59` 收敛空响应的音频前端诊断：
   - 用户 2026-05-28 16:17 日志显示网络和激活已正常：固定 `device_id=00:e0:4c:b7:23:e2` 生效，Wi-Fi 获取 `192.168.3.32`，OTA 返回 `activation required=no`，并出现 `access refresh ok`。

@@ -8,6 +8,11 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.70` 删除临时采集路径扫描，仅保留 PA2/PA4 DATA1 方案：
+  - H.69 已实板验证 PA2/PA4 + DATA1 (`DMIC3/DMIC4`) + AP Audio HAL override 为有效语音路径：采集/预处理峰值非零，VAD/KWS、server STT/TTS 均已跑通。
+  - 删除 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_*`、启动期 DATA0-3 sweep、sweep replay 日志和相关公开函数。
+  - 当前固件只保留正常采集路径：`pdm-2mic-pa2-pa4-data1`、`AUDIO_DMIC3/DMIC4`、`AUDIO_HW_DMIC_CLK_PIN=_PA_2`、`AUDIO_HW_DMIC_DATA1_PIN=_PA_4`、`capture dmic pinmux applied: clk=PA2 data1=PA4`。
+  - 后续不再做 DATA0-3 路径猜测；若还要优化，应转向语音质量、VAD/KWS 阈值、槽位/极性/增益、播放参考和串口日志降噪。
 - `Step H.xiaozhi-client.69` 实板验证 PA2/PA4 数字麦采集链路：
   - Codex 按用户本轮要求执行 `/dev/ttyUSB0` NAND 下载，Flash 工具识别 `GD5F1GM7U`、`1Gb/128MB`，`km4_boot_all.bin` 和 `km0_km4_ca32_app.bin` 均下载完成，最终 `Finished PASS`。
   - 串口 monitor 确认 H.68 版本 `2026.05.28.210112` 启动，Wi-Fi/access ready，`capture_service=running frame=1024B 16000Hz/2ch/16ms reads=8040 wait_to=0`。

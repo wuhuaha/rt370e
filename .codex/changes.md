@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.70
+- 按 H.69 实板验证结论删除本轮临时采集路径扫描内容，只保留已验证通过的 PA2/PA4 DATA1 方案：
+  - 删除 `CONFIG_RIVER_VOICE_CAPTURE_PATH_SWEEP_*` Kconfig 项和 `prj.conf` 中的禁用占位配置。
+  - 删除 `river_voice_capture_run_path_sweep()`、`river_voice_capture_dump_path_sweep_results()` 公开声明、空实现、DATA0-3 candidate 表、独立 AudioRecord sweep 读循环和 replay 日志。
+  - `river_orvibo_audio_open()` 恢复为直接打开正常 capture，不再在正式音频链路前扫描 DATA0/1/2/3。
+  - `audio diag` 不再周期重放 sweep 结果，减少串口噪声。
+- 保留已验证方案：
+  - 板级 profile 仍为 `pdm-2mic-pa2-pa4-data1`，采集 mic pair 仍为 `AUDIO_DMIC3/DMIC4`。
+  - 项目自有 AP Audio HAL override 仍将 `AUDIO_HW_DMIC_CLK_PIN` / `AUDIO_HW_DMIC_DATA1_PIN` 覆盖为 `_PA_2` / `_PA_4`，不修改 `/root/ameba-rtos` SDK 源码。
+  - 板级 pinmux 仍只配置实际硬件使用的 `PA2` 和 `PA4`，日志为 `capture dmic pinmux applied: clk=PA2 data1=PA4`。
+- 保持受保护能力不变：
+  - 未修改 VAD/KWS、tensor dump、alignment replay、board/local parity、Orvibo 网络/激活/协议、Opus、AECM 实验代码或 SDK 源码。
+- Verification for this step:
+  - passed: `git diff --check`.
+  - passed: `python3 tools/diag/check_codex_harness.py`.
+  - passed: source grep confirms no remaining capture path sweep code/config in Kconfig, prj.conf, include, or components.
+  - passed: source grep confirms retained PA2/PA4 DATA1 profile, DMIC3/4 pair, and Audio HAL override hook.
+  - passed: `/root/ameba-rtos` 完整 build completed with `Build done`.
+  - passed: final AP image strings contain `pdm-2mic-pa2-pa4-data1`, `capture dmic pinmux applied: clk=PA2 data1=PA4`, and `capture params applied`.
+  - passed: final AP image strings do not contain temporary sweep markers or `pdm-2mic-pa-data0..3`.
+  - passed: preprocessed AP Audio HAL confirms DMIC clock pinmux uses `_PA_2` and DATA1 pinmux uses `_PA_4`.
+  - not run: board flash/download and serial monitor; current turn only asked删除调试内容，按当前硬件策略构建后由用户手动下载验证，除非用户再次明确要求 Codex 烧录。
+
 ## Step H.xiaozhi-client.69
 - 执行 H.68 镜像的实板 NAND 下载与串口运行验证：
   - 下载命令：`export AMEBA_SDK_ROOT=/root/ameba-rtos; python3 tools/river_flash.py -p /dev/ttyUSB0 -b 1500000`。

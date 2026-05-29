@@ -1,3 +1,56 @@
+## Step H.xiaozhi-client.70 Verification
+
+Confirm the temporary DATA0-3 sweep code/config is gone:
+```bash
+cd /root/ameba-river
+if rg -n "CAPTURE_PATH_SWEEP|capture path sweep|temporary capture path sweep|river_voice_capture_run_path_sweep|river_voice_capture_dump_path_sweep_results|sweep_replay|pdm-2mic-pa-data" \
+  Kconfig prj.conf include components; then
+  exit 1
+fi
+```
+
+Confirm the retained, board-verified PA2/PA4 DATA1 path:
+```bash
+cd /root/ameba-river
+rg -n "pdm-2mic-pa2-pa4-data1|AUDIO_DMIC3|AUDIO_DMIC4|clk=PA2 data1=PA4|river_audio_hw_overrides|RIVER_AUDIO_HW_OVERRIDES_HEADER" \
+  CMakeLists.txt include components
+```
+
+Run hygiene, harness, and latest-SDK build:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected runtime after user-run download:
+```text
+board array: Orvibo-RTL8730E-PDM pdm-2mic-pa2-pa4-data1 usage=DMIC primary=DMIC3 secondary=DMIC4 ...
+capture board mics applied: usage=DMIC ch0=DMIC3 ch1=DMIC4
+capture dmic pinmux applied: clk=PA2 data1=PA4
+capture params applied: ret=0 params=cap_mode=no_afe_pure_data
+```
+
+No `temporary capture path sweep`, `capture path sweep result`, or `capture path sweep replay` logs should appear.
+
+Observed on 2026-05-29:
+- passed: no remaining sweep code/config markers in `Kconfig`, `prj.conf`,
+  `include`, or `components`.
+- passed: retained PA2/PA4 DATA1 source markers in source.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: `/root/ameba-rtos` build completed with `Build done`.
+- passed: final AP image contains `pdm-2mic-pa2-pa4-data1`,
+  `capture dmic pinmux applied: clk=PA2 data1=PA4`, and
+  `capture params applied`.
+- passed: final AP image contains no temporary sweep markers or
+  `pdm-2mic-pa-data0..3`.
+- passed: preprocessed AP Audio HAL contains PA2 for DMIC clock and PA4 for
+  DATA1.
+
 ## Step H.xiaozhi-client.69 Verification
 
 Flash the H.68 PA2/PA4 image to the NAND board:
