@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.86 下载完整 Noto 猫表情动态图系列`
+  - `Step H.xiaozhi-client.87 接入 Noto 猫表情 LVGL 动画播放`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.87` 接入 Noto 猫表情 LVGL 动画播放：
+  - 新增 `components/river_ui/assets/noto_cat_lvgl/` 固件资源目录；10 个 Noto cat GIF 均离线转为 `80x80`、每个动画 8 帧、`LV_COLOR_FORMAT_ARGB8888`/BGRA 的 LVGL `lv_image_dsc_t` 帧。
+  - `river_lvgl_port.c` 新增 `lv_animimg` 表情对象，按 UI emoji token/emotion alias 切换动画并循环播放，同时保留小号 `CAT ...` caption；不启用 SDK `LV_USE_GIF`，也不依赖运行时文件系统。
+  - `river_orvibo_ui.c` 将 Orvibo 状态默认 emoji 切到 Noto cat key：idle/listening 用 `noto_smiley_cat_1f63a`，speaking 用 `noto_joy_cat_1f639`，recovering/error 分别用 pouting/scream。
+  - `river ui emoji <key>` 诊断别名可直接切换 `smiley/smile/joy/heart/smirk/kissing/pouting/crying/scream/face`，用于上板快速验证完整系列。
+  - `git diff --check`、生成脚本 `py_compile`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均通过；AP image 确认包含 `lv_animimg_*`、`river_noto_cat_anim_*` 和 10 个 Noto cat key；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.86` 下载完整 Noto 猫表情动态图系列：
   - 用户选定 `noto_smiley_cat` 风格后，删除上一轮 Pixabay GIF 候选，只保留 Noto animated cat 风格。

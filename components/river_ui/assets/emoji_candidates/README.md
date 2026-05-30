@@ -65,7 +65,6 @@ a7f9731d10269fc732ca19e6e25d85bd84c92f1991b324fba15bea9db865aa01  noto_smiley_ca
 
 - `LV_USE_GIF` is `0` in the current AmebaSmart LVGL config, so raw GIFs are
   not firmware-ready yet.
-- The likely next step is to select runtime expressions, resize/crop to the
-  display target, decode frames offline, and generate project-owned LVGL image
-  descriptors for `lv_animimg` playback. This embeds the asset into the image
-  and avoids a runtime filesystem dependency.
+- Firmware-ready converted assets now live in `../noto_cat_lvgl/`. They are
+  downsampled LVGL `lv_image_dsc_t` frame descriptors for `lv_animimg`
+  playback, so the runtime does not depend on the GIF decoder or a filesystem.

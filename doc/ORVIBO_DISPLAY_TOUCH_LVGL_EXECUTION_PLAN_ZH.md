@@ -46,6 +46,19 @@
   - AP `lib_river_ui.a` 和 `target_img2_ap.axf` 均确认保留 `river_lv_font_zh_16`。
   - 仍需用户上板执行 `river ui text asr 帮我开灯`、`river ui text tts 已为你打开客厅，现在光线更充足了。`，确认屏幕中文实际渲染。
 
+## Step 1.2: Noto cat emoji 动画播放
+
+- 已完成：
+  - 在 `components/river_ui/assets/noto_cat_lvgl/` 生成固件可编译的 Noto cat LVGL 动画资源。
+  - 10 个 Noto cat GIF 均离线转换为 `80x80`、每个动画 8 帧、`LV_COLOR_FORMAT_ARGB8888`/BGRA 字节序的 `lv_image_dsc_t`。
+  - `river_lvgl_port.c` 使用 `lv_animimg` 播放表情动画，并保留小号 ASCII caption；不启用 SDK GIF decoder，也不引入运行时文件系统依赖。
+  - Orvibo UI 状态默认 emoji 切到 Noto cat 资源 key，LLM emotion/诊断输入通过资源别名解析到对应动画。
+  - 新增 `river ui emoji <key>` 诊断别名，便于上板快速切换 `smiley/smile/joy/heart/smirk/kissing/pouting/crying/scream/face`。
+- 验证：
+  - `/root/ameba-rtos` 完整 build 已通过。
+  - AP image 保留 `river_noto_cat_anim_*`、`lv_animimg_*` 符号和 10 个 Noto cat key。
+  - 仍需用户手动烧录后验证屏幕动画实际循环播放和状态/LLM emotion 切换。
+
 ## Step 2: ST7102 MIPI/LCDC bring-up 验证
 
 - 项目内实现 ST7102 power/reset/backlight、MIPI DSI init、LCDC page flip。

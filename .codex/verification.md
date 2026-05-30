@@ -1,3 +1,85 @@
+## Step H.xiaozhi-client.87 Verification
+
+Regenerate the LVGL cat animation resources if the source GIFs change:
+```bash
+cd /root/ameba-river
+python3 components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+```
+
+Expected result:
+- the script reports `generated 10 animations, 8 frames each, 2048000 raw bytes`
+- `components/river_ui/assets/noto_cat_lvgl/river_noto_cat_anim.c/.h` and `README.md` are updated
+
+Run static hygiene and generation checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+find components/river_ui/assets/noto_cat_lvgl -name '__pycache__' -o -name '*.pyc' -print
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- `py_compile` exits successfully
+- remove any generated `__pycache__` before committing
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Build the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- generated images include:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin`
+  - `build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+
+Confirm the animation resources and LVGL animation widget are linked:
+```bash
+cd /root/ameba-river
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -g \
+  build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf \
+  | rg 'river_noto_cat_anim|lv_animimg'
+for key in noto_smiley_cat_1f63a noto_smile_cat_1f638 noto_joy_cat_1f639 \
+  noto_heart_eyes_cat_1f63b noto_smirk_cat_1f63c noto_kissing_cat_1f63d \
+  noto_pouting_cat_1f63e noto_crying_cat_1f63f noto_scream_cat_1f640 \
+  noto_cat_face_1f431; do
+  strings build_RTL8730E/build/project_ap/image/ap_image_all.bin | rg -q "$key" && echo "present $key"
+done
+```
+
+Expected result:
+- `nm` shows `river_noto_cat_anim_*` and `lv_animimg_*`
+- all 10 `present ...` lines are printed
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot and wait for `lvgl ready`.
+3. Run:
+   river ui emoji smiley
+   river ui emoji joy
+   river ui emoji heart
+   river ui emoji pouting
+   river ui text asr 帮我开灯
+   river ui text tts 已为你打开客厅灯，现在光线更充足了。
+4. Confirm the cat animation switches and loops on screen, and ASR/TTS Chinese text still renders.
+```
+
+Observed on 2026-05-30:
+- passed: generated 10 firmware-ready Noto cat LVGL animations, `80x80`, 8 sampled frames each.
+- passed: `git diff --check`.
+- passed: generator `py_compile`; removed `__pycache__`.
+- passed: full `/root/ameba-rtos` build completed with `Build done`.
+- passed: AP image contains `lv_animimg_create/set_src/start`, `river_noto_cat_anim_default/resolve`, all 10 Noto cat keys, and `river ui emoji` usage text.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.86 Verification
 
 Confirm the selected Noto cat GIF set and removal of non-Noto GIF candidates:

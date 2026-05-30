@@ -11,6 +11,7 @@
 #include "river/river_log.h"
 #include "river/river_types.h"
 
+#include "assets/noto_cat_lvgl/river_noto_cat_anim.h"
 #include "river_orvibo_ui_internal.h"
 
 #undef RIVER_LOG_TAG
@@ -33,10 +34,12 @@ typedef struct {
     rtos_queue_t queue;
     lv_display_t *display;
     lv_obj_t *state_label;
+    lv_obj_t *emoji_anim;
     lv_obj_t *emoji_label;
     lv_obj_t *asr_label;
     lv_obj_t *tts_label;
     lv_obj_t *touch_label;
+    const river_noto_cat_anim_t *current_anim;
     river_orvibo_ui_view_state_t pending;
     uint8_t *buf1;
     uint8_t *buf2;
@@ -84,13 +87,30 @@ static void river_lvgl_label_set(lv_obj_t *label, const char *prefix, const char
     lv_label_set_text(label, line);
 }
 
+static void river_lvgl_apply_emoji(const char *emoji)
+{
+    const river_noto_cat_anim_t *anim = river_noto_cat_anim_resolve(emoji);
+
+    if (anim == NULL) {
+        anim = river_noto_cat_anim_default();
+    }
+    if (g_lvgl.emoji_anim != NULL && anim != g_lvgl.current_anim) {
+        lv_animimg_set_src(g_lvgl.emoji_anim, (const void **)anim->frames, anim->frame_count);
+        lv_animimg_set_duration(g_lvgl.emoji_anim, anim->duration_ms);
+        lv_animimg_set_repeat_count(g_lvgl.emoji_anim, LV_ANIM_REPEAT_INFINITE);
+        lv_animimg_start(g_lvgl.emoji_anim);
+        g_lvgl.current_anim = anim;
+    }
+    river_lvgl_label_set(g_lvgl.emoji_label, "CAT ", anim != NULL ? anim->caption : "-");
+}
+
 static void river_lvgl_apply_view(const river_orvibo_ui_view_state_t *view)
 {
     if (view == NULL || !g_lvgl.screen_ready) {
         return;
     }
     river_lvgl_label_set(g_lvgl.state_label, "STATE ", view->state);
-    river_lvgl_label_set(g_lvgl.emoji_label, "", view->emoji);
+    river_lvgl_apply_emoji(view->emoji);
     river_lvgl_label_set(g_lvgl.asr_label, "ASR ", view->asr_text);
     river_lvgl_label_set(g_lvgl.tts_label, "TTS ", view->tts_text);
     river_lvgl_label_set(g_lvgl.touch_label, "TOUCH ", view->touch_summary);
@@ -132,15 +152,24 @@ static void river_lvgl_create_screen(void)
     lv_obj_set_style_border_color(panel, lv_color_hex(0x405060), 0);
     lv_obj_set_style_border_width(panel, 2, 0);
     lv_obj_set_style_radius(panel, 8, 0);
-    lv_obj_set_style_pad_all(panel, 18, 0);
-    lv_obj_set_style_pad_row(panel, 12, 0);
+    lv_obj_set_style_pad_all(panel, 14, 0);
+    lv_obj_set_style_pad_row(panel, 8, 0);
 
     g_lvgl.state_label = river_lvgl_add_label(panel,
                                               &lv_font_montserrat_20,
                                               lv_color_hex(0x99AABB),
                                               400);
+
+    g_lvgl.emoji_anim = lv_animimg_create(panel);
+    lv_obj_set_size(g_lvgl.emoji_anim,
+                    RIVER_NOTO_CAT_ANIM_WIDTH,
+                    RIVER_NOTO_CAT_ANIM_HEIGHT);
+    lv_obj_set_style_bg_opa(g_lvgl.emoji_anim, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(g_lvgl.emoji_anim, 0, 0);
+    lv_obj_set_style_pad_all(g_lvgl.emoji_anim, 0, 0);
+
     g_lvgl.emoji_label = river_lvgl_add_label(panel,
-                                              &lv_font_montserrat_24,
+                                              &lv_font_montserrat_14,
                                               lv_color_hex(0xF0C75E),
                                               400);
     lv_obj_set_style_text_align(g_lvgl.emoji_label, LV_TEXT_ALIGN_CENTER, 0);

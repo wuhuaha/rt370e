@@ -54,7 +54,7 @@ static void river_diag_help(void)
 {
     printf("\triver status\n");
     printf("\triver orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
-    printf("\triver ui <status|touch scan|text <asr|tts|emoji> <text>>\n");
+    printf("\triver ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
     printf("\triver audio <status>\n");
     printf("\triver playback <status|tone [freq_hz] [duration_ms] [level_pct]|stop|interrupt|flush|duck <gain>|unduck>\n");
     printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
@@ -479,7 +479,7 @@ static u32 river_diag_playback_cmd(u16 argc, u8 *argv[])
 static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
 {
     if (argc < 2) {
-        printf("[river][diag] usage: river ui <status|touch scan|text <asr|tts|emoji> <text>>\n");
+        printf("[river][diag] usage: river ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
         return 0;
     }
     if (strcmp((const char *)argv[1], "status") == 0) {
@@ -492,6 +492,15 @@ static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
             return 0;
         }
         printf("[river][diag] usage: river ui touch scan\n");
+        return 0;
+    }
+    if (strcmp((const char *)argv[1], "emoji") == 0) {
+        if (argc < 3) {
+            printf("[river][diag] usage: river ui emoji <key>\n");
+            printf("[river][diag] keys: smiley smile joy heart smirk kissing pouting crying scream face\n");
+            return 0;
+        }
+        (void)river_orvibo_ui_set_emoji((const char *)argv[2]);
         return 0;
     }
     if (strcmp((const char *)argv[1], "text") == 0) {
@@ -510,7 +519,7 @@ static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
         }
         return 0;
     }
-    printf("[river][diag] usage: river ui <status|touch scan|text <asr|tts|emoji> <text>>\n");
+    printf("[river][diag] usage: river ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
     return 0;
 }
 

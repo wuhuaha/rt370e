@@ -116,23 +116,23 @@ static const char *river_ui_state_emoji(river_orvibo_state_t state)
 {
     switch (state) {
     case RIVER_ORVIBO_STATE_STARTING:
-        return ":boot:";
+        return "noto_cat_face_1f431";
     case RIVER_ORVIBO_STATE_NETWORK_WAIT:
-        return ":wifi:";
+        return "noto_smile_cat_1f638";
     case RIVER_ORVIBO_STATE_IDLE:
-        return ":idle:";
+        return "noto_smiley_cat_1f63a";
     case RIVER_ORVIBO_STATE_CONNECTING:
-        return ":link:";
+        return "noto_smile_cat_1f638";
     case RIVER_ORVIBO_STATE_LISTENING:
-        return ":listening:";
+        return "noto_smiley_cat_1f63a";
     case RIVER_ORVIBO_STATE_SPEAKING:
-        return ":speaking:";
+        return "noto_joy_cat_1f639";
     case RIVER_ORVIBO_STATE_RECOVERING:
-        return ":recover:";
+        return "noto_pouting_cat_1f63e";
     case RIVER_ORVIBO_STATE_ERROR:
-        return ":error:";
+        return "noto_scream_cat_1f640";
     default:
-        return ":unknown:";
+        return "noto_smiley_cat_1f63a";
     }
 }
 

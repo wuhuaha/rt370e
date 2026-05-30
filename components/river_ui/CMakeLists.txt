@@ -20,6 +20,7 @@ ameba_list_append(private_sources
 )
 
 ameba_list_append_if(CONFIG_RIVER_UI_LVGL_EN private_sources
+    assets/noto_cat_lvgl/river_noto_cat_anim.c
     river_lv_font_zh_16.c
     river_lvgl_port.c
     river_sdk_lvgl_demo_compat.c

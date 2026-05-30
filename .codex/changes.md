@@ -1,5 +1,29 @@
 # Change Log
 
+## Step H.xiaozhi-client.87
+- 将 Noto cat 完整系列接入固件可播放路径：
+  - 新增 `components/river_ui/assets/noto_cat_lvgl/` 独立固件资源目录。
+  - 新增 `generate_noto_cat_lvgl.py`，从 `emoji_candidates` 中的 10 个 Noto cat GIF 离线抽帧、裁剪、缩放并生成 LVGL image descriptors。
+  - 生成 `river_noto_cat_anim.c/.h`，每个动画 `80x80`、8 帧、`LV_COLOR_FORMAT_ARGB8888`/BGRA，总图像 payload 约 2MB。
+  - 新增资源 README，记录生成参数、源 GIF、源帧数/时长和采样帧索引。
+- 接入 LVGL 播放：
+  - `river_lvgl_port.c` 将原文本 emoji 区域替换为 `lv_animimg` 对象，按 UI emoji token/emotion alias 切换并无限循环播放 Noto cat 动画。
+  - 保留小号 `CAT ...` caption，ASR/TTS 中文 label 继续使用 `river_lv_font_zh_16`。
+  - `components/river_ui/CMakeLists.txt` 在 `CONFIG_RIVER_UI_LVGL_EN` 下编译生成的动画资源。
+- 更新 UI 状态和诊断：
+  - `river_orvibo_ui.c` 将 Orvibo state 默认 emoji 改为 Noto cat key，speaking/listening/error 等状态可直接驱动动画。
+  - `river ui emoji <key>` 可直接切换 `smiley/smile/joy/heart/smirk/kissing/pouting/crying/scream/face`，便于上板遍历完整系列。
+- 边界：
+  - 不修改 `/root/ameba-rtos` SDK 源码，不启用 SDK GIF decoder，不引入运行时文件系统依赖。
+  - 不修改协议 wire format、音频链路、VAD/KWS、tensor dump、alignment replay 或 board/local parity 路径。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py` passed; temporary `__pycache__` removed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`.
+  - AP image `nm` confirms `lv_animimg_*` and `river_noto_cat_anim_*`; image strings confirm all 10 Noto cat keys and `river ui emoji` usage text.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.86
 - 按用户选择收敛到 Noto cat 风格并下载完整猫表情系列：
   - 删除上一轮 Pixabay 候选 GIF，只保留 Noto animated cat 系列。
