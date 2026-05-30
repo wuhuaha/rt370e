@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.86
+- 按用户选择收敛到 Noto cat 风格并下载完整猫表情系列：
+  - 删除上一轮 Pixabay 候选 GIF，只保留 Noto animated cat 系列。
+  - 新增 `noto_cat_face_1f431.gif`、`noto_joy_cat_1f639.gif`、`noto_smirk_cat_1f63c.gif`、`noto_kissing_cat_1f63d.gif`、`noto_pouting_cat_1f63e.gif`、`noto_crying_cat_1f63f.gif`、`noto_scream_cat_1f640.gif`。
+  - 保留上一轮已下载的 `noto_smiley_cat_1f63a.gif`、`noto_smile_cat_1f638.gif`、`noto_heart_eyes_cat_1f63b.gif`，形成 10 个 Noto cat 动图候选。
+  - 重新生成 `preview_contact_sheet.png`，一屏预览完整 Noto cat 系列第一帧。
+  - 更新 `components/river_ui/assets/emoji_candidates/README.md`，记录完整 Noto cat 集合、源 URL、license/source note、尺寸/帧数/大小和 SHA-256。
+- 边界：
+  - 本步只调整候选资源，不修改固件代码、SDK 源码、LVGL 配置、显示/触摸 bring-up、音频链路、协议 wire format、VAD/KWS、tensor dump、alignment replay 或 board/local parity 路径。
+  - 当前 `LV_USE_GIF=0`，raw GIF 仍需后续离线转 LVGL image descriptors 后才能进入固件播放路径。
+- Verification for this step:
+  - Python/Pillow frame scan confirms all 10 Noto cat GIF dimensions, frame counts, durations, and preview generation.
+  - `sha256sum components/river_ui/assets/emoji_candidates/*.{gif,png}` recorded checksums.
+  - `find components/river_ui/assets/emoji_candidates -name 'pixabay_*.gif'` returns no matches.
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: firmware build, flash/download, or serial monitor; this step only adjusts raw candidate assets and source notes.
+
 ## Step H.xiaozhi-client.85
 - 按用户要求先进行网络搜索并下载可爱的猫表情动态图候选资源：
   - 新增独立资源目录 `components/river_ui/assets/emoji_candidates/`。

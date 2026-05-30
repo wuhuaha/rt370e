@@ -1,3 +1,56 @@
+## Step H.xiaozhi-client.86 Verification
+
+Confirm the selected Noto cat GIF set and removal of non-Noto GIF candidates:
+```bash
+cd /root/ameba-river
+find components/river_ui/assets/emoji_candidates -name 'pixabay_*.gif' -print
+python3 - <<'PY'
+from PIL import Image, ImageSequence
+from pathlib import Path
+for p in sorted(Path('components/river_ui/assets/emoji_candidates').glob('noto_*.gif')):
+    im = Image.open(p)
+    frames = sum(1 for _ in ImageSequence.Iterator(im))
+    dur = sum(int(fr.info.get('duration', 0)) for fr in ImageSequence.Iterator(im))
+    print(f'{p.name}: {im.size[0]}x{im.size[1]} frames={frames} duration_ms={dur} bytes={p.stat().st_size}')
+PY
+sha256sum components/river_ui/assets/emoji_candidates/*.{gif,png}
+```
+
+Expected result:
+- the `find` command prints no Pixabay GIFs
+- exactly 10 `noto_*.gif` files are present
+- dimensions, frame counts, durations, and checksums match the asset README
+
+Run static hygiene and Codex harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Observed on 2026-05-30:
+- passed: removed both previous `pixabay_*.gif` candidates.
+- passed: completed the Noto cat set with 10 GIFs:
+  - `noto_cat_face_1f431.gif`: 512x512, 75 frames, 2760ms, 655527 bytes
+  - `noto_crying_cat_1f63f.gif`: 512x512, 51 frames, 1530ms, 465013 bytes
+  - `noto_heart_eyes_cat_1f63b.gif`: 512x512, 77 frames, 2520ms, 880540 bytes
+  - `noto_joy_cat_1f639.gif`: 512x512, 88 frames, 2640ms, 1076135 bytes
+  - `noto_kissing_cat_1f63d.gif`: 512x512, 63 frames, 2160ms, 771899 bytes
+  - `noto_pouting_cat_1f63e.gif`: 512x512, 57 frames, 2010ms, 519944 bytes
+  - `noto_scream_cat_1f640.gif`: 512x512, 55 frames, 2160ms, 658461 bytes
+  - `noto_smile_cat_1f638.gif`: 512x512, 96 frames, 3150ms, 931511 bytes
+  - `noto_smiley_cat_1f63a.gif`: 512x512, 61 frames, 2220ms, 516429 bytes
+  - `noto_smirk_cat_1f63c.gif`: 512x512, 53 frames, 2670ms, 435526 bytes
+- passed: regenerated `preview_contact_sheet.png` for the complete Noto cat set.
+- passed: `sha256sum` values recorded in the asset README.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, or serial monitor; this step only adjusts raw candidate assets and source notes.
+
 ## Step H.xiaozhi-client.85 Verification
 
 Confirm the downloaded GIF candidate set:

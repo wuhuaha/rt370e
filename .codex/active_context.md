@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.85 下载猫表情动态图候选资源`
+  - `Step H.xiaozhi-client.86 下载完整 Noto 猫表情动态图系列`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.86` 下载完整 Noto 猫表情动态图系列：
+  - 用户选定 `noto_smiley_cat` 风格后，删除上一轮 Pixabay GIF 候选，只保留 Noto animated cat 风格。
+  - 候选目录现在包含 10 个 Noto cat GIF：`1f431`、`1f638`、`1f639`、`1f63a`、`1f63b`、`1f63c`、`1f63d`、`1f63e`、`1f63f`、`1f640`。
+  - 重新生成 `preview_contact_sheet.png`，并更新资产 README 的源 URL、license/source note、尺寸/帧数/大小和 SHA-256。
+  - 当前 `LV_USE_GIF=0`，本步仍只归档 raw GIF 候选；后续应选择运行时表情并离线转成 LVGL image descriptors。
+  - Python/Pillow frame scan、SHA-256、Pixabay 删除检查、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行 firmware build/flash/serial monitor。
 
 - `Step H.xiaozhi-client.85` 下载猫表情动态图候选资源：
   - 新增 `components/river_ui/assets/emoji_candidates/` 独立候选资源目录。
