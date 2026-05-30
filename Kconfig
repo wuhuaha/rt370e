@@ -14,7 +14,7 @@ config RIVER_ORVIBO_CLIENT_EN
 
 config RIVER_ORVIBO_OTA_URL
     string "Orvibo access OTA/config URL"
-    default "https://api.tenclass.net/xiaozhi/ota/"
+    default "http://101.33.235.154:8082/xiaozhi/ota/"
     depends on RIVER_ORVIBO_CLIENT_EN
     help
       XiaoZhi-compatible OTA endpoint used to fetch websocket url/token/version
@@ -38,6 +38,18 @@ config RIVER_ORVIBO_WS_TOKEN
       Optional static websocket token for auth-enabled deployments. Leave empty
       when the explicitly configured fallback websocket server accepts
       unauthenticated connections.
+
+config RIVER_ORVIBO_AUTHORIZATION_VALUE
+    string "Orvibo default Authorization value"
+    default "orvibo-river"
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Default value for the Authorization header when OTA returns an empty
+      websocket token. If the value contains a space it is sent as the full
+      header value; otherwise the client sends it as a Bearer token. The
+      Phase 1 self-hosted server currently does not validate this value, but
+      the integration manual recommends carrying the header for OTA and
+      websocket handshakes.
 
 config RIVER_ORVIBO_WS_SUBPROTOCOL
     string "Orvibo websocket subprotocol"

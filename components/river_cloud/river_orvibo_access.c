@@ -132,6 +132,11 @@ static const char *river_orvibo_access_text_or_dash(const char *text)
     return text != NULL && text[0] != '\0' ? text : "-";
 }
 
+static const char *river_orvibo_access_authorization_value(void)
+{
+    return RIVER_ORVIBO_AUTHORIZATION_VALUE;
+}
+
 static uint32_t river_orvibo_access_rotr32(uint32_t value, uint8_t bits)
 {
     return (value >> bits) | (value << (32U - bits));
@@ -731,8 +736,36 @@ static river_status_t river_orvibo_access_http_request(const char *method,
     (void)httpc_request_write_header(conn,
                                      (char *)"Activation-Version",
                                      (char *)river_orvibo_access_activation_version_header());
+    {
+        char protocol_version_header[8];
+
+        (void)snprintf(protocol_version_header,
+                       sizeof(protocol_version_header),
+                       "%u",
+                       (unsigned int)RIVER_ORVIBO_PROTOCOL_VERSION);
+        (void)httpc_request_write_header(conn,
+                                         (char *)"Protocol-Version",
+                                         protocol_version_header);
+    }
     (void)httpc_request_write_header(conn, (char *)"Device-Id", g_river_orvibo_access.device_id);
     (void)httpc_request_write_header(conn, (char *)"Client-Id", g_river_orvibo_access.client_id);
+    if (river_orvibo_access_authorization_value()[0] != '\0') {
+        char authorization_header[RIVER_ORVIBO_ACCESS_TOKEN_MAX + 16U];
+
+        if (strchr(river_orvibo_access_authorization_value(), ' ') == NULL) {
+            (void)snprintf(authorization_header,
+                           sizeof(authorization_header),
+                           "Bearer %s",
+                           river_orvibo_access_authorization_value());
+        } else {
+            river_orvibo_access_copy(authorization_header,
+                                     sizeof(authorization_header),
+                                     river_orvibo_access_authorization_value());
+        }
+        (void)httpc_request_write_header(conn,
+                                         (char *)"Authorization",
+                                         authorization_header);
+    }
     if (river_orvibo_access_activation_hmac_configured()) {
         (void)httpc_request_write_header(conn,
                                          (char *)"Serial-Number",

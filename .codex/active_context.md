@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.83 修复 Orvibo LVGL 中文显示`
+  - `Step H.xiaozhi-client.84 切换 Orvibo 默认服务端到自建 Phase 1`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.84` 切换 Orvibo 默认服务端到自建 Phase 1：
+  - 依据 `doc/device-integration-manual.md`，默认 OTA/config 地址切到 `http://101.33.235.154:8082/xiaozhi/ota/`；OTA 返回的 websocket URL 应为 `ws://101.33.235.154:8082/xiaozhi/v1/`。
+  - 新增 `CONFIG_RIVER_ORVIBO_AUTHORIZATION_VALUE="orvibo-river"`，当前服务端不校验该值，但 OTA HTTP 和 WebSocket handshake 都会携带 Authorization header。
+  - OTA HTTP header 现在包含 `Protocol-Version`、`Device-Id`、`Client-Id`、`Authorization`，WebSocket header 在 OTA token 为空时使用默认 Bearer 占位值。
+  - 本步不改变 hello/listen/audio/MCP wire format，不修改 VAD/KWS、tensor dump、alignment replay、board/local parity、Wi-Fi、音频、UI 或 SDK 源码。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均通过；image string check 确认新 OTA 地址/Authorization 存在且无 `api.tenclass`；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.83` 修复 Orvibo LVGL 中文显示：
   - 根因是 ASR/TTS label 仍使用 `LV_FONT_DEFAULT`，而当前 AmebaSmart LVGL 默认字体是 `lv_font_montserrat_14`，服务端中文 UTF-8 到达正常但字体无 CJK glyph。

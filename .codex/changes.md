@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.84
+- 按 `doc/device-integration-manual.md` 将 Orvibo voice client 默认服务端切到自建 Phase 1 服务：
+  - `CONFIG_RIVER_ORVIBO_OTA_URL` 和 header 兜底默认值从旧 `https://api.tenclass.net/xiaozhi/ota/` 改为 `http://101.33.235.154:8082/xiaozhi/ota/`。
+  - `prj.conf` 显式固定当前默认 OTA 地址，避免后续 menuconfig 默认值变化导致运行时回退旧云端。
+  - 新增 `CONFIG_RIVER_ORVIBO_AUTHORIZATION_VALUE`，默认 `orvibo-river`；当 OTA 返回空 websocket token 时，WebSocket handshake 仍发送 `Authorization: Bearer orvibo-river`，符合手册“当前不校验但建议携带”的要求。
+  - OTA HTTP 请求补齐 `Protocol-Version` 和 `Authorization` header；`Device-Id` / `Client-Id` 继续沿用当前 Orvibo access identity。
+  - WebSocket header 保持 `Protocol-Version` / `Device-Id` / `Client-Id`，并在 OTA token 为空时使用默认 Authorization 占位值。
+- 边界：
+  - 保持 XiaoZhi-compatible wire contract、hello/listen/audio payload、Opus 格式、VAD/KWS、tensor dump、alignment replay、board/local parity、Wi-Fi、音频和 UI 路径不变。
+  - 不修改 `/root/ameba-rtos` SDK 源码；未执行烧录或串口 monitor。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`.
+  - image string check confirms `http://101.33.235.154:8082/xiaozhi/ota/`, `Protocol-Version`, `Authorization`, and `orvibo-river` are present in generated images.
+  - image string check output contains no `api.tenclass` match.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.83
 - 修复 Orvibo LVGL 初始页面 ASR/TTS 中文无法显示：
   - 根因收敛为 LVGL 字体覆盖问题：服务端日志里的 STT/TTS 中文 UTF-8 已正常到达 Orvibo app，但 ASR/TTS label 原先使用 `LV_FONT_DEFAULT`，当前 AmebaSmart LVGL 配置把默认字体固定到 `lv_font_montserrat_14`，不包含 CJK glyph。

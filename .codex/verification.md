@@ -1,3 +1,68 @@
+## Step H.xiaozhi-client.84 Verification
+
+Run static hygiene and Codex harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Build the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- generated images include:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin`
+  - `build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+
+Confirm the self-hosted server contract is compiled into the image:
+```bash
+cd /root/ameba-river
+strings build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin 2>/dev/null \
+  | rg -n "101\\.33\\.235\\.154|api\\.tenclass|orvibo-river|Protocol-Version|Authorization"
+```
+
+Expected result:
+- output contains `http://101.33.235.154:8082/xiaozhi/ota/`
+- output contains `orvibo-river`, `Protocol-Version`, and `Authorization`
+- output does not contain `api.tenclass`
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot the board and wait for Wi-Fi connection.
+3. Watch access logs for:
+   - `ota=http://101.33.235.154:8082/xiaozhi/ota/`
+   - `OTA websocket config applied`
+   - `access refresh ok`
+4. Confirm the WebSocket URL returned by OTA is `ws://101.33.235.154:8082/xiaozhi/v1/`.
+5. Trigger one wake/listen cycle and confirm server STT/TTS events still reach the client.
+```
+
+Expected result:
+- the device no longer contacts the old `api.tenclass.net` OTA endpoint
+- OTA and WebSocket handshakes carry `Device-Id`, `Client-Id`, `Protocol-Version`, and `Authorization`
+- audio uplink/downlink behavior remains XiaoZhi-compatible raw Opus at 16 kHz mono / 60 ms
+
+Observed on 2026-05-30:
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: full `/root/ameba-rtos` build completed with `Build done`.
+- passed: image string check showed the new self-hosted OTA URL, `orvibo-river`, `Protocol-Version`, and `Authorization`.
+- passed: image string check produced no `api.tenclass` match.
+- not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested in the current turn.
+
 ## Step H.xiaozhi-client.83 Verification
 
 Confirm the Chinese display root cause and project-font coverage:

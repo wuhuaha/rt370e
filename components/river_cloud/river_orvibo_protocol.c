@@ -272,6 +272,7 @@ static river_status_t river_orvibo_parse_url(const char *url,
 static river_status_t river_orvibo_build_headers(void)
 {
     char auth_header[320];
+    const char *auth_value;
     int written;
 
     river_orvibo_copy_text(g_river_orvibo_protocol.device_id,
@@ -281,17 +282,20 @@ static river_status_t river_orvibo_build_headers(void)
                            sizeof(g_river_orvibo_protocol.client_id),
                            river_orvibo_access_client_id());
     auth_header[0] = '\0';
-    if (g_river_orvibo_protocol.token[0] != '\0') {
-        if (strchr(g_river_orvibo_protocol.token, ' ') == NULL) {
+    auth_value = g_river_orvibo_protocol.token[0] != '\0' ?
+                     g_river_orvibo_protocol.token :
+                     RIVER_ORVIBO_AUTHORIZATION_VALUE;
+    if (auth_value[0] != '\0') {
+        if (strchr(auth_value, ' ') == NULL) {
             snprintf(auth_header,
                      sizeof(auth_header),
                      "Authorization: Bearer %s\r\n",
-                     g_river_orvibo_protocol.token);
+                     auth_value);
         } else {
             snprintf(auth_header,
                      sizeof(auth_header),
                      "Authorization: %s\r\n",
-                     g_river_orvibo_protocol.token);
+                     auth_value);
         }
     }
     written = snprintf(g_river_orvibo_protocol.headers,
