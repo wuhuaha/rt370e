@@ -1,3 +1,54 @@
+## Step H.xiaozhi-client.85 Verification
+
+Confirm the downloaded GIF candidate set:
+```bash
+cd /root/ameba-river
+file components/river_ui/assets/emoji_candidates/*.gif
+python3 - <<'PY'
+from PIL import Image, ImageSequence
+from pathlib import Path
+for p in sorted(Path('components/river_ui/assets/emoji_candidates').glob('*.gif')):
+    im = Image.open(p)
+    frames = sum(1 for _ in ImageSequence.Iterator(im))
+    dur = sum(int(fr.info.get('duration', 0)) for fr in ImageSequence.Iterator(im))
+    print(f'{p.name}: {im.size[0]}x{im.size[1]} frames={frames} duration_ms={dur} bytes={p.stat().st_size}')
+PY
+sha256sum components/river_ui/assets/emoji_candidates/*.{gif,png}
+```
+
+Expected result:
+- all candidate files are valid GIF images
+- dimensions and frame counts match the source notes in
+  `components/river_ui/assets/emoji_candidates/README.md`
+- checksums match the recorded SHA-256 list
+
+Run static hygiene and Codex harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Observed on 2026-05-30:
+- passed: downloaded 3 AnimatEmojis / Google Noto animated cat GIF candidates.
+- passed: downloaded 2 Pixabay cute cat GIF candidates with smaller 170x170 payloads.
+- passed: `file` reports all 5 downloaded candidates as GIF image data.
+- passed: Python/Pillow frame scan reports:
+  - `noto_heart_eyes_cat_1f63b.gif`: 512x512, 77 frames, 2520ms, 880540 bytes
+  - `noto_smile_cat_1f638.gif`: 512x512, 96 frames, 3150ms, 931511 bytes
+  - `noto_smiley_cat_1f63a.gif`: 512x512, 61 frames, 2220ms, 516429 bytes
+  - `pixabay_cat_cute_emoji_6939.gif`: 170x170, 20 frames, 1000ms, 56699 bytes
+  - `pixabay_cat_cute_tickle_6937.gif`: 170x170, 20 frames, 1000ms, 77956 bytes
+- passed: local first-frame `preview_contact_sheet.png` generated for quick visual comparison.
+- passed: `sha256sum` values recorded in the asset README.
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, or serial monitor; this step only adds raw candidate assets and source notes.
+
 ## Step H.xiaozhi-client.84 Verification
 
 Run static hygiene and Codex harness checks:

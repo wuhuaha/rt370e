@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.84 切换 Orvibo 默认服务端到自建 Phase 1`
+  - `Step H.xiaozhi-client.85 下载猫表情动态图候选资源`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.85` 下载猫表情动态图候选资源：
+  - 新增 `components/river_ui/assets/emoji_candidates/` 独立候选资源目录。
+  - 下载 3 个 AnimatEmojis / Google Noto animated cat emoji GIF：`1f63a`、`1f638`、`1f63b`，页面标注 Google 和 CC BY 4.0。
+  - 下载 2 个 Pixabay cute cat GIF：`pixabay_cat_cute_emoji_6939.gif`、`pixabay_cat_cute_tickle_6937.gif`，源页面有较高浏览/下载/收藏数据，文件更小，适合作为首轮固件候选。
+  - 新增候选资源 README，记录源 URL、license/source note、尺寸/帧数/大小、选择原因、SHA-256 和后续固件转换边界。
+  - 当前 `LV_USE_GIF=0`，本步只归档 raw GIF 候选；后续应选择候选并离线转成 LVGL image descriptors，或单独启用并验证 GIF decoder。
+  - `file`、Python/Pillow frame scan、SHA-256、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行 firmware build/flash/serial monitor。
 
 - `Step H.xiaozhi-client.84` 切换 Orvibo 默认服务端到自建 Phase 1：
   - 依据 `doc/device-integration-manual.md`，默认 OTA/config 地址切到 `http://101.33.235.154:8082/xiaozhi/ota/`；OTA 返回的 websocket URL 应为 `ws://101.33.235.154:8082/xiaozhi/v1/`。

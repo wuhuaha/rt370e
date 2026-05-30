@@ -1,5 +1,23 @@
 # Change Log
 
+## Step H.xiaozhi-client.85
+- 按用户要求先进行网络搜索并下载可爱的猫表情动态图候选资源：
+  - 新增独立资源目录 `components/river_ui/assets/emoji_candidates/`。
+  - 下载 3 个 AnimatEmojis / Google Noto animated cat emoji GIF 候选：`1f63a`、`1f638`、`1f63b`。页面标注作者 Google、license 为 CC BY 4.0，适合后续按 attribution 要求进入项目资源评估。
+  - 下载 2 个 Pixabay cute cat GIF 候选：`pixabay_cat_cute_emoji_6939.gif` 和 `pixabay_cat_cute_tickle_6937.gif`。页面带有较高 views/downloads/saves 数据，文件尺寸更小，适合作为当前 480x480 屏首轮固件候选。
+  - 生成 `preview_contact_sheet.png` 用于本地快速视觉比较。
+  - 新增 `components/river_ui/assets/emoji_candidates/README.md` 记录源 URL、license/source note、尺寸/帧数/大小、选择原因和 SHA-256。
+- 边界：
+  - 本步只下载和归档候选动态图，不修改固件代码、SDK 源码、LVGL 配置、显示/触摸 bring-up、音频链路、协议 wire format、VAD/KWS、tensor dump、alignment replay 或 board/local parity 路径。
+  - 当前 `LV_USE_GIF=0`，这些 raw GIF 还不是可直接运行的固件资源；后续需要选择候选并离线转成项目内 LVGL image descriptors 或另行启用并验证 GIF decoder。
+- Verification for this step:
+  - `file components/river_ui/assets/emoji_candidates/*.gif` confirms all downloaded candidates are valid GIF images.
+  - Python/Pillow frame scan confirms dimensions, frame counts, durations, and creates the preview contact sheet.
+  - `sha256sum components/river_ui/assets/emoji_candidates/*.{gif,png}` recorded checksums.
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: firmware build, flash/download, or serial monitor; this step only adds raw candidate assets and source notes.
+
 ## Step H.xiaozhi-client.84
 - 按 `doc/device-integration-manual.md` 将 Orvibo voice client 默认服务端切到自建 Phase 1 服务：
   - `CONFIG_RIVER_ORVIBO_OTA_URL` 和 header 兜底默认值从旧 `https://api.tenclass.net/xiaozhi/ota/` 改为 `http://101.33.235.154:8082/xiaozhi/ota/`。
