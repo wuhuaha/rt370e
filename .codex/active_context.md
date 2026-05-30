@@ -18,11 +18,12 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.81 补齐硬件报告关键器件和接线图谱`
+  - `Step H.xiaozhi-client.82 接入 Orvibo LVGL 显示和触摸探测`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
   - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+  - `doc/ORVIBO_DISPLAY_TOUCH_LVGL_EXECUTION_PLAN_ZH.md`
 - Active plan index:
   - `.codex/active_plans.md`
 
@@ -32,9 +33,19 @@ or top-of-tree verification target changes.
 - `components/river_core/` contains Orvibo app orchestration and the Orvibo state machine.
 - `components/river_cloud/` contains Orvibo protocol/MCP transport plus shared Wi-Fi/WebSocket/Opus helpers.
 - `components/river_voice/` contains current capture, preproc, Silero VAD, KWS, AEC/BF, playback, and reference services.
+- `components/river_ui/` contains the Orvibo LVGL UI facade, ST7102 MIPI/LCDC bring-up path, and first-stage Sitronix touch probe.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.82` 接入 Orvibo LVGL 显示和触摸探测：
+  - 新增 `components/river_ui` 和 `include/river/river_orvibo_ui.h`，Orvibo core/app 只通过 UI facade 投递 state、emotion/emoji、ASR/STT 和 TTS text，不直接操作 LVGL。
+  - LVGL 9 端口创建 480x480 初始页面，显示 state、ASCII emotion/emoji、ASR、TTS 和 touch 摘要；第一阶段不引入 CJK/emoji 字库闭合。
+  - 项目内实现 ST7102 power/reset/backlight、MIPI DSI init table、LCDC RGB565 flip；默认 `CONFIG_RIVER_UI_ST7102_MIPI_LANE_NUM=1`，保留 1/2 lane 可切换以便上板验证供应商 init 与原理图差异。
+  - Sitronix touch 第一阶段只做 `PB10/PB11` I2C、`PA9` INT、`PA10` RST 的 reset/probe 和候选地址 ACK 扫描，坐标报文解析留到实板 ACK/register 验证后闭合。
+  - 新增 `river ui status`、`river ui touch scan`、`river ui text <asr|tts|emoji> <text>` 诊断命令。
+  - SDK LVGL demo objects 会随 `CONFIG_LVGL_ENABLE` 被 AP/HP 链接；本步新增项目侧 AP 兼容符号和 HP no-op 兼容组件解链接，不修改 `/root/ameba-rtos`。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均通过；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.81` 补齐硬件报告关键器件和接线图谱：
   - 本地 `schematic-pcb-firmware-guide` skill 增加“关键器件身份归一化”和“引脚接线图谱”流程，要求不能把 PDF/OCR raw value 直接当最终型号，要结合 refdes、管脚、封装、网名、周边电路、本地 datasheet、用户资料和外部资料推断。

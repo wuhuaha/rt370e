@@ -1,3 +1,61 @@
+## Step H.xiaozhi-client.82 Verification
+
+Run static hygiene and Codex harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Build the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- generated images include:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin`
+  - `build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot the board and watch the serial log for:
+   - `ui started: lvgl=on touch_probe=on`
+   - `st7102 init: 480x480 lane=1 fps=60`
+   - `lvgl ready: 480x480 depth=16`
+3. From the monitor, run:
+   - `river ui status`
+   - `river ui text emoji :test:`
+   - `river ui text asr hello`
+   - `river ui text tts world`
+   - `river ui touch scan`
+4. During a normal Orvibo interaction, confirm STT/ASR text, TTS sentence text,
+   and LLM emotion/status update on the display.
+```
+
+Expected result:
+- screen powers on and shows the LVGL state/emotion/ASR/TTS surface
+- `river ui status` reports `task=yes`, `lvgl=ready`, and `panel=ready`
+- `river ui touch scan` reports candidate ACKs or `ack:none` without crashing
+- if lane=1 does not produce a stable picture, rebuild with
+  `CONFIG_RIVER_UI_ST7102_MIPI_LANE_NUM=2` and compare panel behavior
+
+Observed on 2026-05-30:
+- passed: `git diff --check`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: full `/root/ameba-rtos` build completed with `Build done`.
+- note: AP link required project-owned `display_mode_*` compatibility symbols for SDK LVGL demo objects; HP image2 required a separate no-op compatibility component because `CONFIG_LVGL_ENABLE` is global in the SDK build.
+- not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested in the current turn.
+
 ## Step H.xiaozhi-client.80 Verification
 
 Run static hygiene and confirm the unsafe deferred-start path is not enabled:

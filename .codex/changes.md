@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.82
+- 接入 Orvibo-owned LVGL UI 初始切片，用于 4 寸 RTL8730E 板显示 XiaoZhi-compatible wire 事件：
+  - 新增 `include/river/river_orvibo_ui.h` 和 `components/river_ui`，提供 UI facade、队列任务、状态缓存和诊断状态。
+  - Orvibo app 启动时启动 UI；状态变化、STT/ASR 文本、TTS sentence_start 文本、LLM emotion/text 会投递到 UI 队列。
+  - LVGL 9 端口创建 480x480 页面，显示 state、emotion/emoji、ASR、TTS 和 touch 摘要；当前 emoji 先使用 ASCII emotion/status 字符串，避免在第一阶段阻塞于 CJK/emoji 字库。
+  - 新增项目内 ST7102 MIPI/LCDC bring-up：`PB26` LCD power、`PA14` reset、`PA16` backlight，项目自有 vendor init table，RGB565 双缓冲 flush，lane 数通过 `CONFIG_RIVER_UI_ST7102_MIPI_LANE_NUM` 保持 1/2 可切换，默认 1 lane。
+  - 新增 Sitronix touch 第一阶段 probe：`PB10/PB11` I2C2、`PA9` INT、`PA10` RST，只做 reset 和候选地址 ACK 扫描，不解析坐标。
+  - 新增 monitor 命令：`river ui status`、`river ui touch scan`、`river ui text <asr|tts|emoji> <text>`。
+  - 新增 `doc/ORVIBO_DISPLAY_TOUCH_LVGL_EXECUTION_PLAN_ZH.md` 并注册到 active plans。
+- SDK 兼容与边界：
+  - 开启 `CONFIG_LVGL_ENABLE=y` / `CONFIG_LVGL_9_3=y` 后，SDK 会同时链接 unused LVGL demo objects；项目侧新增 AP/HP `display_mode_*` 兼容符号解链接，不修改 `/root/ameba-rtos` SDK。
+  - HP 侧兼容符号放在独立 `components/river_hp_sdk_compat`，只为 HP image2 中 unused SDK LVGL demo no-op，不把 AP 显示驱动拉到 HP。
+  - 不修改 VAD/KWS、tensor dump、alignment replay、board/local parity、音频链路、Wi-Fi、Orvibo/XiaoZhi-compatible wire format 或 SDK 源码。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.80
 - 收敛 Orvibo TTS 播放尾段欠载/截断风险，保持低风险路径：
   - `orvibo_tts` 的 `AudioTrackConfig.buffer_bytes` 从 16 个 60ms 应用帧收敛为 4 帧，用更小 DMA period 降低 SDK IRQ 路径的 xrun/underrun 敏感窗口。

@@ -16,6 +16,7 @@
 #include "river/river_orvibo_mcp_volume.h"
 #include "river/river_orvibo_protocol.h"
 #include "river/river_orvibo_state.h"
+#include "river/river_orvibo_ui.h"
 #include "river/river_playback_service.h"
 #include "river/river_reference_service.h"
 #include "river/river_runtime_stats.h"
@@ -721,6 +722,7 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, cons
                                    reason != NULL && reason[0] != '\0' ? reason : "小欧管家");
     }
     transition = river_orvibo_state_machine_dispatch(event, reason);
+    (void)river_orvibo_ui_set_state(transition.new_state);
     river_orvibo_app_copy_text(g_river_orvibo_app.last_event,
                                sizeof(g_river_orvibo_app.last_event),
                                river_orvibo_event_name(event));
@@ -801,6 +803,9 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
                                    sizeof(g_river_orvibo_app.last_server_detail),
                                    msg->detail);
         if (msg->server_text_kind == RIVER_ORVIBO_APP_SERVER_TEXT_LLM) {
+            (void)river_orvibo_ui_set_llm_emotion(
+                g_river_orvibo_app.last_server_detail,
+                g_river_orvibo_app.last_server_text);
             RIVER_LOGI("server llm: emotion=%s text=%s",
                        g_river_orvibo_app.last_server_detail[0] != '\0' ?
                            g_river_orvibo_app.last_server_detail :
@@ -809,6 +814,12 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
                            g_river_orvibo_app.last_server_text :
                            "-");
         } else {
+            if (msg->server_text_kind == RIVER_ORVIBO_APP_SERVER_TEXT_STT) {
+                (void)river_orvibo_ui_set_asr_text(g_river_orvibo_app.last_server_text);
+            } else if (msg->server_text_kind ==
+                       RIVER_ORVIBO_APP_SERVER_TEXT_SENTENCE_START) {
+                (void)river_orvibo_ui_set_tts_text(g_river_orvibo_app.last_server_text);
+            }
             RIVER_LOGI("server text: kind=%s text=%s",
                        kind_name,
                        g_river_orvibo_app.last_server_text[0] != '\0' ?
@@ -960,6 +971,7 @@ river_status_t river_orvibo_app_boot(void)
     RIVER_LOGI("orvibo client boot target=RTL8730E");
     river_runtime_stats_init();
     river_orvibo_state_machine_init(RIVER_ORVIBO_STATE_STARTING);
+    (void)river_orvibo_ui_start();
     if (rtos_queue_create(&g_river_orvibo_app.control_queue,
                           RIVER_ORVIBO_APP_CONTROL_QUEUE_DEPTH,
                           sizeof(river_orvibo_app_msg_t)) != RIVER_ORVIBO_RTOS_OK) {
@@ -1090,6 +1102,7 @@ void river_orvibo_app_print_status(void)
     river_orvibo_access_dump_status();
     river_orvibo_audio_service_dump_status();
     river_orvibo_mcp_volume_dump_status();
+    river_orvibo_ui_dump_status();
     river_wifi_station_dump_status();
 }
 

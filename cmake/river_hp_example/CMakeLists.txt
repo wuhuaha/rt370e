@@ -15,3 +15,9 @@ ameba_add_subdirectory(
     ${RIVER_PROJECT_DIR}/components/river_wifi_hp_shim
     river_wifi_hp_shim
 )
+
+message(STATUS "ameba-river: adding HP SDK compatibility shims")
+ameba_add_subdirectory(
+    ${RIVER_PROJECT_DIR}/components/river_hp_sdk_compat
+    river_hp_sdk_compat
+)

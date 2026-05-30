@@ -49,6 +49,7 @@ if(DEFINED c_CURRENT_IMAGE AND DEFINED c_MCU_PROJECT_NAME AND c_MCU_PROJECT_NAME
 endif()
 
 ameba_add_subdirectory(components/river_common)
+ameba_add_subdirectory(components/river_ui)
 ameba_add_subdirectory(components/river_core)
 ameba_add_subdirectory(components/river_voice)
 ameba_add_subdirectory(components/river_cloud)

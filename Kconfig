@@ -104,6 +104,48 @@ config RIVER_DIAG_CMD_EN
     bool "Enable river monitor command"
     default y
 
+config RIVER_UI_EN
+    bool "Enable Orvibo local display UI"
+    default y
+    help
+      Enable the Orvibo-owned UI facade. The initial screen mirrors the
+      XiaoZhi-compatible wire events by showing emotion/emoji, ASR/STT text,
+      and TTS sentence text.
+
+config RIVER_UI_LVGL_EN
+    bool "Use LVGL for Orvibo local display UI"
+    default y
+    depends on RIVER_UI_EN
+    select LVGL_ENABLE
+    help
+      Build the project-owned LVGL port for the RTL8730E 4-inch ST7102 MIPI
+      panel. The implementation stays in this repository and uses SDK
+      low-level LCDC/MIPI APIs.
+
+config RIVER_UI_ST7102_MIPI_LANE_NUM
+    int "ST7102 MIPI DSI data lanes"
+    range 1 2
+    default 1
+    depends on RIVER_UI_LVGL_EN
+    help
+      Default to one lane because the vendor ST7102 init text starts with
+      SSD_LANE(1,0). The schematic routes two DSI data lanes on CN6, so this
+      remains configurable for board validation.
+
+config RIVER_UI_ST7102_FRAME_RATE
+    int "ST7102 target frame rate"
+    range 30 60
+    default 60
+    depends on RIVER_UI_LVGL_EN
+
+config RIVER_UI_TOUCH_PROBE_EN
+    bool "Probe Sitronix touch over I2C"
+    default y
+    depends on RIVER_UI_EN
+    help
+      Reset the touch controller and scan candidate I2C addresses. Coordinate
+      parsing is intentionally deferred until board ACK/register validation.
+
 config RIVER_AUDIO_ECHO_DEBUG_EN
     bool "Build board audio echo debug path"
     default n

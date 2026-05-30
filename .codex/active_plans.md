@@ -8,6 +8,7 @@ of encoding long plan content directly in root entry files.
 
 - Primary active execution plan:
   - `doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md`
+  - `doc/ORVIBO_DISPLAY_TOUCH_LVGL_EXECUTION_PLAN_ZH.md`
 - Secondary active execution plans:
   - none pinned right now
 
