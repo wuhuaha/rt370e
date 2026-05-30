@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.90
+- 新增 Orvibo 单轮对话模式，默认启用：
+  - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`，`prj.conf` 显式配置默认产品行为为“唤醒 -> 一次服务端响应 -> 本轮 TTS 播放完成后关闭 realtime WebSocket -> 回到本地唤醒监听”。
+  - `river_orvibo_state_machine` 增加单轮/连续模式运行时开关和 `conversation_mode` 名称查询，启动日志和 `river orvibo status` 会打印当前模式。
+  - 在 `SPEAKING` 收到 `SERVER_TTS_FINISHED` 时，单轮模式等待本地 playback drain 后执行 `CLOSE_AUDIO_CHANNEL`、`AUDIO_IDLE`、`DISABLE_BARGE_IN` 并回到 `IDLE`；连续模式保留原来的 `LISTENING` + `START_LISTENING` 行为。
+  - 诊断命令新增 `river orvibo mode <status|single|continuous>`，可在板端临时切换单轮/连续模式。
+- 设计边界：
+  - 不重新引入本地 VAD speech-end 直接 `listen stop`，避免和服务端自动端点检测互相抢状态。
+  - 不改变 XiaoZhi-compatible JSON/Opus wire format、OTA/access、MCP volume-only、KWS/VAD/tensor dump/alignment replay/board-local parity 路径。
+  - 单轮断开点绑定在服务端 TTS stop 事件之后，并通过 app action 等待本地播放 drain，避免收到 TTS 尾包后立刻截断本地播放。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `rg` confirmed config/API/status/diagnostic/state-machine references.
+  - `/root/ameba-rtos` latest-SDK full build completed with `Build done` after rerunning the build on 2026-05-30.
+  - Generated AP/HP/LP configs all contain `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`.
+  - AP image strings contain `conversation_mode`, `single_turn`, `continuous`, and `river orvibo mode` diagnostics.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.89
 - 新增智能家居动作动画候选资源目录 `components/river_ui/assets/action_candidates/`：
   - `light_bulb_on_off_commons.gif` 用于 `action_light_on` / `action_light_off`。

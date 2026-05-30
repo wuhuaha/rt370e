@@ -82,6 +82,16 @@ config RIVER_ORVIBO_SERVER_WAKE_TEXT
       current on-device wake phrase while still matching the target server's
       expected wakeup-word semantics.
 
+config RIVER_ORVIBO_SINGLE_TURN_MODE
+    bool "Close Orvibo realtime channel after one response"
+    default y
+    depends on RIVER_ORVIBO_CLIENT_EN
+    help
+      Treat wake -> request -> server TTS as one turn. After the server sends
+      TTS stop and local playback drains, the client closes the realtime
+      WebSocket channel and returns to idle wake monitoring instead of starting
+      another listening round. Disable this for continuous follow-up sessions.
+
 config RIVER_ORVIBO_DEVICE_ID
     string "Orvibo fixed Device-Id"
     default ""

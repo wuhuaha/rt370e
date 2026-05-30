@@ -9,7 +9,7 @@ or top-of-tree verification target changes.
 - Current working branch: `xiaozhi-client`
 - Active SDK baseline: `/root/ameba-rtos`
 - Active build command:
-  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; export CMAKE_BUILD_PARALLEL_LEVEL=1; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'`
 - Active flash command:
   - User-run board validation unless the user explicitly asks Codex to flash in
     the current turn:
@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.89 关联 TTS 智能家居文本与动作动画`
+  - `Step H.xiaozhi-client.90 新增 Orvibo 单轮对话模式`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.90` 新增 Orvibo 单轮对话模式：
+  - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE`，`prj.conf` 默认启用单轮对话：唤醒后完成一次服务端请求/响应，收到服务端 TTS stop 并等待本地 playback drain 后关闭 realtime WebSocket，回到 `IDLE` 本地唤醒监听。
+  - `river_orvibo_state_machine` 增加单轮/连续模式运行时开关和 `conversation_mode` 状态名；`SPEAKING + SERVER_TTS_FINISHED` 在单轮模式下执行 `WAIT_PLAYBACK_IDLE`、`CLOSE_AUDIO_CHANNEL`、`AUDIO_IDLE`、`DISABLE_BARGE_IN`，连续模式保留旧的 post-TTS `LISTENING` 行为。
+  - 启动日志和 `river orvibo status` 增加 `conversation_mode`；诊断新增 `river orvibo mode <status|single|continuous>` 便于上板确认或临时切换。
+  - `git diff --check`、单轮配置/API/诊断/state grep、`/root/ameba-rtos` 完整 build、生成配置检查、AP image string check 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.89` 关联 TTS 智能家居文本与动作动画：
   - 新增 `components/river_ui/assets/action_candidates/`，下载并记录 Wikimedia Commons 来源的灯泡亮灭 GIF 和幕布开合 GIF，生成器离线转成 `action_light_on/off`、`action_curtain_open/close` 四个 `lv_animimg` 动画 token。

@@ -4,12 +4,14 @@
 #include <stddef.h>
 
 #include "river/river_log.h"
+#include "river/river_orvibo_credentials.h"
 #include "river/river_orvibo_state.h"
 
 #undef RIVER_LOG_TAG
 #define RIVER_LOG_TAG "river.orvibo.state"
 
 static river_orvibo_state_t g_river_orvibo_state = RIVER_ORVIBO_STATE_STARTING;
+static bool g_river_orvibo_single_turn_mode = RIVER_ORVIBO_SINGLE_TURN_MODE != 0;
 
 const char *river_orvibo_state_name(river_orvibo_state_t state)
 {
@@ -79,6 +81,26 @@ void river_orvibo_state_machine_init(river_orvibo_state_t initial_state)
 river_orvibo_state_t river_orvibo_state_machine_current(void)
 {
     return g_river_orvibo_state;
+}
+
+void river_orvibo_state_machine_set_single_turn_mode(bool enabled)
+{
+    if (g_river_orvibo_single_turn_mode == enabled) {
+        return;
+    }
+    g_river_orvibo_single_turn_mode = enabled;
+    RIVER_LOGI("orvibo conversation mode: %s",
+               river_orvibo_state_machine_conversation_mode_name());
+}
+
+bool river_orvibo_state_machine_single_turn_mode(void)
+{
+    return g_river_orvibo_single_turn_mode;
+}
+
+const char *river_orvibo_state_machine_conversation_mode_name(void)
+{
+    return g_river_orvibo_single_turn_mode ? "single_turn" : "continuous";
 }
 
 static river_orvibo_transition_t river_orvibo_transition_make(
@@ -189,11 +211,19 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED) {
-                new_state = RIVER_ORVIBO_STATE_LISTENING;
-                actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |
-                          RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
-                          RIVER_ORVIBO_ACTION_START_LISTENING |
-                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
+                if (g_river_orvibo_single_turn_mode) {
+                    new_state = RIVER_ORVIBO_STATE_IDLE;
+                    actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |
+                              RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |
+                              RIVER_ORVIBO_ACTION_AUDIO_IDLE |
+                              RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
+                } else {
+                    new_state = RIVER_ORVIBO_STATE_LISTENING;
+                    actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |
+                              RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
+                              RIVER_ORVIBO_ACTION_START_LISTENING |
+                              RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
+                }
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
                 actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |

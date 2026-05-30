@@ -17,6 +17,7 @@
 #include "river/river_orvibo_audio_service.h"
 #include "river/river_orvibo_mcp_volume.h"
 #include "river/river_orvibo_protocol.h"
+#include "river/river_orvibo_state.h"
 #include "river/river_orvibo_ui.h"
 #include "river/river_playback_service.h"
 #include "river/river_runtime_stats.h"
@@ -53,7 +54,7 @@ static int16_t g_river_diag_playback_tone_frame[RIVER_DIAG_PLAYBACK_TONE_PCM_SAM
 static void river_diag_help(void)
 {
     printf("\triver status\n");
-    printf("\triver orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+    printf("\triver orvibo <status|connect|refresh|listen <start|stop>|abort|mode <status|single|continuous>|protocol <1|2|3>|volume <0-100>>\n");
     printf("\triver ui <status|touch scan|state <name>|emoji <key>|text <asr|tts|emoji> <text>>\n");
     printf("\triver audio <status>\n");
     printf("\triver playback <status|tone [freq_hz] [duration_ms] [level_pct]|stop|interrupt|flush|duck <gain>|unduck>\n");
@@ -408,7 +409,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
 static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
 {
     if (argc < 2) {
-        printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+        printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|mode <status|single|continuous>|protocol <1|2|3>|volume <0-100>>\n");
         return 0;
     }
 
@@ -442,6 +443,27 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
         river_orvibo_app_request_abort();
         return 0;
     }
+    if (strcmp((const char *)argv[1], "mode") == 0) {
+        if (argc < 3 || strcmp((const char *)argv[2], "status") == 0) {
+            printf("[river][diag] orvibo conversation_mode=%s\n",
+                   river_orvibo_state_machine_conversation_mode_name());
+            return 0;
+        }
+        if (strcmp((const char *)argv[2], "single") == 0 ||
+            strcmp((const char *)argv[2], "single-turn") == 0) {
+            river_orvibo_state_machine_set_single_turn_mode(true);
+        } else if (strcmp((const char *)argv[2], "continuous") == 0 ||
+                   strcmp((const char *)argv[2], "multi") == 0 ||
+                   strcmp((const char *)argv[2], "multi-turn") == 0) {
+            river_orvibo_state_machine_set_single_turn_mode(false);
+        } else {
+            printf("[river][diag] usage: river orvibo mode <status|single|continuous>\n");
+            return 0;
+        }
+        printf("[river][diag] orvibo conversation_mode=%s\n",
+               river_orvibo_state_machine_conversation_mode_name());
+        return 0;
+    }
     if (strcmp((const char *)argv[1], "protocol") == 0) {
         river_orvibo_protocol_config_t config;
         uint32_t version;
@@ -471,7 +493,7 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
         return 0;
     }
 
-    printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
+    printf("[river][diag] usage: river orvibo <status|connect|refresh|listen <start|stop>|abort|mode <status|single|continuous>|protocol <1|2|3>|volume <0-100>>\n");
     return 0;
 }
 

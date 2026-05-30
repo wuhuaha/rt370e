@@ -1,13 +1,18 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-29
+Last Updated: 2026-05-30
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.90` 新增 Orvibo 单轮对话模式：
+  - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE`，并在 `prj.conf` 默认启用；产品默认从唤醒进入一轮服务端请求/响应，收到服务端 TTS stop 并等待本地 playback drain 后关闭 realtime WebSocket，回到本地唤醒监听。
+  - `river_orvibo_state_machine` 增加单轮/连续模式运行时开关；单轮模式下 `SPEAKING + SERVER_TTS_FINISHED` 转 `IDLE` 并执行 `WAIT_PLAYBACK_IDLE`、`CLOSE_AUDIO_CHANNEL`、`AUDIO_IDLE`、`DISABLE_BARGE_IN`，连续模式保留原 post-TTS `LISTENING` 行为。
+  - 启动日志、Orvibo status 和 `river orvibo mode <status|single|continuous>` 诊断均能报告/切换 `conversation_mode`。
+  - `/root/ameba-rtos` 完整构建已在 2026-05-30 重新执行并通过；生成配置确认 AP/HP/LP 均启用单轮模式，AP image 包含 mode/status 诊断字符串。
 - `Step H.xiaozhi-client.79` 为硬件报告 skill 增加交互式 HTML 伴随文档：
   - `schematic-pcb-firmware-guide` 默认输出扩展为 Markdown + 同名离线交互式 HTML；模板新增 `Interactive HTML Companion`，要求自包含、证据对齐、无外部依赖、无业务层扩展。
   - `doc/SCHEMATIC_PCB_FIRMWARE_GUIDE_SKILL_ZH.md` 同步中文规则，要求 HTML 提供搜索/过滤、可排序表格、copy 命令、`localStorage` checklist 和来源可追溯的 SVG/CSS 可视化。

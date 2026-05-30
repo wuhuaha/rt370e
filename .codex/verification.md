@@ -1,3 +1,70 @@
+## Step H.xiaozhi-client.90 Verification
+
+Confirm the default single-turn mode and runtime diagnostic command:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_ORVIBO_SINGLE_TURN_MODE|conversation_mode|mode <status|SERVER_TTS_FINISHED|RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL" \
+  Kconfig prj.conf include/river components/river_core components/river_diag -S
+```
+
+Expected result:
+- `Kconfig` defines `RIVER_ORVIBO_SINGLE_TURN_MODE` with default `y`
+- `prj.conf` sets `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`
+- `SPEAKING + SERVER_TTS_FINISHED` closes the audio channel in single-turn mode after playback drain
+- `river orvibo mode <status|single|continuous>` is available for board-side mode checks and temporary switching
+
+Run static hygiene and latest-SDK build checks:
+```bash
+cd /root/ameba-river
+git diff --check
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- the SDK build exits successfully with `Build done`
+
+Confirm generated configuration and image strings:
+```bash
+cd /root/ameba-river
+rg -n 'CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y' \
+  build_RTL8730E/menuconfig/.config \
+  build_RTL8730E/build/project_ap/.config_ca32 \
+  build_RTL8730E/build/project_hp/.config_km4 \
+  build_RTL8730E/build/project_lp/.config_km0
+strings build_RTL8730E/build/project_ap/image/ap_image_all.bin | \
+  rg 'conversation_mode|single_turn|continuous|river orvibo mode'
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- all generated AP/HP/LP configs contain `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`
+- AP image strings include the conversation mode status and diagnostic command strings
+- the harness script exits with `check_codex_harness: all checks passed`
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot and confirm the startup log includes:
+   orvibo client boot target=RTL8730E conversation_mode=single_turn
+3. Run `river orvibo mode status` and confirm `conversation_mode=single_turn`.
+4. Trigger wake, send one request to the server, and wait for the full TTS reply to finish playing.
+5. Confirm the client closes the realtime channel and returns to local idle/wake monitoring instead of entering another listening round.
+6. Optional comparison: run `river orvibo mode continuous`, repeat one interaction, and confirm it keeps the old post-TTS listening behavior.
+```
+
+Observed on 2026-05-30:
+- passed: `git diff --check`.
+- passed: `rg -n "RIVER_ORVIBO_SINGLE_TURN_MODE|conversation_mode|mode <status|SERVER_TTS_FINISHED|RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL" ...`.
+- passed: full `/root/ameba-rtos` build rerun completed with `Build done`.
+- passed: generated `menuconfig`, AP, HP, and LP configs all contain `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`.
+- passed: AP image strings contain `conversation_mode`, `single_turn`, `continuous`, and `river orvibo mode` diagnostics.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: board flash/download or serial monitor; current NAND hardware policy requires user-run validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.89 Verification
 
 Regenerate the LVGL UI animation resources after adding action GIF assets:

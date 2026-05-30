@@ -2,6 +2,8 @@
 #ifndef AMEBA_RIVER_ORVIBO_STATE_H
 #define AMEBA_RIVER_ORVIBO_STATE_H
 
+#include <stdbool.h>
+
 #include "river/river_types.h"
 
 typedef enum {
@@ -60,6 +62,9 @@ typedef struct {
 } river_orvibo_transition_t;
 
 void river_orvibo_state_machine_init(river_orvibo_state_t initial_state);
+void river_orvibo_state_machine_set_single_turn_mode(bool enabled);
+bool river_orvibo_state_machine_single_turn_mode(void);
+const char *river_orvibo_state_machine_conversation_mode_name(void);
 river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event_t event,
                                                               const char *reason);
 river_orvibo_state_t river_orvibo_state_machine_current(void);

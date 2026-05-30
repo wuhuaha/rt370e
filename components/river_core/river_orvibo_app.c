@@ -968,7 +968,8 @@ river_status_t river_orvibo_app_boot(void)
     }
 
     memset(&g_river_orvibo_app, 0, sizeof(g_river_orvibo_app));
-    RIVER_LOGI("orvibo client boot target=RTL8730E");
+    RIVER_LOGI("orvibo client boot target=RTL8730E conversation_mode=%s",
+               river_orvibo_state_machine_conversation_mode_name());
     river_runtime_stats_init();
     river_orvibo_state_machine_init(RIVER_ORVIBO_STATE_STARTING);
     (void)river_orvibo_ui_start();
@@ -1038,8 +1039,9 @@ void river_orvibo_app_print_status(void)
                                    g_river_orvibo_app.audio_queue) :
                                0U;
 
-    RIVER_LOGI("orvibo app: state=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu aud_flush=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s conversation_mode=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu aud_flush=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
+               river_orvibo_state_machine_conversation_mode_name(),
                river_wifi_station_status_name(),
                (unsigned int)RIVER_ORVIBO_APP_AUDIO_PACKET_MAX,
                (unsigned long)control_depth,
