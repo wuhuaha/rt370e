@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.82 接入 Orvibo LVGL 显示和触摸探测`
+  - `Step H.xiaozhi-client.83 修复 Orvibo LVGL 中文显示`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.83` 修复 Orvibo LVGL 中文显示：
+  - 根因是 ASR/TTS label 仍使用 `LV_FONT_DEFAULT`，而当前 AmebaSmart LVGL 默认字体是 `lv_font_montserrat_14`，服务端中文 UTF-8 到达正常但字体无 CJK glyph。
+  - SDK 自带 CJK 子集不是默认字体，且缺少本轮日志和智能家居回复中的若干关键简体字；本步不修改 SDK，而是在项目内新增 `river_lv_font_zh_16`。
+  - `components/river_ui/river_lv_font_zh_16.c` 是 16px/bpp=2 SourceHanSansSC LVGL 字体子集，覆盖当前 ASR/TTS 日志关键字、常用智能家居词、ASCII 和中文标点。
+  - `components/river_ui/CMakeLists.txt` 在 `CONFIG_RIVER_UI_LVGL_EN` 下编译项目字体，`river_lvgl_port.c` 将 ASR/TTS label 切到该字体。
+  - `river_orvibo_ui.c` 增加 UTF-8 安全截断，避免长中文句子在 192 字节 UI 消息缓冲区边界截断半个字符。
+  - `git diff --check`、字体关键字覆盖 grep、AP archive/image `nm` 字符号检查和 `/root/ameba-rtos` 完整 build 均通过；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.82` 接入 Orvibo LVGL 显示和触摸探测：
   - 新增 `components/river_ui` 和 `include/river/river_orvibo_ui.h`，Orvibo core/app 只通过 UI facade 投递 state、emotion/emoji、ASR/STT 和 TTS text，不直接操作 LVGL。

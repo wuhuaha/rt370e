@@ -1,3 +1,77 @@
+## Step H.xiaozhi-client.83 Verification
+
+Confirm the Chinese display root cause and project-font coverage:
+```bash
+cd /root/ameba-river
+rg -n "LV_FONT_DEFAULT|LV_FONT_MONTSERRAT" \
+  /root/ameba-rtos/component/ui/LVGL/lvgl-9.3/port/amebasmart/lv_conf.h
+rg -n "帮|开|灯|厅|线|论|为|无|现|客|你|已" \
+  components/river_ui/river_lv_font_zh_16.c
+```
+
+Expected result:
+- `LV_FONT_DEFAULT` is `&lv_font_montserrat_14`, so the original ASR/TTS labels had no CJK glyph coverage
+- the project-owned `river_lv_font_zh_16.c` contains the current log's key Simplified Chinese glyphs
+
+Run static hygiene and AP font symbol checks:
+```bash
+cd /root/ameba-river
+git diff --check
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -g \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_ui/lib_river_ui.a \
+  | rg 'river_lv_font_zh_16'
+/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -g \
+  build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf \
+  | rg 'river_lv_font_zh_16'
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- the UI archive shows `river_lv_font_zh_16.o`, one exported `R river_lv_font_zh_16`, and one reference from the LVGL port
+- the AP image contains `river_lv_font_zh_16`
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Build the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- generated images include:
+  - `build_RTL8730E/build/project_hp/image/km4_boot_all.bin`
+  - `build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin`
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot the board and confirm the LVGL page still reaches `lvgl ready`.
+3. From the monitor, run:
+   - `river ui text asr 帮我开灯`
+   - `river ui text tts 已为你打开客厅，现在光线更充足了。`
+   - `river ui status`
+4. During a normal Orvibo interaction, confirm server STT/ASR and
+   TTS sentence_start Chinese text render on the ASR/TTS rows.
+```
+
+Expected result:
+- ASR/TTS Chinese text renders as readable Chinese rather than blank boxes or missing glyph placeholders
+- long Chinese text does not produce broken trailing bytes or LVGL text corruption
+- `river ui status` reports the same Chinese text in `asr=` / `tts=` fields without UTF-8 truncation artifacts
+
+Observed on 2026-05-30:
+- passed: `git diff --check`.
+- passed: project font coverage grep includes the current log's key Simplified Chinese glyphs.
+- passed: AP `lib_river_ui.a` exports and references `river_lv_font_zh_16`.
+- passed: AP `target_img2_ap.axf` contains `river_lv_font_zh_16`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: full `/root/ameba-rtos` build completed with `Build done`.
+- not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested in the current turn.
+
 ## Step H.xiaozhi-client.82 Verification
 
 Run static hygiene and Codex harness checks:

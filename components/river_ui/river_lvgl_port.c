@@ -23,6 +23,8 @@
 #define RIVER_LVGL_QUEUE_DEPTH 4U
 #define RIVER_LVGL_RTOS_OK     0
 
+LV_FONT_DECLARE(river_lv_font_zh_16)
+
 typedef struct {
     bool started;
     bool ready;
@@ -113,6 +115,7 @@ static void river_lvgl_create_screen(void)
 {
     lv_obj_t *screen = lv_screen_active();
     lv_obj_t *panel;
+    const lv_font_t *text_font = &river_lv_font_zh_16;
 
     lv_obj_set_style_bg_color(screen, lv_color_hex(0x101418), 0);
     lv_obj_set_style_pad_all(screen, 20, 0);
@@ -142,11 +145,11 @@ static void river_lvgl_create_screen(void)
                                               400);
     lv_obj_set_style_text_align(g_lvgl.emoji_label, LV_TEXT_ALIGN_CENTER, 0);
     g_lvgl.asr_label = river_lvgl_add_label(panel,
-                                            LV_FONT_DEFAULT,
+                                            text_font,
                                             lv_color_hex(0xE6EDF3),
                                             400);
     g_lvgl.tts_label = river_lvgl_add_label(panel,
-                                            LV_FONT_DEFAULT,
+                                            text_font,
                                             lv_color_hex(0xB6E3C6),
                                             400);
     g_lvgl.touch_label = river_lvgl_add_label(panel,

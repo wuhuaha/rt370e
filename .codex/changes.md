@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.83
+- 修复 Orvibo LVGL 初始页面 ASR/TTS 中文无法显示：
+  - 根因收敛为 LVGL 字体覆盖问题：服务端日志里的 STT/TTS 中文 UTF-8 已正常到达 Orvibo app，但 ASR/TTS label 原先使用 `LV_FONT_DEFAULT`，当前 AmebaSmart LVGL 配置把默认字体固定到 `lv_font_montserrat_14`，不包含 CJK glyph。
+  - SDK 自带 CJK 子集没有作为默认字体使用，且现有子集缺少本轮日志和智能家居回复里的关键简体字，例如 `帮`、`开`、`灯`、`厅` 等；因此没有直接改 SDK 配置或引用 SDK 子集。
+  - 新增项目自有 `components/river_ui/river_lv_font_zh_16.c`，基于 SourceHanSansSC 生成 16px/bpp=2 LVGL 字体子集，覆盖日志关键字、智能家居常用 ASR/TTS 词和基础 ASCII/中文标点。
+  - `components/river_ui/CMakeLists.txt` 在 `CONFIG_RIVER_UI_LVGL_EN` 下编译该字体，`river_lvgl_port.c` 将 ASR/TTS label 字体切到 `river_lv_font_zh_16`。
+  - `river_orvibo_ui.c` 增加 UTF-8 安全截断，避免 192 字节 UI 消息缓冲区在长中文句子处截断半个字符后传给 LVGL。
+- 边界：
+  - 不修改 `/root/ameba-rtos` SDK 源码、LVGL SDK 配置、显示/触摸硬件 bring-up、协议 wire format、音频链路、VAD/KWS、tensor dump、alignment replay 或 board/local parity 路径。
+  - 本步只闭合 ASR/TTS 中文显示；真实 emoji glyph 仍按后续字体/图片资源切片处理。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `rg -n "帮|开|灯|厅|线|论|为|无|现|客|你|已" components/river_ui/river_lv_font_zh_16.c` confirms the new project font contains the current log's key Simplified Chinese glyphs.
+  - `/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -g build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_ui/lib_river_ui.a | rg 'river_lv_font_zh_16'` confirms the AP UI archive exports and references the project font.
+  - `/opt/rtk-toolchain/asdk-10.3.1-4523/linux/newlib/bin/arm-none-eabi-nm -g build_RTL8730E/build/project_ap/make/image2/target_img2_ap.axf | rg 'river_lv_font_zh_16'` confirms the AP image keeps `river_lv_font_zh_16`.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `python3 /root/ameba-rtos/ameba.py build -p` completed successfully against `/root/ameba-rtos` with `Build done`.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.82
 - 接入 Orvibo-owned LVGL UI 初始切片，用于 4 寸 RTL8730E 板显示 XiaoZhi-compatible wire 事件：
   - 新增 `include/river/river_orvibo_ui.h` 和 `components/river_ui`，提供 UI facade、队列任务、状态缓存和诊断状态。

@@ -31,6 +31,21 @@
   - `river ui touch scan`
   - `river ui text <asr|tts|emoji> <text>`
 
+## Step 1.1: ASR/TTS 中文显示闭合
+
+- 原因分析：
+  - 2026-05-30 14:34 的板端日志显示 server STT/TTS 中文已正常进入 Orvibo protocol/app 层。
+  - LVGL 页面原先的 ASR/TTS label 仍使用 `LV_FONT_DEFAULT`；当前 SDK `port/amebasmart/lv_conf.h` 中默认字体为 `lv_font_montserrat_14`，不包含 CJK glyph。
+  - SDK CJK 字体子集不是默认字体，且不能覆盖本轮日志中的全部关键简体字，因此项目侧自带精简字体更可控。
+- 已完成：
+  - 新增 `components/river_ui/river_lv_font_zh_16.c`，16px/bpp=2 SourceHanSansSC LVGL 子集，覆盖当前 ASR/TTS 日志和智能家居常用中文。
+  - `river_lvgl_port.c` 将 ASR/TTS label 字体切到 `river_lv_font_zh_16`。
+  - `river_orvibo_ui.c` 对 UI 文本复制后做 UTF-8 安全截断，避免长中文句子截断半个字符。
+- 验证：
+  - `/root/ameba-rtos` 完整 build 已通过。
+  - AP `lib_river_ui.a` 和 `target_img2_ap.axf` 均确认保留 `river_lv_font_zh_16`。
+  - 仍需用户上板执行 `river ui text asr 帮我开灯`、`river ui text tts 已为你打开客厅，现在光线更充足了。`，确认屏幕中文实际渲染。
+
 ## Step 2: ST7102 MIPI/LCDC bring-up 验证
 
 - 项目内实现 ST7102 power/reset/backlight、MIPI DSI init、LCDC page flip。

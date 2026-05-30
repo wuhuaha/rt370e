@@ -47,6 +47,52 @@ typedef struct {
 
 static river_ui_context_t g_river_ui;
 
+static size_t river_ui_utf8_char_len(uint8_t byte)
+{
+    if (byte < 0x80U) {
+        return 1U;
+    }
+    if ((byte & 0xE0U) == 0xC0U) {
+        return 2U;
+    }
+    if ((byte & 0xF0U) == 0xE0U) {
+        return 3U;
+    }
+    if ((byte & 0xF8U) == 0xF0U) {
+        return 4U;
+    }
+    return 0U;
+}
+
+static void river_ui_trim_utf8(char *text)
+{
+    size_t i = 0U;
+    size_t valid = 0U;
+    size_t len;
+
+    if (text == NULL) {
+        return;
+    }
+    len = strlen(text);
+    while (i < len) {
+        uint8_t byte = (uint8_t)text[i];
+        size_t char_len = river_ui_utf8_char_len(byte);
+
+        if (char_len == 0U || i + char_len > len) {
+            break;
+        }
+        for (size_t j = 1U; j < char_len; j++) {
+            if (((uint8_t)text[i + j] & 0xC0U) != 0x80U) {
+                text[valid] = '\0';
+                return;
+            }
+        }
+        i += char_len;
+        valid = i;
+    }
+    text[valid] = '\0';
+}
+
 static void river_ui_copy(char *dst, size_t dst_size, const char *src)
 {
     if (dst == NULL || dst_size == 0U) {
@@ -58,6 +104,7 @@ static void river_ui_copy(char *dst, size_t dst_size, const char *src)
     }
     strncpy(dst, src, dst_size - 1U);
     dst[dst_size - 1U] = '\0';
+    river_ui_trim_utf8(dst);
 }
 
 static const char *river_ui_state_name(river_orvibo_state_t state)
