@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate LVGL animimg descriptors from the selected Noto cat GIFs."""
+"""Generate LVGL animimg descriptors from selected UI GIF assets."""
 
 from __future__ import annotations
 
@@ -16,73 +16,110 @@ SAMPLE_FRAMES = 8
 
 
 @dataclass(frozen=True)
-class CatAsset:
+class AnimAsset:
     key: str
     caption: str
     gif_name: str
     aliases: tuple[str, ...]
+    source_dir: str = "emoji_candidates"
+    start_index: int | None = None
+    end_index: int | None = None
+    reverse: bool = False
 
 
 ASSETS = (
-    CatAsset(
+    AnimAsset(
         "noto_smiley_cat_1f63a",
         "smiley cat",
         "noto_smiley_cat_1f63a.gif",
         ("smiley", "1f63a", "listen", "listening", "relaxed", "llm"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_smile_cat_1f638",
         "smile cat",
         "noto_smile_cat_1f638.gif",
         ("smile", "1f638", "happy", "wifi", "link", "connect", "connecting"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_joy_cat_1f639",
         "joy cat",
         "noto_joy_cat_1f639.gif",
         ("joy", "1f639", "speak", "speaking", "tts", "excited"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_heart_eyes_cat_1f63b",
         "heart eyes cat",
         "noto_heart_eyes_cat_1f63b.gif",
         ("heart", "heart_eyes", "1f63b", "love", "loving"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_smirk_cat_1f63c",
         "smirk cat",
         "noto_smirk_cat_1f63c.gif",
         ("smirk", "1f63c", "thinking"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_kissing_cat_1f63d",
         "kissing cat",
         "noto_kissing_cat_1f63d.gif",
         ("kiss", "kissing", "1f63d"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_pouting_cat_1f63e",
         "pouting cat",
         "noto_pouting_cat_1f63e.gif",
         ("pout", "pouting", "1f63e", "angry", "recover", "recovering"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_crying_cat_1f63f",
         "crying cat",
         "noto_crying_cat_1f63f.gif",
         ("cry", "crying", "1f63f", "sad"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_scream_cat_1f640",
         "scream cat",
         "noto_scream_cat_1f640.gif",
         ("scream", "1f640", "error", "surprise", "surprised", "afraid", "fear"),
     ),
-    CatAsset(
+    AnimAsset(
         "noto_cat_face_1f431",
         "cat face",
         "noto_cat_face_1f431.gif",
         ("cat_face", "face", "1f431", "idle", "boot", "starting", "unknown"),
+    ),
+    AnimAsset(
+        "action_light_on",
+        "light on",
+        "light_bulb_on_off_commons.gif",
+        ("light_on", "open_light", "lamp_on", "turn_on_light"),
+        source_dir="action_candidates",
+    ),
+    AnimAsset(
+        "action_light_off",
+        "light off",
+        "light_bulb_on_off_commons.gif",
+        ("light_off", "close_light", "lamp_off", "turn_off_light"),
+        source_dir="action_candidates",
+        reverse=True,
+    ),
+    AnimAsset(
+        "action_curtain_open",
+        "curtain open",
+        "curtain_open_close_commons.gif",
+        ("curtain_open", "open_curtain", "curtain_on"),
+        source_dir="action_candidates",
+        start_index=0,
+        end_index=86,
+    ),
+    AnimAsset(
+        "action_curtain_close",
+        "curtain close",
+        "curtain_open_close_commons.gif",
+        ("curtain_close", "close_curtain", "curtain_off"),
+        source_dir="action_candidates",
+        start_index=86,
+        end_index=172,
     ),
 )
 
@@ -95,6 +132,19 @@ def load_frames(path: Path) -> tuple[list[Image.Image], list[int]]:
     with Image.open(path) as image:
         frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(image)]
         durations = [int(frame.info.get("duration", 0) or 30) for frame in ImageSequence.Iterator(image)]
+    return frames, durations
+
+
+def asset_frames(raw_root: Path, asset: AnimAsset) -> tuple[list[Image.Image], list[int]]:
+    frames, durations = load_frames(raw_root / asset.source_dir / asset.gif_name)
+    start = max(0, asset.start_index if asset.start_index is not None else 0)
+    end = asset.end_index if asset.end_index is not None else len(frames) - 1
+    end = min(max(start, end), len(frames) - 1)
+    frames = frames[start : end + 1]
+    durations = durations[start : end + 1]
+    if asset.reverse:
+        frames = list(reversed(frames))
+        durations = list(reversed(durations))
     return frames, durations
 
 
@@ -133,6 +183,14 @@ def fit_frame(frame: Image.Image, bbox: tuple[int, int, int, int]) -> Image.Imag
 
 
 def select_frames(frames: list[Image.Image], durations: list[int]) -> list[int]:
+    if len(frames) <= SAMPLE_FRAMES:
+        if len(frames) <= 1:
+            return [0 for _ in range(SAMPLE_FRAMES)]
+        return [
+            round(((len(frames) - 1) * i) / (SAMPLE_FRAMES - 1))
+            for i in range(SAMPLE_FRAMES)
+        ]
+
     total = max(1, sum(durations))
     cumulative: list[int] = []
     running = 0
@@ -195,7 +253,7 @@ size_t river_noto_cat_anim_count(void);
 """
 
 
-def emit_c(raw_dir: Path) -> tuple[str, list[tuple[CatAsset, int, int, tuple[int, int, int, int], list[int]]]]:
+def emit_c(raw_root: Path) -> tuple[str, list[tuple[AnimAsset, int, int, tuple[int, int, int, int], list[int]]]]:
     out: list[str] = [
         "/* Auto-generated by generate_noto_cat_lvgl.py. */",
         '#include "river_noto_cat_anim.h"',
@@ -208,10 +266,10 @@ def emit_c(raw_dir: Path) -> tuple[str, list[tuple[CatAsset, int, int, tuple[int
         "#endif",
         "",
     ]
-    metadata: list[tuple[CatAsset, int, int, tuple[int, int, int, int], list[int]]] = []
+    metadata: list[tuple[AnimAsset, int, int, tuple[int, int, int, int], list[int]]] = []
 
     for asset in ASSETS:
-        frames, durations = load_frames(raw_dir / asset.gif_name)
+        frames, durations = asset_frames(raw_root, asset)
         bbox = union_bbox(frames)
         indices = select_frames(frames, durations)
         duration_ms = max(1, sum(durations))
@@ -405,12 +463,12 @@ def emit_c(raw_dir: Path) -> tuple[str, list[tuple[CatAsset, int, int, tuple[int
     return "\n".join(out), metadata
 
 
-def emit_readme(metadata: list[tuple[CatAsset, int, int, tuple[int, int, int, int], list[int]]]) -> str:
+def emit_readme(metadata: list[tuple[AnimAsset, int, int, tuple[int, int, int, int], list[int]]]) -> str:
     lines = [
-        "# Noto Cat LVGL Animation Assets",
+        "# River LVGL Animation Assets",
         "",
         "This folder contains firmware-ready LVGL `lv_animimg` resources generated",
-        "from the selected Noto animated cat GIFs in `../emoji_candidates/`.",
+        "from selected GIFs in `../emoji_candidates/` and `../action_candidates/`.",
         "",
         f"- Target size: `{TARGET_SIZE}x{TARGET_SIZE}`",
         f"- Sampled frames per animation: `{SAMPLE_FRAMES}`",
@@ -424,8 +482,9 @@ def emit_readme(metadata: list[tuple[CatAsset, int, int, tuple[int, int, int, in
     ]
     for asset, frame_count, duration_ms, _, indices in metadata:
         index_text = ", ".join(str(index) for index in indices)
+        source = f"{asset.source_dir}/{asset.gif_name}"
         lines.append(
-            f"| `{asset.key}` | {asset.caption} | `{asset.gif_name}` | {frame_count} | {duration_ms}ms | `{index_text}` |"
+            f"| `{asset.key}` | {asset.caption} | `{source}` | {frame_count} | {duration_ms}ms | `{index_text}` |"
         )
     lines.extend(
         [
@@ -443,12 +502,12 @@ def emit_readme(metadata: list[tuple[CatAsset, int, int, tuple[int, int, int, in
 
 def main() -> None:
     root = Path(__file__).resolve().parent
-    raw_dir = root.parent / "emoji_candidates"
+    raw_root = root.parent
     header = root / "river_noto_cat_anim.h"
     source = root / "river_noto_cat_anim.c"
     readme = root / "README.md"
 
-    c_text, metadata = emit_c(raw_dir)
+    c_text, metadata = emit_c(raw_root)
     header.write_text(emit_header(), encoding="utf-8")
     source.write_text(c_text, encoding="utf-8")
     readme.write_text(emit_readme(metadata), encoding="utf-8")

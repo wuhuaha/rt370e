@@ -70,6 +70,19 @@
 - LLM emotion 作为状态的临时覆盖：仅已知 emotion 覆盖，未知 emotion 回退到最新 voice state 表情。
 - 新增 `river ui state <name>` 诊断入口，便于上板依次验证 `idle/listening/speaking/recovering/error`。
 
+## Step 1.4: TTS 智能家居动作动画
+
+- 已完成：
+  - 新增 `components/river_ui/assets/action_candidates/`，保存灯泡亮灭与幕布开合 GIF 源资源，并记录 Wikimedia Commons 来源、作者和 CC BY-SA 3.0 授权信息。
+  - `noto_cat_lvgl` 生成器扩展为通用 UI GIF 转帧器，当前同表生成 10 个 Noto cat 动画和 4 个动作动画。
+  - 新增动作 token：`action_light_on`、`action_light_off`、`action_curtain_open`、`action_curtain_close`。
+  - TTS 文本匹配 `开...灯`、`关...灯`、`开...帘`、`关...帘` 后切换对应动画；ASR、状态机和云端 wire format 不变。
+  - LVGL caption 从 `CAT` 改为 `ANIM`，避免动作动画仍显示猫表情前缀。
+- 验证：
+  - 资源生成器输出 `generated 14 animations, 8 frames each, 2867200 raw bytes`。
+  - `git diff --check`、生成器 `py_compile` 和 `python3 tools/diag/check_codex_harness.py` 已通过。
+  - 暂未执行完整 firmware build；用户说明同事正在构建，避免干扰共享 build 目录。
+
 ## Step 2: ST7102 MIPI/LCDC bring-up 验证
 
 - 项目内实现 ST7102 power/reset/backlight、MIPI DSI init、LCDC page flip。

@@ -101,7 +101,7 @@ static void river_lvgl_apply_emoji(const char *emoji)
         lv_animimg_start(g_lvgl.emoji_anim);
         g_lvgl.current_anim = anim;
     }
-    river_lvgl_label_set(g_lvgl.emoji_label, "CAT ", anim != NULL ? anim->caption : "-");
+    river_lvgl_label_set(g_lvgl.emoji_label, "ANIM ", anim != NULL ? anim->caption : "-");
 }
 
 static void river_lvgl_apply_view(const river_orvibo_ui_view_state_t *view)

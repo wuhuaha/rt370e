@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.88 关联语音交互状态与猫表情动画`
+  - `Step H.xiaozhi-client.89 关联 TTS 智能家居文本与动作动画`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.89` 关联 TTS 智能家居文本与动作动画：
+  - 新增 `components/river_ui/assets/action_candidates/`，下载并记录 Wikimedia Commons 来源的灯泡亮灭 GIF 和幕布开合 GIF，生成器离线转成 `action_light_on/off`、`action_curtain_open/close` 四个 `lv_animimg` 动画 token。
+  - `noto_cat_lvgl` 生成器扩展为通用 UI GIF 资源生成器，当前生成 14 个动画、每个 8 帧、`80x80`、`LV_COLOR_FORMAT_ARGB8888`/BGRA，总 raw payload 约 2.8MB。
+  - `river_orvibo_ui.c` 在 TTS 文本更新时按顺序匹配 `开...灯`、`关...灯`、`开...帘`、`关...帘`，命中后切换到对应动作动画；ASR、状态机和协议 wire format 不变。
+  - `river_lvgl_port.c` 将小 caption 从 `CAT` 改为 `ANIM`，兼容猫表情和设备动作动画。
+  - `git diff --check`、生成器 `py_compile`、资源重生成和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行完整 build/flash/serial monitor，用户明确说明同事正在构建，避免干扰共享 build 目录。
 
 - `Step H.xiaozhi-client.88` 关联语音交互状态与猫表情动画：
   - `river_orvibo_ui.c` 将状态表情收敛为集中规则：`starting/idle` 中性猫脸，`network_wait/connecting` 微笑等待，`listening` 放松笑脸，`speaking` 开心猫，`recovering/error` 分别为生气/惊吓。

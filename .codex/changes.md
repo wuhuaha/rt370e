@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.89
+- 新增智能家居动作动画候选资源目录 `components/river_ui/assets/action_candidates/`：
+  - `light_bulb_on_off_commons.gif` 用于 `action_light_on` / `action_light_off`。
+  - `curtain_open_close_commons.gif` 用于 `action_curtain_open` / `action_curtain_close`。
+  - README 记录 Wikimedia Commons 源页面、作者和 CC BY-SA 3.0 授权信息。
+- 扩展 `generate_noto_cat_lvgl.py`：
+  - 从 `emoji_candidates` 与 `action_candidates` 两类 GIF 生成同一套 LVGL `lv_animimg` 资源表。
+  - 支持按帧区间裁取、反向采样和短 GIF 均匀抽帧。
+  - 当前生成 14 个动画、每个 8 帧、`80x80`、`LV_COLOR_FORMAT_ARGB8888`/BGRA，总 raw payload 约 2.8MB。
+- `river_orvibo_ui.c` 在 TTS 文本更新时增加动作匹配：
+  - `开...灯` -> `action_light_on`
+  - `关...灯` -> `action_light_off`
+  - `开...帘` -> `action_curtain_open`
+  - `关...帘` -> `action_curtain_close`
+  - 匹配使用 UTF-8 字节常量，不改变 ASR、状态机或云端协议。
+- `river_lvgl_port.c` 将动画 caption 前缀从 `CAT` 改为 `ANIM`，同时适配猫表情和设备动作动画。
+- Verification for this step:
+  - resource generator passed and reports `generated 14 animations, 8 frames each, 2867200 raw bytes`.
+  - `git diff --check` passed.
+  - generator `py_compile` passed; temporary `__pycache__` removed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: full firmware build, flash/download, or serial monitor; user explicitly said other colleagues are building, so this step avoids touching shared build/board state.
+
 ## Step H.xiaozhi-client.88
 - 简化并集中维护语音交互状态到 Noto cat 动画的展示规则：
   - `starting/idle` -> `noto_cat_face_1f431`，用于启动和空闲的中性猫脸。

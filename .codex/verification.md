@@ -1,3 +1,54 @@
+## Step H.xiaozhi-client.89 Verification
+
+Regenerate the LVGL UI animation resources after adding action GIF assets:
+```bash
+cd /root/ameba-river
+python3 components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+```
+
+Expected result:
+- the script reports `generated 14 animations, 8 frames each, 2867200 raw bytes`
+- generated resources include `action_light_on`, `action_light_off`, `action_curtain_open`, and `action_curtain_close`
+
+Run static hygiene and generation checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+find components/river_ui/assets -maxdepth 4 \( -name '__pycache__' -o -name '*.pyc' \) -print
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- `py_compile` exits successfully
+- remove any generated `__pycache__` before committing
+- the harness script exits with `check_codex_harness: all checks passed`
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image after the next successful firmware build.
+2. Boot and wait for `lvgl ready`.
+3. Run:
+   river ui text tts 已为你打开客厅灯，现在光线更充足了。
+   river ui text tts 已为你关闭客厅灯。
+   river ui text tts 已帮你打开窗帘。
+   river ui text tts 已帮你关上窗帘。
+4. Confirm the animation caption switches to:
+   ANIM light on
+   ANIM light off
+   ANIM curtain open
+   ANIM curtain close
+```
+
+Observed on 2026-05-30:
+- passed: downloaded action GIF candidates from Wikimedia Commons and recorded source/license notes.
+- passed: regenerated 14 LVGL animations after adding 4 action animation tokens.
+- passed: `git diff --check`.
+- passed: generator `py_compile`; removed `__pycache__`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: full firmware build, flash/download, or serial monitor; user explicitly said other colleagues are building, so this step avoids touching shared build/board state.
+
 ## Step H.xiaozhi-client.88 Verification
 
 Regenerate the LVGL cat animation resources after alias changes:
