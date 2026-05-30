@@ -1,3 +1,67 @@
+## Step H.xiaozhi-client.88 Verification
+
+Regenerate the LVGL cat animation resources after alias changes:
+```bash
+cd /root/ameba-river
+python3 components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+```
+
+Expected result:
+- the script reports `generated 10 animations, 8 frames each, 2048000 raw bytes`
+- `idle` resolves to `noto_cat_face_1f431` in the generated alias table
+
+Run static hygiene and generation checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+find components/river_ui/assets -maxdepth 4 \( -name '__pycache__' -o -name '*.pyc' \) -print
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- `git diff --check` produces no output
+- `py_compile` exits successfully
+- remove any generated `__pycache__` before committing
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Build the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+- AP image contains the updated UI state command and Noto cat state keys
+
+User-run board validation for this slice:
+```text
+1. Manually enter NAND download mode and flash the generated image.
+2. Boot and wait for `lvgl ready`.
+3. Run:
+   river ui state idle
+   river ui state listening
+   river ui state speaking
+   river ui state recovering
+   river ui state error
+   river ui text asr 帮我开灯
+   river ui text tts 已为你打开客厅灯，现在光线更充足了。
+4. Confirm idle/listening/speaking/recovering/error switch to distinct cat animations.
+```
+
+Observed on 2026-05-30:
+- passed: regenerated 10 Noto cat LVGL animations after moving the `idle` alias to `noto_cat_face_1f431`.
+- passed: `git diff --check`.
+- passed: generator `py_compile`; removed `__pycache__`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: full `/root/ameba-rtos` build completed with `Build done`.
+- passed: AP image contains `river ui state ...`, `noto_cat_face_1f431`, `noto_smiley_cat_1f63a`, `noto_joy_cat_1f639`, `noto_pouting_cat_1f63e`, `noto_scream_cat_1f640`.
+- passed: AP `target_img2_ap.axf` retains `lv_animimg_*` and `river_noto_cat_anim_*`.
+- not run: board flash/download and serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.87 Verification
 
 Regenerate the LVGL cat animation resources if the source GIFs change:

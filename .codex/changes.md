@@ -1,5 +1,25 @@
 # Change Log
 
+## Step H.xiaozhi-client.88
+- 简化并集中维护语音交互状态到 Noto cat 动画的展示规则：
+  - `starting/idle` -> `noto_cat_face_1f431`，用于启动和空闲的中性猫脸。
+  - `network_wait/connecting` -> `noto_smile_cat_1f638`，用于联网/连接中的轻松等待。
+  - `listening` -> `noto_smiley_cat_1f63a`，用于正在听用户讲话。
+  - `speaking` -> `noto_joy_cat_1f639`，用于 TTS 播放/回复中。
+  - `recovering/error` -> `noto_pouting_cat_1f63e` / `noto_scream_cat_1f640`。
+- `river_orvibo_ui.c` 新增集中状态表和 LLM emotion 白名单映射：
+  - 服务器 emotion 仅在识别到 `relaxed/happy/excited/love/thinking/sad/angry/surprised/...` 等已知值时覆盖状态表情。
+  - 未知 emotion 不再把当前状态表情冲成默认表情，而是回退到最新 voice state 的表情。
+- `river ui state <name>` 诊断命令可直接模拟 UI 状态切换，方便上板验证 `idle/listening/speaking/error` 等动画映射。
+- `noto_cat_lvgl` 生成器把 `idle` alias 改到 `noto_cat_face_1f431`，并重新生成 `river_noto_cat_anim.c`。
+- Verification for this step:
+  - `git diff --check` passed.
+  - generator `py_compile` passed; temporary `__pycache__` removed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build completed with `Build done`.
+  - AP image strings confirm `river ui state ...` usage and state animation keys; `nm` confirms `lv_animimg_*` and `river_noto_cat_anim_*`.
+  - not run: flash/download or serial monitor; current NAND hardware policy requires user-run board validation unless explicitly requested.
+
 ## Step H.xiaozhi-client.87
 - 将 Noto cat 完整系列接入固件可播放路径：
   - 新增 `components/river_ui/assets/noto_cat_lvgl/` 独立固件资源目录。

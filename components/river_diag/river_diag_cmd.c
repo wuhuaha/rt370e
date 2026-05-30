@@ -54,7 +54,7 @@ static void river_diag_help(void)
 {
     printf("\triver status\n");
     printf("\triver orvibo <status|connect|refresh|listen <start|stop>|abort|protocol <1|2|3>|volume <0-100>>\n");
-    printf("\triver ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
+    printf("\triver ui <status|touch scan|state <name>|emoji <key>|text <asr|tts|emoji> <text>>\n");
     printf("\triver audio <status>\n");
     printf("\triver playback <status|tone [freq_hz] [duration_ms] [level_pct]|stop|interrupt|flush|duck <gain>|unduck>\n");
     printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
@@ -74,6 +74,46 @@ static bool river_diag_parse_u32_arg(const char *text, uint32_t *value_out)
     }
     *value_out = (uint32_t)parsed;
     return true;
+}
+
+static bool river_diag_parse_ui_state(const char *text, river_orvibo_state_t *state_out)
+{
+    if (text == NULL || state_out == NULL) {
+        return false;
+    }
+    if (strcmp(text, "starting") == 0 || strcmp(text, "boot") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_STARTING;
+        return true;
+    }
+    if (strcmp(text, "network") == 0 || strcmp(text, "network_wait") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_NETWORK_WAIT;
+        return true;
+    }
+    if (strcmp(text, "idle") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_IDLE;
+        return true;
+    }
+    if (strcmp(text, "connecting") == 0 || strcmp(text, "connect") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_CONNECTING;
+        return true;
+    }
+    if (strcmp(text, "listening") == 0 || strcmp(text, "listen") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_LISTENING;
+        return true;
+    }
+    if (strcmp(text, "speaking") == 0 || strcmp(text, "speak") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_SPEAKING;
+        return true;
+    }
+    if (strcmp(text, "recovering") == 0 || strcmp(text, "recover") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_RECOVERING;
+        return true;
+    }
+    if (strcmp(text, "error") == 0) {
+        *state_out = RIVER_ORVIBO_STATE_ERROR;
+        return true;
+    }
+    return false;
 }
 
 static int16_t river_diag_playback_triangle_sample(uint32_t phase, uint32_t amplitude)
@@ -479,7 +519,7 @@ static u32 river_diag_playback_cmd(u16 argc, u8 *argv[])
 static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
 {
     if (argc < 2) {
-        printf("[river][diag] usage: river ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
+        printf("[river][diag] usage: river ui <status|touch scan|state <name>|emoji <key>|text <asr|tts|emoji> <text>>\n");
         return 0;
     }
     if (strcmp((const char *)argv[1], "status") == 0) {
@@ -492,6 +532,16 @@ static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
             return 0;
         }
         printf("[river][diag] usage: river ui touch scan\n");
+        return 0;
+    }
+    if (strcmp((const char *)argv[1], "state") == 0) {
+        river_orvibo_state_t state;
+
+        if (argc < 3 || !river_diag_parse_ui_state((const char *)argv[2], &state)) {
+            printf("[river][diag] usage: river ui state <starting|network|idle|connecting|listening|speaking|recovering|error>\n");
+            return 0;
+        }
+        (void)river_orvibo_ui_set_state(state);
         return 0;
     }
     if (strcmp((const char *)argv[1], "emoji") == 0) {
@@ -519,7 +569,7 @@ static u32 river_diag_ui_cmd(u16 argc, u8 *argv[])
         }
         return 0;
     }
-    printf("[river][diag] usage: river ui <status|touch scan|emoji <key>|text <asr|tts|emoji> <text>>\n");
+    printf("[river][diag] usage: river ui <status|touch scan|state <name>|emoji <key>|text <asr|tts|emoji> <text>>\n");
     return 0;
 }
 

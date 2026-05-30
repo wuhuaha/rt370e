@@ -59,6 +59,17 @@
   - AP image 保留 `river_noto_cat_anim_*`、`lv_animimg_*` 符号和 10 个 Noto cat key。
   - 仍需用户手动烧录后验证屏幕动画实际循环播放和状态/LLM emotion 切换。
 
+## Step 1.3: 语音交互状态表情映射
+
+- 简化设计：
+  - `starting/idle` 显示中性猫脸 `noto_cat_face_1f431`。
+  - `network_wait/connecting` 显示微笑猫 `noto_smile_cat_1f638`。
+  - `listening` 显示放松笑脸猫 `noto_smiley_cat_1f63a`。
+  - `speaking` 显示开心猫 `noto_joy_cat_1f639`。
+  - `recovering/error` 显示 `noto_pouting_cat_1f63e` / `noto_scream_cat_1f640`。
+- LLM emotion 作为状态的临时覆盖：仅已知 emotion 覆盖，未知 emotion 回退到最新 voice state 表情。
+- 新增 `river ui state <name>` 诊断入口，便于上板依次验证 `idle/listening/speaking/recovering/error`。
+
 ## Step 2: ST7102 MIPI/LCDC bring-up 验证
 
 - 项目内实现 ST7102 power/reset/backlight、MIPI DSI init、LCDC page flip。

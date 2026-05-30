@@ -41,11 +41,73 @@ typedef struct {
     bool task_running;
     rtos_task_t task;
     rtos_queue_t queue;
+    river_orvibo_state_t voice_state;
     river_orvibo_ui_view_state_t view;
     river_orvibo_ui_status_t status;
 } river_ui_context_t;
 
 static river_ui_context_t g_river_ui;
+
+typedef struct {
+    river_orvibo_state_t state;
+    const char *emoji;
+} river_ui_state_emoji_rule_t;
+
+typedef struct {
+    const char *emotion;
+    const char *emoji;
+} river_ui_emotion_emoji_rule_t;
+
+static const river_ui_state_emoji_rule_t g_river_ui_state_emoji_rules[] = {
+    {RIVER_ORVIBO_STATE_STARTING, "noto_cat_face_1f431"},
+    {RIVER_ORVIBO_STATE_NETWORK_WAIT, "noto_smile_cat_1f638"},
+    {RIVER_ORVIBO_STATE_IDLE, "noto_cat_face_1f431"},
+    {RIVER_ORVIBO_STATE_CONNECTING, "noto_smile_cat_1f638"},
+    {RIVER_ORVIBO_STATE_LISTENING, "noto_smiley_cat_1f63a"},
+    {RIVER_ORVIBO_STATE_SPEAKING, "noto_joy_cat_1f639"},
+    {RIVER_ORVIBO_STATE_RECOVERING, "noto_pouting_cat_1f63e"},
+    {RIVER_ORVIBO_STATE_ERROR, "noto_scream_cat_1f640"},
+};
+
+static const river_ui_emotion_emoji_rule_t g_river_ui_emotion_emoji_rules[] = {
+    {"relaxed", "noto_smiley_cat_1f63a"},
+    {"neutral", "noto_smiley_cat_1f63a"},
+    {"happy", "noto_joy_cat_1f639"},
+    {"excited", "noto_joy_cat_1f639"},
+    {"love", "noto_heart_eyes_cat_1f63b"},
+    {"loving", "noto_heart_eyes_cat_1f63b"},
+    {"thinking", "noto_smirk_cat_1f63c"},
+    {"sad", "noto_crying_cat_1f63f"},
+    {"crying", "noto_crying_cat_1f63f"},
+    {"angry", "noto_pouting_cat_1f63e"},
+    {"surprise", "noto_scream_cat_1f640"},
+    {"surprised", "noto_scream_cat_1f640"},
+    {"afraid", "noto_scream_cat_1f640"},
+    {"fear", "noto_scream_cat_1f640"},
+};
+
+static char river_ui_ascii_tolower(char ch)
+{
+    if (ch >= 'A' && ch <= 'Z') {
+        return (char)(ch - 'A' + 'a');
+    }
+    return ch;
+}
+
+static bool river_ui_streq_ci(const char *a, const char *b)
+{
+    if (a == NULL || b == NULL) {
+        return false;
+    }
+    while (*a != '\0' && *b != '\0') {
+        if (river_ui_ascii_tolower(*a) != river_ui_ascii_tolower(*b)) {
+            return false;
+        }
+        ++a;
+        ++b;
+    }
+    return *a == '\0' && *b == '\0';
+}
 
 static size_t river_ui_utf8_char_len(uint8_t byte)
 {
@@ -114,26 +176,30 @@ static const char *river_ui_state_name(river_orvibo_state_t state)
 
 static const char *river_ui_state_emoji(river_orvibo_state_t state)
 {
-    switch (state) {
-    case RIVER_ORVIBO_STATE_STARTING:
-        return "noto_cat_face_1f431";
-    case RIVER_ORVIBO_STATE_NETWORK_WAIT:
-        return "noto_smile_cat_1f638";
-    case RIVER_ORVIBO_STATE_IDLE:
-        return "noto_smiley_cat_1f63a";
-    case RIVER_ORVIBO_STATE_CONNECTING:
-        return "noto_smile_cat_1f638";
-    case RIVER_ORVIBO_STATE_LISTENING:
-        return "noto_smiley_cat_1f63a";
-    case RIVER_ORVIBO_STATE_SPEAKING:
-        return "noto_joy_cat_1f639";
-    case RIVER_ORVIBO_STATE_RECOVERING:
-        return "noto_pouting_cat_1f63e";
-    case RIVER_ORVIBO_STATE_ERROR:
-        return "noto_scream_cat_1f640";
-    default:
-        return "noto_smiley_cat_1f63a";
+    for (size_t i = 0U; i < sizeof(g_river_ui_state_emoji_rules) /
+                              sizeof(g_river_ui_state_emoji_rules[0]); ++i) {
+        if (g_river_ui_state_emoji_rules[i].state == state) {
+            return g_river_ui_state_emoji_rules[i].emoji;
+        }
     }
+    return "noto_cat_face_1f431";
+}
+
+static const char *river_ui_emotion_emoji(const char *emotion)
+{
+    if (emotion == NULL || emotion[0] == '\0') {
+        return NULL;
+    }
+    if (strncmp(emotion, "noto_", 5) == 0) {
+        return emotion;
+    }
+    for (size_t i = 0U; i < sizeof(g_river_ui_emotion_emoji_rules) /
+                              sizeof(g_river_ui_emotion_emoji_rules[0]); ++i) {
+        if (river_ui_streq_ci(emotion, g_river_ui_emotion_emoji_rules[i].emotion)) {
+            return g_river_ui_emotion_emoji_rules[i].emoji;
+        }
+    }
+    return NULL;
 }
 
 static void river_ui_sync_status(void)
@@ -195,6 +261,7 @@ static void river_ui_apply_message(const river_ui_msg_t *msg)
     g_river_ui.status.handled++;
     switch (msg->type) {
     case RIVER_UI_MSG_STATE:
+        g_river_ui.voice_state = msg->state;
         river_ui_copy(g_river_ui.view.state,
                       sizeof(g_river_ui.view.state),
                       river_ui_state_name(msg->state));
@@ -215,16 +282,22 @@ static void river_ui_apply_message(const river_ui_msg_t *msg)
                       sizeof(g_river_ui.view.tts_text),
                       msg->text);
         break;
-    case RIVER_UI_MSG_LLM:
+    case RIVER_UI_MSG_LLM: {
+        const char *emoji = river_ui_emotion_emoji(msg->detail);
+
+        if (emoji == NULL) {
+            emoji = river_ui_state_emoji(g_river_ui.voice_state);
+        }
         river_ui_copy(g_river_ui.view.emoji,
                       sizeof(g_river_ui.view.emoji),
-                      msg->detail[0] != '\0' ? msg->detail : ":llm:");
+                      emoji);
         if (msg->text[0] != '\0') {
             river_ui_copy(g_river_ui.view.tts_text,
                           sizeof(g_river_ui.view.tts_text),
                           msg->text);
         }
         break;
+    }
     case RIVER_UI_MSG_TOUCH_SCAN:
 #if defined(CONFIG_RIVER_UI_TOUCH_PROBE_EN) && CONFIG_RIVER_UI_TOUCH_PROBE_EN
         if (river_touch_sitronix_probe_scan(g_river_ui.view.touch_summary,
@@ -275,8 +348,11 @@ river_status_t river_orvibo_ui_init(void)
     }
     memset(&g_river_ui, 0, sizeof(g_river_ui));
     g_river_ui.enabled = true;
+    g_river_ui.voice_state = RIVER_ORVIBO_STATE_STARTING;
     river_ui_copy(g_river_ui.view.state, sizeof(g_river_ui.view.state), "starting");
-    river_ui_copy(g_river_ui.view.emoji, sizeof(g_river_ui.view.emoji), ":boot:");
+    river_ui_copy(g_river_ui.view.emoji,
+                  sizeof(g_river_ui.view.emoji),
+                  river_ui_state_emoji(g_river_ui.voice_state));
     river_ui_copy(g_river_ui.view.asr_text, sizeof(g_river_ui.view.asr_text), "-");
     river_ui_copy(g_river_ui.view.tts_text, sizeof(g_river_ui.view.tts_text), "-");
     river_ui_copy(g_river_ui.view.touch_summary,

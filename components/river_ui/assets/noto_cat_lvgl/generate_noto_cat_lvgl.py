@@ -28,7 +28,7 @@ ASSETS = (
         "noto_smiley_cat_1f63a",
         "smiley cat",
         "noto_smiley_cat_1f63a.gif",
-        ("smiley", "1f63a", "idle", "listen", "listening", "relaxed", "llm"),
+        ("smiley", "1f63a", "listen", "listening", "relaxed", "llm"),
     ),
     CatAsset(
         "noto_smile_cat_1f638",
@@ -82,7 +82,7 @@ ASSETS = (
         "noto_cat_face_1f431",
         "cat face",
         "noto_cat_face_1f431.gif",
-        ("cat_face", "face", "1f431", "boot", "starting", "unknown"),
+        ("cat_face", "face", "1f431", "idle", "boot", "starting", "unknown"),
     ),
 )
 

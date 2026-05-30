@@ -129321,7 +129321,6 @@ static const lv_image_dsc_t * const noto_cat_face_1f431_frames[] = {
 static const char * const noto_smiley_cat_1f63a_aliases[] = {
     "smiley",
     "1f63a",
-    "idle",
     "listen",
     "listening",
     "relaxed",
@@ -129397,6 +129396,7 @@ static const char * const noto_cat_face_1f431_aliases[] = {
     "cat_face",
     "face",
     "1f431",
+    "idle",
     "boot",
     "starting",
     "unknown",

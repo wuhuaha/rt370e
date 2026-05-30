@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.87 接入 Noto 猫表情 LVGL 动画播放`
+  - `Step H.xiaozhi-client.88 关联语音交互状态与猫表情动画`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.88` 关联语音交互状态与猫表情动画：
+  - `river_orvibo_ui.c` 将状态表情收敛为集中规则：`starting/idle` 中性猫脸，`network_wait/connecting` 微笑等待，`listening` 放松笑脸，`speaking` 开心猫，`recovering/error` 分别为生气/惊吓。
+  - LLM emotion 现在走白名单映射，仅对 `relaxed/happy/excited/love/thinking/sad/angry/surprised/...` 等已知值覆盖状态表情；未知 emotion 回退到最新 voice state 的表情。
+  - 新增 `river ui state <starting|network|idle|connecting|listening|speaking|recovering|error>` 诊断命令，用于不依赖云端的上板动画状态切换验证。
+  - `noto_cat_lvgl` 生成器和生成 C 文件把 `idle` alias 归到 `noto_cat_face_1f431`，与空闲状态设计保持一致。
+  - `git diff --check`、生成器 `py_compile`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均通过；AP image 确认包含 `river ui state ...`、状态动画 key、`lv_animimg_*` 和 `river_noto_cat_anim_*`；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.87` 接入 Noto 猫表情 LVGL 动画播放：
   - 新增 `components/river_ui/assets/noto_cat_lvgl/` 固件资源目录；10 个 Noto cat GIF 均离线转为 `80x80`、每个动画 8 帧、`LV_COLOR_FORMAT_ARGB8888`/BGRA 的 LVGL `lv_image_dsc_t` 帧。
