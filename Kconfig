@@ -422,6 +422,17 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_
       promoting the lower-risk teacher-a refresh candidate for board-side A/B
       validation.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_A_NEW_TARGET_CYCLE24_2S_V1_FP32_DEBUG
+    bool "Student Conv-ResNet-ED nano teacher-a new-target cycle24 2s v1 FP32 debug model"
+    help
+      Use the FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1.
+      This variant switches the frontend contract to the 2s `40x201`,
+      `n_fft=400`, centered log-mel path and keeps the conv-only resolver used
+      by the current nano FP32 debug deployments. The matching bundle also
+      includes INT8 artifacts, but this option intentionally uses the FP32
+      header for board-side bring-up and parity diagnostics.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG
     bool "Student Conv-ResNet-ED nano teacher-b new-target BNT5 v1 FP32 debug model"
     help
@@ -545,19 +556,19 @@ config RIVER_KWS_INFERENCE_STRIDE_FRAMES
 
 config RIVER_KWS_VAD_PRE_ROLL_MS
     int "Wake-word KWS VAD-gated pre-roll in milliseconds"
-    range 0 1000
+    range 0 2500
     default 320
     depends on RIVER_VOICE_CAPABILITY_KWS
 
 config RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES
     int "Wake-word KWS maximum pre-roll frames flushed into the worker"
-    range 1 64
+    range 1 256
     default 8
     depends on RIVER_VOICE_CAPABILITY_KWS
 
 config RIVER_KWS_INPUT_QUEUE_FRAMES
     int "Wake-word KWS worker queue capacity in frames"
-    range 8 128
+    range 8 256
     default 64
     depends on RIVER_VOICE_CAPABILITY_KWS
 

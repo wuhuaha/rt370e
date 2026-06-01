@@ -30963,3 +30963,33 @@ Expected result:
 - backend input dimensions report `40x201`
 - `threshold_q15=14720`, `hold=1`, `fallback=off`
 - `pre_roll_ms=2000`, `pre_roll_flush=125`, `queue=192`
+
+## Step H.xiaozhi-client.102 - land A 2s FP32 KWS code after UI cleanup
+
+Confirm the commit scope after the Step 101 UI cleanup commit:
+```bash
+cd /root/ameba-river
+git diff --cached --name-only
+git diff --cached --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- staged files are limited to `.codex` records, `Kconfig`, `prj.conf`,
+  `components/river_voice/river_voice_kws.cc`, and the A 2s FP32 generated
+  header
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+The firmware build verification remains the Step 100 build against the same
+working-tree code state:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`

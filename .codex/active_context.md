@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.101 删除灯/窗帘相关 UI 动画代码与资源`
+  - `Step H.xiaozhi-client.102 落地 A 2s FP32 唤醒模型代码`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.102` 落地 A 2s FP32 唤醒模型代码：
+  - 当前 HEAD 已包含 Step 101 的 UI 动画清理记录；本步在该 HEAD 之后提交 KWS 实际代码改动，避免 Step 100 记录与提交顺序混淆。
+  - 本步代码内容与 Step 100 记录的部署结论一致：新增 A 2s FP32 generated header，新增 A 2s FP32 Kconfig 变体，`river_voice_kws.cc` 切到 `float32 [1,40,201,1]`，`prj.conf` 选择该变体并设置 `threshold_q15=14720`、`hold=1`、`fallback=off`、`pre_roll_ms=2000`、`pre_roll_flush=125`、`queue=192`。
+  - 重新确认 staged diff 只包含 `.codex` 记录、KWS Kconfig、KWS runtime、`prj.conf` 和新模型 header；未额外纳入 UI 文件。
+  - `/root/ameba-rtos` 完整 build 已通过并输出 `Build done`；生成 `.config` 和 AP KWS 预处理产物确认新模型与运行参数生效，旧 Teacher B BNT5 variant 字符串未出现在 AP KWS 编译产物中。
+  - 未执行 flash/serial monitor；按当前 NAND 硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.101` 删除灯/窗帘相关 UI 动画代码与资源：
   - 通过 `git log` 与代码检索确认，灯/窗帘 UI 动画入口主要来自提交 `afaaeeb 关联TTS动作文本与设备动画`，涉及 `river_orvibo_ui.c`、`assets/action_candidates/`、`assets/noto_cat_lvgl/generate_noto_cat_lvgl.py`、`assets/noto_cat_lvgl/river_noto_cat_anim.c` 和其 README。

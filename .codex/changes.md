@@ -17588,3 +17588,17 @@
   - `python3 tools/diag/check_codex_harness.py` passed
   - `/root/ameba-rtos` full build completed with `Build done`
   - Flash/serial monitor not run; user-run board validation is still required
+
+## Step H.xiaozhi-client.102
+- 落地 A 2s FP32 唤醒模型代码：
+  - 当前 HEAD 已包含 Step 101 UI 动画清理提交，本步在其后提交 Step 100 记录对应的实际 KWS 代码改动。
+  - staged 内容限定为 `.codex` 记录、`Kconfig`、`prj.conf`、`components/river_voice/river_voice_kws.cc` 和新增 A 2s FP32 generated header。
+  - KWS 运行配置保持 Step 100 的算法 bundle 推荐档：`threshold_q15=14720`、`hold=1`、`cooldown_ms=2500`、`fallback=off`、`stride=16`、`pre_roll_ms=2000`、`pre_roll_flush=125`、`queue=192`。
+- 设计边界：
+  - 不修改 UI、云端协议、VAD 判定、tensor dump、alignment replay、board/local parity 或 SDK 源码。
+- Verification for this step:
+  - `git diff --cached --name-only` confirmed only KWS and `.codex` files are staged
+  - `git diff --cached --check` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `/root/ameba-rtos` full build completed with `Build done`
+  - Flash/serial monitor not run; user-run board validation is still required
