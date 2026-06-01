@@ -1,5 +1,30 @@
 # Change Log
 
+## Step H.xiaozhi-client.92
+- 按新固化流程刷新唤醒算法仓库 `/root/kws-trainint`：
+  - 确认算法仓库在 `main...origin/main`，工作区干净。
+  - 执行 `git pull`，结果为 `Already up to date`。
+  - 执行 `git lfs pull`，命令成功且无错误输出。
+  - 当前算法仓库最新提交仍为 `f9d5cbf 新增同规格端侧nano候选以降低替换迁移风险`，提交时间 `2026-05-07 16:31:33 +0800`。
+- 复核当前最新模型交付包：
+  - 最新候选目录为 `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_current_teacher_a_v2/`。
+  - `model.int8.tflite`：`44992 B`，SHA256 `16130fff3bbc478c0bf19cae8fb1b66e2873f5090a35fe9cb6f9bfb8b95bac5d`。
+  - `model.fp32.tflite`：`141700 B`，SHA256 `6434ed43c722428459f90ac13571acf8aa348ae1f19fb1e6a291da55c962b9aa`。
+  - 输入契约为 `[1, 40, 101, 1]`，算子集合为 `ADD, AVERAGE_POOL_2D, CONV_2D, LOGISTIC`，默认阈值档 `default_target_recall` 为 probability `0.290451` / Q15 `9517` / int8 `-54`。
+  - 算法交付标记 `formal_export_gate_passed=False`，兼容等级为 `requires_frontend_change`，但当前固件主线已经是 `40x101` KWS 前端。
+- 对照固件侧当前配置：
+  - `prj.conf` 已启用 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG=y`。
+  - `components/river_voice/generated/student_conv_resnet_ed_nano_current_teacher_a_v2_fp32_model_data.h` 已存在，长度 `141700`，当前无需重新导入模型文件。
+- 边界：
+  - 本步只刷新和审计算法仓库、更新项目记录，不修改固件源码、模型文件、SDK 源码、VAD/KWS runtime、tensor dump、alignment replay 或 board/local parity 路径。
+- Verification for this step:
+  - `/root/kws-trainint` `git pull` passed with `Already up to date`.
+  - `/root/kws-trainint` `git lfs pull` passed.
+  - `/root/kws-trainint` `git status --short --branch` shows `## main...origin/main`.
+  - Model artifact size/SHA checks passed for the latest `student_conv_resnet_ed_nano_current_teacher_a_v2` bundle.
+  - Firmware-side `rg` confirmed the current `prj.conf` selects the same FP32 debug model variant and the generated model header is present.
+  - not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
 ## Step H.xiaozhi-client.91
 - 固化唤醒算法项目路径和模型刷新流程到 `AGENTS.md`：
   - 明确算法/训练仓库位于 `/root/kws-trainint`。

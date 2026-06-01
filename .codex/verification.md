@@ -1,3 +1,76 @@
+## Step H.xiaozhi-client.92 Verification
+
+Refresh the wakeword algorithm repository and LFS artifacts:
+```bash
+cd /root/kws-trainint
+git status --short --branch
+git pull
+git lfs pull
+git status --short --branch
+git log -1 --oneline --date=iso --pretty=format:'%h %ad %s'
+```
+
+Expected result:
+- working tree is clean on `main...origin/main`
+- `git pull` exits successfully
+- `git lfs pull` exits successfully
+- latest commit is `f9d5cbf 新增同规格端侧nano候选以降低替换迁移风险` unless algorithm colleagues push a newer commit
+
+Inspect the latest wakeword model bundle:
+```bash
+cd /root/kws-trainint
+python3 - <<'PY'
+import hashlib
+from pathlib import Path
+for path in [
+    'artifacts/exports/student_conv_resnet_ed_nano_current_teacher_a_v2/model.int8.tflite',
+    'artifacts/exports/student_conv_resnet_ed_nano_current_teacher_a_v2/model.fp32.tflite',
+]:
+    p = Path(path)
+    print(f'{p.stat().st_size} {hashlib.sha256(p.read_bytes()).hexdigest()} {path}')
+PY
+python3 - <<'PY'
+import json
+from pathlib import Path
+bundle = Path('artifacts/exports/student_conv_resnet_ed_nano_current_teacher_a_v2')
+summary = json.loads((bundle / 'deployment_summary.json').read_text())
+thresholds = json.loads((bundle / 'threshold_profiles.json').read_text())
+print(summary['student_name'])
+print(summary['formal_export_gate_passed'])
+print(summary['board_compatibility'])
+print(thresholds['recommended_profile_id'])
+print(thresholds['profiles'][1])
+PY
+```
+
+Expected result:
+- INT8 model is `44992 B`, SHA256 `16130fff3bbc478c0bf19cae8fb1b66e2873f5090a35fe9cb6f9bfb8b95bac5d`
+- FP32 model is `141700 B`, SHA256 `6434ed43c722428459f90ac13571acf8aa348ae1f19fb1e6a291da55c962b9aa`
+- bundle name is `student_conv_resnet_ed_nano_current_teacher_a_v2`
+- `formal_export_gate_passed` is `False`
+- input contract is `[1, 40, 101, 1]` and required ops are `ADD, AVERAGE_POOL_2D, CONV_2D, LOGISTIC`
+- recommended profile is `default_target_recall`
+
+Confirm firmware-side model selection:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2|student_conv_resnet_ed_nano_current_teacher_a_v2" \
+  prj.conf Kconfig components/river_voice/river_voice_kws.cc components/river_voice/generated
+```
+
+Expected result:
+- `prj.conf` selects `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG=y`
+- generated FP32 model header exists under `components/river_voice/generated/`
+
+Observed on 2026-06-01:
+- passed: `/root/kws-trainint` `git pull` returned `Already up to date`.
+- passed: `/root/kws-trainint` `git lfs pull`.
+- passed: `/root/kws-trainint` status remained `## main...origin/main`.
+- passed: latest algorithm commit is `f9d5cbf 新增同规格端侧nano候选以降低替换迁移风险`.
+- passed: latest model artifact size/SHA checks matched the values above.
+- passed: firmware-side `rg` confirmed the current `prj.conf` selects the same FP32 debug model variant and the generated header is present.
+- not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
 ## Step H.xiaozhi-client.91 Verification
 
 Confirm the persisted wakeword algorithm repository workflow:

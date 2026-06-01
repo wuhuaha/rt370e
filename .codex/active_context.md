@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.90 新增 Orvibo 单轮对话模式`
+  - `Step H.xiaozhi-client.92 刷新并审计算法仓库唤醒模型`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.92` 刷新并审计算法仓库唤醒模型：
+  - 按 `AGENTS.md` 固化流程在 `/root/kws-trainint` 执行 `git pull` 和 `git lfs pull`；算法仓库工作区保持干净，状态为 `main...origin/main`，`git pull` 返回 `Already up to date`。
+  - 当前算法仓库最新提交为 `f9d5cbf 新增同规格端侧nano候选以降低替换迁移风险`，没有比本地更新的远端模型提交。
+  - 最新候选包为 `student_conv_resnet_ed_nano_current_teacher_a_v2`：INT8 TFLite `44992 B` / SHA256 `16130fff3bbc478c0bf19cae8fb1b66e2873f5090a35fe9cb6f9bfb8b95bac5d`，FP32 TFLite `141700 B` / SHA256 `6434ed43c722428459f90ac13571acf8aa348ae1f19fb1e6a291da55c962b9aa`。
+  - 模型契约为 `[1, 40, 101, 1]`、`ADD/AVERAGE_POOL_2D/CONV_2D/LOGISTIC`，默认档 `default_target_recall` 为 probability `0.290451` / Q15 `9517` / int8 `-54`；算法包仍标记 `formal_export_gate_passed=False`。
+  - 固件侧 `prj.conf` 已选择 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_FP32_DEBUG=y`，对应生成模型头文件已存在；本步无需重新导入模型文件。
+  - 未执行 firmware build/flash/serial monitor；本步只刷新和审计算法仓库。
 
 - `Step H.xiaozhi-client.90` 新增 Orvibo 单轮对话模式：
   - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE`，`prj.conf` 默认启用单轮对话：唤醒后完成一次服务端请求/响应，收到服务端 TTS stop 并等待本地 playback drain 后关闭 realtime WebSocket，回到 `IDLE` 本地唤醒监听。
