@@ -1,3 +1,58 @@
+## Step H.xiaozhi-client.99 Verification
+
+Confirm the target A 2s FP32 model contract from algorithm docs:
+```bash
+cd /root/kws-trainint
+rg -n "A 2s nano|student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1|threshold|q15|40x201|FP32 sha256" \
+  docs/context/2026-06-new-target-hardware-student-deployment-guide.md \
+  docs/research/2026-06-new-target-student-full-export.md
+```
+
+Expected result:
+- the target model is documented as `[1,40,201,1]`
+- default profile uses `threshold_probability=0.449219` / `threshold_q15=14720`
+- FP32 SHA256 is `537af97f8a49ea651b34f02181de84182df767ddecd3cd7d6f4da58cdd95d71a`
+
+Check whether the model artifact is locally available:
+```bash
+cd /root/kws-trainint
+find artifacts/exports -maxdepth 1 -type d \
+  -name 'student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1' -print
+git lfs ls-files | rg '537af97|student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1|2s' || true
+git lfs fetch --all origin
+find .git/lfs/objects -type f \
+  -name '537af97f8a49ea651b34f02181de84182df767ddecd3cd7d6f4da58cdd95d71a' -print
+find artifacts/models -maxdepth 5 -type f \( -name 'model_state.pt' -o -name 'best.pt' \) -print
+```
+
+Expected result before firmware integration:
+- the target export directory exists, or
+- the target FP32 LFS object exists, or
+- the student checkpoint exists so the bundle can be regenerated
+
+Observed on 2026-06-01:
+- blocked: target export directory is absent.
+- blocked: target FP32 LFS object is absent after `git lfs fetch --all origin`.
+- blocked: target student checkpoint is absent under `artifacts/models`.
+
+Attempt algorithm-side export:
+```bash
+cd /root/kws-trainint
+TORCH_HOME=/root/kws-trainint/data/cache/torch \
+HF_HOME=/root/kws-trainint/data/cache/hf \
+HUGGINGFACE_HUB_CACHE=/root/kws-trainint/data/cache/hf/hub \
+XDG_CACHE_HOME=/root/kws-trainint/data/cache/xdg \
+TMPDIR=/root/kws-trainint/data/tmp \
+PYTHONPATH=src conda run -n river_kws_gpu_cu128 python -m kws_training export-student-model \
+  --student-params params/students/conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1.json \
+  --representative-samples 128 \
+  --validation-samples 32
+```
+
+Observed result:
+- blocked: export failed while importing `torchaudio` because `_torchaudio.abi3.so` could not load `libcudart.so.13`.
+- not run: firmware build, flash/download, or serial monitor; no firmware files changed.
+
 ## Step H.xiaozhi-client.98 Verification
 
 Refresh the algorithm repository again:

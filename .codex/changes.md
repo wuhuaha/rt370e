@@ -1,5 +1,28 @@
 # Change Log
 
+## Step H.xiaozhi-client.99
+- 审计将当前 KWS 模型切换为 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` FP32 的部署依赖。
+- 从算法文档确认目标部署参数：
+  - 输入契约：`[1,40,201,1]`，即 2s / 40-bin log-mel / 201 frames。
+  - FP32 TFLite 期望大小：`141700 B`。
+  - FP32 SHA256：`537af97f8a49ea651b34f02181de84182df767ddecd3cd7d6f4da58cdd95d71a`。
+  - 默认 profile：`threshold_probability=0.449219`，`threshold_q15=14720`，board recall ref `0.896679`，board FA/hour ref `392.177702`。
+  - `recall_990` profile：`threshold_q15=13696`，board recall ref `0.955720`，board FA/hour ref `535.657349`。
+- 阻塞点：
+  - `/root/kws-trainint/artifacts/exports` 当前没有目标 2s bundle 目录。
+  - `git lfs ls-files` 和 `git lfs fetch --all origin` 后，本地 LFS 对象仍没有目标 FP32 SHA。
+  - `/root/kws-trainint/artifacts/models` 当前没有该 student 的 `model_state.pt` 或 `checkpoints/best.pt`，无法从 checkpoint 重导出。
+  - 尝试按文档运行 `export-student-model`，`river_kws_gpu_cu128` 环境在导入 `torchaudio` 时因缺少 `libcudart.so.13` 失败。
+- 处理决定：
+  - 本步没有改固件源码、模型头文件或 `prj.conf`，因为没有真实 `model.fp32.tflite` / `model_fp32_data.h` 时切换 Kconfig 会留下不可构建的半成品。
+  - 后续继续前，需要算法侧提供完整 `artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/` bundle，或修复本机导出环境并补齐该 student checkpoint。
+- Verification for this step:
+  - confirmed target bundle directory is absent locally。
+  - confirmed target FP32 LFS object SHA is absent after `git lfs fetch --all origin`。
+  - confirmed target checkpoint files are absent locally。
+  - attempted export command and captured the `torchaudio` / `libcudart.so.13` failure。
+  - not run: firmware build, flash/download, or serial monitor; no firmware files changed in this step.
+
 ## Step H.xiaozhi-client.98
 - 再次刷新算法仓库 `/root/kws-trainint`：
   - 本轮执行 `git pull --ff-only && git lfs pull`，结果为 `Already up to date`，仓库状态为 `main...origin/main`。

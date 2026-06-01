@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.98 再次刷新算法仓库并确认 student 全量导出更新`
+  - `Step H.xiaozhi-client.99 审计 A 2s FP32 部署依赖并确认缺少模型产物`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.99` 审计 A 2s FP32 部署依赖并确认缺少模型产物：
+  - 用户要求将当前固件模型切到 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` FP32，并按算法文档部署参数。
+  - 算法文档确认该模型的端侧契约为 FP32 `[1,40,201,1]`，bundle FP32 SHA256 应为 `537af97f8a49ea651b34f02181de84182df767ddecd3cd7d6f4da58cdd95d71a`，默认 profile 为 `threshold_probability=0.449219` / `threshold_q15=14720`，`recall_990` profile 为 `threshold_q15=13696`。
+  - 当前 `/root/kws-trainint/artifacts/exports` 没有 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/`，Git LFS 当前引用和 `git lfs fetch --all origin` 后的本地对象中也没有上述 FP32 SHA。
+  - 当前 `/root/kws-trainint/artifacts/models` 没有该 student 的 `model_state.pt` 或 `checkpoints/best.pt`，无法在本机从 checkpoint 重建 FP32 TFLite/header。
+  - 尝试用 `river_kws_gpu_cu128` 环境执行算法文档的 `export-student-model` 命令，导出在加载 `torchaudio` 时因缺少 `libcudart.so.13` 失败，且尚未进入 checkpoint 加载阶段。
+  - 因缺少真实 `model.fp32.tflite` / `model_fp32_data.h`，本步未修改固件 KWS 变体或 `prj.conf`，避免留下不可构建或伪模型接入；后续需要算法同事提供完整 2s bundle，或修复本机导出环境并补齐 student checkpoint 后再继续。
 
 - `Step H.xiaozhi-client.98` 再次刷新算法仓库并确认 student 全量导出更新：
   - 在 `/root/kws-trainint` 再次执行 `git pull --ff-only && git lfs pull`；当前算法仓库为 `main...origin/main`，HEAD 为 `d2b30f8 修正student导出runbook窗口提示`，本轮 pull 返回 `Already up to date`。
