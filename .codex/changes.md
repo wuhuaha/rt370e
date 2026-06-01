@@ -1,5 +1,19 @@
 # Change Log
 
+## Step H.xiaozhi-client.104
+- 增加 KWS PCM dump 串口抓取脚本：
+  - 新增 `tools/kws/capture_kws_pcm_dump.py`，用于在板子已刷入 Step 103 镜像后自动发送 `river kws dump clear`、`river kws dump next`、`river kws dump meta` 和后续 chunk 拉取命令。
+  - 脚本解析 `kws tensor dump captured` 与 `kws tensor dump snapshot` 中的 chunk 数，默认拉取 `feat_f32`、`output_raw`、`preproc_s16`、`raw_capture_s16`，写入完整串口日志，再调用 `compare_board_pcm_frontend.py --require-raw` 生成对拍 WAV/NPY 和指标。
+  - 当前容器未暴露 `/dev/ttyUSB*` 或 `/dev/ttyACM*`，因此没有实际执行 live flash/serial capture；该脚本用于串口可见后的直接对拍。
+- 设计边界：
+  - 本步只增加主机侧串口抓取自动化，不修改固件、模型、阈值、VAD gate、TFLM invoke、云端协议、UI 或 SDK 源码。
+- Verification for this step:
+  - `python3 -m py_compile tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py tools/kws/replay_board_tensor_dump.py` passed。
+  - `python3 tools/kws/capture_kws_pcm_dump.py --help` passed。
+  - `git diff --check -- tools/kws/capture_kws_pcm_dump.py` passed。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - Not run: live serial capture, because no `/dev/ttyUSB*` or `/dev/ttyACM*` device is visible in this container。
+
 ## Step H.xiaozhi-client.103
 - 为 A 2s FP32 KWS 误唤醒排查增加同窗 raw/preproc PCM 对拍能力：
   - `river kws dump next` 仍按原有方式捕获 `feat_f32`、`input_raw`、`output_raw`，并额外保留同一次 inference 的 `preproc_s16` 与 `raw_capture_s16` PCM snapshot。

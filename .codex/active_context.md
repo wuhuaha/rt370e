@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.103 增加 KWS 同窗 raw/preproc PCM 对拍`
+  - `Step H.xiaozhi-client.104 增加 KWS PCM dump 串口抓取脚本`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,11 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.104` 增加 KWS PCM dump 串口抓取脚本：
+  - 新增 `tools/kws/capture_kws_pcm_dump.py`，在设备已刷入 Step 103 镜像且串口可见时，自动发送 `river kws dump clear/next/meta/chunk ...`，拉取 `feat_f32`、`output_raw`、`preproc_s16`、`raw_capture_s16` chunk，并调用 `compare_board_pcm_frontend.py --require-raw` 生成 raw/preproc/frontend 对拍结果。
+  - 当前容器没有 `/dev/ttyUSB*` 或 `/dev/ttyACM*`，因此本步未执行 live flash/serial capture；镜像仍需板子手动进入 download mode 后才能刷入。
+  - `python3 -m py_compile`、脚本 `--help`、`git diff --check` 和 Codex harness check 均通过；未改固件代码，沿用 Step 103 的完整 firmware build 结果。
 
 - `Step H.xiaozhi-client.103` 增加 KWS 同窗 raw/preproc PCM 对拍：
   - `river kws dump next` 在保留既有 `feat_f32`、`input_raw`、`output_raw` pull-based tensor dump 的同时，额外捕获同一次 inference 的 `preproc_s16` 与 `raw_capture_s16` PCM snapshot。

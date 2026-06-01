@@ -1,3 +1,43 @@
+## Step H.xiaozhi-client.104 Verification
+
+Check the host-side serial capture automation:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  tools/kws/capture_kws_pcm_dump.py \
+  tools/kws/compare_board_pcm_frontend.py \
+  tools/kws/replay_board_tensor_dump.py
+python3 tools/kws/capture_kws_pcm_dump.py --help
+git diff --check -- tools/kws/capture_kws_pcm_dump.py
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- all commands complete without errors
+- `capture_kws_pcm_dump.py --help` lists serial port, timeout, log, output, and compare options
+
+Run live capture after the Step 103 image is flashed and the serial device is visible:
+```bash
+cd /root/ameba-river
+python3 tools/kws/capture_kws_pcm_dump.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  --log tmp/kws_pcm_dump_serial.log \
+  --out-dir tmp/kws_pcm_frontend_compare
+```
+
+Expected live result:
+- script arms `river kws dump next`
+- after one KWS dump is captured, it pulls `feat_f32`, `output_raw`, `preproc_s16`, and `raw_capture_s16`
+- compare output includes `preproc_vs_raw_ch0_*`, `board_numpy_from_pcm_union`, and training frontend candidates
+
+Observed on 2026-06-01:
+- passed: `python3 -m py_compile tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py tools/kws/replay_board_tensor_dump.py`.
+- passed: `python3 tools/kws/capture_kws_pcm_dump.py --help`.
+- passed: `git diff --check -- tools/kws/capture_kws_pcm_dump.py`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: live serial capture, because this container currently has no `/dev/ttyUSB*` or `/dev/ttyACM*` device.
+
 ## Step H.xiaozhi-client.103 Verification
 
 Check the host-side replay and PCM frontend comparison tools:
