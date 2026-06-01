@@ -18,11 +18,6 @@
 #define RIVER_UI_TASK_PRIORITY    4U
 #define RIVER_UI_QUEUE_DEPTH      12U
 #define RIVER_UI_RTOS_OK          0
-#define RIVER_UI_UTF8_OPEN        "\xe5\xbc\x80"
-#define RIVER_UI_UTF8_CLOSE       "\xe5\x85\xb3"
-#define RIVER_UI_UTF8_LIGHT       "\xe7\x81\xaf"
-#define RIVER_UI_UTF8_CURTAIN     "\xe5\xb8\x98"
-
 typedef enum {
     RIVER_UI_MSG_STATE = 0,
     RIVER_UI_MSG_EMOJI,
@@ -90,19 +85,6 @@ static const river_ui_emotion_emoji_rule_t g_river_ui_emotion_emoji_rules[] = {
     {"fear", "noto_scream_cat_1f640"},
 };
 
-typedef struct {
-    const char *verb;
-    const char *object;
-    const char *emoji;
-} river_ui_tts_action_rule_t;
-
-static const river_ui_tts_action_rule_t g_river_ui_tts_action_rules[] = {
-    {RIVER_UI_UTF8_OPEN, RIVER_UI_UTF8_LIGHT, "action_light_on"},
-    {RIVER_UI_UTF8_CLOSE, RIVER_UI_UTF8_LIGHT, "action_light_off"},
-    {RIVER_UI_UTF8_OPEN, RIVER_UI_UTF8_CURTAIN, "action_curtain_open"},
-    {RIVER_UI_UTF8_CLOSE, RIVER_UI_UTF8_CURTAIN, "action_curtain_close"},
-};
-
 static char river_ui_ascii_tolower(char ch)
 {
     if (ch >= 'A' && ch <= 'Z') {
@@ -124,22 +106,6 @@ static bool river_ui_streq_ci(const char *a, const char *b)
         ++b;
     }
     return *a == '\0' && *b == '\0';
-}
-
-static const char *river_ui_find_bytes_after(const char *text, const char *needle)
-{
-    size_t needle_len;
-
-    if (text == NULL || needle == NULL || needle[0] == '\0') {
-        return NULL;
-    }
-    needle_len = strlen(needle);
-    for (const char *start = text; *start != '\0'; ++start) {
-        if (strncmp(start, needle, needle_len) == 0) {
-            return start + needle_len;
-        }
-    }
-    return NULL;
 }
 
 static size_t river_ui_utf8_char_len(uint8_t byte)
@@ -235,21 +201,6 @@ static const char *river_ui_emotion_emoji(const char *emotion)
     return NULL;
 }
 
-static const char *river_ui_tts_action_emoji(const char *text)
-{
-    for (size_t i = 0U; i < sizeof(g_river_ui_tts_action_rules) /
-                              sizeof(g_river_ui_tts_action_rules[0]); ++i) {
-        const char *after_verb =
-            river_ui_find_bytes_after(text, g_river_ui_tts_action_rules[i].verb);
-
-        if (after_verb != NULL &&
-            river_ui_find_bytes_after(after_verb, g_river_ui_tts_action_rules[i].object) != NULL) {
-            return g_river_ui_tts_action_rules[i].emoji;
-        }
-    }
-    return NULL;
-}
-
 static void river_ui_sync_status(void)
 {
     g_river_ui.status.enabled = g_river_ui.enabled;
@@ -329,15 +280,6 @@ static void river_ui_apply_message(const river_ui_msg_t *msg)
         river_ui_copy(g_river_ui.view.tts_text,
                       sizeof(g_river_ui.view.tts_text),
                       msg->text);
-        {
-            const char *emoji = river_ui_tts_action_emoji(msg->text);
-
-            if (emoji != NULL) {
-                river_ui_copy(g_river_ui.view.emoji,
-                              sizeof(g_river_ui.view.emoji),
-                              emoji);
-            }
-        }
         break;
     case RIVER_UI_MSG_LLM: {
         const char *emoji = river_ui_emotion_emoji(msg->detail);

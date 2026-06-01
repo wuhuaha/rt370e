@@ -88,39 +88,6 @@ ASSETS = (
         "noto_cat_face_1f431.gif",
         ("cat_face", "face", "1f431", "idle", "boot", "starting", "unknown"),
     ),
-    AnimAsset(
-        "action_light_on",
-        "light on",
-        "light_bulb_on_off_commons.gif",
-        ("light_on", "open_light", "lamp_on", "turn_on_light"),
-        source_dir="action_candidates",
-    ),
-    AnimAsset(
-        "action_light_off",
-        "light off",
-        "light_bulb_on_off_commons.gif",
-        ("light_off", "close_light", "lamp_off", "turn_off_light"),
-        source_dir="action_candidates",
-        reverse=True,
-    ),
-    AnimAsset(
-        "action_curtain_open",
-        "curtain open",
-        "curtain_open_close_commons.gif",
-        ("curtain_open", "open_curtain", "curtain_on"),
-        source_dir="action_candidates",
-        start_index=0,
-        end_index=86,
-    ),
-    AnimAsset(
-        "action_curtain_close",
-        "curtain close",
-        "curtain_open_close_commons.gif",
-        ("curtain_close", "close_curtain", "curtain_off"),
-        source_dir="action_candidates",
-        start_index=86,
-        end_index=172,
-    ),
 )
 
 

@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.101
+- 删除灯 / 窗帘相关 UI 代码与资源，回收之前在提交 `afaaeeb 关联TTS动作文本与设备动画` 中引入的设备动作动画路径。
+- 删除 `components/river_ui/river_orvibo_ui.c` 中的 TTS 文本到 `action_light_on/off`、`action_curtain_open/close` 的匹配逻辑；TTS 更新现在只刷新文本，不再因为“开灯 / 关灯 / 开帘 / 关帘”切换设备动作动画。
+- 删除 `components/river_ui/assets/action_candidates/` 下的灯泡 / 窗帘 GIF 源资源。
+- 删除 `components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py` 中 4 个 `action_*` 资源定义，并重生成：
+  - `components/river_ui/assets/noto_cat_lvgl/river_noto_cat_anim.c`
+  - `components/river_ui/assets/noto_cat_lvgl/README.md`
+- 清理未跟踪的 `components/river_ui/assets/action_candidates_review/` 候选资源目录，避免仓库中残留灯 / 窗帘图片素材。
+- 边界：
+  - 本步只删除 UI 动画入口与相关图片/生成资源，不改 LVGL 基础显示、猫表情动画、云端协议、状态机、ASR/TTS 文本显示或其他非灯/窗帘 UI 路径。
+- Verification for this step:
+  - `rg` 确认 `components/river_ui/` 和 `include/` 不再包含 `action_light_*`、`action_curtain_*`、`light_bulb_on_off_commons.gif`、`curtain_open_close_commons.gif` 等代码或资源引用。
+  - `python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py` 通过。
+  - 重新运行生成器后输出为 `generated 10 animations, 8 frames each, 2048000 raw bytes`，确认动画集合回到仅保留猫表情资源。
+  - 后续以 `git diff --check`、Codex harness check 和 `/root/ameba-rtos` 全量 build 作为最终静态与构建验证。
+
 ## Step H.xiaozhi-client.99
 - 审计将当前 KWS 模型切换为 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` FP32 的部署依赖。
 - 从算法文档确认目标部署参数：
@@ -17551,3 +17567,24 @@
   - `git diff --cached --check` passed
   - `python3 tools/diag/check_codex_harness.py` passed
   - docs-only step; firmware build not required because no source/Kconfig/build script/SDK file changed
+
+## Step H.xiaozhi-client.100
+- 接入 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` FP32 唤醒模型：
+  - 已重新拉取 `/root/kws-trainint`，算法仓库 HEAD 为 `10f845c 记录A二秒bundle远端交付检查点`，目标 bundle 已补齐。
+  - 新增固件模型头 `components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h`，与算法 bundle `model_fp32_data.h` SHA256 一致：`73e66dbb1bdbb8d81089a437214f5f42ccfec8b8625c49d26eda0df1e3b67a18`。
+  - 新增 Kconfig 变体 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_A_NEW_TARGET_CYCLE24_2S_V1_FP32_DEBUG`，并把 KWS pre-roll/queue 范围放宽到可承载 2s 前端。
+  - `river_voice_kws.cc` 按 bundle 前端契约切到 `float32 [1,40,201,1] -> float32 [1,1,1,1]`，保持 `n_fft=400`、`hop=160`、`center=true`、natural log、per-clip mean/std normalize。
+  - `prj.conf` 选择 A 2s FP32 变体并停用 Teacher B BNT5；按 bundle `threshold_profiles.json` 推荐 `default_target_recall` 使用 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=14720`，保持 `hold=1`、`cooldown=2500ms`、`fallback=off`、`stride=16`。
+  - 为避免 VAD gate open reset frontend 后丢失 2s 历史上下文，设置 `CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS=2000`、`CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES=125`、`CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=192`。
+- 设计边界：
+  - 本步只替换 KWS 模型变体、前端帧数和对应部署参数，不修改 VAD 判定、tensor dump、alignment replay、board/local parity、云端协议、UI 或 SDK 源码。
+  - 继续使用 FP32 debug 路径做端侧 bring-up 和 parity 诊断；INT8 bundle 仅作为算法交付参考，未在本步切换。
+- Verification for this step:
+  - `git diff --check -- Kconfig prj.conf components/river_voice/river_voice_kws.cc .codex/active_context.md .codex/changes.md .codex/verification.md` passed
+  - `sha256sum /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model_fp32_data.h components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h` matched
+  - `rg -n "RIVER_KWS_MODEL_VARIANT|RIVER_KWS_SCORE_THRESHOLD_Q15|RIVER_KWS_TRIGGER_HOLD_FRAMES|RIVER_KWS_VAD_PRE_ROLL_MS|RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES|RIVER_KWS_INPUT_QUEUE_FRAMES|RIVER_KWS_GATE_FALLBACK_EN" build_RTL8730E/build/.config` confirmed the generated config
+  - AP preprocessed KWS output confirmed new variant string plus `threshold_q15=14720`, `hold=1`, `pre_roll_ms=2000`, `pre_roll_flush=125`, and `queue=192`
+  - AP `river_voice_kws.ii` / `river_voice_kws.s` returned no matches for `teacher_b_new_target_bnt5`
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `/root/ameba-rtos` full build completed with `Build done`
+  - Flash/serial monitor not run; user-run board validation is still required

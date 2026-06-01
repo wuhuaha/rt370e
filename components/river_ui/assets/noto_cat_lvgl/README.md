@@ -22,10 +22,6 @@ from selected GIFs in `../emoji_candidates/` and `../action_candidates/`.
 | `noto_crying_cat_1f63f` | crying cat | `emoji_candidates/noto_crying_cat_1f63f.gif` | 51 | 1530ms | `0, 6, 12, 19, 25, 31, 38, 44` |
 | `noto_scream_cat_1f640` | scream cat | `emoji_candidates/noto_scream_cat_1f640.gif` | 55 | 2160ms | `0, 0, 1, 10, 19, 28, 37, 46` |
 | `noto_cat_face_1f431` | cat face | `emoji_candidates/noto_cat_face_1f431.gif` | 75 | 2760ms | `0, 7, 19, 30, 42, 53, 65, 74` |
-| `action_light_on` | light on | `action_candidates/light_bulb_on_off_commons.gif` | 5 | 620ms | `0, 1, 1, 2, 2, 3, 3, 4` |
-| `action_light_off` | light off | `action_candidates/light_bulb_on_off_commons.gif` | 5 | 620ms | `0, 1, 1, 2, 2, 3, 3, 4` |
-| `action_curtain_open` | curtain open | `action_candidates/curtain_open_close_commons.gif` | 87 | 1840ms | `0, 11, 23, 34, 46, 57, 69, 80` |
-| `action_curtain_close` | curtain close | `action_candidates/curtain_open_close_commons.gif` | 87 | 1870ms | `0, 11, 23, 35, 46, 58, 70, 81` |
 
 ## Regeneration
 

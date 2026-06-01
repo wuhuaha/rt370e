@@ -1,3 +1,62 @@
+## Step H.xiaozhi-client.101 Verification
+
+Confirm light / curtain UI action mappings and generated assets are removed:
+```bash
+cd /root/ameba-river
+rg -n "action_light_|action_curtain_|light_bulb_on_off_commons|curtain_open_close_commons|open_light|close_light|open_curtain|close_curtain" \
+  components/river_ui include || true
+rg --files components/river_ui/assets | rg "action_candidates|light|curtain" || true
+```
+
+Expected result:
+- no matches under `components/river_ui/` or `include/`
+- `components/river_ui/assets/action_candidates/` is removed from tracked resources
+- no light / curtain candidate images remain under `components/river_ui/assets/`
+
+Regenerate LVGL animation assets after removing the four `action_*` inputs:
+```bash
+cd /root/ameba-river
+python3 -m py_compile components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+python3 components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py
+```
+
+Expected result:
+- generator passes syntax check
+- generator rewrites `river_noto_cat_anim.h`, `river_noto_cat_anim.c`, and `README.md`
+- output reports `generated 10 animations, 8 frames each, 2048000 raw bytes`
+
+Run hygiene and full firmware build:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  components/river_ui/river_orvibo_ui.c \
+  components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py \
+  components/river_ui/assets/noto_cat_lvgl/README.md \
+  components/river_ui/assets/noto_cat_lvgl/river_noto_cat_anim.c \
+  .codex/changes.md \
+  .codex/verification.md \
+  .codex/active_context.md
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace or patch-format errors
+- harness check passes
+- SDK build completes with `Build done`
+
+Observed on 2026-06-01:
+- passed: `rg` confirmed no remaining light / curtain action-token or source-GIF references under `components/river_ui/` and `include/`.
+- passed: `python3 -m py_compile` for `generate_noto_cat_lvgl.py`.
+- passed: generator rewrote `river_noto_cat_anim.h`, `river_noto_cat_anim.c`, and `README.md`, reporting `generated 10 animations, 8 frames each, 2048000 raw bytes`.
+- passed: `git diff --check` for the touched UI and `.codex` files.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: `python3 /root/ameba-rtos/ameba.py build -p` against `/root/ameba-rtos`; final output contained `Build done`.
+- not run: flash/download or serial monitor; current hardware policy leaves board validation to the user unless explicitly requested.
+
 ## Step H.xiaozhi-client.99 Verification
 
 Confirm the target A 2s FP32 model contract from algorithm docs:
@@ -30810,3 +30869,97 @@ Expected result:
 
 Firmware build is not required for this docs-only step because no source,
 Kconfig, build script, linker script, or SDK file changed.
+
+## Step H.xiaozhi-client.100 - A 2s FP32 KWS model deployment
+
+Confirm the algorithm bundle and copied firmware header match:
+```bash
+cd /root/ameba-river
+git -C /root/kws-trainint log -3 --oneline
+sha256sum \
+  /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model_fp32_data.h \
+  components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h
+sed -n '1,120p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/threshold_profiles.json
+sed -n '1,140p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/frontend_contract.json
+```
+
+Expected result:
+- `/root/kws-trainint` HEAD includes `10f845c`
+- both `model_fp32_data.h` files have SHA256 `73e66dbb1bdbb8d81089a437214f5f42ccfec8b8625c49d26eda0df1e3b67a18`
+- `recommended_profile_id` is `default_target_recall`
+- `threshold_probability=0.449219`, `threshold_q15=14720`
+- FP32 input/output contract is `[1,40,201,1] -> [1,1,1,1]`
+
+Confirm the generated firmware config:
+```bash
+cd /root/ameba-river
+rg -n "RIVER_KWS_MODEL_VARIANT|RIVER_KWS_SCORE_THRESHOLD_Q15|RIVER_KWS_TRIGGER_HOLD_FRAMES|RIVER_KWS_VAD_PRE_ROLL_MS|RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES|RIVER_KWS_INPUT_QUEUE_FRAMES|RIVER_KWS_GATE_FALLBACK_EN" \
+  build_RTL8730E/build/.config
+```
+
+Expected result:
+- `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_A_NEW_TARGET_CYCLE24_2S_V1_FP32_DEBUG=y`
+- Teacher B BNT5 variant is not set
+- `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=14720`
+- `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`
+- `CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS=2000`
+- `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES=125`
+- `CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=192`
+- `CONFIG_RIVER_KWS_GATE_FALLBACK_EN` is not set
+
+Confirm the active AP KWS compile output contains the new runtime log values
+and no longer contains the Teacher B BNT5 variant string:
+```bash
+cd /root/ameba-river
+rg -a -n "student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_debug|return \\(uint32_t\\)14720|kws backend: runtime=tflite_micro|kws config: threshold_q15" \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_voice/CMakeFiles/river_voice_target_img2_ap.dir/river_voice_kws.ii
+rg -a -n "teacher_b_new_target_bnt5" \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_voice/CMakeFiles/river_voice_target_img2_ap.dir/river_voice_kws.ii \
+  build_RTL8730E/build/project_ap/make/image2/example/ameba-river/components/river_voice/CMakeFiles/river_voice_target_img2_ap.dir/river_voice_kws.s
+```
+
+Expected result:
+- the first command finds the new variant and runtime parameter literals
+- the second command returns no matches
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  Kconfig \
+  prj.conf \
+  components/river_voice/river_voice_kws.cc \
+  .codex/active_context.md \
+  .codex/changes.md \
+  .codex/verification.md
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash manually after entering the board's download mode.
+2. Boot and watch KWS startup logs.
+3. Trigger a VAD gate and inspect `kws backend` / `kws config` logs.
+```
+
+Expected result:
+- `variant=student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_debug`
+- backend input dimensions report `40x201`
+- `threshold_q15=14720`, `hold=1`, `fallback=off`
+- `pre_roll_ms=2000`, `pre_roll_flush=125`, `queue=192`

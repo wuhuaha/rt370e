@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.99 审计 A 2s FP32 部署依赖并确认缺少模型产物`
+  - `Step H.xiaozhi-client.101 删除灯/窗帘相关 UI 动画代码与资源`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,24 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.101` 删除灯/窗帘相关 UI 动画代码与资源：
+  - 通过 `git log` 与代码检索确认，灯/窗帘 UI 动画入口主要来自提交 `afaaeeb 关联TTS动作文本与设备动画`，涉及 `river_orvibo_ui.c`、`assets/action_candidates/`、`assets/noto_cat_lvgl/generate_noto_cat_lvgl.py`、`assets/noto_cat_lvgl/river_noto_cat_anim.c` 和其 README。
+  - `components/river_ui/river_orvibo_ui.c` 已删除 `开/关 + 灯/帘` 的 TTS 动画匹配逻辑；TTS 文本更新现在只刷新文本，不再切换 `action_light_*` / `action_curtain_*` 设备动画。
+  - `components/river_ui/assets/action_candidates/` 下灯泡 / 窗帘 GIF 已删除；未跟踪的 `components/river_ui/assets/action_candidates_review/` 候选目录也已清理。
+  - `components/river_ui/assets/noto_cat_lvgl/generate_noto_cat_lvgl.py` 已移除 4 个 `action_*` 资产定义，并重生成 `river_noto_cat_anim.c` / `README.md`；当前生成器输出回到 10 个猫表情动画、每个 8 帧、raw payload `2048000` bytes。
+  - `rg` 与资源文件列表确认 `components/river_ui/` 和 `include/` 已无灯/窗帘 UI 动画 token、别名或 GIF 源资源引用。
+  - 本步尚未 flash/serial monitor；后续按当前硬件策略仅保留用户手动上板验证。
+
+- `Step H.xiaozhi-client.100` 接入 A 2s FP32 唤醒模型：
+  - 按用户要求在 `/root/kws-trainint` 重新拉取算法仓库；算法仓库从 `d2b30f8` 快进到 `10f845c 记录A二秒bundle远端交付检查点`，新增 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` 完整 bundle。
+  - 固件侧新增 FP32 模型头 `components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h`，与算法 bundle `model_fp32_data.h` SHA256 一致：`73e66dbb1bdbb8d81089a437214f5f42ccfec8b8625c49d26eda0df1e3b67a18`；原始 `model.fp32.tflite` 为 `141700 B`，SHA256 `537af97f8a49ea651b34f02181de84182df767ddecd3cd7d6f4da58cdd95d71a`。
+  - `Kconfig` 新增 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_A_NEW_TARGET_CYCLE24_2S_V1_FP32_DEBUG`，并放宽 KWS VAD pre-roll、pre-roll flush、input queue 范围以支持 2s 前端。
+  - `river_voice_kws.cc` 新变体使用 FP32 header，端侧 TFLite 契约为 `float32 [1,40,201,1] -> float32 [1,1,1,1]`，前端保持 `16k`、`n_fft/win_length=400`、`hop=160`、`center=true`、natural log、per-clip mean/std normalize。
+  - `prj.conf` 当前选择 A 2s FP32 变体，停用 Teacher B BNT5 变体；部署阈值按 bundle `threshold_profiles.json` 推荐 `default_target_recall`：`threshold_probability=0.449219` / `threshold_q15=14720`，保持 `hold=1`、`cooldown=2500ms`、`fallback=off`、`stride=16`。
+  - 因当前 KWS VAD gate open 会 reset frontend，本步把 pre-roll 扩到 `CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS=2000`，并设置 `CONFIG_RIVER_KWS_PRE_ROLL_FLUSH_MAX_FRAMES=125`、`CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES=192`，确保 2s 模型 gate 打开后拿到完整历史上下文。
+  - `/root/ameba-rtos` 完整 build 通过；生成 `.config` 确认新 A 2s FP32 变体、`14720/hold=1/fallback=off/pre_roll=2000/flush=125/queue=192` 生效，AP 预处理产物确认运行日志会打印新 variant 和同一组参数，且未编入旧 Teacher B BNT5 variant 字符串。
+  - 未执行 flash/serial monitor；按当前 NAND 硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.99` 审计 A 2s FP32 部署依赖并确认缺少模型产物：
   - 用户要求将当前固件模型切到 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` FP32，并按算法文档部署参数。
