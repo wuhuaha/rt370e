@@ -17677,3 +17677,20 @@
   - `python3 tools/diag/check_codex_harness.py` passed
   - `/root/ameba-rtos` full build completed with `Build done`
   - Flash/serial monitor not run; user-run board validation is still required
+
+## Step H.xiaozhi-client.107
+- 切换 Orvibo XiaoZhi-compatible 服务端接口端口到 `8081`：
+  - `Kconfig` 默认值、`prj.conf` 显式配置和 `include/river/river_orvibo_credentials.h` 兜底 OTA URL 从 `8082` 改为 `8081`，确保生成 `.config` 和最终镜像实际生效。
+  - `doc/device-integration-manual.md` 中的当前联调 Base URL、OTA URL、WebSocket URL、健康检查、E2E 示例、日志/PID 示例和防火墙提示同步从 `8082` 改为 `8081`。
+  - `.codex/active_context.md` 同步最新 landed step 和当前服务端地址，避免后续构建/验证上下文继续指向旧端口。
+- 设计边界：
+  - 本步只切换 Orvibo XiaoZhi-compatible 接入端口，不改变 hello/listen/audio/MCP wire format。
+  - 不修改 VAD/KWS、tensor dump、alignment replay、board/local parity、Wi-Fi、音频、UI 或 SDK 源码。
+- Verification for this step:
+  - `rg -n "101\\.33\\.235\\.154:8082|127\\.0\\.0\\.1:8082|home-ai-server-8082" Kconfig prj.conf include/river/river_orvibo_credentials.h doc/device-integration-manual.md .codex/active_context.md` returned no matches.
+  - `rg -n "101\\.33\\.235\\.154:8081|127\\.0\\.0\\.1:8081|home-ai-server-8081|RIVER_ORVIBO_OTA_URL|CONFIG_RIVER_ORVIBO_OTA_URL" Kconfig prj.conf include/river/river_orvibo_credentials.h doc/device-integration-manual.md .codex/active_context.md` confirmed the new endpoint.
+  - Generated `.config` and final image string checks confirmed `http://101.33.235.154:8081/xiaozhi/ota/` and no `101.33.235.154:8082` match in the active Orvibo image.
+  - `git diff --check` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build completed with `Build done`.
+  - Flash/serial monitor not run; user-run board validation is still required.

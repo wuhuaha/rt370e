@@ -14,7 +14,7 @@ config RIVER_ORVIBO_CLIENT_EN
 
 config RIVER_ORVIBO_OTA_URL
     string "Orvibo access OTA/config URL"
-    default "http://101.33.235.154:8082/xiaozhi/ota/"
+    default "http://101.33.235.154:8081/xiaozhi/ota/"
     depends on RIVER_ORVIBO_CLIENT_EN
     help
       XiaoZhi-compatible OTA endpoint used to fetch websocket url/token/version

@@ -31211,3 +31211,84 @@ python3 /root/ameba-rtos/ameba.py build -p
 
 Expected result:
 - the build exits successfully with `Build done`
+
+## Step H.xiaozhi-client.107 - switch Orvibo XiaoZhi endpoint to 8081
+
+Confirm current source/docs no longer point to the old Orvibo XiaoZhi port:
+```bash
+cd /root/ameba-river
+rg -n "101\\.33\\.235\\.154:8082|127\\.0\\.0\\.1:8082|home-ai-server-8082" \
+  Kconfig \
+  prj.conf \
+  include/river/river_orvibo_credentials.h \
+  doc/device-integration-manual.md \
+  .codex/active_context.md
+```
+
+Expected result:
+- no matches
+
+Confirm the new `8081` endpoint is present in source/docs:
+```bash
+cd /root/ameba-river
+rg -n "101\\.33\\.235\\.154:8081|127\\.0\\.0\\.1:8081|home-ai-server-8081|RIVER_ORVIBO_OTA_URL|CONFIG_RIVER_ORVIBO_OTA_URL" \
+  Kconfig \
+  prj.conf \
+  include/river/river_orvibo_credentials.h \
+  doc/device-integration-manual.md \
+  .codex/active_context.md
+```
+
+Expected result:
+- `Kconfig`, `prj.conf`, and `RIVER_ORVIBO_OTA_URL` default to `http://101.33.235.154:8081/xiaozhi/ota/`
+- the device integration manual uses `http://101.33.235.154:8081` and `ws://101.33.235.154:8081/xiaozhi/v1/`
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Confirm the generated config and active image contain only the new OTA endpoint:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_ORVIBO_OTA_URL|101\\.33\\.235\\.154:8081|101\\.33\\.235\\.154:8082" \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32
+rg -a -n "101\\.33\\.235\\.154:8081|101\\.33\\.235\\.154:8082" \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin
+```
+
+Expected result:
+- generated config points `CONFIG_RIVER_ORVIBO_OTA_URL` at `http://101.33.235.154:8081/xiaozhi/ota/`
+- active image strings include `http://101.33.235.154:8081/xiaozhi/ota/`
+- no generated config or active image string points at `101.33.235.154:8082`
+
+Post-flash board validation:
+```text
+1. Flash manually after entering the board's download mode.
+2. Boot and inspect Orvibo access/protocol logs.
+```
+
+Expected result:
+- boot log shows `ota=http://101.33.235.154:8081/xiaozhi/ota/`
+- OTA returns `ws://101.33.235.154:8081/xiaozhi/v1/`
+- no connection attempt uses `101.33.235.154:8082`

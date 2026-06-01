@@ -7,7 +7,7 @@
 #ifdef CONFIG_RIVER_ORVIBO_OTA_URL
 #define RIVER_ORVIBO_OTA_URL CONFIG_RIVER_ORVIBO_OTA_URL
 #else
-#define RIVER_ORVIBO_OTA_URL "http://101.33.235.154:8082/xiaozhi/ota/"
+#define RIVER_ORVIBO_OTA_URL "http://101.33.235.154:8081/xiaozhi/ota/"
 #endif
 
 #ifdef CONFIG_RIVER_ORVIBO_WS_URL

@@ -7,17 +7,17 @@
 当前常驻实例：
 
 ```text
-Public HTTP Base URL: http://101.33.235.154:8082
-OTA URL:              http://101.33.235.154:8082/xiaozhi/ota/
-WebSocket URL:        ws://101.33.235.154:8082/xiaozhi/v1/
+Public HTTP Base URL: http://101.33.235.154:8081
+OTA URL:              http://101.33.235.154:8081/xiaozhi/ota/
+WebSocket URL:        ws://101.33.235.154:8081/xiaozhi/v1/
 ```
 
 健康检查：
 
 ```bash
-curl http://101.33.235.154:8082/healthz
-curl http://101.33.235.154:8082/readyz
-curl http://101.33.235.154:8082/healthz/runtime
+curl http://101.33.235.154:8081/healthz
+curl http://101.33.235.154:8081/readyz
+curl http://101.33.235.154:8081/healthz/runtime
 ```
 
 当前 Phase 1 能力：
@@ -76,7 +76,7 @@ Authorization: Bearer <any value>
 
 ```http
 GET /xiaozhi/ota/ HTTP/1.1
-Host: 101.33.235.154:8082
+Host: 101.33.235.154:8081
 Device-Id: xiaozhi-device-001
 Client-Id: xiaozhi-device-001
 Protocol-Version: 1
@@ -97,7 +97,7 @@ Protocol-Version: 1
     "url": ""
   },
   "websocket": {
-    "url": "ws://101.33.235.154:8082/xiaozhi/v1/",
+    "url": "ws://101.33.235.154:8081/xiaozhi/v1/",
     "token": ""
   }
 }
@@ -110,7 +110,7 @@ Protocol-Version: 1
 路径：
 
 ```text
-ws://101.33.235.154:8082/xiaozhi/v1/
+ws://101.33.235.154:8081/xiaozhi/v1/
 ```
 
 服务端支持的消息类型：
@@ -383,14 +383,14 @@ LLM/M1 文本：
 当前公开常驻服务是：
 
 ```text
-ws://101.33.235.154:8082/xiaozhi/v1/
+ws://101.33.235.154:8081/xiaozhi/v1/
 ```
 
 如果端侧或固件强制要求 `wss://`，有两种方式：
 
 1. 推荐：Nginx/Ingress 终止 TLS。
    - 外部暴露：`https://voice.example.com`
-   - 反代到：`http://127.0.0.1:8082`
+   - 反代到：`http://127.0.0.1:8081`
    - 设置服务环境变量：
 
 ```text
@@ -424,7 +424,7 @@ HOME_AI_HTTP_ADDR=0.0.0.0:8443
 将小智客户端的 OTA/服务发现地址配置为：
 
 ```text
-http://101.33.235.154:8082/xiaozhi/ota/
+http://101.33.235.154:8081/xiaozhi/ota/
 ```
 
 如果固件配置项区分 HTTP endpoint 和 WebSocket endpoint，优先配置 OTA；让客户端从 OTA 响应中读取 `websocket.url`。
@@ -436,7 +436,7 @@ http://101.33.235.154:8082/xiaozhi/ota/
 ```json
 {
   "websocket": {
-    "url": "ws://101.33.235.154:8082/xiaozhi/v1/",
+    "url": "ws://101.33.235.154:8081/xiaozhi/v1/",
     "token": ""
   }
 }
@@ -449,7 +449,7 @@ http://101.33.235.154:8082/xiaozhi/ota/
 标准小智客户端应连接：
 
 ```text
-ws://101.33.235.154:8082/xiaozhi/v1/
+ws://101.33.235.154:8081/xiaozhi/v1/
 ```
 
 推荐握手 headers：
@@ -532,21 +532,21 @@ tts stop JSON
 检查服务：
 
 ```bash
-curl http://101.33.235.154:8082/healthz
-curl http://101.33.235.154:8082/readyz
-curl http://101.33.235.154:8082/healthz/runtime
+curl http://101.33.235.154:8081/healthz
+curl http://101.33.235.154:8081/readyz
+curl http://101.33.235.154:8081/healthz/runtime
 ```
 
 检查 OTA：
 
 ```bash
-curl http://101.33.235.154:8082/xiaozhi/ota/
+curl http://101.33.235.154:8081/xiaozhi/ota/
 ```
 
 运行端到端测试：
 
 ```bash
-BASE_URL=http://101.33.235.154:8082 \
+BASE_URL=http://101.33.235.154:8081 \
 AUDIO_FORMAT=opus \
 INPUT_MODE=tts \
 INPUT_TEXT=打开客厅灯 \
@@ -562,20 +562,20 @@ scripts/e2e-phase1.sh
 查看服务日志：
 
 ```bash
-tail -f .runtime/logs/home-ai-server-8082.log
+tail -f .runtime/logs/home-ai-server-8081.log
 ```
 
 查看进程：
 
 ```bash
-cat .runtime/tmp/home-ai-server-8082.pid
-ps -fp "$(cat .runtime/tmp/home-ai-server-8082.pid)"
+cat .runtime/tmp/home-ai-server-8081.pid
+ps -fp "$(cat .runtime/tmp/home-ai-server-8081.pid)"
 ```
 
 停止服务：
 
 ```bash
-kill "$(cat .runtime/tmp/home-ai-server-8082.pid)"
+kill "$(cat .runtime/tmp/home-ai-server-8081.pid)"
 ```
 
 ## 端侧排障
@@ -585,7 +585,7 @@ kill "$(cat .runtime/tmp/home-ai-server-8082.pid)"
 检查：
 
 - 是否连接 OTA 返回的 `websocket.url`。
-- 防火墙是否放通 `8082`。
+- 防火墙是否放通 `8081`。
 - 客户端是否强制要求 `wss://`。
 
 如果强制 WSS，需要加 TLS 反代或启用 Go 直连 TLS。

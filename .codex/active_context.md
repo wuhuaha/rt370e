@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.106 修正 KWS PCM/frontend 对拍工具`
+  - `Step H.xiaozhi-client.107 切换 Orvibo XiaoZhi 服务端端口到 8081`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,11 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.107` 切换 Orvibo XiaoZhi 服务端端口到 8081：
+  - `Kconfig`、`prj.conf` 和 `RIVER_ORVIBO_OTA_URL` 兜底默认值均切到 `http://101.33.235.154:8081/xiaozhi/ota/`。
+  - `doc/device-integration-manual.md` 当前联调地址、OTA、WebSocket、健康检查、日志/PID 示例和防火墙提示同步使用 `8081`。
+  - 本步只切换 Orvibo XiaoZhi-compatible 接入端口，不改变 hello/listen/audio/MCP wire format，不修改 VAD/KWS、tensor dump、alignment replay、board/local parity、Wi-Fi、音频、UI 或 SDK 源码。
 
 - `Step H.xiaozhi-client.106` 修正 KWS PCM/frontend 对拍工具：
   - `capture_kws_pcm_dump.py` 增加旧镜像 preproc-only 兼容模式 `--allow-missing-raw`，chunk 拉取按 64B 固件 chunk 长度过滤并支持重试，抓到 dump 后默认先发 `river orvibo abort` 降低会话/TTS 日志穿插概率。
@@ -206,7 +211,7 @@ or top-of-tree verification target changes.
   - `file`、Python/Pillow frame scan、SHA-256、`git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 均通过；未执行 firmware build/flash/serial monitor。
 
 - `Step H.xiaozhi-client.84` 切换 Orvibo 默认服务端到自建 Phase 1：
-  - 依据 `doc/device-integration-manual.md`，默认 OTA/config 地址切到 `http://101.33.235.154:8082/xiaozhi/ota/`；OTA 返回的 websocket URL 应为 `ws://101.33.235.154:8082/xiaozhi/v1/`。
+  - 依据 `doc/device-integration-manual.md`，默认 OTA/config 地址切到 `http://101.33.235.154:8081/xiaozhi/ota/`；OTA 返回的 websocket URL 应为 `ws://101.33.235.154:8081/xiaozhi/v1/`。
   - 新增 `CONFIG_RIVER_ORVIBO_AUTHORIZATION_VALUE="orvibo-river"`，当前服务端不校验该值，但 OTA HTTP 和 WebSocket handshake 都会携带 Authorization header。
   - OTA HTTP header 现在包含 `Protocol-Version`、`Device-Id`、`Client-Id`、`Authorization`，WebSocket header 在 OTA token 为空时使用默认 Bearer 占位值。
   - 本步不改变 hello/listen/audio/MCP wire format，不修改 VAD/KWS、tensor dump、alignment replay、board/local parity、Wi-Fi、音频、UI 或 SDK 源码。
