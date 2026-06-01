@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.94 部署 Teacher B new-target BNT5 FP32 唤醒模型`
+  - `Step H.xiaozhi-client.95 收紧 Teacher B FP32 唤醒阈值和 hold`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.95` 收紧 Teacher B FP32 唤醒阈值和 hold：
+  - 当前固件仍使用 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 debug 模型，未切到 INT8。
+  - 用户 2026-06-01 实板日志确认部署正确，但非唤醒语音可在 `threshold_pm=394`、`hold=2` 下触发；样本包括 `603/654pm` 连续误触发和 `830/861pm` 两帧高分误触发。
+  - `prj.conf` 现将 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 提高到 `26214`（约 `threshold_pm=800`），并将 `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` 提高到 `3`；`CONFIG_RIVER_KWS_COOLDOWN_MS=2500` 和 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n` 保持不变。
+  - 本步只改 KWS 参数，不更换模型文件，不修改 VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py`、`/root/ameba-rtos` 完整 build 均通过；构建输出为 `Build done`，生成 `.config` 确认 `26214/hold=3/fallback=off`，AP/combined image strings 仍确认 Teacher B FP32 变体生效。
+  - 未执行 flash/serial monitor；按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.94` 部署 Teacher B new-target BNT5 FP32 唤醒模型：
   - 当前固件侧 KWS 已从 `student_conv_resnet_ed_nano_current_teacher_a_v2` 切到 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` 的 FP32 debug 变体；未切到 INT8。
