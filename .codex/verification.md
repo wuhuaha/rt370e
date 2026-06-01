@@ -1,3 +1,86 @@
+## Step H.xiaozhi-client.93 Verification
+
+Refresh the wakeword algorithm repository and LFS artifacts:
+```bash
+cd /root/kws-trainint
+before=$(git rev-parse HEAD)
+git pull
+git lfs pull
+after=$(git rev-parse HEAD)
+printf 'before=%s\nafter=%s\n' "$before" "$after"
+git status --short --branch
+git lfs status
+git log --oneline --date=iso --pretty=format:'%h %ad %s' -n 12
+```
+
+Expected result:
+- repository remains clean on `main...origin/main`
+- LFS status has no objects to commit or unstaged LFS changes
+- this refresh may advance from `f9d5cbf` to `f2ca5db` if the new Teacher A/B bundle has not already been pulled
+- recent log includes `601e94a 交付Teacher A/B端侧模型导出包`
+
+Inspect the new Teacher A/B wakeword bundles:
+```bash
+cd /root/kws-trainint
+python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+bundles = [
+    Path('artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_v1'),
+    Path('artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1'),
+]
+for b in bundles:
+    print(f'===== {b.name} =====')
+    summary = json.loads((b / 'deployment_summary.json').read_text())
+    thresholds = json.loads((b / 'threshold_profiles.json').read_text())
+    board = json.loads((b / 'board_report.snapshot.json').read_text())
+    for model in ['model.int8.tflite', 'model.fp32.tflite']:
+        p = b / model
+        print(model, p.stat().st_size, hashlib.sha256(p.read_bytes()).hexdigest())
+    print('input', summary['tflite']['input'])
+    print('ops', summary['tflite']['ops'])
+    print('gate', summary['formal_export_gate_passed'])
+    print('recommended', thresholds['recommended_profile_id'])
+    print('default', thresholds['profiles'][1])
+    print('board', {k: board.get(k) for k in [
+        'board_holdout_recall',
+        'board_fa_per_hour_at_target_recall',
+        'false_alarm_count',
+        'false_negative_count',
+    ]})
+PY
+```
+
+Expected result:
+- Teacher A INT8: `44992 B`, SHA256 `6f15f06c1fc65c2d239b48c265a6e416fcd9273ee35b97c9e5c222c4a03d0ff9`
+- Teacher A FP32: `141700 B`, SHA256 `caf5b5f853e0ce889395dfda12667d3dade7764edc9b37fa23a5e6fc7175afe9`
+- Teacher A default profile: probability `0.359375`, Q15 `11776`, raw int8 `-36`
+- Teacher B INT8: `44992 B`, SHA256 `33fe5c8f3d176d532c047650e32ab9c64a9a53c365b9787483447b7257ec0bd7`
+- Teacher B FP32: `141700 B`, SHA256 `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`
+- Teacher B default profile: probability `0.394531`, Q15 `12928`, raw int8 `-27`
+- both bundles use `[1, 40, 101, 1]` and ops `ADD, AVERAGE_POOL_2D, CONV_2D, LOGISTIC`
+- both bundles still report `formal_export_gate_passed=False`
+
+Confirm firmware integration status:
+```bash
+cd /root/ameba-river
+rg -n "teacher_a_new_target|teacher_b_new_target|NANO_TEACHER|student_conv_resnet_ed_nano_teacher" \
+  Kconfig prj.conf components/river_voice/river_voice_kws.cc components/river_voice/generated -S
+```
+
+Expected result:
+- no Teacher A/B firmware-side variant yet
+- current firmware still selects `student_conv_resnet_ed_nano_current_teacher_a_v2`
+
+Observed on 2026-06-01:
+- passed: `/root/kws-trainint` `git pull` fast-forwarded from `f9d5cbf` to `f2ca5db`.
+- passed: `/root/kws-trainint` `git lfs pull`.
+- passed: `/root/kws-trainint` status is `## main...origin/main`.
+- passed: `/root/kws-trainint` `git lfs status` showed no pending changes.
+- passed: Python artifact inspection confirmed Teacher A/B model sizes, SHA256, contracts, ops, default thresholds, and board metrics.
+- passed: firmware-side `rg` showed the new Teacher A/B variants are not yet integrated.
+- not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
 ## Step H.xiaozhi-client.92 Verification
 
 Refresh the wakeword algorithm repository and LFS artifacts:

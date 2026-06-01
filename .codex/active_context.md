@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.92 刷新并审计算法仓库唤醒模型`
+  - `Step H.xiaozhi-client.93 拉取 Teacher A/B 新端侧模型导出包`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.93` 拉取 Teacher A/B 新端侧模型导出包：
+  - 按固化流程再次在 `/root/kws-trainint` 执行 `git pull` 和 `git lfs pull`；仓库从 `f9d5cbf` 快进到 `f2ca5db`，`git lfs status` 无待提交对象，状态仍为 `main...origin/main`。
+  - 最新关键交付提交为 `601e94a 交付Teacher A/B端侧模型导出包`，新增两个同规格端侧 nano bundle：`student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_v1` 和 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1`。
+  - Teacher A bundle：INT8 `44992 B` / SHA256 `6f15f06c1fc65c2d239b48c265a6e416fcd9273ee35b97c9e5c222c4a03d0ff9`，FP32 `141700 B` / SHA256 `caf5b5f853e0ce889395dfda12667d3dade7764edc9b37fa23a5e6fc7175afe9`，默认档 raw int8 `-36`，board recall `0.966790`，board FA/h `554.787969`。
+  - Teacher B bundle：INT8 `44992 B` / SHA256 `33fe5c8f3d176d532c047650e32ab9c64a9a53c365b9787483447b7257ec0bd7`，FP32 `141700 B` / SHA256 `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`，默认档 raw int8 `-27`，board recall `0.940959`，board FA/h `597.831863`。
+  - 两个 bundle 均保持 `[1, 40, 101, 1]` 输入和 `ADD/AVERAGE_POOL_2D/CONV_2D/LOGISTIC` 算子集合，且 `formal_export_gate_passed=False`；算法侧建议 Teacher A 作为主试板候选，Teacher B 作为对照候选。
+  - 固件侧当前仍只接入 `student_conv_resnet_ed_nano_current_teacher_a_v2`，尚未新增 Teacher A/B 的 generated header 或 `prj.conf` 变体。
+  - 未执行 firmware build/flash/serial monitor；本步只刷新和审计算法仓库。
 
 - `Step H.xiaozhi-client.92` 刷新并审计算法仓库唤醒模型：
   - 按 `AGENTS.md` 固化流程在 `/root/kws-trainint` 执行 `git pull` 和 `git lfs pull`；算法仓库工作区保持干净，状态为 `main...origin/main`，`git pull` 返回 `Already up to date`。

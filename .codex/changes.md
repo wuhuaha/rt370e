@@ -1,5 +1,39 @@
 # Change Log
 
+## Step H.xiaozhi-client.93
+- 再次按固化流程刷新唤醒算法仓库 `/root/kws-trainint`：
+  - 更新前 HEAD 为 `f9d5cbf915c908832e5201e6fb4be098540cc0d4`。
+  - `git pull` 从 `origin/main` 快进到 `f2ca5dbcd9523c6e7f70291ec8f778c87d7e279f`。
+  - `git lfs pull` 成功，`git lfs status` 显示无待提交/未暂存 LFS 变更。
+  - 当前算法仓库状态为 `main...origin/main`，工作区干净。
+- 本次算法更新新增两个 Teacher A/B 同规格端侧 nano export bundle：
+  - `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_v1/`
+  - `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1/`
+  - 关键交付提交为 `601e94a 交付Teacher A/B端侧模型导出包`，最新仓库顶端提交为 `f2ca5db 归档无进一步研究价值的活动任务`。
+- Teacher A student 复核结果：
+  - INT8 TFLite：`44992 B`，SHA256 `6f15f06c1fc65c2d239b48c265a6e416fcd9273ee35b97c9e5c222c4a03d0ff9`。
+  - FP32 TFLite：`141700 B`，SHA256 `caf5b5f853e0ce889395dfda12667d3dade7764edc9b37fa23a5e6fc7175afe9`。
+  - 契约：`[1, 40, 101, 1]`，ops `ADD, AVERAGE_POOL_2D, CONV_2D, LOGISTIC`。
+  - 默认档 `default_target_recall`：probability `0.359375` / Q15 `11776` / raw int8 `-36`。
+  - 离线指标：board recall `0.966790`，board FA/h `554.787969`，false_alarm_eval `4/45`，real_use_eval `85/98`；算法侧建议先烧 Teacher A 作为主试板候选。
+- Teacher B student 复核结果：
+  - INT8 TFLite：`44992 B`，SHA256 `33fe5c8f3d176d532c047650e32ab9c64a9a53c365b9787483447b7257ec0bd7`。
+  - FP32 TFLite：`141700 B`，SHA256 `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`。
+  - 契约同为 `[1, 40, 101, 1]`，ops `ADD, AVERAGE_POOL_2D, CONV_2D, LOGISTIC`。
+  - 默认档 `default_target_recall`：probability `0.394531` / Q15 `12928` / raw int8 `-27`。
+  - 离线指标：board recall `0.940959`，board FA/h `597.831863`，false_alarm_eval `9/45`，real_use_eval `82/98`；算法侧定位为 A/B 对照候选，不建议优先替换。
+- 固件侧当前状态：
+  - 当前 `/root/ameba-river` 仍只接入 `student_conv_resnet_ed_nano_current_teacher_a_v2` FP32 debug 变体。
+  - 尚未新增 Teacher A/B 的 generated model header、Kconfig 变体或 `prj.conf` 选择项。
+  - 本步只审计新算法交付，不导入模型、不改 KWS runtime、不改 protected tensor dump/alignment/board-local parity 路径。
+- Verification for this step:
+  - `/root/kws-trainint` `git pull` fast-forwarded from `f9d5cbf` to `f2ca5db`.
+  - `/root/kws-trainint` `git lfs pull` passed.
+  - `/root/kws-trainint` `git lfs status` showed no pending LFS changes.
+  - Python artifact inspection confirmed both Teacher A/B model sizes, SHA256, input contract, ops, thresholds, and board metrics.
+  - `rg` in `/root/ameba-river` confirmed Teacher A/B variants are not yet integrated in firmware-side Kconfig/KWS generated headers.
+  - not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
 ## Step H.xiaozhi-client.92
 - 按新固化流程刷新唤醒算法仓库 `/root/kws-trainint`：
   - 确认算法仓库在 `main...origin/main`，工作区干净。
