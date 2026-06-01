@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.96
+- 回到 Teacher B 算法/模型同事推荐的触发配置：
+  - 保持 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 模型、`40x101` frontend、conv-only resolver、VAD gate 和 fallback 关闭策略不变。
+  - 将 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从 `26214` 恢复为 Teacher B bundle `default_target_recall` 推荐值 `12928`，约等于 probability `0.394531` / `threshold_pm=394`。
+  - 将 `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` 从 `3` 改为 `1`，对齐算法离线单次过阈值命中语义。
+- 协作决策：
+  - 用户确认当前项目不再通过阈值及 hold 调整处理误唤醒。
+  - 后续误唤醒问题由算法同事通过模型/数据优化解决；固件侧除非用户当前明确要求，不再调 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 或 `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES`。
+  - `AGENTS.md` 已记录该规则，避免后续会话重新在项目侧调参。
+- 边界：
+  - 本步只改 KWS trigger 配置和项目记录，不更换模型文件、不启用 INT8、不修改 VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+- Verification for this step:
+  - `rg` 确认 `prj.conf` 当前选择 Teacher B FP32 debug 变体、阈值 `12928`、`hold=1`，并保持 `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n`。
+  - `git diff --check` 和 `python3 tools/diag/check_codex_harness.py` 通过。
+  - `python3 /root/ameba-rtos/ameba.py build -p` against `/root/ameba-rtos` completed with `Build done`。
+  - `build_RTL8730E/build/.config` 确认启用 Teacher B FP32 debug 变体、阈值 `12928`、`hold=1`、`cooldown=2500`，并保持 gate fallback 关闭。
+  - AP/combined image strings 仍包含 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_debug`、`kws backend` 和 `kws config`。
+  - not run: flash/download or serial monitor; current hardware policy leaves board validation to the user unless explicitly requested.
+
 ## Step H.xiaozhi-client.95
 - 收紧 Teacher B FP32 试板唤醒触发参数：
   - 保持 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 模型、`40x101` frontend、conv-only resolver、VAD gate 和 fallback 关闭策略不变。

@@ -14,6 +14,12 @@
   2. `git pull`
   3. `git lfs pull`
 - Inspect and import wakeword model artifacts from `/root/kws-trainint` after both Git and Git LFS content are current.
+- For KWS trigger policy, use the threshold and hold recommended by the active
+  model delivery bundle or by model colleagues.
+- Do not adjust `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` or
+  `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` in this project to compensate for
+  false wakes unless the user explicitly requests firmware-side tuning in the
+  current turn. Route false-wake quality fixes back to the algorithm/model path.
 
 ## Delivery Mode
 - Work in small, board-verifiable steps.

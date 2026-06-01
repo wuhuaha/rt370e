@@ -1,3 +1,49 @@
+## Step H.xiaozhi-client.96 Verification
+
+Confirm the Teacher B model-colleague recommended trigger profile:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928|CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1|CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n|TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG" \
+  prj.conf Kconfig components/river_voice/river_voice_kws.cc AGENTS.md
+```
+
+Expected result:
+- Teacher B FP32 debug variant remains selected
+- KWS threshold is `12928`, which reports as about `threshold_pm=394`
+- KWS hold is `1`
+- gate fallback remains disabled
+- `AGENTS.md` records that threshold/hold should not be firmware-tuned unless explicitly requested
+
+Run static hygiene and build:
+```bash
+cd /root/ameba-river
+git diff --check -- prj.conf AGENTS.md .codex/changes.md .codex/verification.md .codex/active_context.md
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- harness check passes
+- SDK build completes successfully with `Build done`
+
+After flashing, confirm the runtime KWS status line reports:
+```text
+kws config: threshold_q15=12928 threshold_pm=394 hold=1 cooldown_ms=2500 fallback=off
+```
+
+Observed on 2026-06-01:
+- passed: `rg` confirmed Teacher B FP32 debug remains selected with `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`, and `CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n`; `AGENTS.md` records the no firmware-side threshold/hold tuning rule unless explicitly requested.
+- passed: `git diff --check -- prj.conf AGENTS.md .codex/changes.md .codex/verification.md .codex/active_context.md`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: `python3 /root/ameba-rtos/ameba.py build -p` against `/root/ameba-rtos`; final output contained `Build done`.
+- passed: generated `.config` confirms `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG=y`, `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=1`, `CONFIG_RIVER_KWS_COOLDOWN_MS=2500`, and `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`.
+- passed: `strings -a build_RTL8730E/build/project_hp/image/ap_image_all.bin` and `strings -a build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin` contain `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_debug`, `kws backend`, and `kws config`.
+- not run: flash/download or serial monitor; current hardware policy leaves board validation to the user unless explicitly requested.
+
 ## Step H.xiaozhi-client.95 Verification
 
 Confirm the tightened Teacher B FP32 trigger profile:

@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.95 收紧 Teacher B FP32 唤醒阈值和 hold`
+  - `Step H.xiaozhi-client.96 回到 Teacher B 算法推荐触发配置`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,16 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.96` 回到 Teacher B 算法推荐触发配置：
+  - 当前固件仍使用 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 debug 模型，未切到 INT8。
+  - 按用户确认，当前项目不再通过阈值或 hold 调参处理误唤醒；误唤醒质量问题后续交由算法同事/模型迭代优化。
+  - `prj.conf` 将 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从 `26214` 恢复为 Teacher B bundle `default_target_recall` 推荐值 `12928`（probability `0.394531`，运行时约 `threshold_pm=394`）。
+  - `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES` 从 `3` 改为 `1`，对齐算法离线单次过阈值命中语义；`CONFIG_RIVER_KWS_COOLDOWN_MS=2500`、`CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n`、`stride=16` 保持不变。
+  - `AGENTS.md` 固化新协作规则：除非用户当前明确要求固件侧调参，KWS trigger threshold/hold 使用模型交付或算法同事推荐配置，误唤醒优化回到算法/模型路径。
+  - 本步只改 KWS trigger 配置和项目记录，不更换模型文件，不修改 VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py`、`/root/ameba-rtos` 完整 build 均通过；构建输出为 `Build done`，生成 `.config` 确认 `12928/hold=1/fallback=off`，AP/combined image strings 仍确认 Teacher B FP32 变体生效。
+  - 未执行 flash/serial monitor；按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.95` 收紧 Teacher B FP32 唤醒阈值和 hold：
   - 当前固件仍使用 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 debug 模型，未切到 INT8。
