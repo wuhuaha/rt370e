@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.94
+- 将当前项目唤醒词模型切换为 Teacher B new-target BNT5 FP32 debug 变体：
+  - 新增固件内模型头文件 `components/river_voice/generated/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_model_data.h`，字节内容与 `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1/model.fp32.tflite` 完全一致。
+  - 在 `components/river_voice/river_voice_kws.cc` 新增 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG` 分支，保持当前 `40x101`、`n_fft=400`、centered log-mel 前端和同一 conv-only resolver 路径。
+  - `prj.conf` 取消 Teacher A v2 选择，切换到 Teacher B FP32 变体，并把 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15` 从 `9831` 改为 `12928`，对齐 Teacher B bundle 的 `default_target_recall` 档位。
+- 部署依据：
+  - Teacher B bundle 为 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1`，`formal_export_gate_passed=False`，但它与当前固件主线共享 `[1,40,101,1]` 输入契约、`ADD/AVERAGE_POOL_2D/CONV_2D/LOGISTIC` 算子集合和 `141700 B` FP32 头文件大小，因此可以作为同构 FP32 替换候选。
+  - 该 bundle 的 INT8 虽然存在，但本项目当前部署链路继续使用 FP32 debug 变体，以避免再次切到已经验证过实时性较差的 INT8 路径。
+- 边界：
+  - 本步只切换当前固件的 KWS 模型变体和阈值，不修改 VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+- Verification for this step:
+  - `cp` 生成的模型头文件与 `/root/kws-trainint` 的 `model.fp32.tflite` SHA256 完全一致。
+  - Python 校验确认 Teacher B bundle 的 FP32 契约为 `float32 [1,40,101,1] -> float32 [1,1,1,1]`，默认档阈值为 `0.394531 / q15 12928`。
+  - `rg` 确认 `Kconfig`、`prj.conf` 和 `river_voice_kws.cc` 已切到 Teacher B FP32 变体。
+  - `build_RTL8730E/build/.config` 确认启用 Teacher B FP32 debug 变体、阈值 `12928`、`hold=2`、`cooldown=2500`，并保持 gate fallback 关闭。
+  - `python3 /root/ameba-rtos/ameba.py build -p` against `/root/ameba-rtos` completed with `Build done`。
+  - AP/combined image strings include `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_debug`。
+  - not run: flash/download or serial monitor; current hardware policy leaves board validation to the user unless explicitly requested.
+
 ## Step H.xiaozhi-client.93
 - 再次按固化流程刷新唤醒算法仓库 `/root/kws-trainint`：
   - 更新前 HEAD 为 `f9d5cbf915c908832e5201e6fb4be098540cc0d4`。

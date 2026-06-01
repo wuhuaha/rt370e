@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.93 拉取 Teacher A/B 新端侧模型导出包`
+  - `Step H.xiaozhi-client.94 部署 Teacher B new-target BNT5 FP32 唤醒模型`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.94` 部署 Teacher B new-target BNT5 FP32 唤醒模型：
+  - 当前固件侧 KWS 已从 `student_conv_resnet_ed_nano_current_teacher_a_v2` 切到 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` 的 FP32 debug 变体；未切到 INT8。
+  - 新增模型头文件 `components/river_voice/generated/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_model_data.h`，与 `/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1/model.fp32.tflite` 字节一致：`141700 B`，SHA256 `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`。
+  - `Kconfig` 新增 `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG`；`prj.conf` 选择该变体，并设置 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`、`CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`、`CONFIG_RIVER_KWS_COOLDOWN_MS=2500`、`CONFIG_RIVER_KWS_GATE_FALLBACK_EN=n`。
+  - Bundle 契约已复核为 FP32 `float32 [1,40,101,1] -> float32 [1,1,1,1]`，算子集合 `ADD/AVERAGE_POOL_2D/CONV_2D/LOGISTIC`，继续使用当前 `40x101` centered log-mel 前端和 conv-only resolver path。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py`、`/root/ameba-rtos` 完整 build 均通过；构建输出为 `Build done`，生成 `.config` 和 AP/combined image strings 已确认 Teacher B FP32 变体生效。
+  - 未执行 flash/serial monitor；按当前硬件策略等待用户手动上板验证。
 
 - `Step H.xiaozhi-client.93` 拉取 Teacher A/B 新端侧模型导出包：
   - 按固化流程再次在 `/root/kws-trainint` 执行 `git pull` 和 `git lfs pull`；仓库从 `f9d5cbf` 快进到 `f2ca5db`，`git lfs status` 无待提交对象，状态仍为 `main...origin/main`。

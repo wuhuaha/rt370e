@@ -1,3 +1,90 @@
+## Step H.xiaozhi-client.94 Verification
+
+Confirm the Teacher B FP32 deployment selection:
+```bash
+cd /root/ameba-river
+rg -n "STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG|student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_tflite|CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928" \
+  Kconfig prj.conf components/river_voice/river_voice_kws.cc components/river_voice/generated -S
+```
+
+Expected result:
+- `Kconfig` defines the new Teacher B FP32 debug variant
+- `prj.conf` selects `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG=y`
+- `prj.conf` sets `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`
+- `river_voice_kws.cc` binds `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_tflite`
+
+Verify the copied model bytes match the algorithm bundle:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import ast, hashlib, re
+from pathlib import Path
+header = Path('components/river_voice/generated/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_model_data.h').read_text()
+match = re.search(r'\\{(.*)\\};', header, re.S)
+values = ast.literal_eval('[' + match.group(1) + ']')
+payload = bytes(values)
+source = Path('/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1/model.fp32.tflite').read_bytes()
+print(len(payload), hashlib.sha256(payload).hexdigest())
+print(len(source), hashlib.sha256(source).hexdigest())
+print(payload == source)
+PY
+```
+
+Expected result:
+- both byte streams are `141700 B`
+- both SHA256 hashes are `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`
+- final comparison prints `True`
+
+Confirm model contract and threshold mapping:
+```bash
+cd /root/ameba-river
+python3 - <<'PY'
+import json
+from pathlib import Path
+bundle = Path('/root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1')
+summary = json.loads((bundle / 'deployment_summary.json').read_text())
+thresholds = json.loads((bundle / 'threshold_profiles.json').read_text())
+assert summary['fp32_tflite']['input']['dtype'] == 'float32'
+assert summary['fp32_tflite']['input']['shape'] == [1, 40, 101, 1]
+assert summary['fp32_tflite']['output']['dtype'] == 'float32'
+assert summary['fp32_tflite']['output']['shape'] == [1, 1, 1, 1]
+assert thresholds['recommended_profile_id'] == 'default_target_recall'
+assert thresholds['profiles'][1]['threshold_q15'] == 12928
+print('bundle_contract_ok')
+PY
+```
+
+Expected result:
+- bundle contract is `float32 [1,40,101,1] -> float32 [1,1,1,1]`
+- `default_target_recall` maps to Q15 `12928`
+
+Run static hygiene and build:
+```bash
+cd /root/ameba-river
+git diff --check -- Kconfig prj.conf components/river_voice/river_voice_kws.cc components/river_voice/generated/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_model_data.h
+python3 tools/diag/check_codex_harness.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace errors
+- harness check passes
+- SDK build completes successfully with `Build done`
+
+Observed on 2026-06-01:
+- passed: `rg` confirmed the Teacher B FP32 debug variant, model symbol, and `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`.
+- passed: header bytes match the algorithm bundle exactly (`141700 B`, SHA256 `5ba71c42362ee9e4f93310166d95de74bcbe6a138548852372ba9daee5183e38`).
+- passed: Python bundle contract check confirmed the FP32 `float32 [1,40,101,1] -> float32 [1,1,1,1]` contract and `default_target_recall` threshold `12928`.
+- passed: `git diff --check` for the edited KWS files.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- passed: `python3 /root/ameba-rtos/ameba.py build -p` against `/root/ameba-rtos`; final output contained `Build done`.
+- passed: generated `.config` confirms `CONFIG_RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG=y`, `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=12928`, `CONFIG_RIVER_KWS_TRIGGER_HOLD_FRAMES=2`, `CONFIG_RIVER_KWS_COOLDOWN_MS=2500`, and `# CONFIG_RIVER_KWS_GATE_FALLBACK_EN is not set`.
+- passed: `strings -a build_RTL8730E/build/project_hp/image/ap_image_all.bin` and `strings -a build_RTL8730E/build/project_hp/image/km0_km4_ca32_app.bin` contain `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1_fp32_debug`.
+- not run: flash/download or serial monitor; current hardware policy leaves board validation to the user unless explicitly requested.
+
 ## Step H.xiaozhi-client.93 Verification
 
 Refresh the wakeword algorithm repository and LFS artifacts:

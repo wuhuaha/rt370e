@@ -422,6 +422,18 @@ config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_CURRENT_TEACHER_A_V2_
       promoting the lower-risk teacher-a refresh candidate for board-side A/B
       validation.
 
+config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_NANO_TEACHER_B_NEW_TARGET_BNT5_V1_FP32_DEBUG
+    bool "Student Conv-ResNet-ED nano teacher-b new-target BNT5 v1 FP32 debug model"
+    help
+      Use the FP32 debug bundle exported from
+      /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1.
+      This variant keeps the current `40x101`, `n_fft=400`, centered log-mel
+      frontend and same conv-only resolver path as the current nano FP32
+      deployment while switching the model weights to the Teacher B B-NT-5
+      A/B candidate. The matching algorithm bundle also includes INT8
+      artifacts, but this project variant intentionally keeps the FP32 path
+      that is currently used for board-side deployment and parity debugging.
+
 config RIVER_KWS_MODEL_VARIANT_STUDENT_CONV_RESNET_ED_TINY_V1_FP32_DEBUG
     bool "Student Conv-ResNet-ED tiny v1 FP32 debug model"
     help
