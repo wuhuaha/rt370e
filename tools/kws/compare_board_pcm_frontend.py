@@ -21,12 +21,32 @@ DEFAULT_CONTRACT = Path(
 )
 
 
-def hz_to_mel(freq: float) -> float:
+def htk_hz_to_mel(freq: float) -> float:
     return 2595.0 * math.log10(1.0 + (freq / 700.0))
 
 
-def mel_to_hz(mels: np.ndarray) -> np.ndarray:
+def htk_mel_to_hz(mels: np.ndarray) -> np.ndarray:
     return 700.0 * ((10.0 ** (mels / 2595.0)) - 1.0)
+
+
+def firmware_hz_to_mel(freq: float) -> float:
+    f_sp = 200.0 / 3.0
+    min_log_hz = 1000.0
+    min_log_mel = min_log_hz / f_sp
+    logstep = math.log(6.4) / 27.0
+    if freq < min_log_hz:
+        return freq / f_sp
+    return min_log_mel + math.log(freq / min_log_hz) / logstep
+
+
+def firmware_mel_to_hz(mels: np.ndarray) -> np.ndarray:
+    f_sp = 200.0 / 3.0
+    min_log_hz = 1000.0
+    min_log_mel = min_log_hz / f_sp
+    logstep = math.log(6.4) / 27.0
+    linear = mels * f_sp
+    logarithmic = min_log_hz * np.exp(logstep * (mels - min_log_mel))
+    return np.where(mels < min_log_mel, linear, logarithmic)
 
 
 def normalize(features: np.ndarray, correction: int) -> np.ndarray:
@@ -61,10 +81,10 @@ def torchaudio_mel_fbanks(
     norm: str | None,
 ) -> np.ndarray:
     all_freqs = np.linspace(0.0, float(sample_rate // 2), n_freqs, dtype=np.float64)
-    m_min = hz_to_mel(f_min)
-    m_max = hz_to_mel(f_max)
+    m_min = htk_hz_to_mel(f_min)
+    m_max = htk_hz_to_mel(f_max)
     m_pts = np.linspace(m_min, m_max, n_mels + 2, dtype=np.float64)
-    f_pts = mel_to_hz(m_pts)
+    f_pts = htk_mel_to_hz(m_pts)
     f_diff = f_pts[1:] - f_pts[:-1]
     slopes = f_pts[np.newaxis, :] - all_freqs[:, np.newaxis]
     down_slopes = (-1.0 * slopes[:, :-2]) / f_diff[:-1]
@@ -158,10 +178,10 @@ def board_frontend_from_union(samples: np.ndarray, contract: dict) -> np.ndarray
         window=symmetric_hann(win_length),
     )[:frame_count]
 
-    mel_min = hz_to_mel(float(frontend["f_min_hz"]))
-    mel_max = hz_to_mel(float(frontend["f_max_hz"]))
+    mel_min = firmware_hz_to_mel(float(frontend["f_min_hz"]))
+    mel_max = firmware_hz_to_mel(float(frontend["f_max_hz"]))
     mel_points = np.linspace(mel_min, mel_max, n_mels + 2, dtype=np.float64)
-    hz_points = mel_to_hz(mel_points)
+    hz_points = firmware_mel_to_hz(mel_points)
     fft_bins = (n_fft // 2) + 1
     mel = np.zeros((frame_count, n_mels), dtype=np.float32)
     for band in range(n_mels):
@@ -215,6 +235,27 @@ def compare_pcm(name: str, candidate: np.ndarray, reference: np.ndarray) -> str:
     )
 
 
+def run_tflite_scores(
+    model_path: Path,
+    board: np.ndarray,
+    candidates: list[tuple[str, np.ndarray]],
+) -> list[tuple[str, float]]:
+    import tensorflow as tf
+
+    interpreter = tf.lite.Interpreter(model_path=str(model_path))
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()[0]
+    output_details = interpreter.get_output_details()[0]
+    scores: list[tuple[str, float]] = []
+    for name, feature in [("board_feature", board), *candidates]:
+        tensor = feature.astype(np.float32, copy=False).reshape(1, *feature.shape, 1)
+        interpreter.set_tensor(input_details["index"], tensor)
+        interpreter.invoke()
+        output = interpreter.get_tensor(output_details["index"])
+        scores.append((name, float(output.reshape(-1)[0])))
+    return scores
+
+
 def write_wav(path: Path, samples: np.ndarray, channels: int = 1) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if channels == 1:
@@ -228,6 +269,18 @@ def write_wav(path: Path, samples: np.ndarray, channels: int = 1) -> None:
         handle.writeframes(payload.tobytes())
 
 
+def infer_shape_from_contract(feature_bytes: bytes, contract: dict) -> tuple[int, int, int, int]:
+    frontend = contract["frontend"]
+    shape = (1, int(frontend["feature_dim"]), int(frontend["frame_count"]), 1)
+    expected_bytes = int(np.prod(shape)) * np.dtype("<f4").itemsize
+    if len(feature_bytes) != expected_bytes:
+        raise SystemExit(
+            f"dump missing tensor shape and feature byte count does not match "
+            f"contract: parsed={len(feature_bytes)} expected={expected_bytes}"
+        )
+    return shape
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log", type=Path, required=True)
@@ -235,6 +288,7 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--out-dir", type=Path)
     parser.add_argument("--require-raw", action="store_true")
+    parser.add_argument("--model", type=Path)
     args = parser.parse_args()
 
     records = parse_dump_records(args.log)
@@ -254,11 +308,13 @@ def main() -> int:
     )
     if args.require_raw and not raw_available:
         raise SystemExit(f"dump seq={seq} missing complete raw_capture_s16 chunks")
-    if record.shape is None:
-        raise SystemExit(f"dump seq={seq} missing tensor shape")
 
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
     feature_bytes = record.assemble(record.feat_chunks, record.feat_total_chunks)
+    if record.shape is None:
+        record.shape = infer_shape_from_contract(feature_bytes, contract)
+    if record.layout is None:
+        record.layout = "mels_frames"
     pcm_bytes = record.assemble(record.pcm_chunks, record.pcm_total_chunks)
     if record.pcm_bytes is not None and len(pcm_bytes) != record.pcm_bytes:
         raise SystemExit(
@@ -403,6 +459,9 @@ def main() -> int:
         print("raw_capture: missing")
     for name, candidate in candidates:
         print(compare(name, candidate, board))
+    if args.model is not None:
+        for name, score in run_tflite_scores(args.model, board, candidates):
+            print(f"model_score[{name}]={score:.6f}")
 
     if args.out_dir is not None:
         args.out_dir.mkdir(parents=True, exist_ok=True)

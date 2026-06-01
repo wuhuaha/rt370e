@@ -1,5 +1,31 @@
 # Change Log
 
+## Step H.xiaozhi-client.106
+- 修正 KWS PCM/frontend 对拍工具并完成一次旧镜像 preproc-only 实测：
+  - `capture_kws_pcm_dump.py` 兼容旧镜像缺少 `raw_pcm` chunk 的 snapshot，可通过 `--allow-missing-raw` 拉取 `feat_f32`、`output_raw`、`preproc_s16` 做预处理 PCM 对拍。
+  - chunk 拉取端改为按固件 64B chunk 规则匹配：非最后 chunk 必须正好 128 个 hex 字符，最后 chunk 必须是 1..64 字节偶数长度；遇到串口日志穿插会按 `--chunk-retries` 重试。
+  - 抓到 dump 后默认先发 `river orvibo abort`，减少云端会话/TTS 日志继续穿插 chunk 输出；保留 `--no-quiet-orvibo` 便于需要保持会话的场景。
+  - `compare_board_pcm_frontend.py` 在旧日志 `begin` 行被串口打坏时，可从 `frontend_contract.json` 推导 `[1,40,201,1]` shape；新增 `--model` 可选参数，用同一个 FP32 TFLite 对板端 feature 和各个 host frontend candidate 打分。
+  - 修正 host board-like frontend：板端固件使用 TFLM frontend 的分段 mel 标尺，而训练侧 torchaudio 路径使用 HTK mel；对拍工具现在分别实现两条路径，不再把 HTK mel 误用于 board-like 重算。
+- live capture 结果：
+  - 使用当前串口 `/dev/ttyUSB0` 和旧镜像执行 `--allow-missing-raw`，成功拉取 `seq=6` 的 `feat_f32=503`、`output_raw=1`、`preproc_s16=1013`。
+  - `preproc_s16` PCM hash 与旧镜像 meta 一致：`0x7c488712`；板端 feature hash 可从 diag/meta 片段确认：`0x507ea30a`。
+  - 修正 mel 标尺后，host 从同窗 `preproc_s16` 重算 board-like frontend 与板端 feature 基本精确一致：`mae=0.000000`、`rmse=0.000000`、`max_abs=0.000003`、`corr=1.000000`。
+  - 同一 PCM 用训练侧 torchaudio 默认 frontend 重算后与板端 feature 差异明显：最佳候选 `training_32200_reflect_first201` 为 `mae=0.334050`、`rmse=0.430262`、`max_abs=2.860521`、`corr=0.907431`。
+  - 用 A 2s FP32 TFLite 对同一组 feature 打分：板端 feature `0.551604`，host board-like `0.551603`，训练侧候选约 `0.568944..0.569661`。
+- 当前判断：
+  - 这次实测证明板端 feature 可以由同窗 `preproc_s16` 在主机侧精确重演，模型/TFLite 输出路径没有表现出部署损坏迹象。
+  - 存在明确的训练侧 torchaudio frontend 与固件 TFLM-style frontend 标尺差异；该差异应回到算法/导出契约确认，而不是继续猜固件阈值。
+  - raw capture 仍未完成，因为当前板上运行的是旧镜像，snapshot 没有 `raw_pcm`；需要用户刷入 Step 105 之后再跑默认 `--require-raw` 抓完整 raw/preproc 对拍。
+- Verification for this step:
+  - `python3 -m py_compile tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py tools/kws/replay_board_tensor_dump.py` passed。
+  - `python3 tools/kws/capture_kws_pcm_dump.py --help` passed。
+  - `git diff --check -- tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py` passed。
+  - live serial capture passed chunk pull with `python3 tools/kws/capture_kws_pcm_dump.py -p /dev/ttyUSB0 -b 1500000 --log tmp/kws_pcm_dump_preproc_only_serial_5.log --out-dir tmp/kws_pcm_frontend_compare_preproc5 --allow-missing-raw --chunk-retries 10 --chunk-timeout-s 2.5 --capture-timeout-s 180`。
+  - compare + optional TFLite scoring passed with `python3 tools/kws/compare_board_pcm_frontend.py --log tmp/kws_pcm_dump_preproc_only_serial_5.log --seq latest --out-dir tmp/kws_pcm_frontend_compare_preproc5 --model /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model.fp32.tflite`。
+  - Not run: firmware build, because this step only changes host-side Python tools and `.codex` process records.
+  - Not run: full raw_capture_s16 live comparison, because the currently connected board is still running an older image without `raw_pcm` chunks.
+
 ## Step H.xiaozhi-client.105
 - 增强 KWS dump 紧凑串口格式：
   - `river_voice_kws.cc` 在 `river kws dump meta` 时额外输出 `KWSDUMP BEGIN`、`KWSDUMP META`、`KWSDUMP PCM_META`、`KWSDUMP RAW_PCM_META`、`KWSDUMP SNAPSHOT`，保留原有 `kws tensor dump ...` meta 日志供既有人工排查使用。

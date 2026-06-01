@@ -1,3 +1,74 @@
+## Step H.xiaozhi-client.106 Verification
+
+Check host-side capture and frontend comparison tooling:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  tools/kws/capture_kws_pcm_dump.py \
+  tools/kws/compare_board_pcm_frontend.py \
+  tools/kws/replay_board_tensor_dump.py
+python3 tools/kws/capture_kws_pcm_dump.py --help
+git diff --check -- \
+  tools/kws/capture_kws_pcm_dump.py \
+  tools/kws/compare_board_pcm_frontend.py
+```
+
+Observed live preproc-only capture on the currently connected old board image:
+```bash
+cd /root/ameba-river
+python3 tools/kws/capture_kws_pcm_dump.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  --log tmp/kws_pcm_dump_preproc_only_serial_5.log \
+  --out-dir tmp/kws_pcm_frontend_compare_preproc5 \
+  --allow-missing-raw \
+  --chunk-retries 10 \
+  --chunk-timeout-s 2.5 \
+  --capture-timeout-s 180
+```
+
+Result:
+- pulled `seq=6` with `feat_f32=503`, `output_raw=1`, `preproc_s16=1013`
+- no `raw_capture_s16`, because the board is still running an older image without `raw_pcm` chunks
+- `preproc_s16` PCM hash matched board meta: `0x7c488712`
+
+Run compare plus optional FP32 TFLite scoring:
+```bash
+cd /root/ameba-river
+python3 tools/kws/compare_board_pcm_frontend.py \
+  --log tmp/kws_pcm_dump_preproc_only_serial_5.log \
+  --seq latest \
+  --out-dir tmp/kws_pcm_frontend_compare_preproc5 \
+  --model /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model.fp32.tflite
+```
+
+Observed comparison:
+- `board_numpy_from_pcm_union`: `mae=0.000000`, `rmse=0.000000`, `max_abs=0.000003`, `corr=1.000000`
+- best training-side candidate `training_32200_reflect_first201`: `mae=0.334050`, `rmse=0.430262`, `max_abs=2.860521`, `corr=0.907431`
+- model scores: board feature `0.551604`, host board-like feature `0.551603`, training-side candidates `0.568944..0.569661`
+
+After flashing the current Step 105+ image, rerun without `--allow-missing-raw` to complete raw/preproc comparison:
+```bash
+cd /root/ameba-river
+python3 tools/kws/capture_kws_pcm_dump.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  --log tmp/kws_pcm_dump_serial.log \
+  --out-dir tmp/kws_pcm_frontend_compare \
+  --capture-timeout-s 180
+```
+
+Expected current-image result:
+- `raw_capture_s16` chunks are present and required
+- output includes `preproc_vs_raw_ch0_*`, `board_numpy_from_raw_ch0_union`, and training raw-ch0 frontend candidates
+
+Observed on 2026-06-01:
+- passed: Python compile, script help, and `git diff --check`
+- passed: live preproc-only capture against the currently connected old image
+- passed: compare + optional TFLite scoring
+- not run: firmware build, because this step only changes host-side Python tools and `.codex` records
+- not run: full raw_capture_s16 comparison, because the current board image lacks `raw_pcm` chunks
+
 ## Step H.xiaozhi-client.105 Verification
 
 Check compact KWS dump parsing and build:

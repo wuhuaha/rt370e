@@ -18,8 +18,10 @@ SNAPSHOT_RE = re.compile(
     r"(?:kws tensor dump snapshot:|KWSDUMP SNAPSHOT) "
     r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
     r"chunks=\[feat:(?P<feat>\d+) input:(?P<input>\d+) "
-    r"output:(?P<output>\d+) pcm:(?P<pcm>\d+) raw_pcm:(?P<raw_pcm>\d+)\]"
+    r"output:(?P<output>\d+) pcm:(?P<pcm>\d+)"
+    r"(?: raw_pcm:(?P<raw_pcm>\d+))?\]"
 )
+DUMP_CHUNK_BYTES = 64
 
 
 class SerialCapture:
@@ -82,12 +84,17 @@ class SerialCapture:
 
 def chunk_regex(label: str, seq: int, chunk: int, total: int) -> re.Pattern[str]:
     escaped_label = re.escape(label)
+    if chunk < total:
+        hex_payload = rf"[0-9a-fA-F]{{{DUMP_CHUNK_BYTES * 2}}}"
+    else:
+        hex_payload = rf"(?:[0-9a-fA-F]{{2}}){{1,{DUMP_CHUNK_BYTES}}}"
     return re.compile(
         (
             rf"(?:kws tensor dump {escaped_label}: seq={seq} "
             rf"chunk={chunk}/{total} hex=|"
             rf"KWSDUMP CHUNK label={escaped_label} seq={seq} "
             rf"chunk={chunk}/{total} hex=)"
+            rf"{hex_payload}(?:\r?\n)"
         )
     )
 
@@ -99,20 +106,31 @@ def pull_chunks(
     seq: int,
     command_delay_s: float,
     chunk_timeout_s: float,
+    chunk_retries: int,
 ) -> None:
     for chunk in range(1, total + 1):
-        before = len(capture.buffer)
-        capture.write_command(f"river kws dump chunk {label} {chunk}", command_delay_s)
         pattern = chunk_regex(label, seq, chunk, total)
-        deadline = time.monotonic() + chunk_timeout_s
-        while time.monotonic() < deadline:
-            if pattern.search(capture.buffer, before):
-                break
-            capture.read_for(0.05)
-        else:
-            raise TimeoutError(
-                f"timeout waiting for {label} chunk {chunk}/{total}"
+        for attempt in range(1, chunk_retries + 1):
+            before = len(capture.buffer)
+            capture.write_command(
+                f"river kws dump chunk {label} {chunk}",
+                command_delay_s,
             )
+            deadline = time.monotonic() + chunk_timeout_s
+            while time.monotonic() < deadline:
+                if pattern.search(capture.buffer, before):
+                    break
+                capture.read_for(0.05)
+            else:
+                if attempt < chunk_retries:
+                    continue
+                raise TimeoutError(
+                    f"timeout waiting for {label} chunk {chunk}/{total} "
+                    f"after {chunk_retries} attempts"
+                )
+            break
+        else:
+            raise TimeoutError(f"timeout waiting for {label} chunk {chunk}/{total}")
 
 
 def run_compare(args: argparse.Namespace, log_path: Path) -> None:
@@ -123,10 +141,11 @@ def run_compare(args: argparse.Namespace, log_path: Path) -> None:
         str(log_path),
         "--seq",
         "latest",
-        "--require-raw",
         "--out-dir",
         str(args.out_dir),
     ]
+    if not args.allow_missing_raw:
+        command.append("--require-raw")
     if args.contract is not None:
         command.extend(["--contract", str(args.contract)])
     subprocess.run(command, cwd=args.repo_root, check=True)
@@ -146,7 +165,19 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--capture-timeout-s", type=float, default=90.0)
     parser.add_argument("--chunk-timeout-s", type=float, default=2.0)
+    parser.add_argument("--chunk-retries", type=int, default=5)
     parser.add_argument("--command-delay-s", type=float, default=0.02)
+    parser.add_argument("--post-capture-settle-s", type=float, default=0.8)
+    parser.add_argument(
+        "--allow-missing-raw",
+        action="store_true",
+        help="Allow older board images that only dump preproc_s16, not raw_capture_s16.",
+    )
+    parser.add_argument(
+        "--no-quiet-orvibo",
+        action="store_true",
+        help="Do not send `river orvibo abort` after dump capture.",
+    )
     parser.add_argument("--skip-compare", action="store_true")
     args = parser.parse_args()
 
@@ -168,18 +199,28 @@ def main() -> int:
         )
         seq = int(captured.group("seq"))
         print(f"captured seq={seq}; pulling metadata")
+        if not args.no_quiet_orvibo:
+            capture.write_command("river orvibo abort", args.post_capture_settle_s)
 
         meta_start = len(capture.buffer)
         capture.write_command("river kws dump meta", 0.30)
         snapshot = capture.wait_for(SNAPSHOT_RE, 5.0, meta_start)
         if int(snapshot.group("seq")) != seq:
             seq = int(snapshot.group("seq"))
+        raw_pcm_chunks = int(snapshot.group("raw_pcm") or 0)
+        if raw_pcm_chunks <= 0 and not args.allow_missing_raw:
+            raise RuntimeError(
+                "dump snapshot has no raw_pcm chunks; flash an image with "
+                "raw_capture_s16 support or rerun with --allow-missing-raw "
+                "for preproc-only comparison"
+            )
         counts = {
             "feat_f32": int(snapshot.group("feat")),
             "output_raw": int(snapshot.group("output")),
             "preproc_s16": int(snapshot.group("pcm")),
-            "raw_capture_s16": int(snapshot.group("raw_pcm")),
         }
+        if raw_pcm_chunks > 0:
+            counts["raw_capture_s16"] = raw_pcm_chunks
         print(
             "chunks: "
             + " ".join(f"{label}={total}" for label, total in counts.items())
@@ -194,6 +235,7 @@ def main() -> int:
                 seq,
                 args.command_delay_s,
                 args.chunk_timeout_s,
+                args.chunk_retries,
             )
             print(f"pulled {label}: {total} chunks")
 

@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.105 增强 KWS dump 紧凑串口格式`
+  - `Step H.xiaozhi-client.106 修正 KWS PCM/frontend 对拍工具`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,15 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.106` 修正 KWS PCM/frontend 对拍工具：
+  - `capture_kws_pcm_dump.py` 增加旧镜像 preproc-only 兼容模式 `--allow-missing-raw`，chunk 拉取按 64B 固件 chunk 长度过滤并支持重试，抓到 dump 后默认先发 `river orvibo abort` 降低会话/TTS 日志穿插概率。
+  - `compare_board_pcm_frontend.py` 在旧日志 `begin` 行被串口打坏时可从 `frontend_contract.json` 推导 shape；新增 `--model` 可选 TFLite 打分；board-like frontend 改为使用固件里的 TFLM-style 分段 mel 标尺，训练侧 torchaudio path 继续使用 HTK mel。
+  - 已在当前 `/dev/ttyUSB0` 旧镜像上完成一次 live preproc-only 抓取：`seq=6`，`feat_f32=503`、`output_raw=1`、`preproc_s16=1013`，PCM hash `0x7c488712` 与板端 meta 一致。
+  - host 从同窗 `preproc_s16` 重算 board-like frontend 与板端 feature 精确对齐：`mae=0.000000`、`rmse=0.000000`、`max_abs=0.000003`、`corr=1.000000`；同一 PCM 的训练侧 torchaudio frontend 与板端 feature 差异明显，最佳候选 `mae=0.334050`、`corr=0.907431`。
+  - FP32 TFLite 打分：板端 feature `0.551604`，host board-like feature `0.551603`，训练侧候选 `0.568944..0.569661`。当前证据更支持 frontend contract 差异/模型质量问题，不支持“模型二进制或 TFLite invoke 损坏”。
+  - 当前板上仍是旧镜像，无 `raw_capture_s16` chunk；刷入 Step 105+ 镜像后需重新运行默认 capture 命令完成 raw/preproc 对拍。
+  - `python3 -m py_compile`、脚本 `--help`、`git diff --check`、live preproc-only capture 和 compare + TFLite scoring 均通过；本步只改 host Python 工具和 `.codex` 记录，未执行 firmware build。
 
 - `Step H.xiaozhi-client.105` 增强 KWS dump 紧凑串口格式：
   - `river kws dump meta` 继续输出原 `kws tensor dump ...` 日志，并额外输出 `KWSDUMP BEGIN/META/PCM_META/RAW_PCM_META/SNAPSHOT`；chunk 拉取输出改为更短的 `KWSDUMP CHUNK label=... seq=... chunk=... hex=...`，降低长串口日志被其它任务日志插断后无法解析的概率。
