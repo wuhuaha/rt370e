@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.103
+- 为 A 2s FP32 KWS 误唤醒排查增加同窗 raw/preproc PCM 对拍能力：
+  - `river kws dump next` 仍按原有方式捕获 `feat_f32`、`input_raw`、`output_raw`，并额外保留同一次 inference 的 `preproc_s16` 与 `raw_capture_s16` PCM snapshot。
+  - `raw_capture_s16` 由 `river_orvibo_audio_service.c` 随同一帧 `preproc_s16` 进入 KWS worker queue；pre-roll ring 也改为保存同一个 queue item，避免 raw/preproc 因 worker backlog 或 VAD pre-roll flush 错位。
+  - PCM 抓取点按 KWS worker 实际处理样本推进，记录的是实际进入 KWS frontend 的 16k mono int16 预处理采样，以及对应的 interleaved raw capture frame；frontend reset 时同步记录 `center` 左侧 synthetic zero pad。
+  - 对当前 `[1,40,201,1]` / `n_fft=400` / `hop=160` 模型，`preproc_s16` snapshot 长度为 `400 + (201 - 1) * 160 = 32400` samples，即 64800 bytes；2ch `raw_capture_s16` 为 32400 frames / 129600 bytes。
+  - `river kws dump chunk` 新增 `raw_capture_s16`；`kws tensor dump begin/meta/status/snapshot` 追加 PCM bytes/hash/chunk 诊断，但保留现有 tensor dump 行首和字段顺序。
+  - `tools/kws/replay_board_tensor_dump.py` 继续兼容既有 replay，并能解析 `preproc_s16` / `raw_capture_s16` metadata 与 chunk。
+  - 新增 `tools/kws/compare_board_pcm_frontend.py`，可从同一串口日志解析 `feat_f32 + preproc_s16 + raw_capture_s16`，校验 PCM hash，导出 WAV/NPY，用 numpy 重算 board-like frontend 与训练侧 torchaudio 默认 frontend 近似路径，并输出特征差异指标。
+- 设计边界：
+  - 不修改 KWS 模型、阈值、hold、VAD gate 策略、TFLM invoke、云端协议、UI 或 SDK 源码。
+  - 不删除或弱化既有 tensor dump、alignment replay、board/local parity；本步是在现有 pull-based dump 上增加 PCM 证据链。
+- Verification for this step:
+  - `python3 -m py_compile tools/kws/replay_board_tensor_dump.py tools/kws/compare_board_pcm_frontend.py` passed。
+  - `git diff --check -- include/river/river_voice_kws.h components/river_voice/river_voice_kws.cc components/river_voice/river_orvibo_audio_service.c components/river_diag/river_diag_cmd.c tools/kws/replay_board_tensor_dump.py tools/kws/compare_board_pcm_frontend.py` passed。
+  - `/root/ameba-rtos` full build completed with `Build done`。
+  - `python3 tools/diag/check_codex_harness.py` passed。
+  - Not run yet: flash/download and live serial PCM capture; current NAND hardware still requires manual download-mode handling before this new dump path can be exercised on board。
+
 ## Step H.xiaozhi-client.101
 - 删除灯 / 窗帘相关 UI 代码与资源，回收之前在提交 `afaaeeb 关联TTS动作文本与设备动画` 中引入的设备动作动画路径。
 - 删除 `components/river_ui/river_orvibo_ui.c` 中的 TTS 文本到 `action_light_on/off`、`action_curtain_open/close` 的匹配逻辑；TTS 更新现在只刷新文本，不再因为“开灯 / 关灯 / 开帘 / 关帘”切换设备动作动画。

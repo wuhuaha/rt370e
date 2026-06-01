@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import tensorflow as tf
 
 
 DEFAULT_MODEL = Path(
@@ -74,6 +73,24 @@ CHUNK_RE_COMPACT = re.compile(
 )
 END_RE = re.compile(r"kws tensor dump end: seq=(?P<seq>\d+) infer=(?P<infer>\d+)")
 END_RE_COMPACT = re.compile(r"KWSDUMP END seq=(?P<seq>\d+) infer=(?P<infer>\d+)")
+PCM_META_RE = re.compile(
+    r"kws pcm dump meta: "
+    r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
+    r"label=(?P<label>\w+) sample_rate=(?P<sample_rate>\d+) "
+    r"samples=(?P<samples>\d+) bytes=(?P<bytes>\d+) "
+    r"hash=0x(?P<hash>[0-9a-fA-F]+) "
+    r"center_pad=(?P<center_pad>\d+) window=(?P<window>\d+) "
+    r"hop=(?P<hop>\d+) frames=(?P<frames>\d+)"
+)
+RAW_PCM_META_RE = re.compile(
+    r"kws raw pcm dump meta: "
+    r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
+    r"label=(?P<label>\w+) sample_rate=(?P<sample_rate>\d+) "
+    r"channels=(?P<channels>\d+) samples=(?P<samples>\d+) "
+    r"bytes=(?P<bytes>\d+) hash=0x(?P<hash>[0-9a-fA-F]+) "
+    r"center_pad=(?P<center_pad>\d+) window=(?P<window>\d+) "
+    r"hop=(?P<hop>\d+) frames=(?P<frames>\d+)"
+)
 
 
 def fnv1a32(data: bytes, seed: int = 2166136261) -> int:
@@ -124,9 +141,30 @@ class DumpRecord:
     feat_chunks: dict[int, bytes] = field(default_factory=dict)
     input_chunks: dict[int, bytes] = field(default_factory=dict)
     output_chunks: dict[int, bytes] = field(default_factory=dict)
+    pcm_chunks: dict[int, bytes] = field(default_factory=dict)
+    raw_pcm_chunks: dict[int, bytes] = field(default_factory=dict)
     feat_total_chunks: int | None = None
     input_total_chunks: int | None = None
     output_total_chunks: int | None = None
+    pcm_total_chunks: int | None = None
+    raw_pcm_total_chunks: int | None = None
+    pcm_sample_rate: int | None = None
+    pcm_samples: int | None = None
+    pcm_bytes: int | None = None
+    pcm_hash: int | None = None
+    pcm_center_pad: int | None = None
+    pcm_window: int | None = None
+    pcm_hop: int | None = None
+    pcm_frames: int | None = None
+    raw_pcm_sample_rate: int | None = None
+    raw_pcm_channels: int | None = None
+    raw_pcm_samples: int | None = None
+    raw_pcm_bytes: int | None = None
+    raw_pcm_hash: int | None = None
+    raw_pcm_center_pad: int | None = None
+    raw_pcm_window: int | None = None
+    raw_pcm_hop: int | None = None
+    raw_pcm_frames: int | None = None
     chunk_parse_errors: list[str] = field(default_factory=list)
     ended: bool = False
 
@@ -201,6 +239,10 @@ def parse_dump_records(log_path: Path) -> dict[int, DumpRecord]:
                     record.input_total_chunks = total
                 elif label == "output_raw":
                     record.output_total_chunks = total
+                elif label in ("preproc_s16", "pcm_s16"):
+                    record.pcm_total_chunks = total
+                elif label == "raw_capture_s16":
+                    record.raw_pcm_total_chunks = total
                 try:
                     payload = bytes.fromhex(hex_payload)
                 except ValueError as exc:
@@ -214,6 +256,41 @@ def parse_dump_records(log_path: Path) -> dict[int, DumpRecord]:
                     record.input_chunks[chunk_idx] = payload
                 elif label == "output_raw":
                     record.output_chunks[chunk_idx] = payload
+                elif label in ("preproc_s16", "pcm_s16"):
+                    record.pcm_chunks[chunk_idx] = payload
+                elif label == "raw_capture_s16":
+                    record.raw_pcm_chunks[chunk_idx] = payload
+                continue
+
+            if match := PCM_META_RE.search(line):
+                seq = int(match.group("seq"))
+                record = records.setdefault(seq, DumpRecord(seq=seq))
+                if record.infer is None:
+                    record.infer = int(match.group("infer"))
+                record.pcm_sample_rate = int(match.group("sample_rate"))
+                record.pcm_samples = int(match.group("samples"))
+                record.pcm_bytes = int(match.group("bytes"))
+                record.pcm_hash = int(match.group("hash"), 16)
+                record.pcm_center_pad = int(match.group("center_pad"))
+                record.pcm_window = int(match.group("window"))
+                record.pcm_hop = int(match.group("hop"))
+                record.pcm_frames = int(match.group("frames"))
+                continue
+
+            if match := RAW_PCM_META_RE.search(line):
+                seq = int(match.group("seq"))
+                record = records.setdefault(seq, DumpRecord(seq=seq))
+                if record.infer is None:
+                    record.infer = int(match.group("infer"))
+                record.raw_pcm_sample_rate = int(match.group("sample_rate"))
+                record.raw_pcm_channels = int(match.group("channels"))
+                record.raw_pcm_samples = int(match.group("samples"))
+                record.raw_pcm_bytes = int(match.group("bytes"))
+                record.raw_pcm_hash = int(match.group("hash"), 16)
+                record.raw_pcm_center_pad = int(match.group("center_pad"))
+                record.raw_pcm_window = int(match.group("window"))
+                record.raw_pcm_hop = int(match.group("hop"))
+                record.raw_pcm_frames = int(match.group("frames"))
                 continue
 
             if match := END_RE.search(line) or END_RE_COMPACT.search(line):
@@ -395,6 +472,8 @@ def main() -> int:
         raise SystemExit(f"dump seq={record.seq} unusable: {detail}")
 
     effective_input_hash = fnv1a32(effective_input_bytes)
+
+    import tensorflow as tf
 
     interpreter_kwargs: dict[str, Any] = {"model_path": str(args.model)}
     if args.builtin_ref:

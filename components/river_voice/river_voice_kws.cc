@@ -425,6 +425,22 @@ extern "C" {
     ((RIVER_KWS_SAMPLE_RATE_HZ / 1000U) * RIVER_KWS_INPUT_FRAME_MS)
 #define RIVER_KWS_INPUT_FRAME_BYTES \
     (RIVER_KWS_INPUT_FRAME_SAMPLES * sizeof(int16_t))
+#define RIVER_KWS_FRONTEND_PCM_SAMPLES \
+    (RIVER_KWS_WINDOW_SAMPLES + \
+     ((RIVER_KWS_FEATURE_FRAMES - 1U) * RIVER_KWS_HOP_SAMPLES))
+#define RIVER_KWS_FRONTEND_PCM_BYTES \
+    (RIVER_KWS_FRONTEND_PCM_SAMPLES * sizeof(int16_t))
+#ifndef CONFIG_RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS
+#define CONFIG_RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS 2
+#endif
+#define RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS \
+    ((uint32_t)CONFIG_RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS)
+#define RIVER_KWS_RAW_CAPTURE_FRAME_BYTES \
+    (RIVER_KWS_INPUT_FRAME_SAMPLES * RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS * \
+     sizeof(int16_t))
+#define RIVER_KWS_RAW_CAPTURE_FRONTEND_BYTES \
+    (RIVER_KWS_FRONTEND_PCM_SAMPLES * RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS * \
+     sizeof(int16_t))
 #define RIVER_KWS_PRE_ROLL_FRAMES_RAW \
     (((uint32_t)CONFIG_RIVER_KWS_VAD_PRE_ROLL_MS + \
       RIVER_KWS_INPUT_FRAME_MS - 1U) / RIVER_KWS_INPUT_FRAME_MS)
@@ -627,7 +643,10 @@ typedef enum {
 
 typedef struct {
     uint32_t type;
+    uint32_t raw_capture_channels;
+    uint32_t raw_capture_bytes;
     uint8_t pcm[RIVER_KWS_INPUT_FRAME_BYTES];
+    uint8_t raw_capture[RIVER_KWS_RAW_CAPTURE_FRAME_BYTES];
 } river_voice_kws_queue_item_t;
 
 typedef enum {
@@ -648,6 +667,10 @@ typedef struct {
     bool tensor_dump_output_from_heap_types;
     bool tensor_dump_feature_stage_from_heap_types;
     bool tensor_dump_input_stage_from_heap_types;
+    bool tensor_dump_pcm_history_from_heap_types;
+    bool tensor_dump_pcm_snapshot_from_heap_types;
+    bool tensor_dump_raw_pcm_history_from_heap_types;
+    bool tensor_dump_raw_pcm_snapshot_from_heap_types;
     bool gate_open;
     bool gate_triggered;
     uint32_t mel_frames_seen;
@@ -722,6 +745,8 @@ typedef struct {
     uint32_t tensor_dump_capture_infer;
     uint32_t tensor_dump_capture_feat_hash;
     uint32_t tensor_dump_capture_input_hash;
+    uint32_t tensor_dump_capture_pcm_hash;
+    uint32_t tensor_dump_capture_raw_pcm_hash;
     uint32_t tensor_dump_capture_confidence_q15;
     int32_t tensor_dump_capture_raw_output_scalar;
     bool tensor_dump_capture_gate_open;
@@ -729,9 +754,19 @@ typedef struct {
     size_t tensor_dump_feature_bytes_captured;
     size_t tensor_dump_input_bytes_captured;
     size_t tensor_dump_output_bytes_captured;
+    size_t tensor_dump_pcm_bytes_captured;
+    size_t tensor_dump_raw_pcm_bytes_captured;
     size_t tensor_dump_feature_bytes_reserved;
     size_t tensor_dump_input_bytes_reserved;
     size_t tensor_dump_output_bytes_reserved;
+    size_t tensor_dump_pcm_bytes_reserved;
+    size_t tensor_dump_raw_pcm_bytes_reserved;
+    uint32_t tensor_dump_pcm_history_write_index;
+    uint32_t tensor_dump_pcm_history_count;
+    uint32_t tensor_dump_raw_pcm_history_write_index;
+    uint32_t tensor_dump_raw_pcm_history_count;
+    uint32_t tensor_dump_raw_pcm_history_channels;
+    uint32_t tensor_dump_raw_pcm_snapshot_channels;
     size_t pre_roll_ring_storage_bytes;
     size_t input_ring_storage_bytes;
     float mel_band_norm[RIVER_KWS_MEL_BINS];
@@ -745,6 +780,10 @@ typedef struct {
     uint8_t *tensor_dump_input_tensor;
     uint8_t *tensor_dump_input_stage_tensor;
     uint8_t *tensor_dump_output_tensor;
+    int16_t *tensor_dump_pcm_history;
+    int16_t *tensor_dump_pcm_snapshot;
+    int16_t *tensor_dump_raw_pcm_history;
+    int16_t *tensor_dump_raw_pcm_snapshot;
     float power_bins[RIVER_KWS_FFT_BINS];
     int16_t sample_ring[RIVER_KWS_WINDOW_SAMPLES];
 #if RIVER_KWS_FRONTEND_USE_TFLM_FLOAT_RFFT
@@ -776,6 +815,10 @@ typedef struct {
     void *tensor_dump_input_allocation;
     void *tensor_dump_input_stage_allocation;
     void *tensor_dump_output_allocation;
+    void *tensor_dump_pcm_history_allocation;
+    void *tensor_dump_pcm_snapshot_allocation;
+    void *tensor_dump_raw_pcm_history_allocation;
+    void *tensor_dump_raw_pcm_snapshot_allocation;
     uint8_t *tensor_arena;
     uint8_t *pre_roll_ring_storage;
     uint8_t *input_ring_storage;
@@ -815,8 +858,8 @@ typedef struct {
     uint32_t pre_roll_flush_count;
     uint32_t pre_roll_trim_count;
     uint32_t pre_roll_trimmed_frames;
-    uint8_t pre_roll_frame[RIVER_KWS_INPUT_FRAME_BYTES];
-    uint8_t pre_roll_drop_frame[RIVER_KWS_INPUT_FRAME_BYTES];
+    river_voice_kws_queue_item_t pre_roll_frame;
+    river_voice_kws_queue_item_t pre_roll_drop_item;
     river_audio_frame_ring_t input_ring;
     uint32_t input_ring_dropped;
     uint32_t input_trim_count;
@@ -959,6 +1002,10 @@ static const char *river_voice_kws_tensor_dump_buffer_name(
         return "input_raw";
     case RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW:
         return "output_raw";
+    case RIVER_VOICE_KWS_TENSOR_DUMP_PREPROC_PCM_S16:
+        return "preproc_s16";
+    case RIVER_VOICE_KWS_TENSOR_DUMP_RAW_CAPTURE_S16:
+        return "raw_capture_s16";
     default:
         return "unknown";
     }
@@ -1507,7 +1554,9 @@ static size_t river_voice_kws_tensor_dump_reserved_bytes(
 
     return (context->tensor_dump_feature_bytes_reserved * 2U) +
            (context->tensor_dump_input_bytes_reserved * 2U) +
-           context->tensor_dump_output_bytes_reserved;
+           context->tensor_dump_output_bytes_reserved +
+           (context->tensor_dump_pcm_bytes_reserved * 2U) +
+           (context->tensor_dump_raw_pcm_bytes_reserved * 2U);
 }
 
 static river_status_t river_voice_kws_ensure_tensor_dump_buffers(
@@ -1571,6 +1620,50 @@ static river_status_t river_voice_kws_ensure_tensor_dump_buffers(
         if (status != RIVER_OK) {
             return status;
         }
+    }
+    if (context->tensor_dump_pcm_history == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_pcm_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_pcm_history_allocation,
+            &context->tensor_dump_pcm_history_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_pcm_history = (int16_t *)buffer;
+    }
+    if (context->tensor_dump_pcm_snapshot == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_pcm_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_pcm_snapshot_allocation,
+            &context->tensor_dump_pcm_snapshot_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_pcm_snapshot = (int16_t *)buffer;
+    }
+    if (context->tensor_dump_raw_pcm_history == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_raw_pcm_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_raw_pcm_history_allocation,
+            &context->tensor_dump_raw_pcm_history_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_raw_pcm_history = (int16_t *)buffer;
+    }
+    if (context->tensor_dump_raw_pcm_snapshot == NULL) {
+        status = river_voice_kws_alloc_runtime_buffer(
+            context->tensor_dump_raw_pcm_bytes_reserved,
+            &buffer,
+            &context->tensor_dump_raw_pcm_snapshot_allocation,
+            &context->tensor_dump_raw_pcm_snapshot_from_heap_types);
+        if (status != RIVER_OK) {
+            return status;
+        }
+        context->tensor_dump_raw_pcm_snapshot = (int16_t *)buffer;
     }
 
     return RIVER_OK;
@@ -2041,6 +2134,268 @@ static size_t river_voice_kws_tensor_dump_chunk_count(size_t bytes)
     return chunk_count == 0U ? 1U : chunk_count;
 }
 
+static void river_voice_kws_pcm_history_reset(river_voice_kws_context_t *context)
+{
+    if (context == NULL) {
+        return;
+    }
+
+    context->tensor_dump_pcm_history_write_index = 0U;
+    context->tensor_dump_pcm_history_count = 0U;
+    if (context->tensor_dump_pcm_history != NULL) {
+        memset(context->tensor_dump_pcm_history, 0,
+               context->tensor_dump_pcm_bytes_reserved);
+    }
+}
+
+static void river_voice_kws_record_pcm_sample(river_voice_kws_context_t *context,
+                                              int16_t sample)
+{
+    if (context == NULL || !context->tensor_dump_armed ||
+        context->tensor_dump_pcm_history == NULL ||
+        context->tensor_dump_pcm_bytes_reserved < RIVER_KWS_FRONTEND_PCM_BYTES) {
+        return;
+    }
+
+    context->tensor_dump_pcm_history
+        [context->tensor_dump_pcm_history_write_index] = sample;
+    context->tensor_dump_pcm_history_write_index =
+        (context->tensor_dump_pcm_history_write_index + 1U) %
+        RIVER_KWS_FRONTEND_PCM_SAMPLES;
+    if (context->tensor_dump_pcm_history_count < RIVER_KWS_FRONTEND_PCM_SAMPLES) {
+        context->tensor_dump_pcm_history_count++;
+    }
+}
+
+static void river_voice_kws_record_pcm_silence(river_voice_kws_context_t *context,
+                                               uint32_t sample_count)
+{
+    uint32_t index;
+
+    for (index = 0U; index < sample_count; ++index) {
+        river_voice_kws_record_pcm_sample(context, 0);
+    }
+}
+
+static void river_voice_kws_capture_preproc_pcm_snapshot(
+    river_voice_kws_context_t *context)
+{
+    uint32_t samples;
+    uint32_t start;
+    uint32_t index;
+
+    if (context == NULL || context->tensor_dump_pcm_history == NULL ||
+        context->tensor_dump_pcm_snapshot == NULL ||
+        context->tensor_dump_pcm_bytes_reserved < RIVER_KWS_FRONTEND_PCM_BYTES) {
+        return;
+    }
+
+    samples = context->tensor_dump_pcm_history_count;
+    if (samples > RIVER_KWS_FRONTEND_PCM_SAMPLES) {
+        samples = RIVER_KWS_FRONTEND_PCM_SAMPLES;
+    }
+    if (samples == 0U) {
+        context->tensor_dump_pcm_bytes_captured = 0U;
+        context->tensor_dump_capture_pcm_hash = 0U;
+        return;
+    }
+
+    start = (context->tensor_dump_pcm_history_count < RIVER_KWS_FRONTEND_PCM_SAMPLES) ?
+                0U :
+                context->tensor_dump_pcm_history_write_index;
+    for (index = 0U; index < samples; ++index) {
+        uint32_t history_index =
+            (start + index) % RIVER_KWS_FRONTEND_PCM_SAMPLES;
+        context->tensor_dump_pcm_snapshot[index] =
+            context->tensor_dump_pcm_history[history_index];
+    }
+    context->tensor_dump_pcm_bytes_captured =
+        (size_t)samples * sizeof(int16_t);
+    context->tensor_dump_capture_pcm_hash =
+        river_voice_kws_fnv1a32(
+            (const uint8_t *)context->tensor_dump_pcm_snapshot,
+            context->tensor_dump_pcm_bytes_captured);
+}
+
+static void river_voice_kws_raw_pcm_history_reset(river_voice_kws_context_t *context,
+                                                  bool keep_channels);
+
+static void river_voice_kws_record_raw_pcm_sample(
+    river_voice_kws_context_t *context,
+    const int16_t *sample,
+    uint32_t channels);
+
+static void river_voice_kws_record_raw_pcm_silence(
+    river_voice_kws_context_t *context,
+    uint32_t sample_count)
+{
+    uint32_t channels;
+    uint32_t index;
+    int16_t zeros[RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS];
+
+    if (context == NULL ||
+        context->tensor_dump_raw_pcm_history_channels == 0U ||
+        context->tensor_dump_raw_pcm_history_channels >
+            RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS) {
+        return;
+    }
+
+    memset(zeros, 0, sizeof(zeros));
+    channels = context->tensor_dump_raw_pcm_history_channels;
+    for (index = 0U; index < sample_count; ++index) {
+        river_voice_kws_record_raw_pcm_sample(context, zeros, channels);
+    }
+}
+
+static void river_voice_kws_prepare_raw_pcm_channels(
+    river_voice_kws_context_t *context,
+    uint32_t channels)
+{
+    if (context == NULL || channels == 0U ||
+        channels > RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS) {
+        return;
+    }
+    if (context->tensor_dump_raw_pcm_history_channels == channels) {
+        return;
+    }
+
+    context->tensor_dump_raw_pcm_history_channels = channels;
+    river_voice_kws_raw_pcm_history_reset(context, true);
+}
+
+static void river_voice_kws_raw_pcm_history_reset(river_voice_kws_context_t *context,
+                                                  bool keep_channels)
+{
+    uint32_t channels = 0U;
+
+    if (context == NULL) {
+        return;
+    }
+
+    if (keep_channels) {
+        channels = context->tensor_dump_raw_pcm_history_channels;
+    }
+    context->tensor_dump_raw_pcm_history_write_index = 0U;
+    context->tensor_dump_raw_pcm_history_count = 0U;
+    context->tensor_dump_raw_pcm_snapshot_channels = 0U;
+    if (!keep_channels) {
+        context->tensor_dump_raw_pcm_history_channels = 0U;
+    } else {
+        context->tensor_dump_raw_pcm_history_channels = channels;
+    }
+    if (context->tensor_dump_raw_pcm_history != NULL) {
+        memset(context->tensor_dump_raw_pcm_history,
+               0,
+               context->tensor_dump_raw_pcm_bytes_reserved);
+    }
+    if (context->tensor_dump_armed && channels > 0U) {
+        river_voice_kws_record_raw_pcm_silence(
+            context,
+            RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES);
+    }
+}
+
+static void river_voice_kws_record_raw_pcm_sample(
+    river_voice_kws_context_t *context,
+    const int16_t *sample,
+    uint32_t channels)
+{
+    uint32_t base_index;
+    uint32_t channel;
+
+    if (context == NULL || !context->tensor_dump_armed ||
+        context->tensor_dump_raw_pcm_history == NULL || sample == NULL ||
+        channels == 0U || channels > RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS ||
+        context->tensor_dump_raw_pcm_bytes_reserved <
+            RIVER_KWS_RAW_CAPTURE_FRONTEND_BYTES) {
+        return;
+    }
+
+    if (context->tensor_dump_raw_pcm_history_channels != channels) {
+        river_voice_kws_prepare_raw_pcm_channels(context, channels);
+    }
+    if (context->tensor_dump_raw_pcm_history_channels != channels) {
+        return;
+    }
+
+    base_index = context->tensor_dump_raw_pcm_history_write_index *
+                 RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS;
+    for (channel = 0U; channel < channels; ++channel) {
+        context->tensor_dump_raw_pcm_history[base_index + channel] =
+            sample[channel];
+    }
+    for (; channel < RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS; ++channel) {
+        context->tensor_dump_raw_pcm_history[base_index + channel] = 0;
+    }
+
+    context->tensor_dump_raw_pcm_history_write_index =
+        (context->tensor_dump_raw_pcm_history_write_index + 1U) %
+        RIVER_KWS_FRONTEND_PCM_SAMPLES;
+    if (context->tensor_dump_raw_pcm_history_count <
+        RIVER_KWS_FRONTEND_PCM_SAMPLES) {
+        context->tensor_dump_raw_pcm_history_count++;
+    }
+}
+
+static void river_voice_kws_capture_raw_pcm_snapshot(
+    river_voice_kws_context_t *context)
+{
+    uint32_t channels;
+    uint32_t samples;
+    uint32_t start;
+    uint32_t index;
+
+    if (context == NULL || context->tensor_dump_raw_pcm_history == NULL ||
+        context->tensor_dump_raw_pcm_snapshot == NULL ||
+        context->tensor_dump_raw_pcm_bytes_reserved <
+            RIVER_KWS_RAW_CAPTURE_FRONTEND_BYTES) {
+        return;
+    }
+
+    channels = context->tensor_dump_raw_pcm_history_channels;
+    if (channels == 0U || channels > RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS) {
+        context->tensor_dump_raw_pcm_bytes_captured = 0U;
+        context->tensor_dump_capture_raw_pcm_hash = 0U;
+        context->tensor_dump_raw_pcm_snapshot_channels = 0U;
+        return;
+    }
+
+    samples = context->tensor_dump_raw_pcm_history_count;
+    if (samples > RIVER_KWS_FRONTEND_PCM_SAMPLES) {
+        samples = RIVER_KWS_FRONTEND_PCM_SAMPLES;
+    }
+    if (samples == 0U) {
+        context->tensor_dump_raw_pcm_bytes_captured = 0U;
+        context->tensor_dump_capture_raw_pcm_hash = 0U;
+        context->tensor_dump_raw_pcm_snapshot_channels = 0U;
+        return;
+    }
+
+    start = (context->tensor_dump_raw_pcm_history_count <
+             RIVER_KWS_FRONTEND_PCM_SAMPLES) ?
+                0U :
+                context->tensor_dump_raw_pcm_history_write_index;
+    for (index = 0U; index < samples; ++index) {
+        uint32_t history_index =
+            (start + index) % RIVER_KWS_FRONTEND_PCM_SAMPLES;
+        uint32_t channel;
+
+        for (channel = 0U; channel < channels; ++channel) {
+            context->tensor_dump_raw_pcm_snapshot[(index * channels) + channel] =
+                context->tensor_dump_raw_pcm_history[
+                    (history_index * RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS) +
+                    channel];
+        }
+    }
+    context->tensor_dump_raw_pcm_snapshot_channels = channels;
+    context->tensor_dump_raw_pcm_bytes_captured =
+        (size_t)samples * (size_t)channels * sizeof(int16_t);
+    context->tensor_dump_capture_raw_pcm_hash =
+        river_voice_kws_fnv1a32(
+            (const uint8_t *)context->tensor_dump_raw_pcm_snapshot,
+            context->tensor_dump_raw_pcm_bytes_captured);
+}
+
 static void river_voice_kws_log_hex_chunk(const char *label,
                                           uint32_t seq,
                                           const uint8_t *data,
@@ -2097,6 +2452,8 @@ static void river_voice_kws_tensor_dump_snapshot_reset(
     context->tensor_dump_capture_infer = 0U;
     context->tensor_dump_capture_feat_hash = 0U;
     context->tensor_dump_capture_input_hash = 0U;
+    context->tensor_dump_capture_pcm_hash = 0U;
+    context->tensor_dump_capture_raw_pcm_hash = 0U;
     context->tensor_dump_capture_confidence_q15 = 0U;
     context->tensor_dump_capture_raw_output_scalar = 0;
     context->tensor_dump_capture_gate_open = false;
@@ -2104,6 +2461,9 @@ static void river_voice_kws_tensor_dump_snapshot_reset(
     context->tensor_dump_feature_bytes_captured = 0U;
     context->tensor_dump_input_bytes_captured = 0U;
     context->tensor_dump_output_bytes_captured = 0U;
+    context->tensor_dump_pcm_bytes_captured = 0U;
+    context->tensor_dump_raw_pcm_bytes_captured = 0U;
+    context->tensor_dump_raw_pcm_snapshot_channels = 0U;
 }
 
 static const char *river_voice_kws_tensor_dump_mode_name(
@@ -2156,6 +2516,8 @@ static river_status_t river_voice_kws_arm_tensor_dump(
     context->tensor_dump_mode = mode;
     context->tensor_dump_armed = true;
     context->tensor_dump_feature_valid = false;
+    river_voice_kws_pcm_history_reset(context);
+    river_voice_kws_raw_pcm_history_reset(context, false);
     river_voice_kws_tensor_dump_snapshot_reset(context);
     return RIVER_OK;
 }
@@ -2187,7 +2549,7 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
         return;
     }
 
-    RIVER_LOGI("kws tensor dump begin: seq=%lu infer=%lu gate=%s in_type=%s out_type=%s layout=%s shape=%lu,%lu,%lu,%lu feat_bytes=%lu input_bytes=%lu output_bytes=%lu",
+    RIVER_LOGI("kws tensor dump begin: seq=%lu infer=%lu gate=%s in_type=%s out_type=%s layout=%s shape=%lu,%lu,%lu,%lu feat_bytes=%lu input_bytes=%lu output_bytes=%lu pcm_bytes=%lu raw_pcm_bytes=%lu",
                (unsigned long)context->tensor_dump_capture_seq,
                (unsigned long)context->tensor_dump_capture_infer,
                context->tensor_dump_capture_gate_open ? "open" : "closed",
@@ -2200,8 +2562,10 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                (unsigned long)context->input_shape[3],
                (unsigned long)context->tensor_dump_feature_bytes_captured,
                (unsigned long)context->tensor_dump_input_bytes_captured,
-               (unsigned long)context->tensor_dump_output_bytes_captured);
-    RIVER_LOGI("kws tensor dump meta: seq=%lu feat_hash=0x%08lx input_hash=0x%08lx raw=%ld score=%.6f q15=%lu in_scale=%.9f in_zp=%ld out_scale=%.9f out_zp=%ld",
+               (unsigned long)context->tensor_dump_output_bytes_captured,
+               (unsigned long)context->tensor_dump_pcm_bytes_captured,
+               (unsigned long)context->tensor_dump_raw_pcm_bytes_captured);
+    RIVER_LOGI("kws tensor dump meta: seq=%lu feat_hash=0x%08lx input_hash=0x%08lx raw=%ld score=%.6f q15=%lu in_scale=%.9f in_zp=%ld out_scale=%.9f out_zp=%ld pcm_hash=0x%08lx raw_pcm_hash=0x%08lx pcm_samples=%lu raw_pcm_samples=%lu raw_channels=%lu center_pad=%u window=%u hop=%u frames=%u",
                (unsigned long)context->tensor_dump_capture_seq,
                (unsigned long)context->tensor_dump_capture_feat_hash,
                (unsigned long)context->tensor_dump_capture_input_hash,
@@ -2211,7 +2575,53 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                (double)context->input_scale,
                (long)context->input_zero_point,
                (double)context->output_scale,
-               (long)context->output_zero_point);
+               (long)context->output_zero_point,
+               (unsigned long)context->tensor_dump_capture_pcm_hash,
+               (unsigned long)context->tensor_dump_capture_raw_pcm_hash,
+               (unsigned long)(context->tensor_dump_pcm_bytes_captured /
+                               sizeof(int16_t)),
+               context->tensor_dump_raw_pcm_snapshot_channels == 0U ?
+                   0UL :
+                   (unsigned long)(context->tensor_dump_raw_pcm_bytes_captured /
+                                   (sizeof(int16_t) *
+                                    context->tensor_dump_raw_pcm_snapshot_channels)),
+               (unsigned long)context->tensor_dump_raw_pcm_snapshot_channels,
+               (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+               (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+               (unsigned int)RIVER_KWS_HOP_SAMPLES,
+               (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+    if (context->tensor_dump_pcm_bytes_captured > 0U) {
+        RIVER_LOGI("kws pcm dump meta: seq=%lu infer=%lu label=preproc_s16 sample_rate=%u samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u",
+                   (unsigned long)context->tensor_dump_capture_seq,
+                   (unsigned long)context->tensor_dump_capture_infer,
+                   (unsigned int)RIVER_KWS_SAMPLE_RATE_HZ,
+                   (unsigned long)(context->tensor_dump_pcm_bytes_captured /
+                                   sizeof(int16_t)),
+                   (unsigned long)context->tensor_dump_pcm_bytes_captured,
+                   (unsigned long)context->tensor_dump_capture_pcm_hash,
+                   (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+                   (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+                   (unsigned int)RIVER_KWS_HOP_SAMPLES,
+                   (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+    }
+    if (context->tensor_dump_raw_pcm_bytes_captured > 0U) {
+        RIVER_LOGI("kws raw pcm dump meta: seq=%lu infer=%lu label=raw_capture_s16 sample_rate=%u channels=%lu samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u",
+                   (unsigned long)context->tensor_dump_capture_seq,
+                   (unsigned long)context->tensor_dump_capture_infer,
+                   (unsigned int)RIVER_KWS_SAMPLE_RATE_HZ,
+                   (unsigned long)context->tensor_dump_raw_pcm_snapshot_channels,
+                   context->tensor_dump_raw_pcm_snapshot_channels == 0U ?
+                       0UL :
+                       (unsigned long)(context->tensor_dump_raw_pcm_bytes_captured /
+                                       (sizeof(int16_t) *
+                                        context->tensor_dump_raw_pcm_snapshot_channels)),
+                   (unsigned long)context->tensor_dump_raw_pcm_bytes_captured,
+                   (unsigned long)context->tensor_dump_capture_raw_pcm_hash,
+                   (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+                   (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+                   (unsigned int)RIVER_KWS_HOP_SAMPLES,
+                   (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+    }
 }
 
 static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *context)
@@ -2277,6 +2687,8 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
         context->tensor_dump_feature_bytes_reserved;
     context->tensor_dump_input_bytes_captured = input_bytes;
     context->tensor_dump_output_bytes_captured = output_bytes;
+    river_voice_kws_capture_preproc_pcm_snapshot(context);
+    river_voice_kws_capture_raw_pcm_snapshot(context);
     (void)memcpy(context->tensor_dump_feature_tensor,
                  context->tensor_dump_feature_stage_tensor,
                  context->tensor_dump_feature_bytes_reserved);
@@ -2292,7 +2704,7 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
         river_voice_kws_disarm_tensor_dump(context);
     }
 
-    RIVER_LOGI("kws tensor dump captured: seq=%lu infer=%lu mode=%s feat_chunks=%lu input_chunks=%lu output_chunks=%lu",
+    RIVER_LOGI("kws tensor dump captured: seq=%lu infer=%lu mode=%s feat_chunks=%lu input_chunks=%lu output_chunks=%lu pcm_chunks=%lu raw_pcm_chunks=%lu",
                (unsigned long)seq,
                (unsigned long)context->inference_count,
                river_voice_kws_tensor_dump_mode_name(mode),
@@ -2301,7 +2713,13 @@ static void river_voice_kws_capture_exact_tensors(river_voice_kws_context_t *con
                (unsigned long)river_voice_kws_tensor_dump_chunk_count(
                    context->tensor_dump_input_bytes_captured),
                (unsigned long)river_voice_kws_tensor_dump_chunk_count(
-                   context->tensor_dump_output_bytes_captured));
+                   context->tensor_dump_output_bytes_captured),
+               (unsigned long)river_voice_kws_tensor_dump_chunk_count(
+                   context->tensor_dump_pcm_bytes_captured),
+               context->tensor_dump_raw_pcm_bytes_captured == 0U ?
+                   0UL :
+                   (unsigned long)river_voice_kws_tensor_dump_chunk_count(
+                       context->tensor_dump_raw_pcm_bytes_captured));
 }
 
 static river_status_t river_voice_kws_tensor_dump_buffer_view(
@@ -2326,6 +2744,14 @@ static river_status_t river_voice_kws_tensor_dump_buffer_view(
     case RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW:
         *data_out = context->tensor_dump_output_tensor;
         *bytes_out = context->tensor_dump_output_bytes_captured;
+        return RIVER_OK;
+    case RIVER_VOICE_KWS_TENSOR_DUMP_PREPROC_PCM_S16:
+        *data_out = (const uint8_t *)context->tensor_dump_pcm_snapshot;
+        *bytes_out = context->tensor_dump_pcm_bytes_captured;
+        return RIVER_OK;
+    case RIVER_VOICE_KWS_TENSOR_DUMP_RAW_CAPTURE_S16:
+        *data_out = (const uint8_t *)context->tensor_dump_raw_pcm_snapshot;
+        *bytes_out = context->tensor_dump_raw_pcm_bytes_captured;
         return RIVER_OK;
     default:
         return RIVER_ERR_ARG;
@@ -2524,6 +2950,11 @@ static void river_voice_kws_reset_frontend(river_voice_kws_context_t *context)
     memset(context->fft_input, 0, sizeof(context->fft_input));
     memset(context->fft_output, 0, sizeof(context->fft_output));
 #endif
+    if (context->tensor_dump_armed && context->tensor_dump_pcm_history != NULL) {
+        river_voice_kws_pcm_history_reset(context);
+        river_voice_kws_record_pcm_silence(context, center_pad_samples);
+        river_voice_kws_raw_pcm_history_reset(context, true);
+    }
 }
 
 static bool river_voice_kws_detection_allowed(void)
@@ -2838,6 +3269,7 @@ static void river_voice_kws_emit_trigger(river_voice_kws_context_t *context,
 static void river_voice_kws_push_sample(river_voice_kws_context_t *context,
                                         int16_t sample)
 {
+    river_voice_kws_record_pcm_sample(context, sample);
     context->sample_ring[context->sample_ring_write_index] = sample;
     context->sample_ring_write_index =
         (context->sample_ring_write_index + 1U) % RIVER_KWS_WINDOW_SAMPLES;
@@ -3375,7 +3807,10 @@ static void river_voice_kws_log_status(river_voice_kws_context_t *context)
 static river_status_t river_voice_kws_process_samples(
     river_voice_kws_context_t *context,
     const int16_t *samples,
-    size_t count)
+    size_t count,
+    const int16_t *raw_capture,
+    uint32_t raw_capture_channels,
+    size_t raw_capture_frames)
 {
     size_t index;
 
@@ -3384,6 +3819,13 @@ static river_status_t river_voice_kws_process_samples(
     }
 
     for (index = 0U; index < count; ++index) {
+        if (raw_capture != NULL && raw_capture_channels > 0U &&
+            index < raw_capture_frames) {
+            river_voice_kws_record_raw_pcm_sample(
+                context,
+                &raw_capture[index * raw_capture_channels],
+                raw_capture_channels);
+        }
         river_voice_kws_push_sample(context, samples[index]);
         if (context->mel_frames_seen == 0U &&
             context->sample_ring_fill_count == RIVER_KWS_WINDOW_SAMPLES) {
@@ -3484,28 +3926,50 @@ static river_status_t river_voice_kws_trim_input_backlog(
     return RIVER_OK;
 }
 
-static river_status_t river_voice_kws_enqueue_pcm(
-    river_voice_kws_context_t *context,
+static void river_voice_kws_prepare_queue_item(
+    river_voice_kws_queue_item_t *item,
     const uint8_t *data,
-    size_t bytes)
+    size_t bytes,
+    const uint8_t *raw_capture,
+    size_t raw_capture_bytes,
+    uint32_t raw_capture_channels)
 {
-    river_voice_kws_queue_item_t item;
+    memset(item, 0, sizeof(*item));
+    item->type = RIVER_KWS_QUEUE_ITEM_PCM;
+    if (data != NULL && bytes == RIVER_KWS_INPUT_FRAME_BYTES) {
+        memcpy(item->pcm, data, bytes);
+    }
+    if (raw_capture != NULL &&
+        raw_capture_channels > 0U &&
+        raw_capture_channels <= RIVER_KWS_RAW_CAPTURE_MAX_CHANNELS &&
+        raw_capture_bytes <= RIVER_KWS_RAW_CAPTURE_FRAME_BYTES &&
+        raw_capture_bytes ==
+            ((size_t)RIVER_KWS_INPUT_FRAME_SAMPLES *
+             (size_t)raw_capture_channels * sizeof(int16_t))) {
+        item->raw_capture_channels = raw_capture_channels;
+        item->raw_capture_bytes = (uint32_t)raw_capture_bytes;
+        memcpy(item->raw_capture, raw_capture, raw_capture_bytes);
+    }
+}
+
+static river_status_t river_voice_kws_enqueue_item(
+    river_voice_kws_context_t *context,
+    const river_voice_kws_queue_item_t *item)
+{
     river_status_t status;
 
-    if (context == NULL || data == NULL || bytes != RIVER_KWS_INPUT_FRAME_BYTES) {
+    if (context == NULL || item == NULL ||
+        item->type != RIVER_KWS_QUEUE_ITEM_PCM) {
         return RIVER_ERR_ARG;
     }
 
-    memset(&item, 0, sizeof(item));
-    item.type = RIVER_KWS_QUEUE_ITEM_PCM;
-    memcpy(item.pcm, data, bytes);
     status = river_voice_kws_trim_input_backlog(context);
     if (status != RIVER_OK) {
         return status;
     }
     status = river_audio_frame_ring_write(
         &context->input_ring,
-        reinterpret_cast<const uint8_t *>(&item));
+        reinterpret_cast<const uint8_t *>(item));
     if (status == RIVER_OK) {
         river_voice_kws_signal_worker(context);
         return RIVER_OK;
@@ -3523,13 +3987,36 @@ static river_status_t river_voice_kws_enqueue_pcm(
 
     status = river_audio_frame_ring_write(
         &context->input_ring,
-        reinterpret_cast<const uint8_t *>(&item));
+        reinterpret_cast<const uint8_t *>(item));
     if (status != RIVER_OK) {
         return status;
     }
 
     river_voice_kws_signal_worker(context);
     return RIVER_OK;
+}
+
+static river_status_t river_voice_kws_enqueue_pcm(
+    river_voice_kws_context_t *context,
+    const uint8_t *data,
+    size_t bytes,
+    const uint8_t *raw_capture,
+    size_t raw_capture_bytes,
+    uint32_t raw_capture_channels)
+{
+    river_voice_kws_queue_item_t item;
+
+    if (context == NULL || data == NULL || bytes != RIVER_KWS_INPUT_FRAME_BYTES) {
+        return RIVER_ERR_ARG;
+    }
+
+    river_voice_kws_prepare_queue_item(&item,
+                                       data,
+                                       bytes,
+                                       raw_capture,
+                                       raw_capture_bytes,
+                                       raw_capture_channels);
+    return river_voice_kws_enqueue_item(context, &item);
 }
 
 static river_status_t river_voice_kws_enqueue_reset(
@@ -3552,19 +4039,21 @@ static river_status_t river_voice_kws_enqueue_reset(
     return RIVER_OK;
 }
 
-static river_status_t river_voice_kws_store_pre_roll_frame(
+static river_status_t river_voice_kws_store_pre_roll_item(
     river_voice_kws_context_t *context,
-    const uint8_t *data,
-    size_t bytes)
+    const river_voice_kws_queue_item_t *item)
 {
     river_status_t status;
 
-    if (context == NULL || data == NULL || bytes != RIVER_KWS_INPUT_FRAME_BYTES ||
+    if (context == NULL || item == NULL ||
+        item->type != RIVER_KWS_QUEUE_ITEM_PCM ||
         !context->pre_roll_ring.initialized) {
         return RIVER_ERR_ARG;
     }
 
-    status = river_audio_frame_ring_write(&context->pre_roll_ring, data);
+    status = river_audio_frame_ring_write(
+        &context->pre_roll_ring,
+        reinterpret_cast<const uint8_t *>(item));
     if (status == RIVER_OK) {
         return RIVER_OK;
     }
@@ -3573,17 +4062,43 @@ static river_status_t river_voice_kws_store_pre_roll_frame(
     }
 
     if (river_audio_frame_ring_read(&context->pre_roll_ring,
-                                    context->pre_roll_drop_frame) != RIVER_OK) {
+                                    reinterpret_cast<uint8_t *>(
+                                        &context->pre_roll_drop_item)) != RIVER_OK) {
         return RIVER_ERR_BUSY;
     }
 
-    status = river_audio_frame_ring_write(&context->pre_roll_ring, data);
+    status = river_audio_frame_ring_write(
+        &context->pre_roll_ring,
+        reinterpret_cast<const uint8_t *>(item));
     if (status != RIVER_OK) {
         return status;
     }
 
     context->pre_roll_ring_dropped++;
     return RIVER_OK;
+}
+
+static river_status_t river_voice_kws_store_pre_roll_frame(
+    river_voice_kws_context_t *context,
+    const uint8_t *data,
+    size_t bytes,
+    const uint8_t *raw_capture,
+    size_t raw_capture_bytes,
+    uint32_t raw_capture_channels)
+{
+    river_voice_kws_queue_item_t item;
+
+    if (context == NULL || data == NULL || bytes != RIVER_KWS_INPUT_FRAME_BYTES) {
+        return RIVER_ERR_ARG;
+    }
+
+    river_voice_kws_prepare_queue_item(&item,
+                                       data,
+                                       bytes,
+                                       raw_capture,
+                                       raw_capture_bytes,
+                                       raw_capture_channels);
+    return river_voice_kws_store_pre_roll_item(context, &item);
 }
 
 static river_status_t river_voice_kws_flush_pre_roll(
@@ -3607,8 +4122,9 @@ static river_status_t river_voice_kws_flush_pre_roll(
     if (pending_frames > flush_limit_frames) {
         trim_frames = pending_frames - flush_limit_frames;
         while (trim_frames > 0U) {
-            status = river_audio_frame_ring_read(&context->pre_roll_ring,
-                                                 context->pre_roll_drop_frame);
+            status = river_audio_frame_ring_read(
+                &context->pre_roll_ring,
+                reinterpret_cast<uint8_t *>(&context->pre_roll_drop_item));
             if (status != RIVER_OK) {
                 return status;
             }
@@ -3624,8 +4140,9 @@ static river_status_t river_voice_kws_flush_pre_roll(
     }
 
     while (true) {
-        status = river_audio_frame_ring_read(&context->pre_roll_ring,
-                                             context->pre_roll_frame);
+        status = river_audio_frame_ring_read(
+            &context->pre_roll_ring,
+            reinterpret_cast<uint8_t *>(&context->pre_roll_frame));
         if (status == RIVER_ERR_NOT_FOUND) {
             break;
         }
@@ -3633,9 +4150,7 @@ static river_status_t river_voice_kws_flush_pre_roll(
             return status;
         }
 
-        status = river_voice_kws_enqueue_pcm(context,
-                                             context->pre_roll_frame,
-                                             sizeof(context->pre_roll_frame));
+        status = river_voice_kws_enqueue_item(context, &context->pre_roll_frame);
         if (status != RIVER_OK) {
             return status;
         }
@@ -3693,7 +4208,17 @@ static void river_voice_kws_task(void *arg)
             status = river_voice_kws_process_samples(
                 context,
                 reinterpret_cast<const int16_t *>(context->input_task_item.pcm),
-                RIVER_KWS_INPUT_FRAME_SAMPLES);
+                RIVER_KWS_INPUT_FRAME_SAMPLES,
+                context->input_task_item.raw_capture_bytes > 0U ?
+                    reinterpret_cast<const int16_t *>(
+                        context->input_task_item.raw_capture) :
+                    NULL,
+                context->input_task_item.raw_capture_channels,
+                context->input_task_item.raw_capture_channels == 0U ?
+                    0U :
+                    (size_t)context->input_task_item.raw_capture_bytes /
+                        ((size_t)context->input_task_item.raw_capture_channels *
+                         sizeof(int16_t)));
             context->worker_processing = false;
             if (status != RIVER_OK) {
                 RIVER_LOGW("kws worker process failed: status=%d", (int)status);
@@ -4034,8 +4559,13 @@ extern "C" river_status_t river_voice_kws_init(void)
         (size_t)RIVER_KWS_EXPECTED_INPUT_VALUES * sizeof(float);
     g_river_voice_kws->tensor_dump_input_bytes_reserved = input_bytes_min;
     g_river_voice_kws->tensor_dump_output_bytes_reserved = output_bytes_min;
+    g_river_voice_kws->tensor_dump_pcm_bytes_reserved =
+        (size_t)RIVER_KWS_FRONTEND_PCM_BYTES;
+    g_river_voice_kws->tensor_dump_raw_pcm_bytes_reserved =
+        (size_t)RIVER_KWS_RAW_CAPTURE_FRONTEND_BYTES;
     g_river_voice_kws->pre_roll_ring_storage_bytes =
-        (size_t)RIVER_KWS_INPUT_FRAME_BYTES * (size_t)RIVER_KWS_PRE_ROLL_FRAMES;
+        sizeof(river_voice_kws_queue_item_t) *
+        (size_t)RIVER_KWS_PRE_ROLL_FRAMES;
     g_river_voice_kws->input_ring_storage_bytes =
         sizeof(river_voice_kws_queue_item_t) *
         (size_t)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES;
@@ -4133,13 +4663,13 @@ extern "C" river_status_t river_voice_kws_init(void)
         &g_river_voice_kws->pre_roll_ring,
         g_river_voice_kws->pre_roll_ring_storage,
         g_river_voice_kws->pre_roll_ring_storage_bytes,
-        RIVER_KWS_INPUT_FRAME_BYTES,
+        sizeof(river_voice_kws_queue_item_t),
         RIVER_KWS_PRE_ROLL_FRAMES,
         RIVER_AUDIO_FRAME_RING_MODE_LOCKED);
     if (status != RIVER_OK) {
         RIVER_LOGE("kws pre-roll ring init failed: status=%d frame_bytes=%u frames=%u",
                    (int)status,
-                   (unsigned int)RIVER_KWS_INPUT_FRAME_BYTES,
+                   (unsigned int)sizeof(river_voice_kws_queue_item_t),
                    (unsigned int)RIVER_KWS_PRE_ROLL_FRAMES);
         goto fail;
     }
@@ -4296,6 +4826,18 @@ fail:
             g_river_voice_kws->tensor_dump_output_allocation,
             g_river_voice_kws->tensor_dump_output_from_heap_types);
         river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_pcm_snapshot_allocation,
+            g_river_voice_kws->tensor_dump_pcm_snapshot_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_pcm_history_allocation,
+            g_river_voice_kws->tensor_dump_pcm_history_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_raw_pcm_snapshot_allocation,
+            g_river_voice_kws->tensor_dump_raw_pcm_snapshot_from_heap_types);
+        river_voice_kws_free_allocation(
+            g_river_voice_kws->tensor_dump_raw_pcm_history_allocation,
+            g_river_voice_kws->tensor_dump_raw_pcm_history_from_heap_types);
+        river_voice_kws_free_allocation(
             g_river_voice_kws->tensor_dump_input_stage_allocation,
             g_river_voice_kws->tensor_dump_input_stage_from_heap_types);
         river_voice_kws_free_allocation(
@@ -4372,10 +4914,14 @@ extern "C" const char *river_voice_kws_detection_gate_block_reason(void)
     return river_voice_kws_detection_block_reason();
 }
 
-extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
-                                                       size_t bytes,
-                                                       bool vad_valid,
-                                                       bool is_speech)
+extern "C" river_status_t river_voice_kws_submit_frame_with_capture(
+    const uint8_t *data,
+    size_t bytes,
+    const uint8_t *raw_capture,
+    size_t raw_capture_bytes,
+    uint32_t raw_capture_channels,
+    bool vad_valid,
+    bool is_speech)
 {
     river_status_t status;
     river_voice_kws_context_t *context = g_river_voice_kws;
@@ -4430,13 +4976,23 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                            (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
                            (unsigned long)context->input_ring_dropped);
             }
-            return river_voice_kws_store_pre_roll_frame(context, data, bytes);
+            return river_voice_kws_store_pre_roll_frame(context,
+                                                        data,
+                                                        bytes,
+                                                        raw_capture,
+                                                        raw_capture_bytes,
+                                                        raw_capture_channels);
         }
         return RIVER_OK;
     }
 
     if (!context->gate_open) {
-        status = river_voice_kws_store_pre_roll_frame(context, data, bytes);
+        status = river_voice_kws_store_pre_roll_frame(context,
+                                                      data,
+                                                      bytes,
+                                                      raw_capture,
+                                                      raw_capture_bytes,
+                                                      raw_capture_channels);
         if (status != RIVER_OK) {
             return status;
         }
@@ -4489,10 +5045,34 @@ extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                    (unsigned long)queue_count,
                    (unsigned int)CONFIG_RIVER_KWS_INPUT_QUEUE_FRAMES,
                    (unsigned long)context->input_ring_dropped);
-        return river_voice_kws_store_pre_roll_frame(context, data, bytes);
+        return river_voice_kws_store_pre_roll_frame(context,
+                                                    data,
+                                                    bytes,
+                                                    raw_capture,
+                                                    raw_capture_bytes,
+                                                    raw_capture_channels);
     }
 
-    return river_voice_kws_enqueue_pcm(context, data, bytes);
+    return river_voice_kws_enqueue_pcm(context,
+                                      data,
+                                      bytes,
+                                      raw_capture,
+                                      raw_capture_bytes,
+                                      raw_capture_channels);
+}
+
+extern "C" river_status_t river_voice_kws_submit_frame(const uint8_t *data,
+                                                       size_t bytes,
+                                                       bool vad_valid,
+                                                       bool is_speech)
+{
+    return river_voice_kws_submit_frame_with_capture(data,
+                                                     bytes,
+                                                     NULL,
+                                                     0U,
+                                                     0U,
+                                                     vad_valid,
+                                                     is_speech);
 }
 
 extern "C" void river_voice_kws_dump_profile(void)
@@ -4553,6 +5133,8 @@ extern "C" void river_voice_kws_dump_status(void)
     size_t feat_chunks;
     size_t input_chunks;
     size_t output_chunks;
+    size_t pcm_chunks;
+    size_t raw_pcm_chunks;
     const char *handoff_block_reason;
     bool fallback_enabled;
     uint32_t threshold_q15;
@@ -4600,7 +5182,16 @@ extern "C" void river_voice_kws_dump_status(void)
                         0U :
                         river_voice_kws_tensor_dump_chunk_count(
                             g_river_voice_kws->tensor_dump_output_bytes_captured);
-    RIVER_LOGI("kws tensor dump status: armed=%s mode=%s ready=%s last_seq=%lu last_infer=%lu capture_seq=%lu capture_infer=%lu chunks=[feat:%lu input:%lu output:%lu]",
+    pcm_chunks = g_river_voice_kws->tensor_dump_pcm_bytes_captured == 0U ?
+                     0U :
+                     river_voice_kws_tensor_dump_chunk_count(
+                         g_river_voice_kws->tensor_dump_pcm_bytes_captured);
+    raw_pcm_chunks =
+        g_river_voice_kws->tensor_dump_raw_pcm_bytes_captured == 0U ?
+            0U :
+            river_voice_kws_tensor_dump_chunk_count(
+                g_river_voice_kws->tensor_dump_raw_pcm_bytes_captured);
+    RIVER_LOGI("kws tensor dump status: armed=%s mode=%s ready=%s last_seq=%lu last_infer=%lu capture_seq=%lu capture_infer=%lu chunks=[feat:%lu input:%lu output:%lu pcm:%lu raw_pcm:%lu]",
                g_river_voice_kws->tensor_dump_armed ? "yes" : "no",
                river_voice_kws_tensor_dump_mode_name(
                    g_river_voice_kws->tensor_dump_mode),
@@ -4611,7 +5202,9 @@ extern "C" void river_voice_kws_dump_status(void)
                (unsigned long)g_river_voice_kws->tensor_dump_capture_infer,
                (unsigned long)feat_chunks,
                (unsigned long)input_chunks,
-               (unsigned long)output_chunks);
+               (unsigned long)output_chunks,
+               (unsigned long)pcm_chunks,
+               (unsigned long)raw_pcm_chunks);
     handoff_block_reason =
         river_voice_kws_wake_handoff_block_reason_locked(g_river_voice_kws);
     RIVER_LOGI("kws debug status: local_only=%s wake_handoff=%s reason=%s",
@@ -4699,6 +5292,8 @@ extern "C" void river_voice_kws_dump_tensor_meta(void)
     size_t feat_chunks;
     size_t input_chunks;
     size_t output_chunks;
+    size_t pcm_chunks;
+    size_t raw_pcm_chunks;
 
     if (g_river_voice_kws == NULL || !g_river_voice_kws->initialized) {
         RIVER_LOGI("kws tensor dump status: closed");
@@ -4722,12 +5317,23 @@ extern "C" void river_voice_kws_dump_tensor_meta(void)
                         0U :
                         river_voice_kws_tensor_dump_chunk_count(
                             g_river_voice_kws->tensor_dump_output_bytes_captured);
-    RIVER_LOGI("kws tensor dump snapshot: seq=%lu infer=%lu chunks=[feat:%lu input:%lu output:%lu]",
+    pcm_chunks = g_river_voice_kws->tensor_dump_pcm_bytes_captured == 0U ?
+                     0U :
+                     river_voice_kws_tensor_dump_chunk_count(
+                         g_river_voice_kws->tensor_dump_pcm_bytes_captured);
+    raw_pcm_chunks =
+        g_river_voice_kws->tensor_dump_raw_pcm_bytes_captured == 0U ?
+            0U :
+            river_voice_kws_tensor_dump_chunk_count(
+                g_river_voice_kws->tensor_dump_raw_pcm_bytes_captured);
+    RIVER_LOGI("kws tensor dump snapshot: seq=%lu infer=%lu chunks=[feat:%lu input:%lu output:%lu pcm:%lu raw_pcm:%lu]",
                (unsigned long)g_river_voice_kws->tensor_dump_capture_seq,
                (unsigned long)g_river_voice_kws->tensor_dump_capture_infer,
                (unsigned long)feat_chunks,
                (unsigned long)input_chunks,
-               (unsigned long)output_chunks);
+               (unsigned long)output_chunks,
+               (unsigned long)pcm_chunks,
+               (unsigned long)raw_pcm_chunks);
 }
 
 extern "C" river_status_t river_voice_kws_dump_tensor_chunk(

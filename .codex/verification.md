@@ -1,3 +1,66 @@
+## Step H.xiaozhi-client.103 Verification
+
+Check the host-side replay and PCM frontend comparison tools:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  tools/kws/replay_board_tensor_dump.py \
+  tools/kws/compare_board_pcm_frontend.py
+```
+
+Expected result:
+- both Python tools compile without syntax errors
+- `replay_board_tensor_dump.py` remains importable by the new PCM comparison tool
+
+Run patch hygiene and firmware build:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  include/river/river_voice_kws.h \
+  components/river_voice/river_voice_kws.cc \
+  components/river_voice/river_orvibo_audio_service.c \
+  components/river_diag/river_diag_cmd.c \
+  tools/kws/replay_board_tensor_dump.py \
+  tools/kws/compare_board_pcm_frontend.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh >/dev/null
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- no whitespace or patch-format errors
+- SDK build completes with `Build done`
+
+Board-side capture flow after flashing this image:
+```text
+river kws dump clear
+river kws dump next
+# wait for the target false wake / next KWS inference
+river kws dump meta
+river kws dump chunk feat_f32 1..N
+river kws dump chunk output_raw 1
+river kws dump chunk preproc_s16 1..N
+river kws dump chunk raw_capture_s16 1..N
+```
+
+Host-side PCM/frontend comparison after collecting the log:
+```bash
+cd /root/ameba-river
+python3 tools/kws/compare_board_pcm_frontend.py \
+  --log /path/to/serial_capture.log \
+  --seq latest \
+  --require-raw \
+  --out-dir tmp/kws_pcm_frontend_compare
+```
+
+Observed on 2026-06-01:
+- passed: `python3 -m py_compile tools/kws/replay_board_tensor_dump.py tools/kws/compare_board_pcm_frontend.py`.
+- passed: `git diff --check` for the touched KWS/diag/tool files.
+- passed: `/root/ameba-rtos` full build; final output contained `Build done`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run yet: flash/download and live `preproc_s16` / `raw_capture_s16` capture; the board image is ready, but current NAND hardware requires manual download mode before flashing.
+
 ## Step H.xiaozhi-client.101 Verification
 
 Confirm light / curtain UI action mappings and generated assets are removed:

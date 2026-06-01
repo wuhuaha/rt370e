@@ -587,10 +587,14 @@ static void river_orvibo_audio_task(void *param)
 
         if (river_voice_kws_active()) {
             river_status_t kws_status =
-                river_voice_kws_submit_frame(g_river_orvibo_audio.enhanced_buffer,
-                                             enhanced_bytes,
-                                             detector_result.decision_valid,
-                                             detector_result.is_speech);
+                river_voice_kws_submit_frame_with_capture(
+                    g_river_orvibo_audio.enhanced_buffer,
+                    enhanced_bytes,
+                    g_river_orvibo_audio.capture_buffer,
+                    g_river_orvibo_audio.capture_chunk_bytes,
+                    g_river_orvibo_audio.capture.channels,
+                    detector_result.decision_valid,
+                    detector_result.is_speech);
             if (kws_status == RIVER_OK) {
                 g_river_orvibo_audio.kws_submit_ok++;
             } else {

@@ -15,7 +15,9 @@ extern "C" {
 typedef enum {
     RIVER_VOICE_KWS_TENSOR_DUMP_FEATURE_F32 = 0,
     RIVER_VOICE_KWS_TENSOR_DUMP_INPUT_RAW = 1,
-    RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW = 2
+    RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW = 2,
+    RIVER_VOICE_KWS_TENSOR_DUMP_PREPROC_PCM_S16 = 3,
+    RIVER_VOICE_KWS_TENSOR_DUMP_RAW_CAPTURE_S16 = 4
 } river_voice_kws_tensor_dump_buffer_t;
 
 river_status_t river_voice_kws_init(void);
@@ -24,6 +26,14 @@ river_status_t river_voice_kws_submit_frame(const uint8_t *data,
                                             size_t bytes,
                                             bool vad_valid,
                                             bool is_speech);
+river_status_t river_voice_kws_submit_frame_with_capture(
+    const uint8_t *data,
+    size_t bytes,
+    const uint8_t *raw_capture,
+    size_t raw_capture_bytes,
+    uint32_t raw_capture_channels,
+    bool vad_valid,
+    bool is_speech);
 void river_voice_kws_set_detection_gate(bool allowed, const char *block_reason);
 bool river_voice_kws_detection_gate_allowed(void);
 const char *river_voice_kws_detection_gate_block_reason(void);

@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.102 落地 A 2s FP32 唤醒模型代码`
+  - `Step H.xiaozhi-client.103 增加 KWS 同窗 raw/preproc PCM 对拍`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,14 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.103` 增加 KWS 同窗 raw/preproc PCM 对拍：
+  - `river kws dump next` 在保留既有 `feat_f32`、`input_raw`、`output_raw` pull-based tensor dump 的同时，额外捕获同一次 inference 的 `preproc_s16` 与 `raw_capture_s16` PCM snapshot。
+  - `raw_capture_s16` 由 Orvibo audio service 随同一帧 `preproc_s16` 提交到 KWS worker 队列，避免音频线程和 KWS worker 队列延迟导致 raw/preproc 错位。
+  - PCM 抓取点按 KWS worker 实际处理样本推进；frontend reset 时同步记录 `center` 左侧 synthetic zero pad，所以 raw/preproc snapshot 与同一次 `feat_f32` 的前端窗口对齐。
+  - 当前 A 2s FP32 变体的 `preproc_s16` 为 `32400` samples / `64800` bytes；2ch `raw_capture_s16` 为 `32400` frames / `129600` bytes，可通过 `river kws dump chunk preproc_s16 <index>` 和 `river kws dump chunk raw_capture_s16 <index>` 拉取。
+  - 新增 `tools/kws/compare_board_pcm_frontend.py`，用于解析同一串口日志中的 `feat_f32 + preproc_s16 + raw_capture_s16`，校验 raw/preproc PCM hash，导出 WAV/NPY，并重算 board-like frontend 与训练侧 torchaudio 默认 frontend 近似路径。
+  - `python3 -m py_compile`、`git diff --check` 和 `/root/ameba-rtos` 完整 build 均通过；尚未 flash/serial 抓取 live PCM，当前 NAND 硬件仍需手动进入 download mode 后才能刷入此镜像。
 
 - `Step H.xiaozhi-client.102` 落地 A 2s FP32 唤醒模型代码：
   - 当前 HEAD 已包含 Step 101 的 UI 动画清理记录；本步在该 HEAD 之后提交 KWS 实际代码改动，避免 Step 100 记录与提交顺序混淆。

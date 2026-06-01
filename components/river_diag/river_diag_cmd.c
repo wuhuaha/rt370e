@@ -58,7 +58,7 @@ static void river_diag_help(void)
     printf("\triver ui <status|touch scan|state <name>|emoji <key>|text <asr|tts|emoji> <text>>\n");
     printf("\triver audio <status>\n");
     printf("\triver playback <status|tone [freq_hz] [duration_ms] [level_pct]|stop|interrupt|flush|duck <gain>|unduck>\n");
-    printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
+    printf("\triver kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>>|align <run|status>>\n");
 }
 
 static bool river_diag_parse_u32_arg(const char *text, uint32_t *value_out)
@@ -297,7 +297,7 @@ static u32 river_diag_playback_tone_cmd(u16 argc, u8 *argv[])
 static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
 {
     if (argc < 2) {
-        printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
+        printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>>|align <run|status>>\n");
         return 0;
     }
 
@@ -328,7 +328,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
         uint32_t chunk_index;
 
         if (argc < 3) {
-            printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>\n");
+            printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>>\n");
             return 0;
         }
         if (strcmp((const char *)argv[2], "next") == 0) {
@@ -355,7 +355,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
         }
         if (strcmp((const char *)argv[2], "chunk") == 0) {
             if (argc < 5) {
-                printf("[river][diag] usage: river kws dump chunk <feat_f32|input_raw|output_raw> <index>\n");
+                printf("[river][diag] usage: river kws dump chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>\n");
                 return 0;
             }
             if (strcmp((const char *)argv[3], "feat_f32") == 0) {
@@ -364,8 +364,12 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
                 dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_INPUT_RAW;
             } else if (strcmp((const char *)argv[3], "output_raw") == 0) {
                 dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_OUTPUT_RAW;
+            } else if (strcmp((const char *)argv[3], "preproc_s16") == 0) {
+                dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_PREPROC_PCM_S16;
+            } else if (strcmp((const char *)argv[3], "raw_capture_s16") == 0) {
+                dump_buffer = RIVER_VOICE_KWS_TENSOR_DUMP_RAW_CAPTURE_S16;
             } else {
-                printf("[river][diag] dump label must be feat_f32, input_raw, or output_raw\n");
+                printf("[river][diag] dump label must be feat_f32, input_raw, output_raw, preproc_s16, or raw_capture_s16\n");
                 return 0;
             }
             if (!river_diag_parse_u32_arg((const char *)argv[4], &chunk_index) ||
@@ -378,7 +382,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
             }
             return 0;
         }
-        printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>\n");
+        printf("[river][diag] usage: river kws dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>>\n");
         return 0;
     }
 
@@ -402,7 +406,7 @@ static u32 river_diag_kws_cmd(u16 argc, u8 *argv[])
         return 0;
     }
 
-    printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw> <index>>|align <run|status>>\n");
+    printf("[river][diag] usage: river kws <status|debug local <on|off|status>|dump <next|off|clear|status|meta|chunk <feat_f32|input_raw|output_raw|preproc_s16|raw_capture_s16> <index>>|align <run|status>>\n");
     return 0;
 }
 
