@@ -2432,12 +2432,12 @@ static void river_voice_kws_log_hex_chunk(const char *label,
     }
     hex[chunk_bytes * 2U] = '\0';
 
-    RIVER_LOGI("kws tensor dump %s: seq=%lu chunk=%lu/%lu hex=%s",
-               label,
-               (unsigned long)seq,
-               (unsigned long)chunk_index,
-               (unsigned long)total_chunks,
-               hex);
+    printf("KWSDUMP CHUNK label=%s seq=%lu chunk=%lu/%lu hex=%s\n",
+           label,
+           (unsigned long)seq,
+           (unsigned long)chunk_index,
+           (unsigned long)total_chunks,
+           hex);
 }
 
 static void river_voice_kws_tensor_dump_snapshot_reset(
@@ -2565,6 +2565,22 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                (unsigned long)context->tensor_dump_output_bytes_captured,
                (unsigned long)context->tensor_dump_pcm_bytes_captured,
                (unsigned long)context->tensor_dump_raw_pcm_bytes_captured);
+    printf("KWSDUMP BEGIN seq=%lu infer=%lu gate=%s in_type=%s out_type=%s layout=%s shape=%lu,%lu,%lu,%lu feat_bytes=%lu input_bytes=%lu output_bytes=%lu pcm_bytes=%lu raw_pcm_bytes=%lu\n",
+           (unsigned long)context->tensor_dump_capture_seq,
+           (unsigned long)context->tensor_dump_capture_infer,
+           context->tensor_dump_capture_gate_open ? "open" : "closed",
+           river_voice_kws_tensor_type_name(context->effective_input_type),
+           river_voice_kws_tensor_type_name(context->effective_output_type),
+           river_voice_kws_input_layout_name(context->input_layout),
+           (unsigned long)context->input_shape[0],
+           (unsigned long)context->input_shape[1],
+           (unsigned long)context->input_shape[2],
+           (unsigned long)context->input_shape[3],
+           (unsigned long)context->tensor_dump_feature_bytes_captured,
+           (unsigned long)context->tensor_dump_input_bytes_captured,
+           (unsigned long)context->tensor_dump_output_bytes_captured,
+           (unsigned long)context->tensor_dump_pcm_bytes_captured,
+           (unsigned long)context->tensor_dump_raw_pcm_bytes_captured);
     RIVER_LOGI("kws tensor dump meta: seq=%lu feat_hash=0x%08lx input_hash=0x%08lx raw=%ld score=%.6f q15=%lu in_scale=%.9f in_zp=%ld out_scale=%.9f out_zp=%ld pcm_hash=0x%08lx raw_pcm_hash=0x%08lx pcm_samples=%lu raw_pcm_samples=%lu raw_channels=%lu center_pad=%u window=%u hop=%u frames=%u",
                (unsigned long)context->tensor_dump_capture_seq,
                (unsigned long)context->tensor_dump_capture_feat_hash,
@@ -2590,6 +2606,31 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
                (unsigned int)RIVER_KWS_HOP_SAMPLES,
                (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+    printf("KWSDUMP META seq=%lu feat_hash=0x%08lx input_hash=0x%08lx raw=%ld score=%.6f q15=%lu in_scale=%.9f in_zp=%ld out_scale=%.9f out_zp=%ld pcm_hash=0x%08lx raw_pcm_hash=0x%08lx pcm_samples=%lu raw_pcm_samples=%lu raw_channels=%lu center_pad=%u window=%u hop=%u frames=%u\n",
+           (unsigned long)context->tensor_dump_capture_seq,
+           (unsigned long)context->tensor_dump_capture_feat_hash,
+           (unsigned long)context->tensor_dump_capture_input_hash,
+           (long)context->tensor_dump_capture_raw_output_scalar,
+           (double)context->tensor_dump_capture_score,
+           (unsigned long)context->tensor_dump_capture_confidence_q15,
+           (double)context->input_scale,
+           (long)context->input_zero_point,
+           (double)context->output_scale,
+           (long)context->output_zero_point,
+           (unsigned long)context->tensor_dump_capture_pcm_hash,
+           (unsigned long)context->tensor_dump_capture_raw_pcm_hash,
+           (unsigned long)(context->tensor_dump_pcm_bytes_captured /
+                           sizeof(int16_t)),
+           context->tensor_dump_raw_pcm_snapshot_channels == 0U ?
+               0UL :
+               (unsigned long)(context->tensor_dump_raw_pcm_bytes_captured /
+                               (sizeof(int16_t) *
+                                context->tensor_dump_raw_pcm_snapshot_channels)),
+           (unsigned long)context->tensor_dump_raw_pcm_snapshot_channels,
+           (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+           (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+           (unsigned int)RIVER_KWS_HOP_SAMPLES,
+           (unsigned int)RIVER_KWS_FEATURE_FRAMES);
     if (context->tensor_dump_pcm_bytes_captured > 0U) {
         RIVER_LOGI("kws pcm dump meta: seq=%lu infer=%lu label=preproc_s16 sample_rate=%u samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u",
                    (unsigned long)context->tensor_dump_capture_seq,
@@ -2603,6 +2644,18 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                    (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
                    (unsigned int)RIVER_KWS_HOP_SAMPLES,
                    (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+        printf("KWSDUMP PCM_META seq=%lu infer=%lu label=preproc_s16 sample_rate=%u samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u\n",
+               (unsigned long)context->tensor_dump_capture_seq,
+               (unsigned long)context->tensor_dump_capture_infer,
+               (unsigned int)RIVER_KWS_SAMPLE_RATE_HZ,
+               (unsigned long)(context->tensor_dump_pcm_bytes_captured /
+                               sizeof(int16_t)),
+               (unsigned long)context->tensor_dump_pcm_bytes_captured,
+               (unsigned long)context->tensor_dump_capture_pcm_hash,
+               (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+               (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+               (unsigned int)RIVER_KWS_HOP_SAMPLES,
+               (unsigned int)RIVER_KWS_FEATURE_FRAMES);
     }
     if (context->tensor_dump_raw_pcm_bytes_captured > 0U) {
         RIVER_LOGI("kws raw pcm dump meta: seq=%lu infer=%lu label=raw_capture_s16 sample_rate=%u channels=%lu samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u",
@@ -2621,6 +2674,22 @@ static void river_voice_kws_tensor_dump_log_begin_meta(
                    (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
                    (unsigned int)RIVER_KWS_HOP_SAMPLES,
                    (unsigned int)RIVER_KWS_FEATURE_FRAMES);
+        printf("KWSDUMP RAW_PCM_META seq=%lu infer=%lu label=raw_capture_s16 sample_rate=%u channels=%lu samples=%lu bytes=%lu hash=0x%08lx center_pad=%u window=%u hop=%u frames=%u\n",
+               (unsigned long)context->tensor_dump_capture_seq,
+               (unsigned long)context->tensor_dump_capture_infer,
+               (unsigned int)RIVER_KWS_SAMPLE_RATE_HZ,
+               (unsigned long)context->tensor_dump_raw_pcm_snapshot_channels,
+               context->tensor_dump_raw_pcm_snapshot_channels == 0U ?
+                   0UL :
+                   (unsigned long)(context->tensor_dump_raw_pcm_bytes_captured /
+                                   (sizeof(int16_t) *
+                                    context->tensor_dump_raw_pcm_snapshot_channels)),
+               (unsigned long)context->tensor_dump_raw_pcm_bytes_captured,
+               (unsigned long)context->tensor_dump_capture_raw_pcm_hash,
+               (unsigned int)RIVER_KWS_FRONTEND_CENTER_PAD_SAMPLES,
+               (unsigned int)RIVER_KWS_WINDOW_SAMPLES,
+               (unsigned int)RIVER_KWS_HOP_SAMPLES,
+               (unsigned int)RIVER_KWS_FEATURE_FRAMES);
     }
 }
 
@@ -5334,6 +5403,14 @@ extern "C" void river_voice_kws_dump_tensor_meta(void)
                (unsigned long)output_chunks,
                (unsigned long)pcm_chunks,
                (unsigned long)raw_pcm_chunks);
+    printf("KWSDUMP SNAPSHOT seq=%lu infer=%lu chunks=[feat:%lu input:%lu output:%lu pcm:%lu raw_pcm:%lu]\n",
+           (unsigned long)g_river_voice_kws->tensor_dump_capture_seq,
+           (unsigned long)g_river_voice_kws->tensor_dump_capture_infer,
+           (unsigned long)feat_chunks,
+           (unsigned long)input_chunks,
+           (unsigned long)output_chunks,
+           (unsigned long)pcm_chunks,
+           (unsigned long)raw_pcm_chunks);
 }
 
 extern "C" river_status_t river_voice_kws_dump_tensor_chunk(

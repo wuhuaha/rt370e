@@ -15,12 +15,10 @@ import serial
 
 CAPTURED_RE = re.compile(r"kws tensor dump captured: seq=(?P<seq>\d+)")
 SNAPSHOT_RE = re.compile(
-    r"kws tensor dump snapshot: seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
+    r"(?:kws tensor dump snapshot:|KWSDUMP SNAPSHOT) "
+    r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
     r"chunks=\[feat:(?P<feat>\d+) input:(?P<input>\d+) "
     r"output:(?P<output>\d+) pcm:(?P<pcm>\d+) raw_pcm:(?P<raw_pcm>\d+)\]"
-)
-CHUNK_RE_TEMPLATE = (
-    r"kws tensor dump {label}: seq={seq} chunk={chunk}/{total} hex="
 )
 
 
@@ -83,12 +81,13 @@ class SerialCapture:
 
 
 def chunk_regex(label: str, seq: int, chunk: int, total: int) -> re.Pattern[str]:
+    escaped_label = re.escape(label)
     return re.compile(
-        CHUNK_RE_TEMPLATE.format(
-            label=re.escape(label),
-            seq=seq,
-            chunk=chunk,
-            total=total,
+        (
+            rf"(?:kws tensor dump {escaped_label}: seq={seq} "
+            rf"chunk={chunk}/{total} hex=|"
+            rf"KWSDUMP CHUNK label={escaped_label} seq={seq} "
+            rf"chunk={chunk}/{total} hex=)"
         )
     )
 

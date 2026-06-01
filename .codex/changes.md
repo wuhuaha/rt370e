@@ -1,5 +1,21 @@
 # Change Log
 
+## Step H.xiaozhi-client.105
+- 增强 KWS dump 紧凑串口格式：
+  - `river_voice_kws.cc` 在 `river kws dump meta` 时额外输出 `KWSDUMP BEGIN`、`KWSDUMP META`、`KWSDUMP PCM_META`、`KWSDUMP RAW_PCM_META`、`KWSDUMP SNAPSHOT`，保留原有 `kws tensor dump ...` meta 日志供既有人工排查使用。
+  - `river kws dump chunk ...` 的 chunk 行改为 `KWSDUMP CHUNK label=... seq=... chunk=... hex=...`，减少串口日志前缀长度，便于 host 抓取脚本在多任务日志穿插时匹配同窗 PCM/feature chunk。
+  - `tools/kws/replay_board_tensor_dump.py` 增加 compact PCM meta 解析；`tools/kws/capture_kws_pcm_dump.py` 同时识别普通 snapshot/chunk 与 compact `KWSDUMP` snapshot/chunk。
+- 验证与边界：
+  - 本步只增强 KWS dump 串口可解析性，不修改模型、阈值、VAD gate、frontend 算法、TFLM invoke、云端协议、音频链路或 UI。
+  - 使用 synthetic compact dump 覆盖 `feat_f32`、`output_raw`、`preproc_s16`、`raw_capture_s16` 完整解析与 compare；board-like frontend 从 preproc/raw ch0 重算后 feature hash 与 synthetic 板端 feature hash 完全一致。
+- Verification for this step:
+  - `python3 -m py_compile tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py tools/kws/replay_board_tensor_dump.py` passed。
+  - `python3 tools/kws/capture_kws_pcm_dump.py --help` passed。
+  - synthetic `KWSDUMP` compact log + `python3 tools/kws/compare_board_pcm_frontend.py --log tmp/kws_synthetic_compact_dump.log --seq latest --require-raw --out-dir tmp/kws_synthetic_compare` passed。
+  - `git diff --check -- components/river_voice/river_voice_kws.cc tools/kws/replay_board_tensor_dump.py tools/kws/capture_kws_pcm_dump.py` passed。
+  - `bash -lc 'export AMEBA_SDK_ROOT=/root/ameba-rtos; export CMAKE_BUILD_PARALLEL_LEVEL=1; source /root/ameba-river/env.sh; python3 /root/ameba-rtos/ameba.py build -p'` passed with `Build done`。
+  - Not run: live serial capture, because no `/dev/ttyUSB*` or `/dev/ttyACM*` device is visible in this container。
+
 ## Step H.xiaozhi-client.104
 - 增加 KWS PCM dump 串口抓取脚本：
   - 新增 `tools/kws/capture_kws_pcm_dump.py`，用于在板子已刷入 Step 103 镜像后自动发送 `river kws dump clear`、`river kws dump next`、`river kws dump meta` 和后续 chunk 拉取命令。

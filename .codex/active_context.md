@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.104 增加 KWS PCM dump 串口抓取脚本`
+  - `Step H.xiaozhi-client.105 增强 KWS dump 紧凑串口格式`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.105` 增强 KWS dump 紧凑串口格式：
+  - `river kws dump meta` 继续输出原 `kws tensor dump ...` 日志，并额外输出 `KWSDUMP BEGIN/META/PCM_META/RAW_PCM_META/SNAPSHOT`；chunk 拉取输出改为更短的 `KWSDUMP CHUNK label=... seq=... chunk=... hex=...`，降低长串口日志被其它任务日志插断后无法解析的概率。
+  - `tools/kws/replay_board_tensor_dump.py` 增加 compact PCM meta 解析；`tools/kws/capture_kws_pcm_dump.py` 同时识别普通 snapshot/chunk 和 `KWSDUMP` snapshot/chunk。
+  - 本地 synthetic compact dump 已覆盖 `feat_f32 + output_raw + preproc_s16 + raw_capture_s16` 的完整解析与 compare；`board_numpy_from_pcm_union` 与 `board_numpy_from_raw_ch0_union` 均精确回到 synthetic 板端 feature hash。
+  - `python3 -m py_compile`、脚本 `--help`、synthetic compare、`git diff --check` 和 `/root/ameba-rtos` 完整 build 均通过；当前容器仍未暴露串口设备，未执行 live serial capture。
 
 - `Step H.xiaozhi-client.104` 增加 KWS PCM dump 串口抓取脚本：
   - 新增 `tools/kws/capture_kws_pcm_dump.py`，在设备已刷入 Step 103 镜像且串口可见时，自动发送 `river kws dump clear/next/meta/chunk ...`，拉取 `feat_f32`、`output_raw`、`preproc_s16`、`raw_capture_s16` chunk，并调用 `compare_board_pcm_frontend.py --require-raw` 生成 raw/preproc/frontend 对拍结果。

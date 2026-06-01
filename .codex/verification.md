@@ -1,3 +1,47 @@
+## Step H.xiaozhi-client.105 Verification
+
+Check compact KWS dump parsing and build:
+```bash
+cd /root/ameba-river
+python3 -m py_compile \
+  tools/kws/capture_kws_pcm_dump.py \
+  tools/kws/compare_board_pcm_frontend.py \
+  tools/kws/replay_board_tensor_dump.py
+python3 tools/kws/capture_kws_pcm_dump.py --help
+git diff --check -- \
+  components/river_voice/river_voice_kws.cc \
+  tools/kws/replay_board_tensor_dump.py \
+  tools/kws/capture_kws_pcm_dump.py
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source /root/ameba-river/env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- Python commands complete without errors
+- firmware build finishes with `Build done`
+- `river kws dump meta` emits both normal `kws tensor dump ...` meta lines and compact `KWSDUMP ...` meta/snapshot lines
+- `river kws dump chunk ...` emits `KWSDUMP CHUNK ...`
+
+Host-side live capture after flashing this image:
+```bash
+cd /root/ameba-river
+python3 tools/kws/capture_kws_pcm_dump.py \
+  -p /dev/ttyUSB0 \
+  -b 1500000 \
+  --log tmp/kws_pcm_dump_serial.log \
+  --out-dir tmp/kws_pcm_frontend_compare
+```
+
+Observed on 2026-06-01:
+- passed: `python3 -m py_compile tools/kws/capture_kws_pcm_dump.py tools/kws/compare_board_pcm_frontend.py tools/kws/replay_board_tensor_dump.py`.
+- passed: `python3 tools/kws/capture_kws_pcm_dump.py --help`.
+- passed: synthetic compact `KWSDUMP` log replay through `compare_board_pcm_frontend.py --require-raw`; `board_numpy_from_pcm_union` and `board_numpy_from_raw_ch0_union` matched the synthetic board feature exactly.
+- passed: `git diff --check -- components/river_voice/river_voice_kws.cc tools/kws/replay_board_tensor_dump.py tools/kws/capture_kws_pcm_dump.py`.
+- passed: `/root/ameba-rtos` full firmware build, ending with `Build done`.
+- not run: live serial capture, because this container currently has no `/dev/ttyUSB*` or `/dev/ttyACM*` device.
+
 ## Step H.xiaozhi-client.104 Verification
 
 Check the host-side serial capture automation:

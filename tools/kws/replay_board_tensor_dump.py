@@ -82,8 +82,26 @@ PCM_META_RE = re.compile(
     r"center_pad=(?P<center_pad>\d+) window=(?P<window>\d+) "
     r"hop=(?P<hop>\d+) frames=(?P<frames>\d+)"
 )
+PCM_META_RE_COMPACT = re.compile(
+    r"KWSDUMP PCM_META "
+    r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
+    r"label=(?P<label>\w+) sample_rate=(?P<sample_rate>\d+) "
+    r"samples=(?P<samples>\d+) bytes=(?P<bytes>\d+) "
+    r"hash=0x(?P<hash>[0-9a-fA-F]+) "
+    r"center_pad=(?P<center_pad>\d+) window=(?P<window>\d+) "
+    r"hop=(?P<hop>\d+) frames=(?P<frames>\d+)"
+)
 RAW_PCM_META_RE = re.compile(
     r"kws raw pcm dump meta: "
+    r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
+    r"label=(?P<label>\w+) sample_rate=(?P<sample_rate>\d+) "
+    r"channels=(?P<channels>\d+) samples=(?P<samples>\d+) "
+    r"bytes=(?P<bytes>\d+) hash=0x(?P<hash>[0-9a-fA-F]+) "
+    r"center_pad=(?P<center_pad>\d+) window=(?P<window>\d+) "
+    r"hop=(?P<hop>\d+) frames=(?P<frames>\d+)"
+)
+RAW_PCM_META_RE_COMPACT = re.compile(
+    r"KWSDUMP RAW_PCM_META "
     r"seq=(?P<seq>\d+) infer=(?P<infer>\d+) "
     r"label=(?P<label>\w+) sample_rate=(?P<sample_rate>\d+) "
     r"channels=(?P<channels>\d+) samples=(?P<samples>\d+) "
@@ -262,7 +280,7 @@ def parse_dump_records(log_path: Path) -> dict[int, DumpRecord]:
                     record.raw_pcm_chunks[chunk_idx] = payload
                 continue
 
-            if match := PCM_META_RE.search(line):
+            if match := PCM_META_RE.search(line) or PCM_META_RE_COMPACT.search(line):
                 seq = int(match.group("seq"))
                 record = records.setdefault(seq, DumpRecord(seq=seq))
                 if record.infer is None:
@@ -277,7 +295,7 @@ def parse_dump_records(log_path: Path) -> dict[int, DumpRecord]:
                 record.pcm_frames = int(match.group("frames"))
                 continue
 
-            if match := RAW_PCM_META_RE.search(line):
+            if match := RAW_PCM_META_RE.search(line) or RAW_PCM_META_RE_COMPACT.search(line):
                 seq = int(match.group("seq"))
                 record = records.setdefault(seq, DumpRecord(seq=seq))
                 if record.infer is None:
