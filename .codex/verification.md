@@ -1,3 +1,33 @@
+## Step H.xiaozhi-client.91 Verification
+
+Confirm the persisted wakeword algorithm repository workflow:
+```bash
+cd /root/ameba-river
+rg -n "Wakeword Algorithm Project|/root/kws-trainint|git lfs pull" \
+  AGENTS.md .codex/changes.md .codex/verification.md
+```
+
+Expected result:
+- `AGENTS.md` documents `/root/kws-trainint` as the upstream wakeword algorithm/training project.
+- The documented refresh flow requires `git pull` and `git lfs pull` in `/root/kws-trainint` before inspecting or importing wakeword model artifacts.
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check -- AGENTS.md .codex/changes.md .codex/verification.md
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Observed on 2026-06-01:
+- passed: `rg -n "Wakeword Algorithm Project|/root/kws-trainint|git lfs pull" AGENTS.md .codex/changes.md .codex/verification.md`.
+- passed: `git diff --check -- AGENTS.md .codex/changes.md .codex/verification.md`.
+- passed: `python3 tools/diag/check_codex_harness.py`.
+- not run: firmware build, flash/download, serial monitor, `/root/kws-trainint` `git pull`, or `git lfs pull`; user only asked to persist the future workflow rule.
+
 ## Step H.xiaozhi-client.90 Verification
 
 Confirm the default single-turn mode and runtime diagnostic command:

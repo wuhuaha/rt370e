@@ -7,6 +7,14 @@
 - Do not modify SDK sources under `/root/ameba-rtos-1.2` unless the user explicitly asks.
 - Keep all project-specific code, docs, and process records inside this repository.
 
+## Wakeword Algorithm Project
+- The upstream wakeword algorithm/training project lives at `/root/kws-trainint`.
+- For future wakeword model refreshes from algorithm colleagues, update that repository first:
+  1. `cd /root/kws-trainint`
+  2. `git pull`
+  3. `git lfs pull`
+- Inspect and import wakeword model artifacts from `/root/kws-trainint` after both Git and Git LFS content are current.
+
 ## Delivery Mode
 - Work in small, board-verifiable steps.
 - After each step:

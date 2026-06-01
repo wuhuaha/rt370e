@@ -1,5 +1,18 @@
 # Change Log
 
+## Step H.xiaozhi-client.91
+- 固化唤醒算法项目路径和模型刷新流程到 `AGENTS.md`：
+  - 明确算法/训练仓库位于 `/root/kws-trainint`。
+  - 后续从算法同事处更新唤醒模型时，先在该目录执行 `git pull` 和 `git lfs pull`。
+  - 只有 Git 与 Git LFS 内容都更新后，再从 `/root/kws-trainint` 检查和导入唤醒模型 artifact。
+- 边界：
+  - 本步只更新项目协作规则和验证记录，不修改固件代码、模型文件、SDK 源码、VAD/KWS runtime、tensor dump、alignment replay 或 board/local parity 路径。
+- Verification for this step:
+  - `rg -n "Wakeword Algorithm Project|/root/kws-trainint|git lfs pull" AGENTS.md .codex/changes.md .codex/verification.md` passed.
+  - `git diff --check -- AGENTS.md .codex/changes.md .codex/verification.md` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - not run: firmware build, flash/download, serial monitor, `/root/kws-trainint` `git pull`, or `git lfs pull`; user only asked to persist the future workflow rule.
+
 ## Step H.xiaozhi-client.90
 - 新增 Orvibo 单轮对话模式，默认启用：
   - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`，`prj.conf` 显式配置默认产品行为为“唤醒 -> 一次服务端响应 -> 本轮 TTS 播放完成后关闭 realtime WebSocket -> 回到本地唤醒监听”。
