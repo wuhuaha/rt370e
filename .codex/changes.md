@@ -1,5 +1,59 @@
 # Change Log
 
+## Step H.xiaozhi-client.98
+- 再次刷新算法仓库 `/root/kws-trainint`：
+  - 本轮执行 `git pull --ff-only && git lfs pull`，结果为 `Already up to date`，仓库状态为 `main...origin/main`。
+  - 当前 HEAD：`d2b30f8 修正student导出runbook窗口提示`。
+  - 相比 Step 97 记录的 `bc5bac5`，后续新增 2 个提交：
+    - `ec78ef4 补充学生模型全量导出部署说明`
+    - `d2b30f8 修正student导出runbook窗口提示`
+- 更新内容判断：
+  - 本次后续更新没有新增 `params/students/*.json`。
+  - 当前新目标硬件 student 矩阵仍是 6 个：A 1s nano、B 1s nano、A 2s nano、A 2s tiny、B 2s nano、B 2s tiny。
+  - `docs/context/2026-06-new-target-hardware-student-deployment-guide.md` 和 `docs/research/2026-06-new-target-student-full-export.md` 现在明确 6 个 student 已有可复现 INT8 + FP32 bundle 规格；端侧阈值使用 bundle 内 `threshold_profiles.json` 的 INT8 profile，不直接使用 PyTorch report 阈值。
+  - `src/kws_training/student_export.py` 更新 runbook：shape mismatch 风险提示使用实际 input shape，例如 2s 模型输出 `40x201`；runbook 额外展示推荐 INT8 profile。
+  - `tests/test_student_export.py` 增加 2s input shape 风险提示测试。
+- 当前本机产物状态：
+  - Git/LFS 拉取后 `/root/kws-trainint/artifacts/exports` 仍只看到 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_v1` 和 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` 两个 1s 新目标导出目录。
+  - 未看到 2s bundle 目录；如需固件导入 2s student，需要先在算法仓库重跑导出命令生成本地产物。
+- 边界：
+  - 本步只审计算法仓库更新，不改固件 KWS 模型、阈值、hold、VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+- Verification for this step:
+  - `/root/kws-trainint` `git pull --ff-only && git lfs pull` passed and reported already up to date。
+  - `/root/kws-trainint` `git log --oneline bc5bac5..HEAD` listed the 2 new commits ending at `d2b30f8`。
+  - `/root/kws-trainint` `git diff --name-status bc5bac5..HEAD` confirmed docs, plans, `src/kws_training/student_export.py`, and `tests/test_student_export.py` changes, with no `params/students` additions。
+  - Python JSON inspection confirmed the 6 current new-target student configs and their `window_ms` / teacher / variant values。
+  - `find artifacts/exports -maxdepth 1 -type d` confirmed only the two 1s new-target export directories are present locally。
+  - not run: firmware build, flash/download, or serial monitor; no firmware files changed in this step.
+
+## Step H.xiaozhi-client.97
+- 刷新算法仓库 `/root/kws-trainint`：
+  - 更新前 HEAD：`f2ca5dbcd9523c6e7f70291ec8f778c87d7e279f`。
+  - `git pull` 从 `origin/main` 快进到 `bc5bac5`，新增 5 个提交：
+    - `f8f7757 分析唤醒词窗口时长风险以指导student对照`
+    - `9feaef8 新增2s学生对照并验证漏检分桶`
+    - `7c468aa 补齐TeacherB二秒学生并评测新目标数据`
+    - `a62d37b 补充TeacherAB一秒二秒学生对比`
+    - `bc5bac5 补充新目标学生模型部署指南`
+  - `git lfs pull` 成功，`git lfs status` 显示无待提交对象。
+- 新增 student 候选配置：
+  - `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1`：Teacher A cycle24，`conv_resnet_ed`，`nano_2s`，`window_ms=2000`。
+  - `student_conv_resnet_ed_tiny_teacher_a_new_target_cycle24_2s_v1`：Teacher A cycle24，`conv_resnet_ed`，`tiny_2s`，`window_ms=2000`。
+  - `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_2s_v1`：Teacher B BNT5 avg5，`conv_resnet_ed`，`nano_2s`，`window_ms=2000`。
+  - `student_conv_resnet_ed_tiny_teacher_b_new_target_bnt5_2s_v1`：Teacher B BNT5 avg5，`conv_resnet_ed`，`tiny_2s`，`window_ms=2000`。
+- 关键判断：
+  - 2s student 的导出契约为 `40x201`，与当前固件已接入的 1s Teacher B FP32 `40x101` 路径不同，后续不能只替换模型头文件。
+  - Git/LFS 拉取后本地 `artifacts/exports` 未出现新的 `*2s*` 导出目录；算法文档说明模型二进制和 header 为本地生成物，不提交到 Git。如需固件导入，需先重跑对应 `export-student-model`。
+- 边界：
+  - 本步只审计算法仓库新 student 配置和文档，不改固件 KWS 模型、阈值、hold、VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径。
+- Verification for this step:
+  - `/root/kws-trainint` `git pull` fast-forwarded from `f2ca5db` to `bc5bac5`。
+  - `/root/kws-trainint` `git lfs pull` passed。
+  - `/root/kws-trainint` `git lfs status` showed no pending LFS changes。
+  - Python JSON inspection confirmed the four new 2s student parameter files, teacher source, variant, `window_ms=2000`, and expected export dirs.
+  - `find artifacts/exports -maxdepth 1 -type d -name '*2s*'` returned no local 2s bundle directories after Git/LFS pull.
+  - not run: firmware build, flash/download, or serial monitor; no firmware files changed in this step.
+
 ## Step H.xiaozhi-client.96
 - 回到 Teacher B 算法/模型同事推荐的触发配置：
   - 保持 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 模型、`40x101` frontend、conv-only resolver、VAD gate 和 fallback 关闭策略不变。

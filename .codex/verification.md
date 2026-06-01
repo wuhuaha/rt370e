@@ -1,3 +1,105 @@
+## Step H.xiaozhi-client.98 Verification
+
+Refresh the algorithm repository again:
+```bash
+cd /root/kws-trainint
+git status --short --branch
+git pull --ff-only
+git lfs pull
+git lfs status
+git log --oneline bc5bac5..HEAD
+git diff --name-status bc5bac5..HEAD
+```
+
+Expected result:
+- repository remains clean on `main...origin/main`
+- HEAD is the latest algorithm commit
+- LFS has no pending local changes
+- commits after `bc5bac5` are visible
+
+Inspect current student configs:
+```bash
+cd /root/kws-trainint
+python3 - <<'PY'
+import json
+from pathlib import Path
+for path in sorted(Path('params/students').glob('*new_target*.json')):
+    data = json.loads(path.read_text())['student']
+    frontend = data.get('frontend', {})
+    print(path.name, data['name'], data['variant'], data['teacher_name'], frontend.get('window_ms'))
+PY
+for d in artifacts/exports/student_conv_resnet_ed_*new_target*; do
+  [ -d "$d" ] && printf '%s\n' "$d"
+done
+```
+
+Expected result:
+- the new-target matrix still contains 6 student configs
+- no new `params/students/*.json` files are added by the commits after `bc5bac5`
+- local export directories may not include the 2s bundles unless they have been regenerated locally
+
+Observed on 2026-06-01:
+- passed: `/root/kws-trainint` `git pull --ff-only && git lfs pull`; pull reported `Already up to date`.
+- passed: current HEAD is `d2b30f8 修正student导出runbook窗口提示`.
+- passed: `git log --oneline bc5bac5..HEAD` listed:
+  - `ec78ef4 补充学生模型全量导出部署说明`
+  - `d2b30f8 修正student导出runbook窗口提示`
+- passed: `git diff --name-status bc5bac5..HEAD` showed docs/plans/export-code/test changes and no `params/students` additions.
+- passed: Python JSON inspection confirmed the current 6 new-target student configs.
+- passed: local `artifacts/exports` contains only the 1s A/B nano new-target export directories after Git/LFS pull.
+- not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
+## Step H.xiaozhi-client.97 Verification
+
+Refresh the algorithm repository:
+```bash
+cd /root/kws-trainint
+git status --short --branch
+git pull
+git lfs pull
+git lfs status
+git log --oneline f2ca5db..HEAD
+```
+
+Expected result:
+- repository remains clean on `main...origin/main`
+- `git pull` fast-forwards to the latest algorithm commit
+- LFS has no pending local changes
+
+Inspect new student candidates:
+```bash
+cd /root/kws-trainint
+git diff --name-status f2ca5db..HEAD -- params/students params/experiments docs/context/2026-06-new-target-hardware-student-deployment-guide.md
+python3 - <<'PY'
+import json
+from pathlib import Path
+for path in sorted(Path('params/students').glob('*2s_v1.json')):
+    data = json.loads(path.read_text())['student']
+    frontend = data.get('frontend', {})
+    outputs = data.get('outputs', {})
+    print(path.name, data['name'], data['variant'], data['teacher_name'], frontend.get('window_ms'), outputs.get('export_dir'))
+PY
+find artifacts/exports -maxdepth 1 -type d -name '*2s*' -printf '%f\n' | sort
+```
+
+Expected result:
+- four new `params/students/*2s_v1.json` files are present
+- each new candidate reports `window_ms=2000`
+- no committed/local `artifacts/exports/*2s*` bundle directories are present unless export has been generated locally
+
+Observed on 2026-06-01:
+- passed: `/root/kws-trainint` `git pull` fast-forwarded from `f2ca5dbcd9523c6e7f70291ec8f778c87d7e279f` to `bc5bac5`.
+- passed: `/root/kws-trainint` `git lfs pull`.
+- passed: `/root/kws-trainint` `git lfs status` showed no pending LFS changes.
+- passed: `git log --oneline f2ca5db..HEAD` listed 5 new commits ending at `bc5bac5 补充新目标学生模型部署指南`.
+- passed: Python JSON inspection found:
+  - `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1`
+  - `student_conv_resnet_ed_tiny_teacher_a_new_target_cycle24_2s_v1`
+  - `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_2s_v1`
+  - `student_conv_resnet_ed_tiny_teacher_b_new_target_bnt5_2s_v1`
+- passed: `find artifacts/exports -maxdepth 1 -type d -name '*2s*'` returned no local 2s export bundle directories after Git/LFS pull.
+- not run: firmware build, flash/download, or serial monitor; this step only refreshed and audited the algorithm repository.
+
 ## Step H.xiaozhi-client.96 Verification
 
 Confirm the Teacher B model-colleague recommended trigger profile:

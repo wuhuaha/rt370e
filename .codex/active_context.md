@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.96 回到 Teacher B 算法推荐触发配置`
+  - `Step H.xiaozhi-client.98 再次刷新算法仓库并确认 student 全量导出更新`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,27 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.98` 再次刷新算法仓库并确认 student 全量导出更新：
+  - 在 `/root/kws-trainint` 再次执行 `git pull --ff-only && git lfs pull`；当前算法仓库为 `main...origin/main`，HEAD 为 `d2b30f8 修正student导出runbook窗口提示`，本轮 pull 返回 `Already up to date`。
+  - 相比 Step 97 记录的 `bc5bac5`，算法仓库后续增加 `ec78ef4 补充学生模型全量导出部署说明` 和 `d2b30f8 修正student导出runbook窗口提示` 两个提交。
+  - 本次后续更新没有新增 `params/students/*.json`；当前新目标硬件 student 矩阵仍是 6 个：A/B 1s nano 加 4 个 2s 候选。
+  - 新文档明确 6 个 student 均已有可复现的 INT8 + FP32 bundle 规格与推荐 INT8 profile，且端侧阈值必须来自 bundle 内 `threshold_profiles.json`，不要直接使用 PyTorch report 阈值。
+  - `src/kws_training/student_export.py` 更新 runbook 文案：风险提示现在按实际 input shape 输出 `40x101` 或 `40x201`，并在 runbook 中展示推荐 INT8 profile；`tests/test_student_export.py` 增加 2s shape 风险提示测试。
+  - 当前本地 Git/LFS 拉取后 `/root/kws-trainint/artifacts/exports` 仍只存在 1s A/B nano 新目标导出目录，没有 2s bundle 目录；如果要固件导入 2s student，仍需先在算法仓库重跑导出命令生成本地产物。
+  - 本步未修改固件模型、`prj.conf`、VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径；未执行 firmware build/flash/serial monitor。
+
+- `Step H.xiaozhi-client.97` 刷新算法仓库并审计 2s student 候选：
+  - 按固化流程在 `/root/kws-trainint` 执行 `git pull` 和 `git lfs pull`；算法仓库从 `f2ca5db` 快进到 `bc5bac5`，`git lfs status` 无待提交对象，状态为 `main...origin/main`。
+  - 本次新增 4 个 `params/students/*2s_v1.json` 候选配置，均为新目标硬件数据口径 `teacher_a_new_target_hardware_v1`：
+    - `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1`
+    - `student_conv_resnet_ed_tiny_teacher_a_new_target_cycle24_2s_v1`
+    - `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_2s_v1`
+    - `student_conv_resnet_ed_tiny_teacher_b_new_target_bnt5_2s_v1`
+  - 这些新配置均为 `2000ms` / `40` mel / `25ms` frame / `10ms` shift，导出后输入契约为 `[1,40,201,1]`；它们不能直接沿用当前固件的 `40x101` 1s 前端路径。
+  - 算法文档 `docs/context/2026-06-new-target-hardware-student-deployment-guide.md` 同时把现有 A/B 1s nano 与新增 4 个 2s 候选合成 6 个新目标硬件 student 部署矩阵；文档说明模型二进制和 header 是本地生成物，不提交到 Git。
+  - 当前本地 `/root/kws-trainint/artifacts/exports` 在 Git/LFS 拉取后没有新增 `*2s*` 导出目录；若要导入固件，需要先在算法仓库重跑对应 `export-student-model` 生成 bundle。
+  - 本步未修改固件模型、`prj.conf`、VAD、tensor dump、alignment replay、board/local parity、UI 或云端协议路径；未执行 firmware build/flash/serial monitor。
 
 - `Step H.xiaozhi-client.96` 回到 Teacher B 算法推荐触发配置：
   - 当前固件仍使用 `student_conv_resnet_ed_nano_teacher_b_new_target_bnt5_v1` FP32 debug 模型，未切到 INT8。
