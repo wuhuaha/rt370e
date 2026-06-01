@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.107 切换 Orvibo XiaoZhi 服务端端口到 8081`
+  - `Step H.xiaozhi-client.109 重新部署 2026-06-01 KWS 重导出模型`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,21 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.109` 重新部署 2026-06-01 KWS 重导出模型：
+  - 按算法侧最新说明先同步 `/root/kws-trainint` 到 `3959d05`，读取 `docs/context/2026-06-new-target-hardware-student-deployment-guide.md` 和 bundle `board_runbook.md` / `threshold_profiles.json` / `deployment_summary.json`。
+  - 当前端侧继续使用 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1` 的 FP32 debug 变体和 `40x201` TFLM-style frontend 契约，但把项目内嵌 FP32 头文件同步为算法本次重导出的 `model_fp32_data.h`。
+  - `prj.conf` 的 KWS 默认阈值从旧 `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=14720` 更新为算法明确要求的新默认档 `16384`；召回优先档仍记录为 `15744` 供后续用户手动切换试板。
+  - 本步不修改 VAD、hold、frontend 实现、tensor dump、alignment replay、board/local parity、云端协议、UI 或 SDK 源码。
+  - `git diff --check`、`python3 tools/diag/check_codex_harness.py` 和 `/root/ameba-rtos` 完整 build 均通过；未执行 flash/serial monitor，按当前硬件策略等待用户手动上板验证。
+
+- `Step H.xiaozhi-client.108` 接入 server wake candidate 确认协议：
+  - 当前项目在 Step 107 已切到 `8081`；本步进一步把端侧从旧 `listen detect/start` 唤醒表达切到服务端声明 `features.server_wake_confirm=true` 时的 `type=wake,state=candidate` 流程。
+  - client hello 新增 `wake_candidate_upload=true`、`wake_audio_recording=true`、`wake_upload_modes=["candidate"]`、`wake_audio_formats=["opus"]`；server hello 解析 `server_wake_confirm`、候选上传模式和 Opus 格式能力。
+  - 新服务端能力可用时，端侧发送 `wake_id`、`trigger_source=local_kws`、`keyword_hint=你好小智`、`client_confidence`，随后上传候选 Opus，并等待 `wake.accepted/rejected/uncertain`；旧服务端未声明能力时保留原 `listen detect/start` 回退。
+  - `wake.rejected` 或确认超时会停止上传、清空上行队列并回到 idle；`wake.uncertain` 只给短暂继续上传窗口；`wake.accepted` 后继续上传用户指令音频。
+  - `server_tts_started` 改为控制优先事件并 flush protocol uplink；app 侧只在 listening 且 wake flow 允许时发送上行音频，降低服务端 `audio_outside_listening`。
+  - 本步不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径，不修改 Wi-Fi、UI 或 SDK 源码。
 
 - `Step H.xiaozhi-client.107` 切换 Orvibo XiaoZhi 服务端端口到 8081：
   - `Kconfig`、`prj.conf` 和 `RIVER_ORVIBO_OTA_URL` 兜底默认值均切到 `http://101.33.235.154:8081/xiaozhi/ota/`。

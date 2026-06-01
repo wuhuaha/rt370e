@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.109
+- 重新部署算法侧 2026-06-01 重导出的 A 2s nano KWS bundle：
+  - 按仓库约定先在 `/root/kws-trainint` 执行 `git pull --ff-only origin main`，同步到提交 `3959d05`，并读取新交付说明 `docs/context/2026-06-new-target-hardware-student-deployment-guide.md`、bundle `board_runbook.md`、`threshold_profiles.json`、`deployment_summary.json`。
+  - 该 bundle 为 `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1`，frontend 明确为 `tflm_microfrontend_v1`，输入契约 `[1,40,201,1]`，默认阈值档 `default_target_recall` 更新为 `threshold_probability=0.500000`、`threshold_output_int8=0`、`threshold_q15=16384`。
+  - 继续使用当前工程的 FP32 debug 变体部署路径，但将项目内嵌的 `components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h` 同步为算法仓库本次重导出的 `model_fp32_data.h`。
+  - `prj.conf` 的 KWS 默认 Q15 阈值从旧的 `14720` 更新为算法明确要求不要再使用的 `16384`，并同步注释中的 probability / int8 / board reference 指标。
+- 设计边界：
+  - 本步只同步 KWS 模型 bundle 和默认阈值，不修改 VAD、hold、frontend 实现、tensor dump、alignment replay、board/local parity、云端协议、UI 或 SDK 源码。
+  - 仍遵守当前硬件策略：只完成 build 验证，不主动 flash 或串口上板。
+- Verification for this step:
+  - `git -C /root/kws-trainint rev-parse --short HEAD` returned `3959d05`
+  - `sed -n '1,220p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/threshold_profiles.json` confirmed `default_target_recall.threshold_q15=16384` and `recall_990.threshold_q15=15744`
+  - `sed -n '1,220p' /root/kws-trainint/docs/context/2026-06-new-target-hardware-student-deployment-guide.md` confirmed the 2026-06-01 re-export guidance and the instruction not to keep using `14720`
+  - `sha256sum /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model_fp32_data.h components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h` matched after sync
+  - `git diff --check -- prj.conf components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h .codex/changes.md .codex/verification.md .codex/active_context.md` passed
+  - `python3 tools/diag/check_codex_harness.py` passed
+  - `/root/ameba-rtos` full build completed with `Build done`
+  - Flash/serial monitor not run; user-run board validation is still required
+
 ## Step H.xiaozhi-client.106
 - 修正 KWS PCM/frontend 对拍工具并完成一次旧镜像 preproc-only 实测：
   - `capture_kws_pcm_dump.py` 兼容旧镜像缺少 `raw_pcm` chunk 的 snapshot，可通过 `--allow-missing-raw` 拉取 `feat_f32`、`output_raw`、`preproc_s16` 做预处理 PCM 对拍。
@@ -17693,4 +17712,23 @@
   - `git diff --check` passed.
   - `python3 tools/diag/check_codex_harness.py` passed.
   - `/root/ameba-rtos` full build completed with `Build done`.
+  - Flash/serial monitor not run; user-run board validation is still required.
+
+## Step H.xiaozhi-client.108
+- 接入服务端 wake candidate 确认协议：
+  - client hello 的 `features` 新增 `wake_candidate_upload=true`、`wake_audio_recording=true`、`wake_upload_modes=["candidate"]`、`wake_audio_formats=["opus"]`。
+  - server hello 解析 `server_wake_confirm`、候选上传模式和 Opus 格式能力；能力完整时不再发送旧 `listen detect` / 初始 `listen start` 唤醒帧。
+  - 本地 KWS 命中后发送 `type=wake,state=candidate`，携带 `wake_id`、`trigger_source=local_kws`、`keyword_hint=你好小智` 和 `client_confidence`，随后进入候选 Opus 上传。
+  - 新增 `wake.accepted` / `wake.rejected` / `wake.uncertain` 解析；accepted 后继续用户指令音频，rejected 或确认超时会清空上行并回 idle，uncertain 只保留短暂继续上传窗口。
+  - `server_tts_started` 改为控制优先事件，并在 TTS 开始时 flush protocol uplink；app 侧发送上行音频前检查 state/wake-flow，减少服务端 `audio_outside_listening`。
+  - 旧服务端没有声明 wake confirm 能力时仍回退到原 `listen detect/start` 流程。
+  - `doc/device-integration-manual.md` 同步当前新 wake candidate 流程和旧 listen 回退说明。
+- 设计边界：
+  - 不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径。
+  - 不修改 Wi-Fi、UI、SDK 源码或音频编码格式；候选音频仍是 raw Opus binary frame。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" components include` confirmed the new protocol path.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build: pending in this worktree until the final verification run completes.
   - Flash/serial monitor not run; user-run board validation is still required.

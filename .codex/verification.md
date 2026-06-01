@@ -1,3 +1,78 @@
+## Step H.xiaozhi-client.109 Verification
+
+Confirm the algorithm-side bundle and deployment guidance are updated:
+```bash
+cd /root/ameba-river
+git -C /root/kws-trainint pull --ff-only origin main
+git -C /root/kws-trainint lfs pull --include="artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/**"
+git -C /root/kws-trainint rev-parse --short HEAD
+sed -n '1,220p' /root/kws-trainint/docs/context/2026-06-new-target-hardware-student-deployment-guide.md
+sed -n '1,220p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/board_runbook.md
+sed -n '1,220p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/threshold_profiles.json
+sed -n '1,220p' /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/deployment_summary.json
+```
+
+Expected result:
+- `/root/kws-trainint` is at commit `3959d05`
+- bundle remains `student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1`
+- frontend is `tflm_microfrontend_v1`
+- default profile is `threshold_probability=0.500000`, `threshold_output_int8=0`, `threshold_q15=16384`
+- recall-first profile is `recall_990` with `threshold_q15=15744`
+- the guide explicitly says not to keep using `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=14720`
+
+Confirm the embedded FP32 header is synced from the algorithm bundle:
+```bash
+cd /root/ameba-river
+sha256sum \
+  /root/kws-trainint/artifacts/exports/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1/model_fp32_data.h \
+  components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h
+```
+
+Expected result:
+- the two SHA-256 values are identical
+
+Check patch hygiene and Codex harness files:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  prj.conf \
+  components/river_voice/generated/student_conv_resnet_ed_nano_teacher_a_new_target_cycle24_2s_v1_fp32_model_data.h \
+  .codex/changes.md \
+  .codex/verification.md \
+  .codex/active_context.md
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace or patch-format errors
+- harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- build exits successfully with `Build done`
+- generated config reflects `CONFIG_RIVER_KWS_SCORE_THRESHOLD_Q15=16384`
+- boot/runtime flash verification remains user-run because the board still requires manual download mode
+
+Post-flash board validation:
+```text
+1. Flash manually after entering the board's download mode.
+2. Boot and inspect the KWS backend log and trigger behavior.
+3. If needed, use the existing tensor dump / parity path to confirm the new bundle on board.
+```
+
+Expected result:
+- KWS backend log shows the A 2s nano FP32 debug variant and `threshold_q15=16384`
+- no board-side deployment continues using `14720`
+- tensor dump / parity path remains available for further model-quality triage
+
 ## Step H.xiaozhi-client.106 Verification
 
 Check host-side capture and frontend comparison tooling:
@@ -31292,3 +31367,59 @@ Expected result:
 - boot log shows `ota=http://101.33.235.154:8081/xiaozhi/ota/`
 - OTA returns `ws://101.33.235.154:8081/xiaozhi/v1/`
 - no connection attempt uses `101.33.235.154:8082`
+
+## Step H.xiaozhi-client.108 - server wake candidate confirm protocol
+
+Confirm the new wake-confirm protocol path is present:
+```bash
+cd /root/ameba-river
+rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" \
+  components \
+  include \
+  doc/device-integration-manual.md
+```
+
+Expected result:
+- client hello advertises candidate wake upload capability
+- server hello parses `server_wake_confirm` and related wake feature fields
+- app sends `type=wake,state=candidate` through `river_orvibo_protocol_send_wake_candidate`
+- app handles accepted/rejected/uncertain and drops audio outside allowed state/wake-flow boundaries
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash manually after entering the board's download mode.
+2. Boot and trigger a local wake.
+3. Inspect server and board logs for wake candidate protocol.
+```
+
+Expected result:
+- client hello features include `wake_candidate_upload`, `wake_audio_recording`, `wake_upload_modes=["candidate"]`, `wake_audio_formats=["opus"]`
+- server hello log on board shows `wake_confirm=yes ... mode_candidate=yes opus=yes`
+- first wake control frame is `type=wake,state=candidate` with `wake_id`, not `listen detect`
+- initial `listen start` is skipped while `wake_flow=candidate_pending`
+- candidate Opus frames are uploaded until `wake.accepted/rejected/uncertain`
+- `wake.rejected` or `wake_confirm_timeout` returns to idle and stops uplink
+- service-side `audio_outside_listening` count should not increase after TTS starts or after the wake candidate is rejected
