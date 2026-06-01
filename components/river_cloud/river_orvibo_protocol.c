@@ -80,6 +80,11 @@ typedef struct {
     bool session_open;
     bool server_hello_received;
     bool server_hello_rejected;
+    bool server_wake_confirm;
+    bool server_wake_candidate_upload;
+    bool server_wake_audio_recording;
+    bool server_wake_upload_candidate;
+    bool server_wake_audio_opus;
     bool ws_closed;
     river_orvibo_protocol_config_t config;
     wsclient_context *wsclient;
@@ -99,6 +104,11 @@ typedef struct {
     uint32_t tts_sentence_rx;
     uint32_t stt_rx;
     uint32_t llm_rx;
+    uint32_t wake_tx;
+    uint32_t wake_rx;
+    uint32_t wake_accepted_rx;
+    uint32_t wake_rejected_rx;
+    uint32_t wake_uncertain_rx;
     uint32_t audio_enqueued;
     uint32_t audio_queue_drop_oldest;
     uint32_t audio_queue_full;
@@ -150,6 +160,48 @@ static void river_orvibo_copy_text(char *dst, size_t dst_size, const char *src)
     }
     strncpy(dst, src, dst_size - 1U);
     dst[dst_size - 1U] = '\0';
+}
+
+static bool river_orvibo_json_string_array_contains(const cJSON *array, const char *needle)
+{
+    const cJSON *item;
+
+    if (!cJSON_IsArray(array) || needle == NULL) {
+        return false;
+    }
+    cJSON_ArrayForEach(item, array) {
+        if (cJSON_IsString(item) && item->valuestring != NULL &&
+            strcmp(item->valuestring, needle) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool river_orvibo_json_add_single_string_array(cJSON *parent,
+                                                      const char *name,
+                                                      const char *value)
+{
+    cJSON *array;
+    cJSON *item;
+
+    if (parent == NULL || name == NULL || value == NULL) {
+        return false;
+    }
+    array = cJSON_CreateArray();
+    item = cJSON_CreateString(value);
+    if (array == NULL || item == NULL) {
+        if (array != NULL) {
+            cJSON_Delete(array);
+        }
+        if (item != NULL) {
+            cJSON_Delete(item);
+        }
+        return false;
+    }
+    cJSON_AddItemToArray(array, item);
+    cJSON_AddItemToObject(parent, name, array);
+    return true;
 }
 
 static void river_orvibo_set_last_error(const char *error)
@@ -397,6 +449,15 @@ static river_status_t river_orvibo_send_hello(void)
     cJSON_AddStringToObject(root, "type", "hello");
     cJSON_AddNumberToObject(root, "version", g_river_orvibo_protocol.config.protocol_version);
     cJSON_AddBoolToObject(features, "mcp", g_river_orvibo_protocol.config.enable_mcp);
+    cJSON_AddBoolToObject(features, "wake_candidate_upload", true);
+    cJSON_AddBoolToObject(features, "wake_audio_recording", true);
+    if (!river_orvibo_json_add_single_string_array(features, "wake_upload_modes", "candidate") ||
+        !river_orvibo_json_add_single_string_array(features, "wake_audio_formats", "opus")) {
+        cJSON_Delete(audio_params);
+        cJSON_Delete(features);
+        cJSON_Delete(root);
+        return RIVER_ERR_NO_MEMORY;
+    }
     cJSON_AddItemToObject(root, "features", features);
     cJSON_AddStringToObject(root, "transport", "websocket");
     cJSON_AddStringToObject(audio_params, "format", RIVER_ORVIBO_AUDIO_FORMAT);
@@ -410,7 +471,7 @@ static river_status_t river_orvibo_send_hello(void)
                             "frame_duration",
                             g_river_orvibo_protocol.config.uplink_frame_duration_ms);
     cJSON_AddItemToObject(root, "audio_params", audio_params);
-    RIVER_LOGI("client hello features: mcp=%s server_aec=no",
+    RIVER_LOGI("client hello features: mcp=%s wake_candidate_upload=yes wake_audio_recording=yes wake_upload_modes=candidate wake_audio_formats=opus server_aec=no",
                g_river_orvibo_protocol.config.enable_mcp ? "yes" : "no");
     return river_orvibo_send_json_root(root);
 }
@@ -423,6 +484,12 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
     const cJSON *sample_rate_obj;
     const cJSON *channels_obj;
     const cJSON *frame_duration_obj;
+    const cJSON *features;
+    const cJSON *wake_confirm_obj;
+    const cJSON *wake_candidate_obj;
+    const cJSON *wake_audio_obj;
+    const cJSON *wake_modes;
+    const cJSON *wake_formats;
 
     transport_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "transport");
     if (!cJSON_IsString(transport_obj) || transport_obj->valuestring == NULL ||
@@ -466,14 +533,46 @@ static void river_orvibo_parse_server_hello(const cJSON *root)
                 (uint32_t)frame_duration_obj->valueint;
         }
     }
+    g_river_orvibo_protocol.server_wake_confirm = false;
+    g_river_orvibo_protocol.server_wake_candidate_upload = false;
+    g_river_orvibo_protocol.server_wake_audio_recording = false;
+    g_river_orvibo_protocol.server_wake_upload_candidate = false;
+    g_river_orvibo_protocol.server_wake_audio_opus = false;
+    features = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "features");
+    if (cJSON_IsObject(features)) {
+        wake_confirm_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features, "server_wake_confirm");
+        wake_candidate_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features, "wake_candidate_upload");
+        wake_audio_obj =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features, "wake_audio_recording");
+        wake_modes =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features, "wake_upload_modes");
+        wake_formats =
+            cJSON_GetObjectItemCaseSensitive((cJSON *)features, "wake_audio_formats");
+
+        g_river_orvibo_protocol.server_wake_confirm = cJSON_IsTrue(wake_confirm_obj);
+        g_river_orvibo_protocol.server_wake_candidate_upload =
+            cJSON_IsTrue(wake_candidate_obj);
+        g_river_orvibo_protocol.server_wake_audio_recording = cJSON_IsTrue(wake_audio_obj);
+        g_river_orvibo_protocol.server_wake_upload_candidate =
+            river_orvibo_json_string_array_contains(wake_modes, "candidate");
+        g_river_orvibo_protocol.server_wake_audio_opus =
+            river_orvibo_json_string_array_contains(wake_formats, "opus");
+    }
     g_river_orvibo_protocol.server_hello_received = true;
-    RIVER_LOGI("server hello: sid=%s audio=%luHz/%luch/%lums",
+    RIVER_LOGI("server hello: sid=%s audio=%luHz/%luch/%lums wake_confirm=%s candidate_upload=%s wake_audio=%s mode_candidate=%s opus=%s",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
                    g_river_orvibo_protocol.session_id :
                    "-",
                (unsigned long)g_river_orvibo_protocol.server_sample_rate,
                (unsigned long)g_river_orvibo_protocol.server_channels,
-               (unsigned long)g_river_orvibo_protocol.server_frame_duration_ms);
+               (unsigned long)g_river_orvibo_protocol.server_frame_duration_ms,
+               g_river_orvibo_protocol.server_wake_confirm ? "yes" : "no",
+               g_river_orvibo_protocol.server_wake_candidate_upload ? "yes" : "no",
+               g_river_orvibo_protocol.server_wake_audio_recording ? "yes" : "no",
+               g_river_orvibo_protocol.server_wake_upload_candidate ? "yes" : "no",
+               g_river_orvibo_protocol.server_wake_audio_opus ? "yes" : "no");
     river_orvibo_emit_event(RIVER_ORVIBO_PROTOCOL_EVENT_SERVER_HELLO,
                             NULL,
                             NULL,
@@ -538,6 +637,66 @@ static void river_orvibo_handle_mcp_message(const cJSON *root)
     }
 }
 
+static bool river_orvibo_handle_wake_message(const cJSON *root,
+                                             const char *type,
+                                             const char *state)
+{
+    const char *wake_state = state;
+    const cJSON *wake_id_obj;
+    const cJSON *reason_obj;
+    const char *wake_id;
+    const char *reason;
+    river_orvibo_protocol_event_type_t event_type;
+
+    if (type == NULL) {
+        return false;
+    }
+    if (strncmp(type, "wake.", 5U) == 0) {
+        wake_state = type + 5U;
+    } else if (strcmp(type, "wake") != 0) {
+        return false;
+    }
+    if (wake_state == NULL) {
+        return true;
+    }
+
+    if (strcmp(wake_state, "accepted") == 0) {
+        event_type = RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_ACCEPTED;
+        g_river_orvibo_protocol.wake_accepted_rx++;
+    } else if (strcmp(wake_state, "rejected") == 0) {
+        event_type = RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_REJECTED;
+        g_river_orvibo_protocol.wake_rejected_rx++;
+    } else if (strcmp(wake_state, "uncertain") == 0) {
+        event_type = RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_UNCERTAIN;
+        g_river_orvibo_protocol.wake_uncertain_rx++;
+    } else {
+        RIVER_LOGI("wake event ignored: state=%s", wake_state);
+        return true;
+    }
+
+    wake_id_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "wake_id");
+    reason_obj = cJSON_GetObjectItemCaseSensitive((cJSON *)root, "reason");
+    wake_id = cJSON_IsString(wake_id_obj) ? wake_id_obj->valuestring : NULL;
+    reason = cJSON_IsString(reason_obj) ? reason_obj->valuestring : NULL;
+    g_river_orvibo_protocol.wake_rx++;
+    RIVER_LOGI("server wake result: state=%s wake_id=%s reason=%s",
+               wake_state,
+               wake_id != NULL ? wake_id : "-",
+               reason != NULL ? reason : "-");
+    river_orvibo_emit_event(event_type,
+                            wake_id,
+                            wake_state,
+                            reason,
+                            NULL,
+                            NULL,
+                            0U,
+                            0U,
+                            0U,
+                            0U,
+                            0U);
+    return true;
+}
+
 static void river_orvibo_handle_text_message(const char *json_text, int json_len)
 {
     cJSON *root;
@@ -589,6 +748,10 @@ static void river_orvibo_handle_text_message(const char *json_text, int json_len
         river_orvibo_copy_text(g_river_orvibo_protocol.last_text,
                                sizeof(g_river_orvibo_protocol.last_text),
                                text);
+    }
+    if (river_orvibo_handle_wake_message(root, type, state)) {
+        cJSON_Delete(root);
+        return;
     }
 
     if (strcmp(type, "tts") == 0) {
@@ -827,6 +990,11 @@ static void river_orvibo_ws_close_cb(wsclient_context *wsclient, void *user_data
     g_river_orvibo_protocol.ws_closed = true;
     g_river_orvibo_protocol.session_open = false;
     g_river_orvibo_protocol.server_hello_received = false;
+    g_river_orvibo_protocol.server_wake_confirm = false;
+    g_river_orvibo_protocol.server_wake_candidate_upload = false;
+    g_river_orvibo_protocol.server_wake_audio_recording = false;
+    g_river_orvibo_protocol.server_wake_upload_candidate = false;
+    g_river_orvibo_protocol.server_wake_audio_opus = false;
     g_river_orvibo_protocol.last_incoming_ms = 0U;
     g_river_orvibo_protocol.close_events++;
     g_river_orvibo_protocol.sessions_closed++;
@@ -1243,6 +1411,11 @@ river_status_t river_orvibo_protocol_open_audio_channel(void)
     g_river_orvibo_protocol.ws_closed = false;
     g_river_orvibo_protocol.server_hello_received = false;
     g_river_orvibo_protocol.server_hello_rejected = false;
+    g_river_orvibo_protocol.server_wake_confirm = false;
+    g_river_orvibo_protocol.server_wake_candidate_upload = false;
+    g_river_orvibo_protocol.server_wake_audio_recording = false;
+    g_river_orvibo_protocol.server_wake_upload_candidate = false;
+    g_river_orvibo_protocol.server_wake_audio_opus = false;
     g_river_orvibo_protocol.last_incoming_ms =
         (uint32_t)rtos_time_get_current_system_time_ms();
     g_river_orvibo_protocol.session_epoch++;
@@ -1287,6 +1460,14 @@ bool river_orvibo_protocol_audio_channel_open(void)
     return g_river_orvibo_protocol.session_open &&
            g_river_orvibo_protocol.wsclient != NULL &&
            g_river_orvibo_protocol.wsclient->readyState == WSC_OPEN;
+}
+
+bool river_orvibo_protocol_server_wake_confirm_enabled(void)
+{
+    return g_river_orvibo_protocol.server_wake_confirm &&
+           g_river_orvibo_protocol.server_wake_candidate_upload &&
+           g_river_orvibo_protocol.server_wake_upload_candidate &&
+           g_river_orvibo_protocol.server_wake_audio_opus;
 }
 
 river_status_t river_orvibo_protocol_poll(uint32_t timeout_ms)
@@ -1518,6 +1699,41 @@ static void river_orvibo_add_session_id(cJSON *root)
     }
 }
 
+river_status_t river_orvibo_protocol_send_wake_candidate(const char *wake_id,
+                                                         const char *keyword_hint,
+                                                         uint16_t confidence_q15)
+{
+    cJSON *root = cJSON_CreateObject();
+    double confidence;
+    river_status_t status;
+
+    if (root == NULL) {
+        return RIVER_ERR_NO_MEMORY;
+    }
+    if (confidence_q15 > 32767U) {
+        confidence_q15 = 32767U;
+    }
+    confidence = (double)confidence_q15 / 32767.0;
+    river_orvibo_add_session_id(root);
+    cJSON_AddStringToObject(root, "type", "wake");
+    cJSON_AddStringToObject(root, "state", "candidate");
+    cJSON_AddStringToObject(root,
+                            "wake_id",
+                            wake_id != NULL && wake_id[0] != '\0' ? wake_id : "wake-local");
+    cJSON_AddStringToObject(root, "trigger_source", "local_kws");
+    cJSON_AddStringToObject(root,
+                            "keyword_hint",
+                            keyword_hint != NULL && keyword_hint[0] != '\0' ?
+                                keyword_hint :
+                                "你好小智");
+    cJSON_AddNumberToObject(root, "client_confidence", confidence);
+    status = river_orvibo_send_json_root(root);
+    if (status == RIVER_OK) {
+        g_river_orvibo_protocol.wake_tx++;
+    }
+    return status;
+}
+
 river_status_t river_orvibo_protocol_send_wake_word_detected(const char *text)
 {
     cJSON *root = cJSON_CreateObject();
@@ -1597,6 +1813,11 @@ river_status_t river_orvibo_protocol_send_mcp_message(const char *payload_json)
     return river_orvibo_send_json_root(root);
 }
 
+void river_orvibo_protocol_flush_uplink(const char *reason)
+{
+    river_orvibo_clear_uplink_queue(reason != NULL ? reason : "flush_uplink");
+}
+
 void river_orvibo_protocol_dump_status(void)
 {
     uint32_t uplink_depth = g_river_orvibo_protocol.uplink_queue != NULL ?
@@ -1608,7 +1829,7 @@ void river_orvibo_protocol_dump_status(void)
                                    now_ms - g_river_orvibo_protocol.last_incoming_ms :
                                    0U;
 
-    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu flush=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums last_text=%s",
+    RIVER_LOGI("orvibo protocol: open=%s hello=%s sid=%s url=%s proto=%u ws_subprotocol=%s payload_max=%u text=%lu/%lu audio=%lu/%lu wake_confirm=%s wake=%lu/%lu accepted=%lu rejected=%lu uncertain=%lu uplink_task=%s q=%lu/%u enq=%lu drop_oldest=%lu full=%lu flush=%lu closed=%lu stale=%lu retry=%lu fail=%lu poll=%lu close_evt=%lu timeout=%lu incoming_age=%lums/%ums sessions=%lu/%lu errors=%lu last_error=%s server_audio=%luHz/%luch/%lums last_text=%s",
                river_orvibo_protocol_audio_channel_open() ? "yes" : "no",
                g_river_orvibo_protocol.server_hello_received ? "yes" : "no",
                g_river_orvibo_protocol.session_id[0] != '\0' ?
@@ -1624,6 +1845,12 @@ void river_orvibo_protocol_dump_status(void)
                (unsigned long)g_river_orvibo_protocol.text_rx,
                (unsigned long)g_river_orvibo_protocol.audio_tx,
                (unsigned long)g_river_orvibo_protocol.audio_rx,
+               river_orvibo_protocol_server_wake_confirm_enabled() ? "yes" : "no",
+               (unsigned long)g_river_orvibo_protocol.wake_tx,
+               (unsigned long)g_river_orvibo_protocol.wake_rx,
+               (unsigned long)g_river_orvibo_protocol.wake_accepted_rx,
+               (unsigned long)g_river_orvibo_protocol.wake_rejected_rx,
+               (unsigned long)g_river_orvibo_protocol.wake_uncertain_rx,
                g_river_orvibo_protocol.uplink_task_running ? "yes" : "no",
                (unsigned long)uplink_depth,
                (unsigned int)RIVER_ORVIBO_UPLINK_QUEUE_DEPTH,

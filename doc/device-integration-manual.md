@@ -47,9 +47,15 @@ device
   -> connect ws://.../xiaozhi/v1/
   -> send hello
   -> receive server hello
-  -> send listen start
-  -> send binary raw Opus frames
-  -> send listen stop
+  -> if server hello features.server_wake_confirm=true:
+       send wake candidate JSON
+       send candidate binary raw Opus frames
+       wait wake.accepted / wake.rejected / wake.uncertain
+       only continue command audio after wake.accepted
+  -> else:
+       send listen detect/start
+       send binary raw Opus frames
+       send listen stop
   -> receive stt event
   -> receive tts sentence_start
   -> receive llm event
@@ -483,7 +489,25 @@ Authorization: Bearer <可为空或任意调试 token>
 
 ### 5. 上行音频
 
-标准小智客户端在 `listen start` 后发送 raw Opus binary frames：
+服务端声明 `features.server_wake_confirm=true`、`wake_candidate_upload=true` 且
+`wake_upload_modes` 包含 `candidate` 时，端侧先发送候选唤醒事件：
+
+```json
+{
+  "type": "wake",
+  "state": "candidate",
+  "wake_id": "wake-unique-id",
+  "trigger_source": "local_kws",
+  "keyword_hint": "你好小智",
+  "client_confidence": 0.8
+}
+```
+
+随后发送候选 raw Opus binary frames，并等待服务端返回
+`wake.accepted` / `wake.rejected` / `wake.uncertain`。只有 `accepted` 后才继续上传用户指令音频；
+`rejected` 应停止上传并回到 idle；`uncertain` 只短暂继续上传候选音频。
+
+旧服务端未声明上述能力时，标准小智客户端在 `listen start` 后发送 raw Opus binary frames：
 
 ```text
 listen start JSON
@@ -607,7 +631,8 @@ kill "$(cat .runtime/tmp/home-ai-server-8081.pid)"
 - 上行是否 raw Opus。
 - 是否误发 Ogg/WebM/RTP。
 - 每个 binary frame 是否只包含一个 Opus packet。
-- 是否在 `listen start` 后发送音频。
+- 新 wake 协议下是否先发送 `type=wake,state=candidate`，并且只在 `wake.accepted` 后继续上传用户指令音频。
+- 旧 listen 协议下是否在 `listen start` 后发送音频。
 - 是否发送了 `listen stop`。
 
 ### 有文本但没声音

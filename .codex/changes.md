@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.110
+- 接入服务端 wake candidate 确认协议：
+  - client hello 的 `features` 新增 `wake_candidate_upload=true`、`wake_audio_recording=true`、`wake_upload_modes=["candidate"]`、`wake_audio_formats=["opus"]`。
+  - server hello 解析 `server_wake_confirm`、候选上传模式和 Opus 格式能力；能力完整时不再发送旧 `listen detect` / 初始 `listen start` 唤醒帧。
+  - 本地 KWS 命中后发送 `type=wake,state=candidate`，携带 `wake_id`、`trigger_source=local_kws`、`keyword_hint=你好小智` 和 `client_confidence`，随后进入候选 Opus 上传。
+  - 新增 `wake.accepted` / `wake.rejected` / `wake.uncertain` 解析；accepted 后继续用户指令音频，rejected 或确认超时会清空上行并回 idle，uncertain 只保留短暂继续上传窗口。
+  - `server_tts_started` 改为控制优先事件，并在 TTS 开始时 flush protocol uplink；app 侧发送上行音频前检查 state/wake-flow，减少服务端 `audio_outside_listening`。
+  - 旧服务端没有声明 wake confirm 能力时仍回退到原 `listen detect/start` 流程。
+  - `doc/device-integration-manual.md` 同步当前新 wake candidate 流程和旧 listen 回退说明。
+- 设计边界：
+  - 不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径。
+  - 不修改 Wi-Fi、UI、SDK 源码或音频编码格式；候选音频仍是 raw Opus binary frame。
+- Verification for this step:
+  - `git diff --check` passed.
+  - `rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" components include doc/device-integration-manual.md` confirmed the new protocol path.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build completed with `Build done`.
+  - Flash/serial monitor not run; user-run board validation is still required.
+
 ## Step H.xiaozhi-client.109
 - 重新部署算法侧 2026-06-01 重导出的 A 2s nano KWS bundle：
   - 按仓库约定先在 `/root/kws-trainint` 执行 `git pull --ff-only origin main`，同步到提交 `3959d05`，并读取新交付说明 `docs/context/2026-06-new-target-hardware-student-deployment-guide.md`、bundle `board_runbook.md`、`threshold_profiles.json`、`deployment_summary.json`。
@@ -17712,23 +17731,4 @@
   - `git diff --check` passed.
   - `python3 tools/diag/check_codex_harness.py` passed.
   - `/root/ameba-rtos` full build completed with `Build done`.
-  - Flash/serial monitor not run; user-run board validation is still required.
-
-## Step H.xiaozhi-client.108
-- 接入服务端 wake candidate 确认协议：
-  - client hello 的 `features` 新增 `wake_candidate_upload=true`、`wake_audio_recording=true`、`wake_upload_modes=["candidate"]`、`wake_audio_formats=["opus"]`。
-  - server hello 解析 `server_wake_confirm`、候选上传模式和 Opus 格式能力；能力完整时不再发送旧 `listen detect` / 初始 `listen start` 唤醒帧。
-  - 本地 KWS 命中后发送 `type=wake,state=candidate`，携带 `wake_id`、`trigger_source=local_kws`、`keyword_hint=你好小智` 和 `client_confidence`，随后进入候选 Opus 上传。
-  - 新增 `wake.accepted` / `wake.rejected` / `wake.uncertain` 解析；accepted 后继续用户指令音频，rejected 或确认超时会清空上行并回 idle，uncertain 只保留短暂继续上传窗口。
-  - `server_tts_started` 改为控制优先事件，并在 TTS 开始时 flush protocol uplink；app 侧发送上行音频前检查 state/wake-flow，减少服务端 `audio_outside_listening`。
-  - 旧服务端没有声明 wake confirm 能力时仍回退到原 `listen detect/start` 流程。
-  - `doc/device-integration-manual.md` 同步当前新 wake candidate 流程和旧 listen 回退说明。
-- 设计边界：
-  - 不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径。
-  - 不修改 Wi-Fi、UI、SDK 源码或音频编码格式；候选音频仍是 raw Opus binary frame。
-- Verification for this step:
-  - `git diff --check` passed.
-  - `rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" components include` confirmed the new protocol path.
-  - `python3 tools/diag/check_codex_harness.py` passed.
-  - `/root/ameba-rtos` full build: pending in this worktree until the final verification run completes.
   - Flash/serial monitor not run; user-run board validation is still required.

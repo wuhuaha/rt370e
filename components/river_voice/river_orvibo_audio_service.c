@@ -170,6 +170,7 @@ static void river_orvibo_voice_event_handler(const river_voice_event_t *event)
     memset(&out_event, 0, sizeof(out_event));
     out_event.type = RIVER_ORVIBO_AUDIO_EVENT_WAKE_DETECTED;
     out_event.text = event->text;
+    out_event.confidence_q15 = event->confidence;
     river_orvibo_audio_emit(&out_event);
 }
 

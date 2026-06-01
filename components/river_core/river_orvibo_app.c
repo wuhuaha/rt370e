@@ -46,6 +46,9 @@
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MIN_MS 1000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_MAX_MS 30000U
 #define RIVER_ORVIBO_APP_CONNECT_BACKOFF_STREAK_CAP 6U
+#define RIVER_ORVIBO_APP_WAKE_ID_MAX       64U
+#define RIVER_ORVIBO_APP_WAKE_CONFIRM_TIMEOUT_MS 5000U
+#define RIVER_ORVIBO_APP_WAKE_UNCERTAIN_GRACE_MS 1500U
 #define RIVER_ORVIBO_RTOS_OK               0
 
 typedef enum {
@@ -57,7 +60,8 @@ typedef enum {
     RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH,
     RIVER_ORVIBO_APP_MSG_LISTEN_START,
     RIVER_ORVIBO_APP_MSG_LISTEN_STOP,
-    RIVER_ORVIBO_APP_MSG_ABORT
+    RIVER_ORVIBO_APP_MSG_ABORT,
+    RIVER_ORVIBO_APP_MSG_WAKE_RESULT
 } river_orvibo_app_msg_type_t;
 
 typedef enum {
@@ -65,6 +69,15 @@ typedef enum {
     RIVER_ORVIBO_APP_SERVER_TEXT_STT,
     RIVER_ORVIBO_APP_SERVER_TEXT_LLM
 } river_orvibo_app_server_text_kind_t;
+
+typedef enum {
+    RIVER_ORVIBO_APP_WAKE_FLOW_IDLE = 0,
+    RIVER_ORVIBO_APP_WAKE_FLOW_LEGACY,
+    RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING,
+    RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN,
+    RIVER_ORVIBO_APP_WAKE_FLOW_ACCEPTED,
+    RIVER_ORVIBO_APP_WAKE_FLOW_REJECTED
+} river_orvibo_app_wake_flow_t;
 
 typedef struct {
     river_orvibo_app_msg_type_t type;
@@ -77,6 +90,7 @@ typedef struct {
     uint32_t sample_rate;
     uint32_t channels;
     uint32_t frame_duration_ms;
+    int confidence_q15;
     size_t bytes;
     uint8_t data[RIVER_ORVIBO_APP_AUDIO_PACKET_MAX];
 } river_orvibo_app_msg_t;
@@ -100,6 +114,7 @@ typedef struct {
     uint32_t handled;
     uint32_t uplink_sent;
     uint32_t uplink_busy;
+    uint32_t uplink_dropped;
     uint32_t uplink_oversize;
     uint32_t downlink_ok;
     uint32_t downlink_fail;
@@ -118,6 +133,17 @@ typedef struct {
     uint32_t next_connect_retry_ms;
     uint32_t last_wifi_log_ms;
     uint32_t last_access_retry_ms;
+    uint32_t wake_sequence;
+    uint32_t wake_candidate_sent;
+    uint32_t wake_accept_rx;
+    uint32_t wake_reject_rx;
+    uint32_t wake_uncertain_rx;
+    uint32_t wake_timeout;
+    uint32_t wake_legacy;
+    uint32_t wake_deadline_ms;
+    int wake_confidence_q15;
+    river_orvibo_app_wake_flow_t wake_flow;
+    char wake_id[RIVER_ORVIBO_APP_WAKE_ID_MAX];
     char wake_text[64];
     char last_event[48];
     char last_server_text_kind[32];
@@ -151,8 +177,7 @@ static bool river_orvibo_app_msg_is_audio(const river_orvibo_app_msg_t *msg)
         return true;
     }
     if (msg->type == RIVER_ORVIBO_APP_MSG_STATE_EVENT &&
-        (msg->event == RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED ||
-         msg->event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED)) {
+        msg->event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED) {
         return true;
     }
     return false;
@@ -171,6 +196,72 @@ static const char *river_orvibo_app_server_text_kind_name(
     default:
         return "server_text";
     }
+}
+
+static const char *river_orvibo_app_wake_flow_name(river_orvibo_app_wake_flow_t flow)
+{
+    switch (flow) {
+    case RIVER_ORVIBO_APP_WAKE_FLOW_IDLE:
+        return "idle";
+    case RIVER_ORVIBO_APP_WAKE_FLOW_LEGACY:
+        return "legacy";
+    case RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING:
+        return "candidate_pending";
+    case RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN:
+        return "candidate_uncertain";
+    case RIVER_ORVIBO_APP_WAKE_FLOW_ACCEPTED:
+        return "accepted";
+    case RIVER_ORVIBO_APP_WAKE_FLOW_REJECTED:
+        return "rejected";
+    default:
+        return "unknown";
+    }
+}
+
+static uint16_t river_orvibo_app_confidence_to_q15(int confidence_q15)
+{
+    if (confidence_q15 <= 0) {
+        return 0U;
+    }
+    if (confidence_q15 > 32767) {
+        return 32767U;
+    }
+    return (uint16_t)confidence_q15;
+}
+
+static void river_orvibo_app_reset_wake_flow(const char *reason)
+{
+    if (g_river_orvibo_app.wake_flow != RIVER_ORVIBO_APP_WAKE_FLOW_IDLE) {
+        RIVER_LOGI("wake flow reset: old=%s wake_id=%s reason=%s",
+                   river_orvibo_app_wake_flow_name(g_river_orvibo_app.wake_flow),
+                   g_river_orvibo_app.wake_id[0] != '\0' ?
+                       g_river_orvibo_app.wake_id :
+                       "-",
+                   reason != NULL ? reason : "-");
+    }
+    g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_IDLE;
+    g_river_orvibo_app.wake_deadline_ms = 0U;
+    g_river_orvibo_app.wake_confidence_q15 = 0;
+    g_river_orvibo_app.wake_id[0] = '\0';
+}
+
+static void river_orvibo_app_begin_wake_attempt(const char *text, int confidence_q15)
+{
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+
+    g_river_orvibo_app.wake_sequence++;
+    g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_IDLE;
+    g_river_orvibo_app.wake_deadline_ms = 0U;
+    g_river_orvibo_app.wake_confidence_q15 = confidence_q15;
+    snprintf(g_river_orvibo_app.wake_id,
+             sizeof(g_river_orvibo_app.wake_id),
+             "wake-%08lx-%08lx",
+             (unsigned long)now_ms,
+             (unsigned long)g_river_orvibo_app.wake_sequence);
+    RIVER_LOGI("wake attempt prepared: wake_id=%s local_wake=%s q15=%d",
+               g_river_orvibo_app.wake_id,
+               text != NULL && text[0] != '\0' ? text : "-",
+               confidence_q15);
 }
 
 static river_status_t river_orvibo_app_post_audio(const river_orvibo_app_msg_t *msg)
@@ -340,6 +431,7 @@ static void river_orvibo_audio_event_handler(const river_orvibo_audio_event_t *e
                                    event->text != NULL && event->text[0] != '\0' ?
                                        event->text :
                                        "wake_word");
+        msg.confidence_q15 = event->confidence_q15;
         break;
     case RIVER_ORVIBO_AUDIO_EVENT_SPEECH_STARTED:
         msg.type = RIVER_ORVIBO_APP_MSG_STATE_EVENT;
@@ -429,6 +521,14 @@ static void river_orvibo_protocol_event_handler(const river_orvibo_protocol_even
         msg.server_text_kind = RIVER_ORVIBO_APP_SERVER_TEXT_LLM;
         river_orvibo_app_copy_text(msg.text, sizeof(msg.text), event->text);
         river_orvibo_app_copy_text(msg.detail, sizeof(msg.detail), event->state);
+        break;
+    case RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_ACCEPTED:
+    case RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_REJECTED:
+    case RIVER_ORVIBO_PROTOCOL_EVENT_WAKE_UNCERTAIN:
+        msg.type = RIVER_ORVIBO_APP_MSG_WAKE_RESULT;
+        river_orvibo_app_copy_text(msg.text, sizeof(msg.text), event->text);
+        river_orvibo_app_copy_text(msg.reason, sizeof(msg.reason), event->state);
+        river_orvibo_app_copy_text(msg.detail, sizeof(msg.detail), event->reason);
         break;
     case RIVER_ORVIBO_PROTOCOL_EVENT_AUDIO_PACKET:
         if (event->audio_data == NULL || event->audio_bytes == 0U) {
@@ -564,6 +664,91 @@ static bool river_orvibo_app_protocol_control_channel_open(const char *action)
     return false;
 }
 
+static bool river_orvibo_app_wake_id_matches(const char *wake_id)
+{
+    if (wake_id == NULL || wake_id[0] == '\0' ||
+        g_river_orvibo_app.wake_id[0] == '\0') {
+        return true;
+    }
+    return strcmp(wake_id, g_river_orvibo_app.wake_id) == 0;
+}
+
+static bool river_orvibo_app_uplink_allowed(void)
+{
+    river_orvibo_state_t state = river_orvibo_state_machine_current();
+
+    if (state != RIVER_ORVIBO_STATE_LISTENING) {
+        return false;
+    }
+    if (!river_orvibo_protocol_server_wake_confirm_enabled()) {
+        return true;
+    }
+    return g_river_orvibo_app.wake_flow ==
+               RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING ||
+           g_river_orvibo_app.wake_flow ==
+               RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN ||
+           g_river_orvibo_app.wake_flow == RIVER_ORVIBO_APP_WAKE_FLOW_ACCEPTED;
+}
+
+static void river_orvibo_app_close_wake_candidate(const char *reason)
+{
+    const char *close_reason = reason != NULL ? reason : "wake_rejected";
+
+    river_orvibo_protocol_flush_uplink(close_reason);
+    river_orvibo_app_clear_audio_queue(close_reason);
+    (void)river_orvibo_audio_service_set_mode(RIVER_ORVIBO_AUDIO_MODE_IDLE);
+    river_orvibo_protocol_close_audio_channel();
+    river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED, close_reason);
+}
+
+static void river_orvibo_app_handle_wake_result(const char *wake_id,
+                                                const char *state,
+                                                const char *reason)
+{
+    uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+
+    if (!river_orvibo_app_wake_id_matches(wake_id)) {
+        RIVER_LOGW("ignore stale wake result: state=%s wake_id=%s current=%s",
+                   state != NULL ? state : "-",
+                   wake_id != NULL && wake_id[0] != '\0' ? wake_id : "-",
+                   g_river_orvibo_app.wake_id[0] != '\0' ?
+                       g_river_orvibo_app.wake_id :
+                       "-");
+        return;
+    }
+    if (state != NULL && strcmp(state, "accepted") == 0) {
+        g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_ACCEPTED;
+        g_river_orvibo_app.wake_deadline_ms = 0U;
+        g_river_orvibo_app.wake_accept_rx++;
+        RIVER_LOGI("wake accepted: wake_id=%s reason=%s",
+                   g_river_orvibo_app.wake_id[0] != '\0' ?
+                       g_river_orvibo_app.wake_id :
+                       "-",
+                   reason != NULL && reason[0] != '\0' ? reason : "-");
+    } else if (state != NULL && strcmp(state, "rejected") == 0) {
+        g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_REJECTED;
+        g_river_orvibo_app.wake_deadline_ms = 0U;
+        g_river_orvibo_app.wake_reject_rx++;
+        RIVER_LOGI("wake rejected: wake_id=%s reason=%s",
+                   g_river_orvibo_app.wake_id[0] != '\0' ?
+                       g_river_orvibo_app.wake_id :
+                       "-",
+                   reason != NULL && reason[0] != '\0' ? reason : "-");
+        river_orvibo_app_close_wake_candidate("wake_rejected");
+    } else if (state != NULL && strcmp(state, "uncertain") == 0) {
+        g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN;
+        g_river_orvibo_app.wake_deadline_ms =
+            now_ms + RIVER_ORVIBO_APP_WAKE_UNCERTAIN_GRACE_MS;
+        g_river_orvibo_app.wake_uncertain_rx++;
+        RIVER_LOGI("wake uncertain: wake_id=%s grace_ms=%u reason=%s",
+                   g_river_orvibo_app.wake_id[0] != '\0' ?
+                       g_river_orvibo_app.wake_id :
+                       "-",
+                   (unsigned int)RIVER_ORVIBO_APP_WAKE_UNCERTAIN_GRACE_MS,
+                   reason != NULL && reason[0] != '\0' ? reason : "-");
+    }
+}
+
 static void river_orvibo_app_apply_actions(uint32_t actions)
 {
     if ((actions & RIVER_ORVIBO_ACTION_PREPARE_TTS_PLAYBACK) != 0U) {
@@ -574,6 +759,52 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
     }
     if ((actions & RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE) != 0U) {
         (void)river_orvibo_audio_service_wait_playback_idle(RIVER_ORVIBO_APP_TTS_DRAIN_MS);
+    }
+    if ((actions & RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED) != 0U) {
+        if (river_orvibo_app_protocol_control_channel_open("send_wake_detected")) {
+            river_status_t status;
+
+            if (river_orvibo_protocol_server_wake_confirm_enabled()) {
+                uint32_t now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+
+                status = river_orvibo_protocol_send_wake_candidate(
+                    g_river_orvibo_app.wake_id,
+                    river_orvibo_app_server_wake_text(),
+                    river_orvibo_app_confidence_to_q15(
+                        g_river_orvibo_app.wake_confidence_q15));
+                if (status == RIVER_OK) {
+                    g_river_orvibo_app.wake_flow =
+                        RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING;
+                    g_river_orvibo_app.wake_deadline_ms =
+                        now_ms + RIVER_ORVIBO_APP_WAKE_CONFIRM_TIMEOUT_MS;
+                    g_river_orvibo_app.wake_candidate_sent++;
+                }
+                RIVER_LOGI("wake candidate sent: status=%d wake_id=%s keyword=%s local_wake=%s q15=%d",
+                           (int)status,
+                           g_river_orvibo_app.wake_id[0] != '\0' ?
+                               g_river_orvibo_app.wake_id :
+                               "-",
+                           river_orvibo_app_server_wake_text(),
+                           g_river_orvibo_app.wake_text[0] != '\0' ?
+                               g_river_orvibo_app.wake_text :
+                               "-",
+                           g_river_orvibo_app.wake_confidence_q15);
+                river_orvibo_app_record_protocol_control("send_wake_candidate", status, true);
+            } else {
+                status = river_orvibo_protocol_send_wake_word_detected(
+                    river_orvibo_app_server_wake_text());
+                if (status == RIVER_OK) {
+                    g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_LEGACY;
+                    g_river_orvibo_app.wake_legacy++;
+                }
+                RIVER_LOGI("server wake detect text=%s local_wake=%s",
+                           river_orvibo_app_server_wake_text(),
+                           g_river_orvibo_app.wake_text[0] != '\0' ?
+                               g_river_orvibo_app.wake_text :
+                               "-");
+                river_orvibo_app_record_protocol_control("send_wake_detected", status, true);
+            }
+        }
     }
     if ((actions & RIVER_ORVIBO_ACTION_AUDIO_IDLE) != 0U) {
         (void)river_orvibo_audio_service_set_mode(RIVER_ORVIBO_AUDIO_MODE_IDLE);
@@ -647,18 +878,6 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
     if ((actions & RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL) != 0U) {
         river_orvibo_protocol_close_audio_channel();
     }
-    if ((actions & RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED) != 0U) {
-        if (river_orvibo_app_protocol_control_channel_open("send_wake_detected")) {
-            river_status_t status = river_orvibo_protocol_send_wake_word_detected(
-                river_orvibo_app_server_wake_text());
-            RIVER_LOGI("server wake detect text=%s local_wake=%s",
-                       river_orvibo_app_server_wake_text(),
-                       g_river_orvibo_app.wake_text[0] != '\0' ?
-                           g_river_orvibo_app.wake_text :
-                           "-");
-            river_orvibo_app_record_protocol_control("send_wake_detected", status, true);
-        }
-    }
     if ((actions & RIVER_ORVIBO_ACTION_STOP_LISTENING) != 0U) {
         if (river_orvibo_app_protocol_control_channel_open("listen_stop")) {
             river_status_t status = river_orvibo_protocol_send_stop_listening();
@@ -679,7 +898,18 @@ static void river_orvibo_app_apply_actions(uint32_t actions)
         }
     }
     if ((actions & RIVER_ORVIBO_ACTION_START_LISTENING) != 0U) {
-        if (river_orvibo_app_protocol_control_channel_open("listen_start")) {
+        if (river_orvibo_protocol_server_wake_confirm_enabled() &&
+            (((actions & RIVER_ORVIBO_ACTION_SEND_WAKE_DETECTED) != 0U) ||
+             g_river_orvibo_app.wake_flow ==
+                 RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING ||
+             g_river_orvibo_app.wake_flow ==
+                 RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN)) {
+            RIVER_LOGI("listen start skipped: wake_flow=%s wake_id=%s",
+                       river_orvibo_app_wake_flow_name(g_river_orvibo_app.wake_flow),
+                       g_river_orvibo_app.wake_id[0] != '\0' ?
+                           g_river_orvibo_app.wake_id :
+                           "-");
+        } else if (river_orvibo_app_protocol_control_channel_open("listen_start")) {
             const char *listen_mode = river_orvibo_app_listen_mode();
             river_status_t status =
                 river_orvibo_protocol_send_start_listening(listen_mode);
@@ -712,7 +942,9 @@ static river_status_t river_orvibo_app_refresh_access(const char *reason)
     return status;
 }
 
-static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, const char *reason)
+static void river_orvibo_app_handle_state_event(river_orvibo_event_t event,
+                                                const char *reason,
+                                                int confidence_q15)
 {
     river_orvibo_transition_t transition;
 
@@ -720,6 +952,7 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, cons
         river_orvibo_app_copy_text(g_river_orvibo_app.wake_text,
                                    sizeof(g_river_orvibo_app.wake_text),
                                    reason != NULL && reason[0] != '\0' ? reason : "小欧管家");
+        river_orvibo_app_begin_wake_attempt(g_river_orvibo_app.wake_text, confidence_q15);
     }
     transition = river_orvibo_state_machine_dispatch(event, reason);
     (void)river_orvibo_ui_set_state(transition.new_state);
@@ -729,12 +962,20 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event, cons
     if (event == RIVER_ORVIBO_EVENT_NETWORK_READY) {
         (void)river_orvibo_app_refresh_access(reason);
     }
+    if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_STARTED) {
+        river_orvibo_protocol_flush_uplink("server_tts_started");
+    }
     river_orvibo_app_apply_actions(transition.actions);
     if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED ||
         event == RIVER_ORVIBO_EVENT_NETWORK_LOST ||
         event == RIVER_ORVIBO_EVENT_ERROR_RECOVERABLE ||
         event == RIVER_ORVIBO_EVENT_ERROR_FATAL) {
         river_orvibo_app_clear_audio_queue(river_orvibo_event_name(event));
+        river_orvibo_app_reset_wake_flow(river_orvibo_event_name(event));
+    }
+    if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED &&
+        transition.new_state == RIVER_ORVIBO_STATE_IDLE) {
+        river_orvibo_app_reset_wake_flow("single_turn_finished");
     }
     if (transition.changed && transition.new_state == RIVER_ORVIBO_STATE_RECOVERING) {
         river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_RECOVERY_DONE, "recoverable_error_closed");
@@ -751,9 +992,22 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
     g_river_orvibo_app.handled++;
     switch (msg->type) {
     case RIVER_ORVIBO_APP_MSG_STATE_EVENT:
-        river_orvibo_app_handle_state_event(msg->event, msg->reason);
+        river_orvibo_app_handle_state_event(msg->event, msg->reason, msg->confidence_q15);
         break;
     case RIVER_ORVIBO_APP_MSG_AUDIO_UPLINK:
+        if (!river_orvibo_app_uplink_allowed()) {
+            g_river_orvibo_app.uplink_dropped++;
+            if (g_river_orvibo_app.uplink_dropped <= 3U ||
+                (g_river_orvibo_app.uplink_dropped % 20U) == 0U) {
+                RIVER_LOGW("drop uplink audio outside accepted boundary: state=%s wake_flow=%s bytes=%lu ts=%lu drops=%lu",
+                           river_orvibo_state_name(river_orvibo_state_machine_current()),
+                           river_orvibo_app_wake_flow_name(g_river_orvibo_app.wake_flow),
+                           (unsigned long)msg->bytes,
+                           (unsigned long)msg->timestamp_ms,
+                           (unsigned long)g_river_orvibo_app.uplink_dropped);
+            }
+            break;
+        }
         status = river_orvibo_protocol_send_audio(msg->data, msg->bytes, msg->timestamp_ms);
         if (status == RIVER_OK) {
             g_river_orvibo_app.uplink_sent++;
@@ -829,7 +1083,9 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
         break;
     }
     case RIVER_ORVIBO_APP_MSG_CONNECT:
-        river_orvibo_app_handle_state_event(RIVER_ORVIBO_EVENT_WAKE_DETECTED, "diag_connect");
+        river_orvibo_app_handle_state_event(RIVER_ORVIBO_EVENT_WAKE_DETECTED,
+                                            "diag_connect",
+                                            0);
         break;
     case RIVER_ORVIBO_APP_MSG_ACCESS_REFRESH:
         (void)river_orvibo_app_refresh_access("diag_refresh");
@@ -847,6 +1103,9 @@ static void river_orvibo_app_handle_message(const river_orvibo_app_msg_t *msg)
         status = river_orvibo_protocol_send_abort_speaking("diag_abort");
         river_orvibo_app_record_protocol_control("diag_abort", status, false);
         river_orvibo_audio_service_stop_playback("diag_abort");
+        break;
+    case RIVER_ORVIBO_APP_MSG_WAKE_RESULT:
+        river_orvibo_app_handle_wake_result(msg->text, msg->reason, msg->detail);
         break;
     default:
         break;
@@ -923,6 +1182,33 @@ static void river_orvibo_app_check_connect_retry(void)
             "connect_retry");
 }
 
+static void river_orvibo_app_check_wake_confirm_timeout(void)
+{
+    uint32_t now_ms;
+
+    if (g_river_orvibo_app.wake_deadline_ms == 0U ||
+        (g_river_orvibo_app.wake_flow !=
+             RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_PENDING &&
+         g_river_orvibo_app.wake_flow !=
+             RIVER_ORVIBO_APP_WAKE_FLOW_CANDIDATE_UNCERTAIN)) {
+        return;
+    }
+    now_ms = (uint32_t)rtos_time_get_current_system_time_ms();
+    if (!river_orvibo_app_time_reached(now_ms, g_river_orvibo_app.wake_deadline_ms)) {
+        return;
+    }
+
+    g_river_orvibo_app.wake_timeout++;
+    g_river_orvibo_app.wake_flow = RIVER_ORVIBO_APP_WAKE_FLOW_REJECTED;
+    g_river_orvibo_app.wake_deadline_ms = 0U;
+    RIVER_LOGW("wake confirm timeout: wake_id=%s timeouts=%lu",
+               g_river_orvibo_app.wake_id[0] != '\0' ?
+                   g_river_orvibo_app.wake_id :
+                   "-",
+               (unsigned long)g_river_orvibo_app.wake_timeout);
+    river_orvibo_app_close_wake_candidate("wake_confirm_timeout");
+}
+
 static void river_orvibo_app_drain_queues(void)
 {
     river_orvibo_app_msg_t msg;
@@ -955,6 +1241,7 @@ static void river_orvibo_app_task(void *param)
     while (true) {
         river_orvibo_app_check_wifi();
         river_orvibo_app_check_connect_retry();
+        river_orvibo_app_check_wake_confirm_timeout();
         (void)river_orvibo_protocol_poll(RIVER_ORVIBO_APP_POLL_MS);
         river_orvibo_app_drain_queues();
         rtos_time_delay_ms(RIVER_ORVIBO_APP_POLL_MS);
@@ -1039,7 +1326,7 @@ void river_orvibo_app_print_status(void)
                                    g_river_orvibo_app.audio_queue) :
                                0U;
 
-    RIVER_LOGI("orvibo app: state=%s conversation_mode=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu aud_flush=%lu handled=%lu uplink_enq=%lu busy=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
+    RIVER_LOGI("orvibo app: state=%s conversation_mode=%s wifi=%s audio_max=%u ctl_q=%lu/%u aud_q=%lu/%u posted=%lu fail=%lu ctl=%lu/%lu aud=%lu/%lu aud_drop_oldest=%lu aud_flush=%lu handled=%lu uplink_enq=%lu busy=%lu drop=%lu downlink=%lu/%lu dropped=%lu oversize=%lu/%lu last_event=%s last_error=%s",
                river_orvibo_state_name(river_orvibo_state_machine_current()),
                river_orvibo_state_machine_conversation_mode_name(),
                river_wifi_station_status_name(),
@@ -1059,6 +1346,7 @@ void river_orvibo_app_print_status(void)
                (unsigned long)g_river_orvibo_app.handled,
                (unsigned long)g_river_orvibo_app.uplink_sent,
                (unsigned long)g_river_orvibo_app.uplink_busy,
+               (unsigned long)g_river_orvibo_app.uplink_dropped,
                (unsigned long)g_river_orvibo_app.downlink_ok,
                (unsigned long)g_river_orvibo_app.downlink_fail,
                (unsigned long)g_river_orvibo_app.downlink_dropped,
@@ -1080,13 +1368,26 @@ void river_orvibo_app_print_status(void)
                g_river_orvibo_app.last_server_detail[0] != '\0' ?
                    g_river_orvibo_app.last_server_detail :
                    "-");
-    RIVER_LOGI("orvibo access refresh=%lu/%lu protocol_ctrl=%lu/%lu skip=%lu wake_text=%s",
+    RIVER_LOGI("orvibo access refresh=%lu/%lu protocol_ctrl=%lu/%lu skip=%lu wake_flow=%s wake_id=%s wake_text=%s q15=%d candidate=%lu accepted=%lu rejected=%lu uncertain=%lu timeout=%lu legacy=%lu",
                (unsigned long)g_river_orvibo_app.access_refresh_ok,
                (unsigned long)g_river_orvibo_app.access_refresh_fail,
                (unsigned long)g_river_orvibo_app.protocol_control_ok,
                (unsigned long)g_river_orvibo_app.protocol_control_fail,
                (unsigned long)g_river_orvibo_app.protocol_control_skip,
-               g_river_orvibo_app.wake_text[0] != '\0' ? g_river_orvibo_app.wake_text : "-");
+               river_orvibo_app_wake_flow_name(g_river_orvibo_app.wake_flow),
+               g_river_orvibo_app.wake_id[0] != '\0' ?
+                   g_river_orvibo_app.wake_id :
+                   "-",
+               g_river_orvibo_app.wake_text[0] != '\0' ?
+                   g_river_orvibo_app.wake_text :
+                   "-",
+               g_river_orvibo_app.wake_confidence_q15,
+               (unsigned long)g_river_orvibo_app.wake_candidate_sent,
+               (unsigned long)g_river_orvibo_app.wake_accept_rx,
+               (unsigned long)g_river_orvibo_app.wake_reject_rx,
+               (unsigned long)g_river_orvibo_app.wake_uncertain_rx,
+               (unsigned long)g_river_orvibo_app.wake_timeout,
+               (unsigned long)g_river_orvibo_app.wake_legacy);
     RIVER_LOGI("orvibo connect: ok=%lu fail=%lu retry=%s streak=%lu next=%lu posted=%lu suppressed=%lu",
                (unsigned long)g_river_orvibo_app.connect_open_ok,
                (unsigned long)g_river_orvibo_app.connect_open_fail,

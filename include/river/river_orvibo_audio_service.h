@@ -27,6 +27,7 @@ typedef enum {
 typedef struct {
     river_orvibo_audio_event_type_t type;
     const char *text;
+    int confidence_q15;
     const uint8_t *packet;
     size_t packet_bytes;
     uint32_t timestamp_ms;

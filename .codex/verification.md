@@ -1,3 +1,59 @@
+## Step H.xiaozhi-client.110 - server wake candidate confirm protocol
+
+Confirm the new wake-confirm protocol path is present:
+```bash
+cd /root/ameba-river
+rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" \
+  components \
+  include \
+  doc/device-integration-manual.md
+```
+
+Expected result:
+- client hello advertises candidate wake upload capability
+- server hello parses `server_wake_confirm` and related wake feature fields
+- app sends `type=wake,state=candidate` through `river_orvibo_protocol_send_wake_candidate`
+- app handles accepted/rejected/uncertain and drops audio outside allowed state/wake-flow boundaries
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Post-flash board validation:
+```text
+1. Flash manually after entering the board's download mode.
+2. Boot and trigger a local wake.
+3. Inspect server and board logs for wake candidate protocol.
+```
+
+Expected result:
+- client hello features include `wake_candidate_upload`, `wake_audio_recording`, `wake_upload_modes=["candidate"]`, `wake_audio_formats=["opus"]`
+- server hello log on board shows `wake_confirm=yes ... mode_candidate=yes opus=yes`
+- first wake control frame is `type=wake,state=candidate` with `wake_id`, not `listen detect`
+- initial `listen start` is skipped while `wake_flow=candidate_pending`
+- candidate Opus frames are uploaded until `wake.accepted/rejected/uncertain`
+- `wake.rejected` or `wake_confirm_timeout` returns to idle and stops uplink
+- service-side `audio_outside_listening` count should not increase after TTS starts or after the wake candidate is rejected
+
 ## Step H.xiaozhi-client.109 Verification
 
 Confirm the algorithm-side bundle and deployment guidance are updated:
@@ -31367,59 +31423,3 @@ Expected result:
 - boot log shows `ota=http://101.33.235.154:8081/xiaozhi/ota/`
 - OTA returns `ws://101.33.235.154:8081/xiaozhi/v1/`
 - no connection attempt uses `101.33.235.154:8082`
-
-## Step H.xiaozhi-client.108 - server wake candidate confirm protocol
-
-Confirm the new wake-confirm protocol path is present:
-```bash
-cd /root/ameba-river
-rg -n "server_wake_confirm|wake_candidate_upload|wake_audio_recording|wake_upload_modes|wake_audio_formats|send_wake_candidate|wake accepted|wake rejected|wake uncertain|wake_confirm_timeout|listen start skipped|drop uplink audio outside accepted boundary" \
-  components \
-  include \
-  doc/device-integration-manual.md
-```
-
-Expected result:
-- client hello advertises candidate wake upload capability
-- server hello parses `server_wake_confirm` and related wake feature fields
-- app sends `type=wake,state=candidate` through `river_orvibo_protocol_send_wake_candidate`
-- app handles accepted/rejected/uncertain and drops audio outside allowed state/wake-flow boundaries
-
-Run static hygiene and harness checks:
-```bash
-cd /root/ameba-river
-git diff --check
-python3 tools/diag/check_codex_harness.py
-```
-
-Expected result:
-- no whitespace errors
-- the harness script exits with `check_codex_harness: all checks passed`
-
-Rebuild the latest-SDK external project image:
-```bash
-cd /root/ameba-river
-export AMEBA_SDK_ROOT=/root/ameba-rtos
-export CMAKE_BUILD_PARALLEL_LEVEL=1
-source ./env.sh
-python3 /root/ameba-rtos/ameba.py build -p
-```
-
-Expected result:
-- the build exits successfully with `Build done`
-
-Post-flash board validation:
-```text
-1. Flash manually after entering the board's download mode.
-2. Boot and trigger a local wake.
-3. Inspect server and board logs for wake candidate protocol.
-```
-
-Expected result:
-- client hello features include `wake_candidate_upload`, `wake_audio_recording`, `wake_upload_modes=["candidate"]`, `wake_audio_formats=["opus"]`
-- server hello log on board shows `wake_confirm=yes ... mode_candidate=yes opus=yes`
-- first wake control frame is `type=wake,state=candidate` with `wake_id`, not `listen detect`
-- initial `listen start` is skipped while `wake_flow=candidate_pending`
-- candidate Opus frames are uploaded until `wake.accepted/rejected/uncertain`
-- `wake.rejected` or `wake_confirm_timeout` returns to idle and stops uplink
-- service-side `audio_outside_listening` count should not increase after TTS starts or after the wake candidate is rejected
