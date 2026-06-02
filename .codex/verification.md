@@ -1,3 +1,75 @@
+## Step H.xiaozhi-client.112 - forbid single-turn in current build
+
+Confirm current source guards single-turn behind the build macro:
+```bash
+cd /root/ameba-river
+rg -n "single_turn_supported|single_turn build option disabled|#if RIVER_ORVIBO_SINGLE_TURN_MODE|single_turn_finished" \
+  components \
+  include
+```
+
+Expected result:
+- `river_orvibo_state.c` wraps the single-turn TTS-finished branch in `#if RIVER_ORVIBO_SINGLE_TURN_MODE`
+- `river_orvibo_state_machine_set_single_turn_mode(true)` refuses to enable single-turn when the build option is disabled
+- `river_diag_cmd.c` rejects `river orvibo mode single` when `single_turn_supported=no`
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  components/river_core/river_orvibo_state.c \
+  components/river_core/river_orvibo_app.c \
+  components/river_diag/river_diag_cmd.c \
+  include/river/river_orvibo_state.h \
+  doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/changes.md \
+  .codex/verification.md
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Confirm generated configs still do not enable single-turn mode:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE" \
+  prj.conf \
+  build_RTL8730E/menuconfig/.config \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32
+```
+
+Expected result:
+- every match is `# CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE is not set`
+
+Confirm the image exposes the disabled-state diagnostics:
+```bash
+cd /root/ameba-river
+strings -a build_RTL8730E/build/project_ap/image/ap_image_all.bin | \
+  rg "single_turn_supported|single-turn mode disabled by build config|single_turn build option disabled|conversation_mode=%s"
+! strings -a build_RTL8730E/build/project_ap/image/ap_image_all.bin | rg "single_turn_finished"
+```
+
+Expected result:
+- boot/status strings include `single_turn_supported`
+- diagnostic rejection strings for single-turn mode are present
+- `single_turn_finished` is absent from the image
+
 ## Step H.xiaozhi-client.111 - isolate single-turn default constraint
 
 Confirm the recent single-turn introduction point:

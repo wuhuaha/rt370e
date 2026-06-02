@@ -85,12 +85,33 @@ river_orvibo_state_t river_orvibo_state_machine_current(void)
 
 void river_orvibo_state_machine_set_single_turn_mode(bool enabled)
 {
+#if RIVER_ORVIBO_SINGLE_TURN_MODE
+    if (enabled && !river_orvibo_state_machine_single_turn_supported()) {
+        if (g_river_orvibo_single_turn_mode) {
+            g_river_orvibo_single_turn_mode = false;
+        }
+        RIVER_LOGW("orvibo conversation mode request ignored: single_turn build option disabled");
+        return;
+    }
     if (g_river_orvibo_single_turn_mode == enabled) {
         return;
     }
     g_river_orvibo_single_turn_mode = enabled;
     RIVER_LOGI("orvibo conversation mode: %s",
                river_orvibo_state_machine_conversation_mode_name());
+#else
+    if (g_river_orvibo_single_turn_mode) {
+        g_river_orvibo_single_turn_mode = false;
+    }
+    if (enabled) {
+        RIVER_LOGW("orvibo conversation mode request ignored: single_turn build option disabled");
+    }
+#endif
+}
+
+bool river_orvibo_state_machine_single_turn_supported(void)
+{
+    return RIVER_ORVIBO_SINGLE_TURN_MODE != 0;
 }
 
 bool river_orvibo_state_machine_single_turn_mode(void)
@@ -211,6 +232,7 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                           RIVER_ORVIBO_ACTION_STOP_PLAYBACK |
                           RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
             } else if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED) {
+#if RIVER_ORVIBO_SINGLE_TURN_MODE
                 if (g_river_orvibo_single_turn_mode) {
                     new_state = RIVER_ORVIBO_STATE_IDLE;
                     actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |
@@ -224,6 +246,13 @@ river_orvibo_transition_t river_orvibo_state_machine_dispatch(river_orvibo_event
                               RIVER_ORVIBO_ACTION_START_LISTENING |
                               RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
                 }
+#else
+                new_state = RIVER_ORVIBO_STATE_LISTENING;
+                actions = RIVER_ORVIBO_ACTION_WAIT_PLAYBACK_IDLE |
+                          RIVER_ORVIBO_ACTION_AUDIO_LISTENING |
+                          RIVER_ORVIBO_ACTION_START_LISTENING |
+                          RIVER_ORVIBO_ACTION_DISABLE_BARGE_IN;
+#endif
             } else if (event == RIVER_ORVIBO_EVENT_AUDIO_CHANNEL_CLOSED) {
                 new_state = RIVER_ORVIBO_STATE_IDLE;
                 actions = RIVER_ORVIBO_ACTION_CLOSE_AUDIO_CHANNEL |

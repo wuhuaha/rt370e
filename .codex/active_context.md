@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.111 隔离单轮对话默认约束`
+  - `Step H.xiaozhi-client.112 禁止当前构建启用单轮对话`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,13 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.112` 禁止当前构建启用单轮对话：
+  - 在 Step 111 默认关闭宏的基础上，进一步把单轮 TTS stop 分支放入 `#if RIVER_ORVIBO_SINGLE_TURN_MODE` 编译期保护；当前配置为 0 时，`SPEAKING + SERVER_TTS_FINISHED` 只能回到 `LISTENING`，不会执行单轮关闭 WebSocket 的动作。
+  - `river_orvibo_state_machine_set_single_turn_mode(true)` 在当前构建中只记录 `single_turn build option disabled` 并保持 `continuous`；`river orvibo mode single` 也会直接提示 build config 禁用，不能运行时打开单轮。
+  - 启动日志和诊断状态增加 `single_turn_supported=no`，便于上板确认烧入的镜像确实不支持单轮模式。
+  - 后续如产品需要恢复单轮，只能重新启用 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 并重编，不允许当前服务联调镜像现场打开。
+  - 本步不修改 wake candidate wire format，不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径，不修改 Wi-Fi、UI 或 SDK 源码。
 
 - `Step H.xiaozhi-client.111` 隔离单轮对话默认约束：
   - 通过 `git log --grep` 确认单轮对话模式由 `b1cedaa 新增 Orvibo 单轮对话模式` 引入；相关状态机和诊断命令仍保留。

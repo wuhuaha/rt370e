@@ -8,6 +8,10 @@ External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.112` 禁止当前构建启用单轮对话：
+  - 当前服务联调镜像不支持单轮模式：`CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 未启用时，`SERVER_TTS_FINISHED` 的单轮关闭通道分支不会编译进可执行路径。
+  - `river orvibo mode single` 在当前构建中只会提示 build config 禁用，不能运行时打开单轮；启动和诊断日志用 `single_turn_supported=no` 标识。
+  - 后续如需恢复单轮，需要改配置并重编，而不是在当前镜像上用诊断命令启用。
 - `Step H.xiaozhi-client.111` 隔离单轮对话默认约束：
   - `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 和单轮状态机分支保留，但当前 `Kconfig` 默认值改为 `n`，`prj.conf` 显式取消该配置，默认构建回到连续会话。
   - 运行时 `conversation_mode` 状态名、`river orvibo mode <status|single|continuous>` 诊断命令和单轮分支仍可用于后续产品重新启用或上板临时切换。

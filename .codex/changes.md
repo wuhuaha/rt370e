@@ -1,5 +1,24 @@
 # Change Log
 
+## Step H.xiaozhi-client.112
+- 禁止当前构建启用单轮对话：
+  - `SPEAKING + SERVER_TTS_FINISHED` 的单轮关闭通道分支增加 `#if RIVER_ORVIBO_SINGLE_TURN_MODE` 编译期保护；当前配置未启用时只能回到 `LISTENING` 连续会话。
+  - `river_orvibo_state_machine_set_single_turn_mode(true)` 在当前构建中拒绝启用并记录 `single_turn build option disabled`。
+  - `river orvibo mode single` 在当前构建中提示 build config 禁用，不能通过诊断命令打开单轮。
+  - 启动日志和 `river orvibo mode status` 增加 `single_turn_supported=no`，用于确认当前镜像不支持单轮。
+- 设计边界：
+  - 不修改 wake candidate 协议、VAD/KWS/frontend/tensor dump/alignment replay/board-local parity、Wi-Fi、UI 或 SDK 源码。
+  - 后续若要恢复单轮，需要重新启用 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 并重编。
+- Verification for this step:
+  - `rg -n "single_turn_supported|single_turn build option disabled|#if RIVER_ORVIBO_SINGLE_TURN_MODE|single_turn_finished" components include` confirmed the compile-time and runtime guards.
+  - `git diff --check -- components/river_core/river_orvibo_state.c components/river_core/river_orvibo_app.c components/river_diag/river_diag_cmd.c include/river/river_orvibo_state.h .codex/active_context.md .codex/changes.md .codex/verification.md doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build completed with `Build done`.
+  - Generated config checks confirmed `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` remains not set.
+  - Image strings confirmed `single_turn_supported=%s`, `single-turn mode disabled by build config`, and `single_turn build option disabled` are present.
+  - Image strings confirmed `single_turn_finished` is absent from `ap_image_all.bin`.
+  - Flash/serial monitor not run; user-run board validation is still required.
+
 ## Step H.xiaozhi-client.111
 - 隔离单轮对话默认约束：
   - 通过 `git log --grep` 确认最近引入点为 `b1cedaa 新增 Orvibo 单轮对话模式`。

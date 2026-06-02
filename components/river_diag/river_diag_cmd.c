@@ -449,12 +449,19 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
     }
     if (strcmp((const char *)argv[1], "mode") == 0) {
         if (argc < 3 || strcmp((const char *)argv[2], "status") == 0) {
-            printf("[river][diag] orvibo conversation_mode=%s\n",
-                   river_orvibo_state_machine_conversation_mode_name());
+            printf("[river][diag] orvibo conversation_mode=%s single_turn_supported=%s\n",
+                   river_orvibo_state_machine_conversation_mode_name(),
+                   river_orvibo_state_machine_single_turn_supported() ? "yes" : "no");
             return 0;
         }
         if (strcmp((const char *)argv[2], "single") == 0 ||
             strcmp((const char *)argv[2], "single-turn") == 0) {
+            if (!river_orvibo_state_machine_single_turn_supported()) {
+                printf("[river][diag] single-turn mode disabled by build config\n");
+                printf("[river][diag] orvibo conversation_mode=%s single_turn_supported=no\n",
+                       river_orvibo_state_machine_conversation_mode_name());
+                return 0;
+            }
             river_orvibo_state_machine_set_single_turn_mode(true);
         } else if (strcmp((const char *)argv[2], "continuous") == 0 ||
                    strcmp((const char *)argv[2], "multi") == 0 ||
@@ -464,8 +471,9 @@ static u32 river_diag_orvibo_cmd(u16 argc, u8 *argv[])
             printf("[river][diag] usage: river orvibo mode <status|single|continuous>\n");
             return 0;
         }
-        printf("[river][diag] orvibo conversation_mode=%s\n",
-               river_orvibo_state_machine_conversation_mode_name());
+        printf("[river][diag] orvibo conversation_mode=%s single_turn_supported=%s\n",
+               river_orvibo_state_machine_conversation_mode_name(),
+               river_orvibo_state_machine_single_turn_supported() ? "yes" : "no");
         return 0;
     }
     if (strcmp((const char *)argv[1], "protocol") == 0) {

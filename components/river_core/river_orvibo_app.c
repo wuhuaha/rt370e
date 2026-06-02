@@ -973,10 +973,13 @@ static void river_orvibo_app_handle_state_event(river_orvibo_event_t event,
         river_orvibo_app_clear_audio_queue(river_orvibo_event_name(event));
         river_orvibo_app_reset_wake_flow(river_orvibo_event_name(event));
     }
+#if RIVER_ORVIBO_SINGLE_TURN_MODE
     if (event == RIVER_ORVIBO_EVENT_SERVER_TTS_FINISHED &&
-        transition.new_state == RIVER_ORVIBO_STATE_IDLE) {
+        transition.new_state == RIVER_ORVIBO_STATE_IDLE &&
+        river_orvibo_state_machine_single_turn_mode()) {
         river_orvibo_app_reset_wake_flow("single_turn_finished");
     }
+#endif
     if (transition.changed && transition.new_state == RIVER_ORVIBO_STATE_RECOVERING) {
         river_orvibo_app_post_state(RIVER_ORVIBO_EVENT_RECOVERY_DONE, "recoverable_error_closed");
     }
@@ -1255,8 +1258,9 @@ river_status_t river_orvibo_app_boot(void)
     }
 
     memset(&g_river_orvibo_app, 0, sizeof(g_river_orvibo_app));
-    RIVER_LOGI("orvibo client boot target=RTL8730E conversation_mode=%s",
-               river_orvibo_state_machine_conversation_mode_name());
+    RIVER_LOGI("orvibo client boot target=RTL8730E conversation_mode=%s single_turn_supported=%s",
+               river_orvibo_state_machine_conversation_mode_name(),
+               river_orvibo_state_machine_single_turn_supported() ? "yes" : "no");
     river_runtime_stats_init();
     river_orvibo_state_machine_init(RIVER_ORVIBO_STATE_STARTING);
     (void)river_orvibo_ui_start();
