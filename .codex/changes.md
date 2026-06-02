@@ -1,5 +1,22 @@
 # Change Log
 
+## Step H.xiaozhi-client.111
+- 隔离单轮对话默认约束：
+  - 通过 `git log --grep` 确认最近引入点为 `b1cedaa 新增 Orvibo 单轮对话模式`。
+  - `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 的 Kconfig 默认值从 `y` 改为 `n`。
+  - `prj.conf` 显式取消 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE`，当前构建默认回到连续会话。
+  - 单轮状态机分支、`river_orvibo_state_machine_set_single_turn_mode()` 和 `river orvibo mode <status|single|continuous>` 诊断命令保留，后续可通过宏或诊断重新启用。
+- 设计边界：
+  - 不修改 server wake candidate 协议、VAD/KWS/frontend/tensor dump/alignment replay/board-local parity、Wi-Fi、UI 或 SDK 源码。
+- Verification for this step:
+  - `git log --oneline --decorate -n 40 --grep='单轮\|single-turn\|single turn\|conversation_mode\|continuous' --all` confirmed `b1cedaa` as the current single-turn introduction point.
+  - `rg -n "SINGLE_TURN|single_turn|conversation_mode|continuous|CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE" Kconfig prj.conf components include .codex/active_context.md` confirmed the macro is disabled by default while runtime code paths remain.
+  - `git diff --check -- Kconfig prj.conf doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md .codex/active_context.md .codex/changes.md .codex/verification.md` passed.
+  - `python3 tools/diag/check_codex_harness.py` passed.
+  - `/root/ameba-rtos` full build completed with `Build done`.
+  - Generated config checks confirmed `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` is not enabled.
+  - Flash/serial monitor not run; user-run board validation is still required.
+
 ## Step H.xiaozhi-client.110
 - 接入服务端 wake candidate 确认协议：
   - client hello 的 `features` 新增 `wake_candidate_upload=true`、`wake_audio_recording=true`、`wake_upload_modes=["candidate"]`、`wake_audio_formats=["opus"]`。

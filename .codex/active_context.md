@@ -18,7 +18,7 @@ or top-of-tree verification target changes.
   - User-run board validation unless explicitly requested in the current turn:
     `python3 /root/ameba-rtos/tools/ameba/Monitor/monitor.py -p /dev/ttyUSB0 -b 1500000`
 - Latest landed step:
-  - `Step H.xiaozhi-client.110 接入 server wake candidate 确认协议`
+  - `Step H.xiaozhi-client.111 隔离单轮对话默认约束`
 - Current active objective:
   - Rebuild this branch as an Orvibo voice client mainline. The first external wire contract remains XiaoZhi-compatible, but code/file/function naming and runtime ownership are Orvibo-owned.
 - Active plan:
@@ -37,6 +37,12 @@ or top-of-tree verification target changes.
 - `components/river_diag/` exposes Orvibo, audio, playback, KWS tensor dump, and KWS alignment diagnostics.
 
 ## Latest Verified Slice
+
+- `Step H.xiaozhi-client.111` 隔离单轮对话默认约束：
+  - 通过 `git log --grep` 确认单轮对话模式由 `b1cedaa 新增 Orvibo 单轮对话模式` 引入；相关状态机和诊断命令仍保留。
+  - `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 的 Kconfig 默认值从 `y` 改为 `n`，`prj.conf` 显式取消该配置，当前默认启动应报告 `conversation_mode=continuous`。
+  - 保留 `river_orvibo_state_machine_set_single_turn_mode()`、`river orvibo mode <status|single|continuous>` 和 `SPEAKING + SERVER_TTS_FINISHED` 的单轮分支，后续产品需要时可重新启用宏或上板临时切换。
+  - 本步不修改 server wake candidate wire format，不修改 VAD/KWS/frontend/tensor dump/alignment replay/board-local parity 路径，不修改 Wi-Fi、UI 或 SDK 源码。
 
 - `Step H.xiaozhi-client.110` 接入 server wake candidate 确认协议：
   - 当前项目在 Step 107 已切到 `8081`；本步进一步把端侧从旧 `listen detect/start` 唤醒表达切到服务端声明 `features.server_wake_confirm=true` 时的 `type=wake,state=candidate` 流程。

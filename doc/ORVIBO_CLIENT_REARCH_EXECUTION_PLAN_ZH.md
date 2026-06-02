@@ -1,13 +1,17 @@
 # Orvibo 语音客户端 Clean-Slate 重构计划
 
 Status: active
-Last Updated: 2026-05-30
+Last Updated: 2026-06-02
 Branch: `xiaozhi-client`
 SDK Baseline: `/root/ameba-rtos`
 External Protocol Baseline: XiaoZhi-compatible realtime server protocol
 
 Latest Verified Slice:
 
+- `Step H.xiaozhi-client.111` 隔离单轮对话默认约束：
+  - `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE` 和单轮状态机分支保留，但当前 `Kconfig` 默认值改为 `n`，`prj.conf` 显式取消该配置，默认构建回到连续会话。
+  - 运行时 `conversation_mode` 状态名、`river orvibo mode <status|single|continuous>` 诊断命令和单轮分支仍可用于后续产品重新启用或上板临时切换。
+  - 本步只隔离默认配置，不修改 wake candidate 协议、VAD/KWS、tensor dump、alignment replay、board/local parity 或 SDK。
 - `Step H.xiaozhi-client.90` 新增 Orvibo 单轮对话模式：
   - 新增 `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE`，并在 `prj.conf` 默认启用；产品默认从唤醒进入一轮服务端请求/响应，收到服务端 TTS stop 并等待本地 playback drain 后关闭 realtime WebSocket，回到本地唤醒监听。
   - `river_orvibo_state_machine` 增加单轮/连续模式运行时开关；单轮模式下 `SPEAKING + SERVER_TTS_FINISHED` 转 `IDLE` 并执行 `WAIT_PLAYBACK_IDLE`、`CLOSE_AUDIO_CHANNEL`、`AUDIO_IDLE`、`DISABLE_BARGE_IN`，连续模式保留原 post-TTS `LISTENING` 行为。

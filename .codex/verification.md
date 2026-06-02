@@ -1,3 +1,86 @@
+## Step H.xiaozhi-client.111 - isolate single-turn default constraint
+
+Confirm the recent single-turn introduction point:
+```bash
+cd /root/ameba-river
+git log --oneline --decorate -n 40 \
+  --grep='单轮\|single-turn\|single turn\|conversation_mode\|continuous' \
+  --all
+```
+
+Expected result:
+- `b1cedaa 新增 Orvibo 单轮对话模式` is listed as the current single-turn introduction point
+
+Confirm the macro is disabled by default while the future re-enable path remains:
+```bash
+cd /root/ameba-river
+rg -n "SINGLE_TURN|single_turn|conversation_mode|continuous|CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE" \
+  Kconfig \
+  prj.conf \
+  components \
+  include \
+  .codex/active_context.md
+```
+
+Expected result:
+- `Kconfig` has `default n` for `RIVER_ORVIBO_SINGLE_TURN_MODE`
+- `prj.conf` has `# CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE is not set`
+- state-machine, app log, and diagnostic mode switching code paths are still present
+
+Run static hygiene and harness checks:
+```bash
+cd /root/ameba-river
+git diff --check -- \
+  Kconfig \
+  prj.conf \
+  doc/ORVIBO_CLIENT_REARCH_EXECUTION_PLAN_ZH.md \
+  .codex/active_context.md \
+  .codex/changes.md \
+  .codex/verification.md
+python3 tools/diag/check_codex_harness.py
+```
+
+Expected result:
+- no whitespace errors
+- the harness script exits with `check_codex_harness: all checks passed`
+
+Rebuild the latest-SDK external project image:
+```bash
+cd /root/ameba-river
+export AMEBA_SDK_ROOT=/root/ameba-rtos
+export CMAKE_BUILD_PARALLEL_LEVEL=1
+source ./env.sh
+python3 /root/ameba-rtos/ameba.py build -p
+```
+
+Expected result:
+- the build exits successfully with `Build done`
+
+Confirm generated configs do not enable single-turn mode:
+```bash
+cd /root/ameba-river
+rg -n "CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE" \
+  prj.conf \
+  build_RTL8730E/menuconfig/.config \
+  build_RTL8730E/build/.config \
+  build_RTL8730E/build/project_ap/.config_ca32
+```
+
+Expected result:
+- `prj.conf` contains `# CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE is not set`
+- generated configs do not enable `CONFIG_RIVER_ORVIBO_SINGLE_TURN_MODE=y`
+
+Optional post-build image string sanity check:
+```bash
+cd /root/ameba-river
+rg -a -n "conversation_mode=continuous|conversation_mode=single_turn|single_turn_finished" \
+  build_RTL8730E/build/project_ap/image/ap_image_all.bin \
+  build_RTL8730E/km0_km4_ca32_app.bin
+```
+
+Expected result:
+- runtime mode strings still exist, showing the future re-enable and diagnostic paths were not removed
+
 ## Step H.xiaozhi-client.110 - server wake candidate confirm protocol
 
 Confirm the new wake-confirm protocol path is present:
